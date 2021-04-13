@@ -1,0 +1,20 @@
+{
+    "main": {
+        "type": "dataset",
+        "name": "Demo1",
+        "dateCreated": "2020-12-17T13:38:49",
+        "author": "All",
+        "license": "CC-BY",
+        "files": [
+        {
+            "url":
+            "https://raw.githubusercontent.com/tbertinmahieux/MSongsDB/master/Tasks_Demos/CoverSongs/shs_dataset_test.txt",
+            "checksum": "efb2c764274b745f5fc37f97c6b0e764",
+            "contentLength": "4535431",
+            "contentType": "text/csv",
+            "encoding": "UTF-8",
+            "compression": "zip"
+        }
+      ]
+    }
+  }

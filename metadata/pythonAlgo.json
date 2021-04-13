@@ -1,13 +1,13 @@
 {
   "main": {
     "type": "algorithm",
-    "name": "Test Algo",
+    "name": "Test Python Algo",
     "dateCreated": "2020-12-17T13:38:49",
     "author": "Alex",
     "license": "CC-BY",
     "files": [
       {
-        "url": "https://raw.githubusercontent.com/oceanprotocol/test-algorithm/master/javascript/algo.js",
+        "url": "https://raw.githubusercontent.com/oceanprotocol/cdt-algorithms/main/python/linecounter/line_counter.py",
         "contentType": "text/js",
         "encoding": "UTF-8"
       }
@@ -17,9 +17,9 @@
       "format": "docker-image",
       "version": "0.1",
       "container": {
-        "entrypoint": "node $ALGO",
-        "image": "node",
-        "tag": "10"
+        "entrypoint": "python3.6 $ALGO",
+        "image": "oceanprotocol/algo_dockers",
+        "tag": "python-sql"
       }
     }
   }

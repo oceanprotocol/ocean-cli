@@ -22,7 +22,6 @@ const config = {
   mnemonic: process.env.MNEMONIC,
   rpc: process.env.RPC
 }
-console.log(config)
 const provider = new HDWalletProvider(config.mnemonic, config.rpc)
 
 const web3 = new Web3(provider)

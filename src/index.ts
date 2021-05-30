@@ -1,3 +1,6 @@
+require('dotenv').config()
+global.WebSocket = require('isomorphic-ws');
+
 import { Ocean, ConfigHelper } from '@oceanprotocol/lib'
 import { Commands } from './commands'
 import * as fs from 'fs'

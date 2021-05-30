@@ -6,6 +6,10 @@ import {
 } from '@oceanprotocol/lib/dist/node/ddo/interfaces/Service'
 import { SearchQuery } from '@oceanprotocol/lib/dist/node/metadatacache/MetadataCache'
 import fs from 'fs'
+import path from 'path'
+import { Buckets } from '@textile/hub'
+import { CHUNK_SIZE } from '@textile/buckets/dist/cjs/api'
+
 
 export class Commands {
   public ocean: Ocean
@@ -22,39 +26,7 @@ export class Commands {
     })
   }
 
-  // commands
-  public async publish(args: string[]) {
-    console.log('start publishing')
-    let asset
-    try {
-      asset = JSON.parse(
-        fs.readFileSync(args[1],
-          'utf8'
-        )
-      )
-    }
-    catch (e) {
-      console.error("Cannot read metadata from " + args[1])
-      console.error(e)
-      return
-    }
-    const tokenAddress = await this.ocean.datatokens.create(
-      '',
-      this.account.getId(),
-      '10000000000',
-      'BBDT',
-      'BBDT'
-    )
-    await this.ocean.datatokens.mint(tokenAddress, this.account.getId(), '1000000000')
-    
-    const downloadService = await this.ocean.assets.createAccessServiceAttributes(
-      this.account,
-      '1', // set the price in datatoken
-      new Date(Date.now()).toISOString().split('.')[0] + 'Z', // publishedDate
-      0 // timeout
-    )
-    // create compute service
-    const timeout = 3600
+  private createComputeService(timeout = 3600) {
     const cluster = this.ocean.compute.createClusterAttributes(
       'Kubernetes',
       'http://10.0.0.17/xxx'
@@ -91,7 +63,8 @@ export class Commands {
       allowAllPublishedAlgorithms: false,
       publisherTrustedAlgorithms: []
     }
-    const computeService = this.ocean.compute.createComputeService(
+
+    return this.ocean.compute.createComputeService(
       this.account,
       '1',
       new Date(Date.now()).toISOString().split('.')[0] + 'Z', // publishedDate,
@@ -99,14 +72,84 @@ export class Commands {
       origComputePrivacy,
       timeout
     )
+  }
 
+  private async processAsset(asset) {
+    const key = {
+      key: process.env.HUB_KEY,
+      secret: process.env.HUB_SECRET,
+    }
+
+    const buckets = await Buckets.withKeyInfo(key)
+    const { root } = await buckets.getOrCreate('ocean');
+    if (!root) throw new Error('bucket not created');
+    const bucketKey = root.key;
+
+    for (let file of asset.main.files) {
+      if (!file.path) {
+        continue
+      }
+
+      console.log(`Upload file ${file.path}`)
+      const stream = fs.createReadStream(file.path, {
+        highWaterMark: CHUNK_SIZE,
+      })
+      const filename = path.basename(file.path)
+      await buckets.pushPath(bucketKey, filename, stream)
+      const link = await buckets.links(bucketKey, filename)
+      console.log(`File url ${link.url}`)
+      file.url = link.url
+      delete file.path
+    }
+  }
+
+  // commands
+  public async publish(args: string[]) {
+    console.log('start publishing')
+    let data
+    try {
+      data = JSON.parse(
+        fs.readFileSync(args[1],
+          'utf8'
+        )
+      )
+    }
+    catch (e) {
+      console.error("Cannot read metadata from " + args[1])
+      console.error(e)
+      return
+    }
+    const { metadata, asset } = data;
+
+    const dataTokenOptions = this.ocean.datatokens.generateDtName()
+    const tokenAddress = await this.ocean.datatokens.create(
+      '',
+      this.account.getId(),
+      '10000000000',
+      dataTokenOptions.name,
+      dataTokenOptions.symbol
+    )
+    await this.ocean.datatokens.mint(tokenAddress, this.account.getId(), '1000000000')
+
+    const downloadService = await this.ocean.assets.createAccessServiceAttributes(
+      this.account,
+      '1', // set the price in datatoken
+      new Date(Date.now()).toISOString().split('.')[0] + 'Z', // publishedDate
+      metadata.timeout || 0 // timeout
+    )
+    const services: any = [downloadService]
+    if (metadata.accessType === 'compute') {
+      services.push(this.createComputeService(metadata.timeout))
+    }
+
+    await this.processAsset(asset)
     const ddo = await this.ocean.assets.create(
       asset,
       this.account,
-      [downloadService, computeService],
+      services,
       tokenAddress
     )
-    const storeTx = await this.ocean.onChainMetadata.publish(
+    await this.ocean.onChainMetadata.publish(
       ddo.id,
       ddo,
       this.account.getId()
@@ -136,7 +179,7 @@ export class Commands {
       'BBALG'
     )
     await this.ocean.datatokens.mint(tokenAddress, this.account.getId(), '1000000000')
-    
+
     const service1 = await this.ocean.assets.createAccessServiceAttributes(
       this.account,
       '1',

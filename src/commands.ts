@@ -90,7 +90,7 @@ export class Commands {
         continue
       }
 
-      console.log(`Upload file ${file.path}`)
+      console.log(`Uploading file ${file.path}`)
       const stream = fs.createReadStream(file.path, {
         highWaterMark: CHUNK_SIZE,
       })
@@ -101,6 +101,29 @@ export class Commands {
       file.url = link.url
       delete file.path
     }
+  }
+
+  public async createPrice(metadata, tokenAddress) {
+    console.log("Creating price")
+    await this.ocean.datatokens.mint(tokenAddress, this.account.getId(), metadata.dtAmount)
+
+    if (metadata.isPool) {
+      await this.ocean.pool .create(
+        this.account.getId(),
+        tokenAddress,
+        metadata.dtAmount,
+        metadata.weightOnDataToken,
+        metadata.oceanAmount,
+        metadata.swapFee
+      )
+      return
+    }
+
+    if (!metadata.price) {
+      return
+    }
+
+    await this.ocean.fixedRateExchange.create(tokenAddress, metadata.price, this.account.getId(), metadata.dtAmount)
   }
 
   // commands
@@ -129,7 +152,6 @@ export class Commands {
       dataTokenOptions.name,
       dataTokenOptions.symbol
     )
-    await this.ocean.datatokens.mint(tokenAddress, this.account.getId(), '1000000000')
 
     const downloadService = await this.ocean.assets.createAccessServiceAttributes(
       this.account,
@@ -155,6 +177,8 @@ export class Commands {
       this.account.getId()
     )
     console.log('Asset published. ID:  ' + ddo.id)
+
+    await this.createPrice(metadata, tokenAddress)
   }
 
   public async publishAlgo(args: string[]) {

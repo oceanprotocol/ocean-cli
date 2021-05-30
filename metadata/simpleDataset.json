@@ -1,12 +1,15 @@
 {
   "metadata": {
-    "accessType": "compute",
-    "timeout": 86400
+    "accessType": "access",
+    "timeout": 86400,
+    "isPool": false,
+    "dtAmount": "1000",
+    "price": "1"
   },
   "asset": {
     "main": {
       "type": "dataset",
-      "name": "Hub",
+      "name": "Stack",
       "dateCreated": "2020-12-17T13:38:49",
       "author": "All",
       "license": "CC-BY",

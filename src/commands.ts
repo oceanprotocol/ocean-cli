@@ -4,6 +4,7 @@ import {
   ServiceComputePrivacy,
   ServiceType
 } from '@oceanprotocol/lib/dist/node/ddo/interfaces/Service'
+import { ComputeInput, ComputeAlgorithm } from '@oceanprotocol/lib/dist/node/ocean/interfaces/Compute'
 import { SearchQuery } from '@oceanprotocol/lib/dist/node/metadatacache/MetadataCache'
 import fs from 'fs'
 
@@ -233,12 +234,15 @@ export class Commands {
     }
 
     const computeAddress = await this.ocean.compute.getComputeAddress(dataDdo.id, computeService.index)
+    const algoDefinition: ComputeAlgorithm = {
+      did: algoDdo.id,
+      serviceIndex: algoService.index
+    }
     const order = await this.ocean.compute.orderAsset(
       this.account.getId(),
       dataDdo.id,
       computeService.index,
-      algoDdo.id,
-      undefined,
+      algoDefinition,
       null, // no marketplace fee
       computeAddress // CtD is the consumer of the dataset
     )
@@ -262,18 +266,17 @@ export class Commands {
       console.error('Error ordering algo ' + args[2] + '.  Do you have enought tokens?')
       return
     }
+    algoDefinition.transferTxId = orderalgo
+    algoDefinition.dataToken = algoDdo.dataToken
     const response = await this.ocean.compute.start(
       dataDdo.id,
       order,
       dataDdo.dataToken,
       this.account,
-      algoDdo.id,
-      undefined,
+      algoDefinition,
       output,
       `${computeService.index}`,
-      computeService.type,
-      orderalgo,
-      algoDdo.dataToken
+      computeService.type
     )
     const { jobId } = response
     console.log('Compute started.  JobID: ' + jobId)
@@ -282,6 +285,8 @@ export class Commands {
   public async getCompute(args: string[]) {
     const response = await this.ocean.compute.status(
       this.account,
+      undefined,
+      undefined,
       undefined,
       args[1],
       null,

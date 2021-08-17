@@ -3,7 +3,8 @@ import { Commands } from './commands'
 import * as fs from 'fs'
 import Web3 from 'web3'
 import HDWalletProvider = require('../node_modules/@truffle/hdwallet-provider/dist')
-
+import metadataABI from '@oceanprotocol/contracts/artifacts/Metadata.json'
+import { AbiItem } from 'web3-utils/types'
 if (!process.env.MNEMONIC) {
   console.error('Have you forgot to set env MNEMONIC?')
   process.exit(0)

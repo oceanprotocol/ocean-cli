@@ -296,7 +296,7 @@ export class Commands {
       console.error('Error resolving ' + args[1] + '.  Does this asset exists?')
       return
     }
-    if (ddo.publicKey[0].owner !== this.account.getId()) {
+    if (ddo.publicKey[0].owner.toLowerCase() !== this.account.getId().toLowerCase()) {
       console.error(
         'You are not the owner of this asset, and there for you cannot update it.'
       )
@@ -327,7 +327,7 @@ export class Commands {
       console.error('Error resolving ' + args[1] + '.  Does this asset exists?')
       return
     }
-    if (ddo.publicKey[0].owner !== this.account.getId()) {
+    if (ddo.publicKey[0].owner.toLowerCase() !== this.account.getId().toLowerCase()) {
       console.error(
         'You are not the owner of this asset, and there for you cannot update it.'
       )

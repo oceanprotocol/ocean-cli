@@ -7,7 +7,7 @@
     "license": "CC-BY",
     "files": [
       {
-        "url": "https://raw.githubusercontent.com/oceanprotocol/cdt-algorithms/main/python/linecounter/line_counter.py",
+        "url": "https://raw.githubusercontent.com/oceanprotocol/c2d-examples/main/python/linecounter/line_counter.py",
         "contentType": "text/js",
         "encoding": "UTF-8"
       }

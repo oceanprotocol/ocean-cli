@@ -1,363 +1,363 @@
-import { Ocean, Account, DataTokens, Logger, Metadata } from '@oceanprotocol/lib'
+import fs from "fs";
+import { createAsset, handleComputeOrder, orderAsset } from "./helpers";
 import {
-  Service,
-  ServiceComputePrivacy,
-  ServiceType
-} from '@oceanprotocol/lib/dist/node/ddo/interfaces/Service'
-import { ComputeInput, ComputeAlgorithm } from '@oceanprotocol/lib/dist/node/ocean/interfaces/Compute'
-import { SearchQuery } from '@oceanprotocol/lib/dist/node/metadatacache/MetadataCache'
-import fs from 'fs'
+	Aquarius,
+	Asset,
+	ComputeAlgorithm,
+	ComputeAsset,
+	ComputeJob,
+	Config,
+	ConfigHelper,
+	DDO,
+	Datatoken,
+	ProviderInstance,
+	downloadFile,
+} from "@oceanprotocol/lib";
+import { Signer } from "ethers";
 
 export class Commands {
-  public ocean: Ocean
-  public account: Account
-  constructor(ocean: Ocean, account: Account) {
-    this.ocean = ocean
-    this.account = account
-  }
+	public signer: Signer;
+	public config: Config;
+	public aquarius: Aquarius;
+	public providerUrl: string;
 
-  // utils
-  public async sleep(ms: number) {
-    return new Promise((resolve) => {
-      setTimeout(resolve, ms)
-    })
-  }
+	constructor(signer: Signer, network?: string | number, config?: Config) {
+		this.signer = signer;
+		this.config = config || new ConfigHelper().getConfig(network || "unknown");
+		this.aquarius = new Aquarius(this.config.metadataCacheUri);
+		this.providerUrl = config.providerUri;
+	}
+	// utils
+	public async sleep(ms: number) {
+		return new Promise((resolve) => {
+			setTimeout(resolve, ms);
+		});
+	}
 
-  // commands
-  public async publish(args: string[]) {
-    console.log('start publishing')
-    let asset
-    try {
-      asset = JSON.parse(
-        fs.readFileSync(args[1],
-          'utf8'
-        )
-      )
-    }
-    catch (e) {
-      console.error("Cannot read metadata from " + args[1])
-      console.error(e)
-      return
-    }
-    const tokenAddress = await this.ocean.datatokens.create(
-      '',
-      this.account.getId(),
-      '10000000000',
-      'BBDT',
-      'BBDT'
-    )
-    await this.ocean.datatokens.mint(tokenAddress, this.account.getId(), '1000000000')
-    
-    const downloadService = await this.ocean.assets.createAccessServiceAttributes(
-      this.account,
-      '1', // set the price in datatoken
-      new Date(Date.now()).toISOString().split('.')[0] + 'Z', // publishedDate
-      0 // timeout
-    )
-    // create compute service
-    const timeout = 3600
-    const cluster = this.ocean.compute.createClusterAttributes(
-      'Kubernetes',
-      'http://10.0.0.17/xxx'
-    )
-    const servers = [
-      this.ocean.compute.createServerAttributes(
-        '1',
-        'xlsize',
-        '50',
-        '16',
-        '0',
-        '128gb',
-        '160gb',
-        timeout
-      )
-    ]
-    const containers = [
-      this.ocean.compute.createContainerAttributes(
-        'tensorflow/tensorflow',
-        'latest',
-        'sha256:cb57ecfa6ebbefd8ffc7f75c0f00e57a7fa739578a429b6f72a0df19315deadc'
-      )
-    ]
-    const provider = this.ocean.compute.createProviderAttributes(
-      'Azure',
-      'Compute service with 16gb ram for each node.',
-      cluster,
-      containers,
-      servers
-    )
-    const origComputePrivacy: ServiceComputePrivacy = {
-      allowRawAlgorithm: false,
-      allowNetworkAccess: false,
-      allowAllPublishedAlgorithms: false,
-      publisherTrustedAlgorithms: []
-    }
-    const computeService = this.ocean.compute.createComputeService(
-      this.account,
-      '1',
-      new Date(Date.now()).toISOString().split('.')[0] + 'Z', // publishedDate,
-      provider,
-      origComputePrivacy,
-      timeout
-    )
+	// commands
+	public async publish(args: string[]) {
+		console.log("start publishing");
+		let asset: Asset;
+		try {
+			asset = JSON.parse(fs.readFileSync(args[1], "utf8"));
+		} catch (e) {
+			console.error("Cannot read metadata from " + args[1]);
+			console.error(e);
+			return;
+		}
+		// add some more checks
+		const urlAssetId = await createAsset(
+			asset.nft.name,
+			asset.nft.symbol,
+			this.signer,
+			asset.services[0].files,
+			asset,
+			this.providerUrl,
+			addresses.ERC721Factory,
+			this.aquarius
+		);
 
-    const ddo = await this.ocean.assets.create(
-      asset,
-      this.account,
-      [downloadService, computeService],
-      tokenAddress
-    )
-    const storeTx = await this.ocean.onChainMetadata.publish(
-      ddo.id,
-      ddo,
-      this.account.getId()
-    )
-    console.log('Asset published. ID:  ' + ddo.id)
-  }
+		console.log("Asset published. ID:  " + urlAssetId);
+	}
 
-  public async publishAlgo(args: string[]) {
-    let algoAsset
-    try {
-      algoAsset = JSON.parse(
-        fs.readFileSync(args[1],
-          'utf8'
-        )
-      )
-    }
-    catch (e) {
-      console.error("Cannot read metadata from " + args[1])
-      console.error(e)
-      return
-    }
-    const tokenAddress = await this.ocean.datatokens.create(
-      '',
-      this.account.getId(),
-      '10000000000',
-      'BBALG',
-      'BBALG'
-    )
-    await this.ocean.datatokens.mint(tokenAddress, this.account.getId(), '1000000000')
-    
-    const service1 = await this.ocean.assets.createAccessServiceAttributes(
-      this.account,
-      '1',
-      new Date(Date.now()).toISOString().split('.')[0] + 'Z', // publishedDate,,
-      0
-    )
-    const algorithmAsset = await this.ocean.assets.create(
-      algoAsset,
-      this.account,
-      [service1],
-      tokenAddress
-    )
-    const storeTx = await this.ocean.onChainMetadata.publish(
-      algorithmAsset.id,
-      algorithmAsset,
-      this.account.getId()
-    )
-    console.log('Algorithm published. ID:  ' + algorithmAsset.id)
-  }
+	public async publishAlgo(args: string[]) {
+		let algoAsset;
+		try {
+			algoAsset = JSON.parse(fs.readFileSync(args[1], "utf8"));
+		} catch (e) {
+			console.error("Cannot read metadata from " + args[1]);
+			console.error(e);
+			return;
+		}
 
-  public async getDDO(args: string[]) {
-    console.log('Getting DDO for :' + args[1])
-    const ddo = await this.ocean.assets.resolve(args[1])
-    if (!ddo) {
-      console.error('Error fetching DDO ' + args[1] + '.  Does this asset exists?')
-    } else console.log(ddo)
-  }
+		// add some more checks
+		const algoDid = await createAsset(
+			algoAsset.nft.name,
+			algoAsset.nft.symbol,
+			this.signer,
+			algoAsset.services[0].files,
+			algoAsset,
+			this.providerUrl,
+			addresses.ERC721Factory,
+			this.aquarius
+		);
+		// add some more checks
+		console.log("Algorithm published. DID:  " + algoDid);
+	}
 
-  public async download(args: string[]) {
-    const dataDdo = await this.ocean.assets.resolve(args[1])
-    if (!dataDdo) {
-      console.error('Error fetching DDO ' + args[1] + '.  Does this asset exists?')
-      return
-    }
-    const accessService = await this.ocean.assets.getServiceByType(args[1], 'access')
-    if (!accessService) {
-      console.error(
-        'Error getting accessService from ' +
-        args[1] +
-        '.  Does this asset has an accessService?'
-      )
-      return
-    }
-    const txid = await this.ocean.assets.order(
-      args[1],
-      'access',
-      this.account.getId(),
-      accessService.index
-    )
-    if (!txid) {
-      console.error(
-        'Error ordering access for ' + args[1] + '.  Do you have enought tokens?'
-      )
-      return
-    }
-    await this.ocean.assets.download(
-      args[1],
-      txid,
-      dataDdo.dataToken,
-      this.account,
-      'downloads/' + args[1]
-    )
-  }
+	public async getDDO(args: string[]) {
+		console.log("Resolving Asset with DID :" + args[1]);
+		const resolvedDDO = await this.aquarius.waitForAqua(args[1]);
+		if (!resolvedDDO) {
+			console.error(
+				"Error fetching Asset with DID: " +
+					args[1] +
+					".  Does this asset exists?"
+			);
+		} else console.log(resolvedDDO);
+	}
 
-  public async compute(args: string[]) {
-    const output = {}
-    const dataDdo = await this.ocean.assets.resolve(args[1])
-    if (!dataDdo) {
-      console.error('Error resolving ' + args[1] + '.  Does this asset exists?')
-      return
-    }
-    const algoDdo = await this.ocean.assets.resolve(args[2])
-    if (!algoDdo) {
-      console.error('Error resolving ' + args[2] + '.  Does this asset exists?')
-      return
-    }
-    const computeService = await this.ocean.assets.getServiceByType(args[1], 'compute')
-    if (!computeService) {
-      console.error(
-        'Error getting computeService for ' +
-        args[1] +
-        '.  Does this asset has an computeService?'
-      )
-      return
-    }
-    const algoService = await this.ocean.assets.getServiceByType(args[2], 'access')
-    if (!algoService) {
-      console.error(
-        'Error getting accessService for algo ' +
-        args[2] +
-        '.  Does this asset has an accessService?'
-      )
-      return
-    }
+	public async download(args: string[]) {
+		const dataDdo = await this.aquarius.waitForAqua(args[1]);
+		if (!dataDdo) {
+			console.error(
+				"Error fetching DDO " + args[1] + ".  Does this asset exists?"
+			);
+			return;
+		}
 
-    const computeAddress = await this.ocean.compute.getComputeAddress(dataDdo.id, computeService.index)
-    const algoDefinition: ComputeAlgorithm = {
-      did: algoDdo.id,
-      serviceIndex: algoService.index
-    }
-    const order = await this.ocean.compute.orderAsset(
-      this.account.getId(),
-      dataDdo.id,
-      computeService.index,
-      algoDefinition,
-      null, // no marketplace fee
-      computeAddress // CtD is the consumer of the dataset
-    )
-    if (!order) {
-      console.error(
-        'Error ordering compute for ' + args[1] + '.  Do you have enought tokens?'
-      )
-      return
-    }
+		const datatoken = new Datatoken(this.signer, this.config.chainId);
 
-    // order the algorithm
-    const orderalgo = await this.ocean.compute.orderAlgorithm(
-      algoDdo.id,
-      algoService.type,
-      this.account.getId(),
-      algoService.index,
-      null, // no marketplace fee
-      computeAddress // CtD is the consumer of the dataset
-    )
-    if (!orderalgo) {
-      console.error('Error ordering algo ' + args[2] + '.  Do you have enought tokens?')
-      return
-    }
-    algoDefinition.transferTxId = orderalgo
-    algoDefinition.dataToken = algoDdo.dataToken
-    const response = await this.ocean.compute.start(
-      dataDdo.id,
-      order,
-      dataDdo.dataToken,
-      this.account,
-      algoDefinition,
-      output,
-      `${computeService.index}`,
-      computeService.type
-    )
-    const { jobId } = response
-    console.log('Compute started.  JobID: ' + jobId)
-  }
+		const orderTx = await orderAsset(
+			dataDdo.id,
+			dataDdo.services[0].datatokenAddress,
+			await this.signer.getAddress(),
+			dataDdo.services[0].id,
+			0,
+			datatoken,
+			this.providerUrl
+		);
 
-  public async getCompute(args: string[]) {
-    const response = await this.ocean.compute.status(
-      this.account,
-      undefined,
-      undefined,
-      undefined,
-      args[1],
-      null,
-      true
-    )
-    console.log(response)
-  }
+		if (!orderTx) {
+			console.error(
+				"Error ordering access for " +
+					args[1] +
+					".  Do you have enought tokens?"
+			);
+			return;
+		}
 
-  public async allowAlgo(args: string[]) {
-    const ddo = await this.ocean.assets.resolve(args[1])
-    if (!ddo) {
-      console.error('Error resolving ' + args[1] + '.  Does this asset exists?')
-      return
-    }
-    if (ddo.publicKey[0].owner.toLowerCase() !== this.account.getId().toLowerCase()) {
-      console.error(
-        'You are not the owner of this asset, and there for you cannot update it.'
-      )
-      return
-    }
-    const computeService = await this.ocean.assets.getServiceByType(args[1], 'compute')
-    if (!computeService) {
-      console.error(
-        'Error getting computeService for ' +
-        args[1] +
-        '.  Does this asset has an computeService?'
-      )
-      return
-    }
-    const algoDdo = await this.ocean.assets.resolve(args[2])
-    const newDdo = await this.ocean.compute.addTrustedAlgorithmtoAsset(
-      ddo,
-      computeService.index,
-      algoDdo.id
-    )
-    const txid = await this.ocean.onChainMetadata.update(ddo.id, newDdo, this.account.getId())
-    console.log('Asset updated')
-  }
+		const urlDownloadUrl = await ProviderInstance.getDownloadUrl(
+			dataDdo.id,
+			dataDdo.services[0].id,
+			0,
+			orderTx.transactionHash,
+			this.providerUrl,
+			this.signer
+		);
+		try {
+			await downloadFile(urlDownloadUrl);
+		} catch (e) {
+			console.log(`Download url dataset failed: ${e}`);
+		}
+	}
 
-  public async disallowAlgo(args: string[]) {
-    const ddo = await this.ocean.assets.resolve(args[1])
-    if (!ddo) {
-      console.error('Error resolving ' + args[1] + '.  Does this asset exists?')
-      return
-    }
-    if (ddo.publicKey[0].owner.toLowerCase() !== this.account.getId().toLowerCase()) {
-      console.error(
-        'You are not the owner of this asset, and there for you cannot update it.'
-      )
-      return
-    }
-    const computeService = await this.ocean.assets.getServiceByType(args[1], 'compute')
-    if (!computeService) {
-      console.error(
-        'Error getting computeService for ' +
-        args[1] +
-        '.  Does this asset has an computeService?'
-      )
-      return
-    }
-    const algoDdo = await this.ocean.assets.resolve(args[2])
-    const newDdo = await this.ocean.compute.removeTrustedAlgorithmFromAsset(
-      ddo,
-      computeService.index,
-      algoDdo.id
-    )
-    const txid = await this.ocean.onChainMetadata.update(ddo.id, newDdo, this.account.getId())
-    console.log('Asset updated')
-  }
+	public async compute(args: string[]) {
+		const output = {};
+		const dataDdo = await this.aquarius.waitForAqua(args[1]);
+		if (!dataDdo) {
+			console.error(
+				"Error fetching DDO " + args[1] + ".  Does this asset exists?"
+			);
+			return;
+		}
 
-  public async query(args: string[]) {
-    // WIP
-  }
+		const algoDdo = await this.aquarius.waitForAqua(args[2]);
+		if (!algoDdo) {
+			console.error(
+				"Error fetching DDO " + args[1] + ".  Does this asset exists?"
+			);
+			return;
+		}
+
+		// get compute environments
+		const computeEnvs = await ProviderInstance.getComputeEnvironments(
+			this.providerUrl
+		);
+
+		const datatoken = new Datatoken(
+			this.signer,
+			(await this.signer.provider.getNetwork()).chainId
+		);
+
+		// let's have 5 minute of compute access
+		const mytime = new Date();
+		const computeMinutes = 5;
+		mytime.setMinutes(mytime.getMinutes() + computeMinutes);
+		const computeValidUntil = Math.floor(mytime.getTime() / 1000);
+
+		const computeEnv = computeEnvs[dataDdo.chainId][0];
+
+		const assets: ComputeAsset[] = [
+			{
+				documentId: dataDdo.id,
+				serviceId: dataDdo.services[0].id,
+			},
+		];
+		const dtAddressArray = [dataDdo.services[0].datatokenAddress];
+		const algo: ComputeAlgorithm = {
+			documentId: algoDdo.id,
+			serviceId: algoDdo.services[0].id,
+		};
+
+		const providerInitializeComputeJob =
+			await ProviderInstance.initializeCompute(
+				assets,
+				algo,
+				computeEnv.id,
+				computeValidUntil,
+				this.providerUrl,
+				await this.signer.getAddress()
+			);
+		if (
+			!providerInitializeComputeJob ||
+			"error" in providerInitializeComputeJob.algorithm
+		) {
+			console.error(
+				"Error initializing Provider for the compute job using dataset DID " +
+					args[1] +
+					" and algorithm DID " +
+					args[2]
+			);
+			return;
+		}
+
+		algo.transferTxId = await handleComputeOrder(
+			providerInitializeComputeJob.algorithm,
+			algoDdo.services[0].datatokenAddress,
+			this.signer,
+			computeEnv.consumerAddress,
+			0,
+			datatoken,
+			this.config
+		);
+		if (!algo.transferTxId) {
+			console.error(
+				"Error ordering compute for algorithm with DID: " +
+					args[2] +
+					".  Do you have enought tokens?"
+			);
+			return;
+		}
+
+		for (let i = 0; i < providerInitializeComputeJob.datasets.length; i++) {
+			assets[i].transferTxId = await handleComputeOrder(
+				providerInitializeComputeJob.datasets[i],
+				dtAddressArray[i],
+				this.signer,
+				computeEnv.consumerAddress,
+				0,
+				datatoken,
+				this.config
+			);
+			if (!assets[i].transferTxId) {
+				console.error(
+					"Error ordering dataset with DID: " +
+						args[1] +
+						".  Do you have enought tokens?"
+				);
+				return;
+			}
+		}
+
+		const computeJobs = await ProviderInstance.computeStart(
+			this.providerUrl,
+			this.signer,
+			computeEnv.id,
+			assets[0],
+			algo
+		);
+		const { jobId } = computeJobs[0];
+		console.log("Compute started.  JobID: " + jobId);
+	}
+
+	public async getCompute(args: string[]) {
+		const jobStatus = (await ProviderInstance.computeStatus(
+			this.providerUrl,
+			await this.signer.getAddress(),
+			args[2],
+			args[1]
+		)) as ComputeJob;
+		console.log(jobStatus);
+	}
+
+	// public async allowAlgo(args: string[]) {
+	// 	const ddo = await this.ocean.assets.resolve(args[1]);
+	// 	if (!ddo) {
+	// 		console.error(
+	// 			"Error resolving " + args[1] + ".  Does this asset exists?"
+	// 		);
+	// 		return;
+	// 	}
+	// 	if (
+	// 		ddo.publicKey[0].owner.toLowerCase() !==
+	// 		this.account.getId().toLowerCase()
+	// 	) {
+	// 		console.error(
+	// 			"You are not the owner of this asset, and there for you cannot update it."
+	// 		);
+	// 		return;
+	// 	}
+	// 	const computeService = await this.ocean.assets.getServiceByType(
+	// 		args[1],
+	// 		"compute"
+	// 	);
+	// 	if (!computeService) {
+	// 		console.error(
+	// 			"Error getting computeService for " +
+	// 				args[1] +
+	// 				".  Does this asset has an computeService?"
+	// 		);
+	// 		return;
+	// 	}
+	// 	const algoDdo = await this.ocean.assets.resolve(args[2]);
+	// 	const newDdo = await this.ocean.compute.addTrustedAlgorithmtoAsset(
+	// 		ddo,
+	// 		computeService.index,
+	// 		algoDdo.id
+	// 	);
+	// 	const txid = await this.ocean.onChainMetadata.update(
+	// 		ddo.id,
+	// 		newDdo,
+	// 		this.account.getId()
+	// 	);
+	// 	console.log("Asset updated");
+	// }
+
+	// public async disallowAlgo(args: string[]) {
+	// 	const ddo = await this.ocean.assets.resolve(args[1]);
+	// 	if (!ddo) {
+	// 		console.error(
+	// 			"Error resolving " + args[1] + ".  Does this asset exists?"
+	// 		);
+	// 		return;
+	// 	}
+	// 	if (
+	// 		ddo.publicKey[0].owner.toLowerCase() !==
+	// 		this.account.getId().toLowerCase()
+	// 	) {
+	// 		console.error(
+	// 			"You are not the owner of this asset, and there for you cannot update it."
+	// 		);
+	// 		return;
+	// 	}
+	// 	const computeService = await this.ocean.assets.getServiceByType(
+	// 		args[1],
+	// 		"compute"
+	// 	);
+	// 	if (!computeService) {
+	// 		console.error(
+	// 			"Error getting computeService for " +
+	// 				args[1] +
+	// 				".  Does this asset has an computeService?"
+	// 		);
+	// 		return;
+	// 	}
+	// 	const algoDdo = await this.ocean.assets.resolve(args[2]);
+	// 	const newDdo = await this.ocean.compute.removeTrustedAlgorithmFromAsset(
+	// 		ddo,
+	// 		computeService.index,
+	// 		algoDdo.id
+	// 	);
+	// 	const txid = await this.ocean.onChainMetadata.update(
+	// 		ddo.id,
+	// 		newDdo,
+	// 		this.account.getId()
+	// 	);
+	// 	console.log("Asset updated");
+	// }
+
+	// public async query(args: string[]) {
+	// 	// WIP
+	// }
 }

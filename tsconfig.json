@@ -1,21 +1,19 @@
 {
-    "compilerOptions": {
-      "resolveJsonModule": true,
-      "moduleResolution": "node",
-      "esModuleInterop": true,
-      "allowSyntheticDefaultImports": true,
-      "lib": ["es2017", "es6", "es7", "dom"],
-      "declaration": true,
-      "module": "commonjs",
-      "target": "es5",
-      "removeComments": true,
-      "experimentalDecorators": true,
-      "preserveConstEnums": true,
-      "outDir": "./dist/node/",
-      "rootDir": "./src/",
-      "sourceMap": true,
-      "typeRoots": ["node_modules/@types"]
-    },
-    "include": ["src/**/*"],
-    "exclude": ["node_modules", "**/*.test.ts"]
-  }
+  "compilerOptions": {
+    "resolveJsonModule": true,
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "lib": ["ESNext", "dom"],
+    "declaration": true,
+    "module": "ESNext",
+    "target": "ESNext",
+    "removeComments": false,
+    "experimentalDecorators": true,
+    "preserveConstEnums": true,
+    "outDir": "./dist/",
+    "sourceMap": true,
+    "declarationDir": "./dist/"
+  },
+  "include": ["src/**/*", "test/**/*"]
+}

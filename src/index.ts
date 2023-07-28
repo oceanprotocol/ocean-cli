@@ -17,21 +17,28 @@ if (!process.env.NETWORK) {
 function help() {
 	console.log("Available options:");
 	console.log(
-		"\t publish  METADATA_FILE - reads MEDATDATA_FILE and publishes a new asset with access service and compute service"
+		"\t publish  METADATA_FILE - reads MEDATDATA_FILE and publishes a new asset with access service or compute service"
 	);
 	console.log(
 		"\t publishAlgo  METADATA_FILE - reads MEDATDATA_FILE and publishes a new algo"
 	);
-	console.log("\t getDDO DID - gets ddo for an asset");
+	console.log("\t getDDO DID - gets DDO for an asset using the asset did");
 	console.log(
 		"\t download DID DESTINATION_FOLDER - downloads an asset into downloads/DESTINATION_FOLDER"
 	);
-	console.log("\t allowAlgo DATA_DID ALGO_DID - approves an algo for an asset");
 	console.log(
-		"\t disallowAlgo DATA_DID ALGO_DID - removes an approved algo for the asset approved algos"
+		"\t allowAlgo DATASET_DID ALGO_DID - approves an algorithm to run on a dataset"
 	);
-	console.log("\t startCompute DATA_DID ALGO_DID - computes an asset");
-	console.log("\t getCompute JOB_ID - gets a compute status");
+	console.log(
+		"\t disallowAlgo DATASET_DID ALGO_DID - removes an approved algorithm from the dataset approved algos"
+	);
+	console.log(
+		"\t startCompute DATASET_DID ALGO_DID - starts a compute job on the mentioned dataset using the inputed algorithm's id"
+	);
+	console.log("\t getCompute JOB_ID - gets a compute status.");
+	console.log(
+		"\t editAsset DATASET_DID UPDATED_METADATA_FILE - updates DDO using the metadata items in the file."
+	);
 }
 
 async function start() {

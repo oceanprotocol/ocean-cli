@@ -60,7 +60,7 @@ export class Commands {
 				asset.services[0].files,
 				asset,
 				this.providerUrl,
-				this.config.nftFactoryAddress,
+				this.config,
 				this.aquarius
 			);
 			console.log("Asset published. ID:  " + urlAssetId);
@@ -89,7 +89,7 @@ export class Commands {
 			algoAsset.services[0].files,
 			algoAsset,
 			this.providerUrl,
-			this.config.nftFactoryAddress,
+			this.config,
 			this.aquarius
 		);
 		// add some more checks

@@ -10,8 +10,8 @@
     "created": "2021-12-20T14:35:20Z",
     "updated": "2021-12-20T14:35:20Z",
     "type": "dataset",
-    "name": "cli publish",
-    "description": "desc desc desc",
+    "name": "cli fixed asset",
+    "description": "asset published using ocean.js cli tool",
     "tags": [
       "test"
     ],
@@ -58,7 +58,10 @@
   "datatokens": [
   ],
   "stats": {
-  },
-  "accessDetails": {
+    "allocated": 0,
+    "orders": 0,
+    "price": {
+      "value": "2"
+    }
   }
 }

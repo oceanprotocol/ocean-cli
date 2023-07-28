@@ -16,6 +16,8 @@ import {
 	DDO,
 	ProviderFees,
 	getEventFromTx,
+	DispenserCreationParams,
+	FreCreationParams,
 } from "@oceanprotocol/lib";
 
 export async function createAsset(
@@ -25,11 +27,11 @@ export async function createAsset(
 	assetUrl: any,
 	ddo: any,
 	providerUrl: string,
-	nftContractAddress: string, // addresses.ERC721Factory,
+	config: Config, // addresses.ERC721Factory,
 	aquariusInstance: Aquarius
 ) {
 	const nft = new Nft(owner, (await owner.provider.getNetwork()).chainId);
-	const nftFactory = new NftFactory(nftContractAddress, owner);
+	const nftFactory = new NftFactory(config.nftFactoryAddress, owner);
 	const chain = (await owner.provider.getNetwork()).chainId;
 
 	ddo.chainId = parseInt(chain.toString(10));
@@ -45,19 +47,54 @@ export async function createAsset(
 		templateIndex: 1,
 		cap: "100000",
 		feeAmount: "0",
-		paymentCollector: ZERO_ADDRESS,
-		feeToken: ZERO_ADDRESS,
+		paymentCollector: await owner.getAddress(),
+		feeToken: config.oceanTokenAddress,
 		minter: await owner.getAddress(),
 		mpFeeAddress: ZERO_ADDRESS,
 	};
 
-	const bundleNFT = await nftFactory.createNftWithDatatoken(
-		nftParamsAsset,
-		datatokenParams
-	);
+	let bundleNFT;
+	if (!ddo.stats.price.value) {
+		bundleNFT = await nftFactory.createNftWithDatatoken(
+			nftParamsAsset,
+			datatokenParams
+		);
+	} else if (ddo.stats.price.value === "0") {
+		const dispenserParams: DispenserCreationParams = {
+			dispenserAddress: config.dispenserAddress,
+			maxTokens: "1",
+			maxBalance: "1",
+			withMint: true,
+			allowedSwapper: ZERO_ADDRESS,
+		};
+
+		bundleNFT = await nftFactory.createNftWithDatatokenWithDispenser(
+			nftParamsAsset,
+			datatokenParams,
+			dispenserParams
+		);
+	} else {
+		const fixedPriceParams: FreCreationParams = {
+			fixedRateAddress: config.fixedRateExchangeAddress,
+			baseTokenAddress: config.oceanTokenAddress,
+			owner: await owner.getAddress(),
+			marketFeeCollector: await owner.getAddress(),
+			baseTokenDecimals: 18,
+			datatokenDecimals: 18,
+			fixedRate: ddo.stats.price.value,
+			marketFee: "0",
+			allowedConsumer: await owner.getAddress(),
+			withMint: false,
+		};
+
+		bundleNFT = await nftFactory.createNftWithDatatokenWithFixedRate(
+			nftParamsAsset,
+			datatokenParams,
+			fixedPriceParams
+		);
+	}
 
 	const trxReceipt = await bundleNFT.wait();
-
 	// events have been emitted
 	const nftCreatedEvent = getEventFromTx(trxReceipt, "NFTCreated");
 	const tokenCreatedEvent = getEventFromTx(trxReceipt, "TokenCreated");

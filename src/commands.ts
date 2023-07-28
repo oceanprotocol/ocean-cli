@@ -1,5 +1,10 @@
 import fs from "fs";
-import { createAsset, handleComputeOrder, orderAsset } from "./helpers";
+import {
+	createAsset,
+	handleComputeOrder,
+	orderAsset,
+	updateAssetMetadata,
+} from "./helpers";
 import {
 	Aquarius,
 	Asset,
@@ -12,6 +17,7 @@ import {
 	Datatoken,
 	ProviderInstance,
 	downloadFile,
+	getHash,
 } from "@oceanprotocol/lib";
 import { Signer } from "ethers";
 
@@ -25,7 +31,7 @@ export class Commands {
 		this.signer = signer;
 		this.config = config || new ConfigHelper().getConfig(network || "unknown");
 		this.aquarius = new Aquarius(this.config.metadataCacheUri);
-		this.providerUrl = config.providerUri;
+		this.providerUrl = this.config.providerUri;
 	}
 	// utils
 	public async sleep(ms: number) {
@@ -45,19 +51,24 @@ export class Commands {
 			console.error(e);
 			return;
 		}
-		// add some more checks
-		const urlAssetId = await createAsset(
-			asset.nft.name,
-			asset.nft.symbol,
-			this.signer,
-			asset.services[0].files,
-			asset,
-			this.providerUrl,
-			addresses.ERC721Factory,
-			this.aquarius
-		);
-
-		console.log("Asset published. ID:  " + urlAssetId);
+		try {
+			// add some more checks
+			const urlAssetId = await createAsset(
+				asset.nft.name,
+				asset.nft.symbol,
+				this.signer,
+				asset.services[0].files,
+				asset,
+				this.providerUrl,
+				this.config.nftFactoryAddress,
+				this.aquarius
+			);
+			console.log("Asset published. ID:  " + urlAssetId);
+		} catch (e) {
+			console.error("Error when publishing dataset from file: " + args[1]);
+			console.error(e);
+			return;
+		}
 	}
 
 	public async publishAlgo(args: string[]) {
@@ -78,7 +89,7 @@ export class Commands {
 			algoAsset.services[0].files,
 			algoAsset,
 			this.providerUrl,
-			addresses.ERC721Factory,
+			this.config.nftFactoryAddress,
 			this.aquarius
 		);
 		// add some more checks
@@ -271,48 +282,62 @@ export class Commands {
 		console.log(jobStatus);
 	}
 
-	// public async allowAlgo(args: string[]) {
-	// 	const ddo = await this.ocean.assets.resolve(args[1]);
-	// 	if (!ddo) {
-	// 		console.error(
-	// 			"Error resolving " + args[1] + ".  Does this asset exists?"
-	// 		);
-	// 		return;
-	// 	}
-	// 	if (
-	// 		ddo.publicKey[0].owner.toLowerCase() !==
-	// 		this.account.getId().toLowerCase()
-	// 	) {
-	// 		console.error(
-	// 			"You are not the owner of this asset, and there for you cannot update it."
-	// 		);
-	// 		return;
-	// 	}
-	// 	const computeService = await this.ocean.assets.getServiceByType(
-	// 		args[1],
-	// 		"compute"
-	// 	);
-	// 	if (!computeService) {
-	// 		console.error(
-	// 			"Error getting computeService for " +
-	// 				args[1] +
-	// 				".  Does this asset has an computeService?"
-	// 		);
-	// 		return;
-	// 	}
-	// 	const algoDdo = await this.ocean.assets.resolve(args[2]);
-	// 	const newDdo = await this.ocean.compute.addTrustedAlgorithmtoAsset(
-	// 		ddo,
-	// 		computeService.index,
-	// 		algoDdo.id
-	// 	);
-	// 	const txid = await this.ocean.onChainMetadata.update(
-	// 		ddo.id,
-	// 		newDdo,
-	// 		this.account.getId()
-	// 	);
-	// 	console.log("Asset updated");
-	// }
+	public async allowAlgo(args: string[]) {
+		const asset = await this.aquarius.waitForAqua(args[1]);
+		if (!asset) {
+			console.error(
+				"Error fetching DDO " + args[1] + ".  Does this asset exists?"
+			);
+			return;
+		}
+
+		if (asset.nft.owner !== (await this.signer.getAddress())) {
+			console.error(
+				"You are not the owner of this asset, and there for you cannot update it."
+			);
+			return;
+		}
+
+		if (asset.services[0].type !== "compute") {
+			console.error(
+				"Error getting computeService for " +
+					args[1] +
+					".  Does this asset has an computeService?"
+			);
+			return;
+		}
+		const algoAsset = await this.aquarius.waitForAqua(args[2]);
+		if (!algoAsset) {
+			console.error(
+				"Error fetching DDO " + args[2] + ".  Does this asset exists?"
+			);
+			return;
+		}
+
+		const filesChecksum = await ProviderInstance.checkDidFiles(
+			algoAsset.id,
+			algoAsset.services[0].id,
+			algoAsset.services[0].serviceEndpoint,
+			true
+		);
+
+		const containerChecksum =
+			algoAsset.metadata.algorithm.container.entrypoint +
+			algoAsset.metadata.algorithm.container.checksum;
+		const trustedAlgorithm = {
+			did: algoAsset.id,
+			containerSectionChecksum: getHash(containerChecksum),
+			filesChecksum: filesChecksum?.[0]?.checksum,
+		};
+		asset.services[0].compute.publisherTrustedAlgorithms.push(trustedAlgorithm);
+		const txid = await updateAssetMetadata(
+			this.signer,
+			asset,
+			this.providerUrl,
+			this.aquarius
+		);
+		console.log("Asset updated " + txid);
+	}
 
 	// public async disallowAlgo(args: string[]) {
 	// 	const ddo = await this.ocean.assets.resolve(args[1]);
@@ -357,7 +382,35 @@ export class Commands {
 	// 	console.log("Asset updated");
 	// }
 
-	// public async query(args: string[]) {
-	// 	// WIP
-	// }
+	public async editAsset(args: string[]) {
+		const asset = await this.aquarius.waitForAqua(args[1]);
+		if (!asset) {
+			console.error(
+				"Error fetching DDO " + args[1] + ".  Does this asset exists?"
+			);
+			return;
+		}
+		let updateJson;
+		try {
+			updateJson = JSON.parse(fs.readFileSync(args[1], "utf8"));
+		} catch (e) {
+			console.error("Cannot read metadata from " + args[1]);
+			console.error(e);
+			return;
+		}
+		// Get keys and values
+		const keys = Object.keys(updateJson);
+
+		for (const key in keys) {
+			asset[key] = updateJson[key];
+		}
+
+		const updateAssetTx = await updateAssetMetadata(
+			this.signer,
+			asset,
+			this.providerUrl,
+			this.aquarius
+		);
+		console.log("Asset updated " + updateAssetTx);
+	}
 }

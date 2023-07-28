@@ -14,17 +14,6 @@ if (!process.env.NETWORK) {
 	process.exit(0);
 }
 
-const config = {
-	network: process.env.NETWORK,
-	mnemonic: process.env.MNEMONIC,
-	rpc: process.env.RPC,
-};
-
-const provider = new ethers.providers.JsonRpcProvider(process.env.RPC);
-const signer = new ethers.Wallet(process.env.MNEMONIC, provider);
-
-console.log("Using account: " + (await signer.getAddress()));
-
 function help() {
 	console.log("Available options:");
 	console.log(
@@ -46,8 +35,11 @@ function help() {
 }
 
 async function start() {
-	// const ocean = await Ocean.getInstance(oceanconfig)
-	// const oceanAccounts = await ocean.accounts.list()
+	const provider = new ethers.providers.JsonRpcProvider(process.env.RPC);
+	const signer = new ethers.Wallet(process.env.MNEMONIC, provider);
+
+	console.log("Using account: " + (await signer.getAddress()));
+
 	const { chainId } = await signer.provider.getNetwork();
 	const commands = new Commands(signer, chainId);
 	const myArgs = process.argv.slice(2);
@@ -64,20 +56,20 @@ async function start() {
 		case "download":
 			await commands.download(myArgs);
 			break;
-		case "allowAlgo":
-			await commands.allowAlgo(myArgs);
-			break;
-		case "disallowAlgo":
-			await commands.disallowAlgo(myArgs);
-			break;
+		// case "allowAlgo":
+		// 	await commands.allowAlgo(myArgs);
+		// 	break;
+		// case "disallowAlgo":
+		// 	await commands.disallowAlgo(myArgs);
+		// 	break;
 		case "startCompute":
 			await commands.compute(myArgs);
 			break;
 		case "getCompute":
 			await commands.getCompute(myArgs);
 			break;
-		case "query":
-			await commands.query(myArgs);
+		case "edit":
+			await commands.editAsset(myArgs);
 			break;
 		case "h":
 			help();

@@ -6,14 +6,16 @@
     "allowSyntheticDefaultImports": true,
     "lib": ["ESNext", "dom"],
     "declaration": true,
-    "module": "ESNext",
-    "target": "ESNext",
-    "removeComments": false,
+    "target": "es6",
+    "module": "commonjs",
+    "removeComments": true,
     "experimentalDecorators": true,
     "preserveConstEnums": true,
-    "outDir": "./dist/",
+    "outDir": "./dist/node/",
+    "rootDir": "./src/",
     "sourceMap": true,
-    "declarationDir": "./dist/"
+    "typeRoots": ["node_modules/@types"]
   },
-  "include": ["src/**/*", "test/**/*"]
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "**/*.test.ts"]
 }

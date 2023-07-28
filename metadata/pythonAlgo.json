@@ -1,26 +1,64 @@
 {
-  "main": {
+  "@context": [
+    "https://w3id.org/did/v1"
+  ],
+  "id": "",
+  "nftAddress": "",
+  "version": "4.1.0",
+  "chainId": 80001,
+  "metadata": {
+    "created": "2021-12-20T14:35:20Z",
+    "updated": "2021-12-20T14:35:20Z",
     "type": "algorithm",
-    "name": "Test Python Algo",
-    "dateCreated": "2020-12-17T13:38:49",
-    "author": "Alex",
-    "license": "CC-BY",
-    "files": [
-      {
-        "url": "https://raw.githubusercontent.com/oceanprotocol/c2d-examples/main/python/linecounter/line_counter.py",
-        "contentType": "text/js",
-        "encoding": "UTF-8"
-      }
+    "name": "cli publish",
+    "description": "desc desc desc",
+    "tags": [
+      "test"
     ],
-    "algorithm": {
-      "language": "js",
-      "format": "docker-image",
-      "version": "0.1",
-      "container": {
-        "entrypoint": "python3.6 $ALGO",
-        "image": "oceanprotocol/algo_dockers",
-        "tag": "python-sql"
-      }
+    "author": "oceanprotocol",
+    "license": "https://market.oceanprotocol.com/terms",
+    "additionalInformation": {
+      "termsAndConditions": true
     }
+  },
+  "services": [
+    {
+      "id": "ccb398c50d6abd5b456e8d7242bd856a1767a890b537c2f8c10ba8b8a10e6025",
+      "type": "access",
+      "files": {
+        "datatokenAddress": "0x0",
+        "nftAddress": "0x0",
+        "files": [
+          {
+            "type": "url",
+            "url": "https://raw.githubusercontent.com/oceanprotocol/testdatasets/main/shs_dataset_test.txt",
+            "method": "GET"
+          }
+        ]
+      },
+      "datatokenAddress": "",
+      "serviceEndpoint": "https://v4.provider.oceanprotocol.com",
+      "timeout": 86400
+    }
+  ],
+  "event": {
+  },
+  "nft": {
+    "address": "",
+    "name": "Ocean Data NFT",
+    "symbol": "OCEAN-NFT",
+    "state": 5,
+    "tokenURI": "",
+    "owner": "",
+    "created": ""
+  },
+  "purgatory": {
+    "state": false
+  },
+  "datatokens": [
+  ],
+  "stats": {
+  },
+  "accessDetails": {
   }
 }

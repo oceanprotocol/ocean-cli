@@ -56,12 +56,12 @@ async function start() {
 		case "download":
 			await commands.download(myArgs);
 			break;
-		// case "allowAlgo":
-		// 	await commands.allowAlgo(myArgs);
-		// 	break;
-		// case "disallowAlgo":
-		// 	await commands.disallowAlgo(myArgs);
-		// 	break;
+		case "allowAlgo":
+			await commands.allowAlgo(myArgs);
+			break;
+		case "disallowAlgo":
+			await commands.disallowAlgo(myArgs);
+			break;
 		case "startCompute":
 			await commands.compute(myArgs);
 			break;
@@ -75,7 +75,7 @@ async function start() {
 			help();
 			break;
 		default:
-			console.error("did you forgot the command ? use h for help");
+			console.error("Not sure what command to use ? use h for help.");
 			break;
 	}
 	process.exit(0);

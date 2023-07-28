@@ -339,48 +339,62 @@ export class Commands {
 		console.log("Asset updated " + txid);
 	}
 
-	// public async disallowAlgo(args: string[]) {
-	// 	const ddo = await this.ocean.assets.resolve(args[1]);
-	// 	if (!ddo) {
-	// 		console.error(
-	// 			"Error resolving " + args[1] + ".  Does this asset exists?"
-	// 		);
-	// 		return;
-	// 	}
-	// 	if (
-	// 		ddo.publicKey[0].owner.toLowerCase() !==
-	// 		this.account.getId().toLowerCase()
-	// 	) {
-	// 		console.error(
-	// 			"You are not the owner of this asset, and there for you cannot update it."
-	// 		);
-	// 		return;
-	// 	}
-	// 	const computeService = await this.ocean.assets.getServiceByType(
-	// 		args[1],
-	// 		"compute"
-	// 	);
-	// 	if (!computeService) {
-	// 		console.error(
-	// 			"Error getting computeService for " +
-	// 				args[1] +
-	// 				".  Does this asset has an computeService?"
-	// 		);
-	// 		return;
-	// 	}
-	// 	const algoDdo = await this.ocean.assets.resolve(args[2]);
-	// 	const newDdo = await this.ocean.compute.removeTrustedAlgorithmFromAsset(
-	// 		ddo,
-	// 		computeService.index,
-	// 		algoDdo.id
-	// 	);
-	// 	const txid = await this.ocean.onChainMetadata.update(
-	// 		ddo.id,
-	// 		newDdo,
-	// 		this.account.getId()
-	// 	);
-	// 	console.log("Asset updated");
-	// }
+	public async disallowAlgo(args: string[]) {
+		const asset = await this.aquarius.waitForAqua(args[1]);
+		if (!asset) {
+			console.error(
+				"Error fetching DDO " + args[1] + ".  Does this asset exists?"
+			);
+			return;
+		}
+		if (asset.nft.owner !== (await this.signer.getAddress())) {
+			console.error(
+				"You are not the owner of this asset, and there for you cannot update it."
+			);
+			return;
+		}
+		if (asset.services[0].type !== "compute") {
+			console.error(
+				"Error getting computeService for " +
+					args[1] +
+					".  Does this asset has an computeService?"
+			);
+			return;
+		}
+		if (asset.services[0].compute.publisherTrustedAlgorithms) {
+			console.error(
+				" " + args[1] + ".  Does this asset has an computeService?"
+			);
+			return;
+		}
+		const indexToDelete =
+			asset.services[0].compute.publisherTrustedAlgorithms.findIndex(
+				(item) => item.did === args[2]
+			);
+
+		if (indexToDelete !== -1) {
+			asset.services[0].compute.publisherTrustedAlgorithms.splice(
+				indexToDelete,
+				1
+			);
+		} else {
+			console.error(
+				" " +
+					args[2] +
+					".  is not allowed by the publisher to run on " +
+					args[1]
+			);
+			return;
+		}
+
+		const txid = await updateAssetMetadata(
+			this.signer,
+			asset,
+			this.providerUrl,
+			this.aquarius
+		);
+		console.log("Asset updated " + txid);
+	}
 
 	public async editAsset(args: string[]) {
 		const asset = await this.aquarius.waitForAqua(args[1]);

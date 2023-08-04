@@ -4,6 +4,7 @@ import {
 	handleComputeOrder,
 	orderAsset,
 	updateAssetMetadata,
+	downloadFile,
 } from "./helpers";
 import {
 	Aquarius,
@@ -16,7 +17,6 @@ import {
 	DDO,
 	Datatoken,
 	ProviderInstance,
-	downloadFile,
 	getHash,
 } from "@oceanprotocol/lib";
 import { Signer } from "ethers";
@@ -147,7 +147,8 @@ export class Commands {
 			this.signer
 		);
 		try {
-			await downloadFile(urlDownloadUrl);
+			const { filename } = await downloadFile(urlDownloadUrl, args[2]);
+			console.log("File downloaded successfully:", filename);
 		} catch (e) {
 			console.log(`Download url dataset failed: ${e}`);
 		}

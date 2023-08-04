@@ -9,10 +9,6 @@ if (!process.env.RPC) {
 	console.error("Have you forgot to set env RPC?");
 	process.exit(0);
 }
-if (!process.env.NETWORK) {
-	console.error("Have you forgot to set env NETWORK?");
-	process.exit(0);
-}
 
 function help() {
 	console.log("Available options:");

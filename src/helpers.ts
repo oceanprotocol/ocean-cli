@@ -1,5 +1,9 @@
 import { SHA256 } from "crypto-js";
 import { ethers, Signer } from "ethers";
+import fetch from "cross-fetch";
+import { promises as fs } from "fs";
+import * as path from "path";
+
 import {
 	Aquarius,
 	DatatokenCreateParams,
@@ -18,7 +22,43 @@ import {
 	getEventFromTx,
 	DispenserCreationParams,
 	FreCreationParams,
+	DownloadResponse,
 } from "@oceanprotocol/lib";
+
+export async function downloadFile(
+	url: string,
+	downloadPath: string,
+	index?: number
+): Promise<DownloadResponse> {
+	const response = await fetch(url);
+	if (!response.ok) {
+		throw new Error("Response error.");
+	}
+
+	let filename: string;
+	try {
+		filename = response.headers
+			.get("content-disposition")
+			.match(/attachment;filename=(.+)/)[1];
+	} catch {
+		try {
+			filename = url.split("/").pop();
+		} catch {
+			filename = `file${index}`;
+		}
+	}
+
+	const filePath = path.join(downloadPath, filename);
+	const data = await response.arrayBuffer();
+
+	try {
+		await fs.writeFile(filePath, Buffer.from(data));
+	} catch (err) {
+		throw new Error("Error while saving the file:", err.message);
+	}
+
+	return { data, filename };
+}
 
 export async function createAsset(
 	name: string,

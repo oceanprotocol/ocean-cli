@@ -2,7 +2,6 @@ import fs from "fs";
 import {
 	createAsset,
 	handleComputeOrder,
-	orderAsset,
 	updateAssetMetadata,
 	downloadFile,
 } from "./helpers";
@@ -18,6 +17,7 @@ import {
 	Datatoken,
 	ProviderInstance,
 	getHash,
+	orderAsset,
 } from "@oceanprotocol/lib";
 import { Signer } from "ethers";
 
@@ -119,17 +119,9 @@ export class Commands {
 
 		const datatoken = new Datatoken(this.signer, this.config.chainId);
 
-		const orderTx = await orderAsset(
-			dataDdo.id,
-			dataDdo.services[0].datatokenAddress,
-			await this.signer.getAddress(),
-			dataDdo.services[0].id,
-			0,
-			datatoken,
-			this.providerUrl
-		);
+		const tx = await orderAsset(dataDdo, this.signer, this.config, datatoken);
 
-		if (!orderTx) {
+		if (!tx) {
 			console.error(
 				"Error ordering access for " +
 					args[1] +
@@ -137,6 +129,8 @@ export class Commands {
 			);
 			return;
 		}
+
+		const orderTx = await tx.wait();
 
 		const urlDownloadUrl = await ProviderInstance.getDownloadUrl(
 			dataDdo.id,
@@ -148,7 +142,7 @@ export class Commands {
 		);
 		try {
 			const { filename } = await downloadFile(urlDownloadUrl, args[2]);
-			console.log("File downloaded successfully:", filename);
+			console.log("File downloaded successfully:", args[2] + "/" + filename);
 		} catch (e) {
 			console.log(`Download url dataset failed: ${e}`);
 		}

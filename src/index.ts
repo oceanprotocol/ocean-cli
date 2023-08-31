@@ -33,7 +33,7 @@ function help() {
 	);
 
 	console.log(
-		"\t stopCompute JOB_ID - stops the compute process for the given job id! "
+		"\t stopCompute DATASET_DID JOB_ID - stops the compute process for the mentioned dataset with the given job id! "
 	);
 
 	console.log("\t getCompute JOB_ID - gets a compute status.");
@@ -71,7 +71,10 @@ async function start() {
 			await commands.disallowAlgo(myArgs);
 			break;
 		case "startCompute":
-			await commands.compute(myArgs);
+			await commands.computeStart(myArgs);
+			break;
+		case "stopCompute":
+			await commands.computeStop(myArgs);
 			break;
 		case "getCompute":
 			await commands.getCompute(myArgs);

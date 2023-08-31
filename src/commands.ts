@@ -155,7 +155,7 @@ export class Commands {
 		}
 	}
 
-	public async compute(args: string[]) {
+	public async computeStart(args: string[]) {
 		const output = {};
 		const dataDdo = await this.aquarius.waitForAqua(args[1]);
 		if (!dataDdo) {
@@ -272,6 +272,17 @@ export class Commands {
 		);
 		const { jobId } = computeJobs[0];
 		console.log("Compute started.  JobID: " + jobId);
+	}
+
+	public async computeStop(args: string[]) {
+		const jobStatus = await ProviderInstance.computeStop(
+			args[1],
+			await this.signer.getAddress(),
+			args[2],
+			this.providerUrl,
+			this.signer
+		);
+		console.log(jobStatus);
 	}
 
 	public async getCompute(args: string[]) {

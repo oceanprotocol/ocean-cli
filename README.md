@@ -51,6 +51,18 @@ export MNEMONIC="XXXX"
 export RPC='XXXX'
 ```
 
+- Optional set metadataCache URL if you want to use a custom Aquarius version instead of the default one.
+
+```
+export AQUARIUS_URL='XXXX'
+```
+
+- Optional set Provider URL if you want to use a custom Provider version instead of the default one.
+
+```
+export PROVIDER_URL='XXXX'
+```
+
 ### Build the TypeScript code
 
 ```

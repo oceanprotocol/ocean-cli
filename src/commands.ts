@@ -30,8 +30,15 @@ export class Commands {
 	constructor(signer: Signer, network?: string | number, config?: Config) {
 		this.signer = signer;
 		this.config = config || new ConfigHelper().getConfig(network || "unknown");
-		this.aquarius = new Aquarius(this.config.metadataCacheUri);
-		this.providerUrl = this.config.providerUri;
+		console.log(
+			"Using metadataCache :",
+			process.env.AQUARIUS_URL || this.config.metadataCacheUri
+		);
+		this.aquarius = new Aquarius(
+			process.env.AQUARIUS_URL || this.config.metadataCacheUri
+		);
+		this.providerUrl = process.env.PROVIDER_URL || this.config.providerUri;
+		console.log("Using Provider :", this.providerUrl);
 	}
 	// utils
 	public async sleep(ms: number) {

@@ -31,6 +31,11 @@ function help() {
 	console.log(
 		"\t startCompute DATASET_DID ALGO_DID - starts a compute job on the mentioned dataset using the inputed algorithm's id"
 	);
+
+	console.log(
+		"\t stopCompute JOB_ID - stops the compute process for the given job id! "
+	);
+
 	console.log("\t getCompute JOB_ID - gets a compute status.");
 	console.log(
 		"\t editAsset DATASET_DID UPDATED_METADATA_FILE - updates DDO using the metadata items in the file."

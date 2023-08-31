@@ -126,7 +126,13 @@ export class Commands {
 
 		const datatoken = new Datatoken(this.signer, this.config.chainId);
 
-		const tx = await orderAsset(dataDdo, this.signer, this.config, datatoken);
+		const tx = await orderAsset(
+			dataDdo,
+			this.signer,
+			this.config,
+			datatoken,
+			this.providerUrl
+		);
 
 		if (!tx) {
 			console.error(
@@ -173,7 +179,6 @@ export class Commands {
 			return;
 		}
 
-		// get compute environments
 		const computeEnvs = await ProviderInstance.getComputeEnvironments(
 			this.providerUrl
 		);
@@ -183,7 +188,6 @@ export class Commands {
 			(await this.signer.provider.getNetwork()).chainId
 		);
 
-		// let's have 5 minute of compute access
 		const mytime = new Date();
 		const computeMinutes = 5;
 		mytime.setMinutes(mytime.getMinutes() + computeMinutes);
@@ -197,6 +201,7 @@ export class Commands {
 				serviceId: dataDdo.services[0].id,
 			},
 		];
+
 		const dtAddressArray = [dataDdo.services[0].datatokenAddress];
 		const algo: ComputeAlgorithm = {
 			documentId: algoDdo.id,
@@ -227,12 +232,14 @@ export class Commands {
 
 		algo.transferTxId = await handleComputeOrder(
 			providerInitializeComputeJob.algorithm,
-			algoDdo.services[0].datatokenAddress,
+			algoDdo,
 			this.signer,
 			computeEnv.consumerAddress,
 			0,
 			datatoken,
-			this.config
+			this.config,
+			providerInitializeComputeJob?.algorithm?.providerFee,
+			this.providerUrl
 		);
 		if (!algo.transferTxId) {
 			console.error(
@@ -246,12 +253,14 @@ export class Commands {
 		for (let i = 0; i < providerInitializeComputeJob.datasets.length; i++) {
 			assets[i].transferTxId = await handleComputeOrder(
 				providerInitializeComputeJob.datasets[i],
-				dtAddressArray[i],
+				dataDdo,
 				this.signer,
 				computeEnv.consumerAddress,
 				0,
 				datatoken,
-				this.config
+				this.config,
+				providerInitializeComputeJob?.datasets[i].providerFee,
+				this.providerUrl
 			);
 			if (!assets[i].transferTxId) {
 				console.error(
@@ -262,7 +271,7 @@ export class Commands {
 				return;
 			}
 		}
-
+		console.log("Starting compute job ...");
 		const computeJobs = await ProviderInstance.computeStart(
 			this.providerUrl,
 			this.signer,

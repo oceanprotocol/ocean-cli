@@ -18,13 +18,11 @@ import {
 	Datatoken,
 	Config,
 	DDO,
-	orderAsset,
+	ProviderFees,
 	getEventFromTx,
 	DispenserCreationParams,
 	FreCreationParams,
 	DownloadResponse,
-	Asset,
-	ProviderFees,
 } from "@oceanprotocol/lib";
 
 export async function downloadFile(
@@ -207,14 +205,12 @@ export async function updateAssetMetadata(
 
 export async function handleComputeOrder(
 	order: ProviderComputeInitialize,
-	asset: Asset,
+	datatokenAddress: string,
 	payerAccount: Signer,
-	consumerAddress: string,
+	consumerAccount: string,
 	serviceIndex: number,
 	datatoken: Datatoken,
 	config: Config,
-	providerFees: ProviderFees,
-	providerUrl: string,
 	consumeMarkerFee?: ConsumeMarketFee
 ) {
 	/* We do have 3 possible situations:
@@ -228,14 +224,14 @@ export async function handleComputeOrder(
 			config,
 			await payerAccount.getAddress(),
 			order.providerFee.providerFeeToken,
-			asset.services[0].datatokenAddress,
+			datatokenAddress,
 			order.providerFee.providerFeeAmount
 		);
 	}
 	if (order.validOrder) {
 		if (!order.providerFee) return order.validOrder;
 		const tx = await datatoken.reuseOrder(
-			asset.services[0].datatokenAddress,
+			datatokenAddress,
 			order.validOrder,
 			order.providerFee
 		);
@@ -243,20 +239,14 @@ export async function handleComputeOrder(
 		const orderReusedTx = getEventFromTx(reusedTx, "OrderReused");
 		return orderReusedTx.transactionHash;
 	}
-	console.log("Ordering asset with DID: ", asset.id);
-	const txStartOrder = await orderAsset(
-		asset,
-		payerAccount,
-		config,
-		datatoken,
-		providerUrl,
-		consumerAddress,
-		consumeMarkerFee,
-		providerFees
+	const tx = await datatoken.startOrder(
+		datatokenAddress,
+		consumerAccount,
+		serviceIndex,
+		order.providerFee,
+		consumeMarkerFee
 	);
-
-	const tx = await txStartOrder.wait();
-	const orderStartedTx = getEventFromTx(tx, "OrderStarted");
-
+	const orderTx = await tx.wait();
+	const orderStartedTx = getEventFromTx(orderTx, "OrderStarted");
 	return orderStartedTx.transactionHash;
 }

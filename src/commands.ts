@@ -1,4 +1,5 @@
 import fs from "fs";
+import { homedir } from 'os'
 import {
 	createAsset,
 	handleComputeOrder,
@@ -21,15 +22,70 @@ import {
 } from "@oceanprotocol/lib";
 import { Signer } from "ethers";
 
+
+const getAddresses = () => {
+	const data = JSON.parse(
+	  // eslint-disable-next-line security/detect-non-literal-fs-filename
+	  fs.readFileSync(
+		process.env.ADDRESS_FILE ||
+		  `${homedir}/.ocean/ocean-contracts/artifacts/address.json`,
+		'utf8'
+	  )
+	)
+	return data.development
+	  }
+
 export class Commands {
 	public signer: Signer;
 	public config: Config;
 	public aquarius: Aquarius;
 	public providerUrl: string;
 
+
+
+	
 	constructor(signer: Signer, network?: string | number, config?: Config) {
 		this.signer = signer;
 		this.config = config || new ConfigHelper().getConfig(network || "unknown");
+		if(process.env.ADDRESS_FILE){
+			const customContracts=getAddresses()
+			const {
+				FixedPrice,
+				Dispenser,
+				OPFCommunityFeeCollector,
+				ERC721Factory,
+				Ocean,
+				chainId,
+				startBlock,
+				veAllocate,
+				veOCEAN,
+				veDelegation,
+				veFeeDistributor,
+				veDelegationProxy,
+				DFRewards,
+				DFStrategyV1,
+				veFeeEstimate
+			  } = customContracts
+			  const configAddresses = {
+				nftFactoryAddress: ERC721Factory,
+				opfCommunityFeeCollector: OPFCommunityFeeCollector,
+				fixedRateExchangeAddress: FixedPrice,
+				dispenserAddress: Dispenser,
+				oceanTokenAddress: Ocean,
+				chainId,
+				startBlock,
+				veAllocate,
+				veOCEAN,
+				veDelegation,
+				veFeeDistributor,
+				veDelegationProxy,
+				DFRewards,
+				DFStrategyV1,
+				veFeeEstimate
+			  }
+			this.config = { ...this.config, ...configAddresses }
+		}
+		
 		console.log(
 			"Using metadataCache :",
 			process.env.AQUARIUS_URL || this.config.metadataCacheUri
@@ -126,13 +182,7 @@ export class Commands {
 
 		const datatoken = new Datatoken(this.signer, this.config.chainId);
 
-		const tx = await orderAsset(
-			dataDdo,
-			this.signer,
-			this.config,
-			datatoken,
-			this.providerUrl
-		);
+		const tx = await orderAsset(dataDdo, this.signer, this.config, datatoken);
 
 		if (!tx) {
 			console.error(
@@ -179,6 +229,7 @@ export class Commands {
 			return;
 		}
 
+		// get compute environments
 		const computeEnvs = await ProviderInstance.getComputeEnvironments(
 			this.providerUrl
 		);
@@ -187,7 +238,17 @@ export class Commands {
 			this.signer,
 			(await this.signer.provider.getNetwork()).chainId
 		);
+		await datatoken.mint(
+			dataDdo.services[0].datatokenAddress,
+			(await this.signer.getAddress()),
+			"1")
 
+			await datatoken.mint(
+				algoDdo.services[0].datatokenAddress,
+				(await this.signer.getAddress()),
+				"1")
+
+		// let's have 5 minute of compute access
 		const mytime = new Date();
 		const computeMinutes = 5;
 		mytime.setMinutes(mytime.getMinutes() + computeMinutes);
@@ -201,7 +262,6 @@ export class Commands {
 				serviceId: dataDdo.services[0].id,
 			},
 		];
-
 		const dtAddressArray = [dataDdo.services[0].datatokenAddress];
 		const algo: ComputeAlgorithm = {
 			documentId: algoDdo.id,
@@ -232,14 +292,12 @@ export class Commands {
 
 		algo.transferTxId = await handleComputeOrder(
 			providerInitializeComputeJob.algorithm,
-			algoDdo,
+			algoDdo.services[0].datatokenAddress,
 			this.signer,
 			computeEnv.consumerAddress,
 			0,
 			datatoken,
-			this.config,
-			providerInitializeComputeJob?.algorithm?.providerFee,
-			this.providerUrl
+			this.config
 		);
 		if (!algo.transferTxId) {
 			console.error(
@@ -253,14 +311,12 @@ export class Commands {
 		for (let i = 0; i < providerInitializeComputeJob.datasets.length; i++) {
 			assets[i].transferTxId = await handleComputeOrder(
 				providerInitializeComputeJob.datasets[i],
-				dataDdo,
+				dtAddressArray[i],
 				this.signer,
 				computeEnv.consumerAddress,
 				0,
 				datatoken,
-				this.config,
-				providerInitializeComputeJob?.datasets[i].providerFee,
-				this.providerUrl
+				this.config
 			);
 			if (!assets[i].transferTxId) {
 				console.error(
@@ -271,7 +327,7 @@ export class Commands {
 				return;
 			}
 		}
-		console.log("Starting compute job ...");
+
 		const computeJobs = await ProviderInstance.computeStart(
 			this.providerUrl,
 			this.signer,

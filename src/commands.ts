@@ -1,4 +1,5 @@
 import fs from "fs";
+import os from "os";
 import {
 	createAsset,
 	handleComputeOrder,
@@ -38,7 +39,12 @@ export class Commands {
 			process.env.AQUARIUS_URL || this.config.metadataCacheUri
 		);
 		this.providerUrl = process.env.PROVIDER_URL || this.config.providerUri;
+		process.env.CUSTOM_PROVIDER_URL =
+			config.chainId === 8996 && os.type() === "Darwin"
+				? "http://127.0.0.1:8030"
+				: null;
 		console.log("Using Provider :", this.providerUrl);
+		console.log(" MacOS provider url :", process.env.CUSTOM_PROVIDER_URL);
 	}
 	// utils
 	public async sleep(ms: number) {
@@ -131,7 +137,7 @@ export class Commands {
 			this.signer,
 			this.config,
 			datatoken,
-			this.providerUrl
+			process.env.CUSTOM_PROVIDER_URL || this.providerUrl
 		);
 
 		if (!tx) {
@@ -150,7 +156,7 @@ export class Commands {
 			dataDdo.services[0].id,
 			0,
 			orderTx.transactionHash,
-			this.providerUrl,
+			process.env.CUSTOM_PROVIDER_URL || this.providerUrl,
 			this.signer
 		);
 		try {
@@ -180,7 +186,7 @@ export class Commands {
 		}
 
 		const computeEnvs = await ProviderInstance.getComputeEnvironments(
-			this.providerUrl
+			process.env.CUSTOM_PROVIDER_URL || this.providerUrl
 		);
 
 		const datatoken = new Datatoken(
@@ -214,7 +220,7 @@ export class Commands {
 				algo,
 				computeEnv.id,
 				computeValidUntil,
-				this.providerUrl,
+				process.env.CUSTOM_PROVIDER_URL || this.providerUrl,
 				await this.signer.getAddress()
 			);
 		if (
@@ -239,7 +245,7 @@ export class Commands {
 			datatoken,
 			this.config,
 			providerInitializeComputeJob?.algorithm?.providerFee,
-			this.providerUrl
+			process.env.CUSTOM_PROVIDER_URL || this.providerUrl
 		);
 		if (!algo.transferTxId) {
 			console.error(
@@ -260,7 +266,7 @@ export class Commands {
 				datatoken,
 				this.config,
 				providerInitializeComputeJob?.datasets[i].providerFee,
-				this.providerUrl
+				process.env.CUSTOM_PROVIDER_URL || this.providerUrl
 			);
 			if (!assets[i].transferTxId) {
 				console.error(
@@ -273,7 +279,7 @@ export class Commands {
 		}
 		console.log("Starting compute job ...");
 		const computeJobs = await ProviderInstance.computeStart(
-			this.providerUrl,
+			process.env.CUSTOM_PROVIDER_URL || this.providerUrl,
 			this.signer,
 			computeEnv.id,
 			assets[0],
@@ -288,7 +294,7 @@ export class Commands {
 			args[1],
 			await this.signer.getAddress(),
 			args[2],
-			this.providerUrl,
+			process.env.CUSTOM_PROVIDER_URL || this.providerUrl,
 			this.signer
 		);
 		console.log(jobStatus);
@@ -296,7 +302,7 @@ export class Commands {
 
 	public async getCompute(args: string[]) {
 		const jobStatus = (await ProviderInstance.computeStatus(
-			this.providerUrl,
+			process.env.CUSTOM_PROVIDER_URL || this.providerUrl,
 			await this.signer.getAddress(),
 			args[2],
 			args[1]

@@ -69,7 +69,7 @@ export async function createAsset(
 	assetUrl: any,
 	ddo: any,
 	providerUrl: string,
-	config: Config, // addresses.ERC721Factory,
+	config: Config,
 	aquariusInstance: Aquarius
 ) {
 	const nft = new Nft(owner, (await owner.provider.getNetwork()).chainId);
@@ -149,10 +149,10 @@ export async function createAsset(
 	ddo.services[0].files = await ProviderInstance.encrypt(
 		assetUrl,
 		chain,
-		providerUrl
+		process.env.CUSTOM_PROVIDER_URL || providerUrl
 	);
 	ddo.services[0].datatokenAddress = datatokenAddressAsset;
-	ddo.services[0].serviceEndpoint = providerUrl; // put back proviederUrl
+	ddo.services[0].serviceEndpoint = providerUrl;
 
 	ddo.nftAddress = nftAddress;
 	ddo.id =
@@ -162,7 +162,7 @@ export async function createAsset(
 	const encryptedResponse = await ProviderInstance.encrypt(
 		ddo,
 		chain,
-		providerUrl
+		process.env.CUSTOM_PROVIDER_URL || providerUrl
 	);
 	const validateResult = await aquariusInstance.validate(ddo);
 	await nft.setMetadata(
@@ -188,7 +188,7 @@ export async function updateAssetMetadata(
 	const providerResponse = await ProviderInstance.encrypt(
 		updatedDdo,
 		updatedDdo.chainId,
-		providerUrl
+		process.env.CUSTOM_PROVIDER_URL || providerUrl
 	);
 	const encryptedResponse = await providerResponse;
 	const validateResult = await aquariusInstance.validate(updatedDdo);

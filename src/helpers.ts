@@ -72,11 +72,11 @@ export async function createAsset(
 	config: Config,
 	aquariusInstance: Aquarius
 ) {
-	const nft = new Nft(owner, (await owner.provider.getNetwork()).chainId);
+	const { chainId } = await owner.provider.getNetwork();
+	const nft = new Nft(owner, chainId);
 	const nftFactory = new NftFactory(config.nftFactoryAddress, owner);
-	const chain = (await owner.provider.getNetwork()).chainId;
 
-	ddo.chainId = parseInt(chain.toString(10));
+	ddo.chainId = parseInt(chainId.toString(10));
 	const nftParamsAsset: NftCreateData = {
 		name,
 		symbol,
@@ -148,7 +148,7 @@ export async function createAsset(
 	assetUrl.nftAddress = nftAddress;
 	ddo.services[0].files = await ProviderInstance.encrypt(
 		assetUrl,
-		chain,
+		chainId,
 		process.env.CUSTOM_PROVIDER_URL || providerUrl
 	);
 	ddo.services[0].datatokenAddress = datatokenAddressAsset;
@@ -157,11 +157,11 @@ export async function createAsset(
 	ddo.nftAddress = nftAddress;
 	ddo.id =
 		"did:op:" +
-		SHA256(ethers.utils.getAddress(nftAddress) + chain.toString(10));
+		SHA256(ethers.utils.getAddress(nftAddress) + chainId.toString(10));
 
 	const encryptedResponse = await ProviderInstance.encrypt(
 		ddo,
-		chain,
+		chainId,
 		process.env.CUSTOM_PROVIDER_URL || providerUrl
 	);
 	const validateResult = await aquariusInstance.validate(ddo);

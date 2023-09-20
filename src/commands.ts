@@ -28,23 +28,28 @@ export class Commands {
 	public aquarius: Aquarius;
 	public providerUrl: string;
 
-	constructor(signer: Signer, network?: string | number, config?: Config) {
+	constructor(signer: Signer, network: string | number, config?: Config) {
 		this.signer = signer;
-		this.config = config || new ConfigHelper().getConfig(network || "unknown");
-		console.log(
-			"Using metadataCache :",
-			process.env.AQUARIUS_URL || this.config.metadataCacheUri
-		);
-		this.aquarius = new Aquarius(
-			process.env.AQUARIUS_URL || this.config.metadataCacheUri
-		);
+		this.config = config || new ConfigHelper().getConfig(network);
 		this.providerUrl = process.env.PROVIDER_URL || this.config.providerUri;
 		process.env.CUSTOM_PROVIDER_URL =
-			config.chainId === 8996 && os.type() === "Darwin"
+			this.config.chainId === 8996 && os.type() === "Darwin"
 				? "http://127.0.0.1:8030"
 				: null;
 		console.log("Using Provider :", this.providerUrl);
-		console.log(" MacOS provider url :", process.env.CUSTOM_PROVIDER_URL);
+		process.env.CUSTOM_PROVIDER_URL &&
+			console.log(" -> MacOS provider url :", process.env.CUSTOM_PROVIDER_URL);
+		this.config.metadataCacheUri =
+			this.config.chainId === 8996 && os.type() === "Darwin"
+				? "http://127.0.0.1:5000"
+				: null;
+		this.aquarius = new Aquarius(
+			process.env.AQUARIUS_URL || this.config.metadataCacheUri
+		);
+		console.log(
+			"Using Aquarius :",
+			process.env.AQUARIUS_URL || this.config.metadataCacheUri
+		);
 	}
 	// utils
 	public async sleep(ms: number) {

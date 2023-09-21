@@ -17,10 +17,12 @@ import {
 	DDO,
 	Datatoken,
 	ProviderInstance,
+	amountToUnits,
 	getHash,
 	orderAsset,
+	sendTx,
 } from "@oceanprotocol/lib";
-import { Signer } from "ethers";
+import { Signer, ethers } from "ethers";
 
 export class Commands {
 	public signer: Signer;
@@ -459,5 +461,40 @@ export class Commands {
 			this.aquarius
 		);
 		console.log("Asset updated " + updateAssetTx);
+	}
+
+	public async mintOceanTokens(args: string[]) {
+		const minAbi = [
+			{
+				constant: false,
+				inputs: [
+					{ name: "to", type: "address" },
+					{ name: "value", type: "uint256" },
+				],
+				name: "mint",
+				outputs: [{ name: "", type: "bool" }],
+				payable: false,
+				stateMutability: "nonpayable",
+				type: "function",
+			},
+		];
+
+		const tokenContract = new ethers.Contract(
+			this.config.oceanTokenAddress,
+			minAbi,
+			this.signer
+		);
+		const estGasPublisher = await tokenContract.estimateGas.mint(
+			this.signer.getAddress(),
+			amountToUnits(null, null, "1000", 18)
+		);
+		await sendTx(
+			estGasPublisher,
+			this.signer,
+			1,
+			tokenContract.mint,
+			await this.signer.getAddress(),
+			amountToUnits(null, null, "1000", 18)
+		);
 	}
 }

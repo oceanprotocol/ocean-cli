@@ -83,6 +83,9 @@ async function start() {
 		case "edit":
 			await commands.editAsset(myArgs);
 			break;
+		case "mintOcean":
+			await commands.mintOceanTokens(myArgs);
+			break;
 		case "h":
 			help();
 			break;

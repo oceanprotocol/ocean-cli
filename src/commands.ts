@@ -1,5 +1,6 @@
 import fs from "fs";
 import os from "os";
+import util from "util";
 import {
 	createAsset,
 	handleComputeOrder,
@@ -114,6 +115,38 @@ export class Commands {
 		);
 		// add some more checks
 		console.log("Algorithm published. DID:  " + algoDid);
+	}
+
+	public async editAsset(args: string[]) {
+		const asset = await this.aquarius.waitForAqua(args[1]);
+		if (!asset) {
+			console.error(
+				"Error fetching DDO " + args[1] + ".  Does this asset exists?"
+			);
+			return;
+		}
+		let updateJson;
+		try {
+			updateJson = JSON.parse(fs.readFileSync(args[1], "utf8"));
+		} catch (e) {
+			console.error("Cannot read metadata from " + args[1]);
+			console.error(e);
+			return;
+		}
+		// Get keys and values
+		const keys = Object.keys(updateJson);
+
+		for (const key in keys) {
+			asset[key] = updateJson[key];
+		}
+
+		const updateAssetTx = await updateAssetMetadata(
+			this.signer,
+			asset,
+			this.providerUrl,
+			this.aquarius
+		);
+		console.log("Asset updated " + updateAssetTx);
 	}
 
 	public async getDDO(args: string[]) {
@@ -307,16 +340,6 @@ export class Commands {
 		console.log(jobStatus);
 	}
 
-	public async getCompute(args: string[]) {
-		const jobStatus = (await ProviderInstance.computeStatus(
-			process.env.CUSTOM_PROVIDER_URL || this.providerUrl,
-			await this.signer.getAddress(),
-			args[2],
-			args[1]
-		)) as ComputeJob;
-		console.log(jobStatus);
-	}
-
 	public async allowAlgo(args: string[]) {
 		const asset = await this.aquarius.waitForAqua(args[1]);
 		if (!asset) {
@@ -431,36 +454,30 @@ export class Commands {
 		console.log("Asset updated " + txid);
 	}
 
-	public async editAsset(args: string[]) {
-		const asset = await this.aquarius.waitForAqua(args[1]);
-		if (!asset) {
-			console.error(
-				"Error fetching DDO " + args[1] + ".  Does this asset exists?"
-			);
-			return;
-		}
-		let updateJson;
-		try {
-			updateJson = JSON.parse(fs.readFileSync(args[1], "utf8"));
-		} catch (e) {
-			console.error("Cannot read metadata from " + args[1]);
-			console.error(e);
-			return;
-		}
-		// Get keys and values
-		const keys = Object.keys(updateJson);
-
-		for (const key in keys) {
-			asset[key] = updateJson[key];
-		}
-
-		const updateAssetTx = await updateAssetMetadata(
-			this.signer,
-			asset,
+	public async getJobStatus(args: string[]) {
+		const jobStatus = (await ProviderInstance.computeStatus(
 			this.providerUrl,
-			this.aquarius
+			await this.signer.getAddress(),
+			args[2],
+			args[1]
+		)) as ComputeJob;
+		console.log(util.inspect(jobStatus, false, null, true));
+	}
+
+	public async downloadJobResults(args: string[]) {
+		const jobResult = await ProviderInstance.getComputeResultUrl(
+			this.providerUrl,
+			this.signer,
+			args[1],
+			parseInt(args[2])
 		);
-		console.log("Asset updated " + updateAssetTx);
+		console.log("jobResult ", jobResult);
+		try {
+			const { filename } = await downloadFile(jobResult, args[3]);
+			console.log("File downloaded successfully:", args[3] + "/" + filename);
+		} catch (e) {
+			console.log(`Download url dataset failed: ${e}`);
+		}
 	}
 
 	public async mintOceanTokens(args: string[]) {

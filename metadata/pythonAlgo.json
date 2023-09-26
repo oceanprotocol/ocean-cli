@@ -5,26 +5,33 @@
   "id": "",
   "nftAddress": "",
   "version": "4.1.0",
-  "chainId": 80001,
+  "chainId": 137,
   "metadata": {
-    "created": "2021-12-20T14:35:20Z",
-    "updated": "2021-12-20T14:35:20Z",
+    "created": "2023-08-01T17:09:39Z",
+    "updated": "2023-08-01T17:09:39Z",
     "type": "algorithm",
-    "name": "cli publish",
-    "description": "desc desc desc",
-    "tags": [
-      "test"
-    ],
-    "author": "oceanprotocol",
+    "name": "CLi Algo",
+    "description": "Cli algo",
+    "author": "OPF",
     "license": "https://market.oceanprotocol.com/terms",
     "additionalInformation": {
       "termsAndConditions": true
+    },
+    "algorithm": {
+      "language": "py",
+      "version": "0.1",
+      "container": {
+        "entrypoint": "python $ALGO",
+        "image": "oceanprotocol/algo_dockers",
+        "tag": "python-branin",
+        "checksum": "sha256:8221d20c1c16491d7d56b9657ea09082c0ee4a8ab1a6621fa720da58b09580e4"
+      }
     }
   },
   "services": [
     {
-      "id": "ccb398c50d6abd5b456e8d7242bd856a1767a890b537c2f8c10ba8b8a10e6025",
-      "type": "access",
+      "id": "db164c1b981e4d2974e90e61bda121512e6909c1035c908d68933ae4cfaba6b0",
+      "type": "compute",
       "files": {
         "datatokenAddress": "0x0",
         "nftAddress": "0x0",
@@ -36,12 +43,21 @@
           }
         ]
       },
-      "datatokenAddress": "",
-      "serviceEndpoint": "https://v4.provider.oceanprotocol.com",
-      "timeout": 86400
+      "timeout": 86400,
+      "compute": {
+        "allowRawAlgorithm": false,
+        "allowNetworkAccess": true,
+        "publisherTrustedAlgorithmPublishers": [],
+        "publisherTrustedAlgorithms": []
+      }
     }
   ],
-  "event": {
+  "stats": {
+    "allocated": 0,
+    "orders": 0,
+    "price": {
+      "value": "0"
+    }
   },
   "nft": {
     "address": "",
@@ -51,14 +67,5 @@
     "tokenURI": "",
     "owner": "",
     "created": ""
-  },
-  "purgatory": {
-    "state": false
-  },
-  "datatokens": [
-  ],
-  "stats": {
-  },
-  "accessDetails": {
   }
 }

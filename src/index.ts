@@ -44,8 +44,9 @@ function help() {
 
 async function start() {
 	const provider = new ethers.providers.JsonRpcProvider(process.env.RPC);
-	const signer = new ethers.Wallet(process.env.MNEMONIC, provider);
+	console.log("Using RPC: " + process.env.RPC);
 
+	const signer = new ethers.Wallet(process.env.MNEMONIC, provider);
 	console.log("Using account: " + (await signer.getAddress()));
 
 	const { chainId } = await signer.provider.getNetwork();
@@ -81,6 +82,9 @@ async function start() {
 			break;
 		case "edit":
 			await commands.editAsset(myArgs);
+			break;
+		case "mintOcean":
+			await commands.mintOceanTokens(myArgs);
 			break;
 		case "h":
 			help();

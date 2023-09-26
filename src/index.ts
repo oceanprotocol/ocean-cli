@@ -97,8 +97,6 @@ async function start() {
 		case "getJobStatus":
 			await commands.getJobStatus(myArgs);
 			break;
-			// case "getJobResults":
-			// 	await commands.getJobResults(myArgs);
 			break;
 		case "downloadJobResults":
 			await commands.downloadJobResults(myArgs);

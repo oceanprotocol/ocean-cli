@@ -126,7 +126,7 @@ export async function createAsset(
 			fixedRate: ddo.stats.price.value,
 			marketFee: "0",
 			allowedConsumer: await owner.getAddress(),
-			withMint: false,
+			withMint: true,
 		};
 
 		bundleNFT = await nftFactory.createNftWithDatatokenWithFixedRate(

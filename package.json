@@ -1,7 +1,7 @@
 {
-  "name": "ocean-demo",
+  "name": "ocean-cli",
   "version": "2.0.0",
-  "description": "",
+  "description": "CLI tool to interact with the oceanprotocol's JavaScript library to privately & securely publish, consume and run compute on data.",
   "main": "index.js",
   "scripts": {
     "build": "npm run clean && npm run build:tsc",

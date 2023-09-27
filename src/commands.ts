@@ -39,7 +39,7 @@ export class Commands {
 			process.env.CUSTOM_PROVIDER_URL = "http://127.0.0.1:8030";
 		}
 		console.log("Using Provider :", this.providerUrl);
-		process.env.CUSTOM_PROVIDER_UR &&
+		process.env.CUSTOM_PROVIDER_URL &&
 			console.log(" -> MacOS provider url :", process.env.CUSTOM_PROVIDER_URL);
 		this.config.metadataCacheUri =
 			this.config.chainId === 8996 && os.type() === "Darwin"

@@ -10,8 +10,8 @@
     "created": "2021-12-20T14:35:20Z",
     "updated": "2021-12-20T14:35:20Z",
     "type": "dataset",
-    "name": "cli fixed asset",
-    "description": "asset published using ocean.js cli tool",
+    "name": "ocean-cli demo asset",
+    "description": "asset published using ocean cli tool",
     "tags": [
       "test"
     ],
@@ -31,7 +31,7 @@
         "files": [
           {
             "type": "url",
-            "url": "https://raw.githubusercontent.com/oceanprotocol/testdatasets/main/shs_dataset_test.txt",
+            "url": "https://dumps.wikimedia.org/enwiki/latest/enwiki-latest-abstract10.xml.gz-rss.xml",
             "method": "GET"
           }
         ]

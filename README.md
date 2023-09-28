@@ -1,6 +1,6 @@
 [![banner](https://raw.githubusercontent.com/oceanprotocol/art/master/github/repo-banner%402x.png)](https://oceanprotocol.com)
 
-<h1 align="center">ocean.js cli</h1>
+<h1 align="center">Ocean CLI</h1>
 
 > CLI tool to interact with the oceanprotocol's JavaScript library to privately & securely publish, consume and run compute on data.
 
@@ -8,16 +8,16 @@
 [![code style: prettier](https://img.shields.io/badge/code_style-prettier-7b1173.svg?style=flat-square)](https://github.com/prettier/prettier)
 [![js oceanprotocol](https://img.shields.io/badge/js-oceanprotocol-7b1173.svg)](https://github.com/oceanprotocol/eslint-config-oceanprotocol)
 
-With the ocean.js cli tool you can:
+With the Ocean CLI tool you can:
 
 - **Publish** data services: downloadable files or compute-to-data.
 - **Edit** existing assets.
 - **Consume** data services, ordering datatokens and downloading data.
 - **Compute to data** on public available datasets using a published algorithm.
 
-Ocean.js cli is using ocean.js Javascripti library witch is part of the [Ocean Protocol](https://oceanprotocol.com) toolset.
+Ocean CLI is using ocean.js Javascripti library witch is part of the [Ocean Protocol](https://oceanprotocol.com) toolset.
 
-If you run into problems, please open up a [new issue](https://github.com/oceanprotocol/ocean.js-cli/issues/new?assignees=&labels=Type%3A+Bug&projects=&template=bug_report.md&title=).
+If you run into problems, please open up a [new issue](https://github.com/oceanprotocol/ocean-cli/issues/new?assignees=&labels=Type%3A+Bug&projects=&template=bug_report.md&title=).
 
 - [📚 Prerequisites](#-prerequisites)
 - [🏗 Installation & Usage](#-installation--usage)
@@ -33,7 +33,7 @@ If you run into problems, please open up a [new issue](https://github.com/oceanp
 ### Clone and install
 
 ```bash
-$ git clone https://github.com/oceanprotocol/ocean.js-cli.git
+$ git clone https://github.com/oceanprotocol/ocean-cli.git
 npm install
 ```
 
@@ -63,6 +63,12 @@ export AQUARIUS_URL='XXXX'
 export PROVIDER_URL='XXXX'
 ```
 
+- Optional set ADDRESS_FILE if you want to use a custom set of smart contract address
+
+```
+export ADDRESS_FILE='path-to-address-file'
+```
+
 ### Build the TypeScript code
 
 ```
@@ -80,7 +86,7 @@ npm run cli h
 E.g. run publish command
 
 ```
-npm run cli publish metadata/simpleDataset.json
+npm run cli publish metadata/simpleDownloadDataset.json
 ```
 
 ## 🏛 License

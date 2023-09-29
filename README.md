@@ -39,10 +39,10 @@ npm install
 
 ### Set up environment variables
 
-- Set a private key and export it
+- Set a private key(by exporting env "PRIVATE_KEY") or a mnemonic (by exporting env "MNEMONIC")
 
 ```
-export MNEMONIC="XXXX"
+export PRIVATE_KEY"XXXX"
 ```
 
 - Set an RPC

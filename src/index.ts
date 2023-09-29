@@ -61,7 +61,7 @@ async function start() {
 	console.log("Using RPC: " + process.env.RPC);
 	let signer
 	if (process.env.PRIVATE_KEY)
-		signer = new ethers.Wallet(process.env.MNEMONIC, provider);
+		signer = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
 	else{
 		signer = ethers.Wallet.fromMnemonic(process.env.MNEMONIC);
 		signer = await signer.connect(provider)

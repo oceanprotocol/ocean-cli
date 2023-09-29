@@ -1,8 +1,8 @@
 import { ethers } from "ethers";
 import { Commands } from "./commands";
 
-if (!process.env.MNEMONIC) {
-	console.error("Have you forgot to set env MNEMONIC?");
+if (!process.env.MNEMONIC && !process.env.PRIVATE_KEY) {
+	console.error("Have you forgot to set env MNEMONIC or PRIVATE_KEY?");
 	process.exit(0);
 }
 if (!process.env.RPC) {
@@ -59,8 +59,11 @@ function help() {
 async function start() {
 	const provider = new ethers.providers.JsonRpcProvider(process.env.RPC);
 	console.log("Using RPC: " + process.env.RPC);
-
-	const signer = new ethers.Wallet(process.env.MNEMONIC, provider);
+	let signer
+	if (process.env.PRIVATE_KEY)
+		signer = new ethers.Wallet(process.env.MNEMONIC, provider);
+	else
+		signer = ethers.Wallet.fromMnemonic(process.env.MNEMONIC);
 	console.log("Using account: " + (await signer.getAddress()));
 
 	const { chainId } = await signer.provider.getNetwork();

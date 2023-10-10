@@ -217,6 +217,12 @@ export class Commands {
 	public async computeStart(args: string[]) {
 		const output = {};
 		const dataDdo = await this.aquarius.waitForAqua(args[1]);
+
+		const providerURI =
+			this.macOsProviderUrl && dataDdo.chainId === 8996
+				? this.macOsProviderUrl
+				: dataDdo.services[0].serviceEndpoint;
+
 		if (!dataDdo) {
 			console.error(
 				"Error fetching DDO " + args[1] + ".  Does this asset exists?"
@@ -280,7 +286,7 @@ export class Commands {
 				algo,
 				computeEnv.id,
 				computeValidUntil,
-				this.macOsProviderUrl || this.providerUrl,
+				providerURI,
 				await this.signer.getAddress()
 			);
 		if (
@@ -305,7 +311,7 @@ export class Commands {
 			datatoken,
 			this.config,
 			providerInitializeComputeJob?.algorithm?.providerFee,
-			this.macOsProviderUrl || this.providerUrl
+			providerURI
 		);
 		if (!algo.transferTxId) {
 			console.error(
@@ -326,7 +332,7 @@ export class Commands {
 				datatoken,
 				this.config,
 				providerInitializeComputeJob?.datasets[i].providerFee,
-				this.macOsProviderUrl || this.providerUrl
+				providerURI
 			);
 			if (!assets[i].transferTxId) {
 				console.error(
@@ -339,7 +345,7 @@ export class Commands {
 		}
 		console.log("Starting compute job ...");
 		const computeJobs = await ProviderInstance.computeStart(
-			this.macOsProviderUrl || this.providerUrl,
+			providerURI,
 			this.signer,
 			computeEnv.id,
 			assets[0],
@@ -350,11 +356,17 @@ export class Commands {
 	}
 
 	public async computeStop(args: string[]) {
+		const dataDdo = await this.aquarius.waitForAqua(args[1]);
+		const providerURI =
+			this.macOsProviderUrl && dataDdo.chainId === 8996
+				? this.macOsProviderUrl
+				: dataDdo.services[0].serviceEndpoint;
+
 		const jobStatus = await ProviderInstance.computeStop(
 			args[1],
 			await this.signer.getAddress(),
 			args[2],
-			this.macOsProviderUrl || this.providerUrl,
+			providerURI,
 			this.signer
 		);
 		console.log(jobStatus);
@@ -477,8 +489,14 @@ export class Commands {
 	}
 
 	public async getJobStatus(args: string[]) {
+		const dataDdo = await this.aquarius.waitForAqua(args[1]);
+		const providerURI =
+			this.macOsProviderUrl && dataDdo.chainId === 8996
+				? this.macOsProviderUrl
+				: dataDdo.services[0].serviceEndpoint;
+
 		const jobStatus = (await ProviderInstance.computeStatus(
-			this.providerUrl,
+			providerURI,
 			await this.signer.getAddress(),
 			args[2],
 			args[1]

@@ -6,6 +6,7 @@ import {
 	handleComputeOrder,
 	updateAssetMetadata,
 	downloadFile,
+	isOrderable,
 } from "./helpers";
 import {
 	Aquarius,
@@ -171,6 +172,11 @@ export class Commands {
 			return;
 		}
 
+		const providerURI =
+			this.macOsProviderUrl && dataDdo.chainId === 8996
+				? this.macOsProviderUrl
+				: dataDdo.services[0].serviceEndpoint;
+
 		const datatoken = new Datatoken(this.signer, this.config.chainId);
 
 		const tx = await orderAsset(
@@ -178,7 +184,7 @@ export class Commands {
 			this.signer,
 			this.config,
 			datatoken,
-			this.macOsProviderUrl || this.providerUrl
+			providerURI
 		);
 
 		if (!tx) {
@@ -197,7 +203,7 @@ export class Commands {
 			dataDdo.services[0].id,
 			0,
 			orderTx.transactionHash,
-			this.macOsProviderUrl || this.providerUrl,
+			providerURI,
 			this.signer
 		);
 		try {
@@ -254,6 +260,19 @@ export class Commands {
 			documentId: algoDdo.id,
 			serviceId: algoDdo.services[0].id,
 		};
+
+		const canStartCompute = isOrderable(
+			dataDdo,
+			dataDdo.services[0].id,
+			algo,
+			algoDdo
+		);
+		if (!canStartCompute) {
+			console.error(
+				"Error Cannot start compute job using the dataset DID & algorithm DID provided"
+			);
+			return;
+		}
 
 		const providerInitializeComputeJob =
 			await ProviderInstance.initializeCompute(

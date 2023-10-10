@@ -25,6 +25,8 @@ import {
 	DownloadResponse,
 	Asset,
 	ProviderFees,
+	ComputeAlgorithm,
+	LoggerInstance,
 } from "@oceanprotocol/lib";
 
 export async function downloadFile(
@@ -261,4 +263,35 @@ export async function handleComputeOrder(
 	const orderStartedTx = getEventFromTx(tx, "OrderStarted");
 
 	return orderStartedTx.transactionHash;
+}
+
+export async function isOrderable(
+	asset: Asset | DDO,
+	serviceId: string,
+	algorithm: ComputeAlgorithm,
+	algorithmDDO: Asset | DDO
+): Promise<boolean> {
+	const datasetService = asset.services.find((s) => s.id === serviceId);
+	if (!datasetService) return false;
+
+	if (datasetService.type === "compute") {
+		if (algorithm.meta) {
+			if (datasetService.compute.allowRawAlgorithm) return true;
+			return false;
+		}
+		if (algorithm.documentId) {
+			const algoService = algorithmDDO.services.find(
+				(s) => s.id === algorithm.serviceId
+			);
+			if (algoService && algoService.type === "compute") {
+				if (algoService.serviceEndpoint !== datasetService.serviceEndpoint) {
+					LoggerInstance.error(
+						"ERROR: Both assets with compute service are not served by the same provider"
+					);
+					return false;
+				}
+			}
+		}
+	}
+	return true;
 }

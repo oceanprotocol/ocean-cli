@@ -15,7 +15,7 @@ With the Ocean CLI tool you can:
 - **Consume** data services, ordering datatokens and downloading data.
 - **Compute to data** on public available datasets using a published algorithm.
 
-Ocean CLI is using ocean.js Javascripti library witch is part of the [Ocean Protocol](https://oceanprotocol.com) toolset.
+Ocean CLI is using ocean.js Javascripti library which is part of the [Ocean Protocol](https://oceanprotocol.com) toolset.
 
 If you run into problems, please open up a [new issue](https://github.com/oceanprotocol/ocean-cli/issues/new?assignees=&labels=Type%3A+Bug&projects=&template=bug_report.md&title=).
 

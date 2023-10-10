@@ -152,7 +152,7 @@ export class Commands {
 	}
 
 	public async getDDO(args: string[]) {
-		console.log("Resolving Asset with DID :" + args[1]);
+		console.log("Resolving Asset with DID: " + args[1]);
 		const resolvedDDO = await this.aquarius.waitForAqua(args[1]);
 		if (!resolvedDDO) {
 			console.error(
@@ -176,7 +176,7 @@ export class Commands {
 			this.macOsProviderUrl && dataDdo.chainId === 8996
 				? this.macOsProviderUrl
 				: dataDdo.services[0].serviceEndpoint;
-
+		console.log("Downloading asset using provider: ", providerURI);
 		const datatoken = new Datatoken(this.signer, this.config.chainId);
 
 		const tx = await orderAsset(
@@ -280,6 +280,7 @@ export class Commands {
 			return;
 		}
 
+		console.log("Starting compute job using provider: ", providerURI);
 		const providerInitializeComputeJob =
 			await ProviderInstance.initializeCompute(
 				assets,
@@ -302,6 +303,7 @@ export class Commands {
 			return;
 		}
 
+		console.log("Ordering algorithm: ", args[2]);
 		algo.transferTxId = await handleComputeOrder(
 			providerInitializeComputeJob.algorithm,
 			algoDdo,
@@ -323,6 +325,7 @@ export class Commands {
 		}
 
 		for (let i = 0; i < providerInitializeComputeJob.datasets.length; i++) {
+			console.log("Ordering dataset: ", args[1]);
 			assets[i].transferTxId = await handleComputeOrder(
 				providerInitializeComputeJob.datasets[i],
 				dataDdo,
@@ -357,6 +360,12 @@ export class Commands {
 
 	public async computeStop(args: string[]) {
 		const dataDdo = await this.aquarius.waitForAqua(args[1]);
+		if (!dataDdo) {
+			console.error(
+				"Error fetching DDO " + args[1] + ".  Does this asset exists?"
+			);
+			return;
+		}
 		const providerURI =
 			this.macOsProviderUrl && dataDdo.chainId === 8996
 				? this.macOsProviderUrl
@@ -490,6 +499,12 @@ export class Commands {
 
 	public async getJobStatus(args: string[]) {
 		const dataDdo = await this.aquarius.waitForAqua(args[1]);
+		if (!dataDdo) {
+			console.error(
+				"Error fetching DDO " + args[1] + ".  Does this asset exists?"
+			);
+			return;
+		}
 		const providerURI =
 			this.macOsProviderUrl && dataDdo.chainId === 8996
 				? this.macOsProviderUrl

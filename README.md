@@ -45,6 +45,12 @@ npm install
 export PRIVATE_KEY"XXXX"
 ```
 
+or
+
+```
+export MNEMONIC="XXXX"
+```
+
 - Set an RPC
 
 ```

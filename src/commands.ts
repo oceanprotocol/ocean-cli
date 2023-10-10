@@ -6,6 +6,7 @@ import {
 	handleComputeOrder,
 	updateAssetMetadata,
 	downloadFile,
+	isOrderable,
 } from "./helpers";
 import {
 	Aquarius,
@@ -30,21 +31,19 @@ export class Commands {
 	public config: Config;
 	public aquarius: Aquarius;
 	public providerUrl: string;
+	public macOsProviderUrl: string;
 
 	constructor(signer: Signer, network: string | number, config?: Config) {
 		this.signer = signer;
 		this.config = config || new ConfigHelper().getConfig(network);
 		this.providerUrl = process.env.PROVIDER_URL || this.config.providerUri;
 		if (this.config.chainId === 8996 && os.type() === "Darwin") {
-			process.env.CUSTOM_PROVIDER_URL = "http://127.0.0.1:8030";
+			this.macOsProviderUrl = "http://127.0.0.1:8030";
+			this.config.metadataCacheUri = "http://127.0.0.1:5000";
 		}
 		console.log("Using Provider :", this.providerUrl);
-		process.env.CUSTOM_PROVIDER_URL &&
-			console.log(" -> MacOS provider url :", process.env.CUSTOM_PROVIDER_URL);
-		this.config.metadataCacheUri =
-			this.config.chainId === 8996 && os.type() === "Darwin"
-				? "http://127.0.0.1:5000"
-				: null;
+		this.macOsProviderUrl &&
+			console.log(" -> MacOS provider url :", this.macOsProviderUrl);
 
 		this.aquarius = new Aquarius(
 			process.env.AQUARIUS_URL || this.config.metadataCacheUri
@@ -82,7 +81,8 @@ export class Commands {
 				asset,
 				this.providerUrl,
 				this.config,
-				this.aquarius
+				this.aquarius,
+				this.macOsProviderUrl
 			);
 			console.log("Asset published. ID:  " + urlAssetId);
 		} catch (e) {
@@ -111,7 +111,8 @@ export class Commands {
 			algoAsset,
 			this.providerUrl,
 			this.config,
-			this.aquarius
+			this.aquarius,
+			this.macOsProviderUrl
 		);
 		// add some more checks
 		console.log("Algorithm published. DID:  " + algoDid);
@@ -144,13 +145,14 @@ export class Commands {
 			this.signer,
 			asset,
 			this.providerUrl,
-			this.aquarius
+			this.aquarius,
+			this.macOsProviderUrl
 		);
 		console.log("Asset updated " + updateAssetTx);
 	}
 
 	public async getDDO(args: string[]) {
-		console.log("Resolving Asset with DID :" + args[1]);
+		console.log("Resolving Asset with DID: " + args[1]);
 		const resolvedDDO = await this.aquarius.waitForAqua(args[1]);
 		if (!resolvedDDO) {
 			console.error(
@@ -170,6 +172,11 @@ export class Commands {
 			return;
 		}
 
+		const providerURI =
+			this.macOsProviderUrl && dataDdo.chainId === 8996
+				? this.macOsProviderUrl
+				: dataDdo.services[0].serviceEndpoint;
+		console.log("Downloading asset using provider: ", providerURI);
 		const datatoken = new Datatoken(this.signer, this.config.chainId);
 
 		const tx = await orderAsset(
@@ -177,7 +184,7 @@ export class Commands {
 			this.signer,
 			this.config,
 			datatoken,
-			process.env.CUSTOM_PROVIDER_URL || this.providerUrl
+			providerURI
 		);
 
 		if (!tx) {
@@ -196,7 +203,7 @@ export class Commands {
 			dataDdo.services[0].id,
 			0,
 			orderTx.transactionHash,
-			process.env.CUSTOM_PROVIDER_URL || this.providerUrl,
+			providerURI,
 			this.signer
 		);
 		try {
@@ -210,6 +217,12 @@ export class Commands {
 	public async computeStart(args: string[]) {
 		const output = {};
 		const dataDdo = await this.aquarius.waitForAqua(args[1]);
+
+		const providerURI =
+			this.macOsProviderUrl && dataDdo.chainId === 8996
+				? this.macOsProviderUrl
+				: dataDdo.services[0].serviceEndpoint;
+
 		if (!dataDdo) {
 			console.error(
 				"Error fetching DDO " + args[1] + ".  Does this asset exists?"
@@ -226,7 +239,7 @@ export class Commands {
 		}
 
 		const computeEnvs = await ProviderInstance.getComputeEnvironments(
-			process.env.CUSTOM_PROVIDER_URL || this.providerUrl
+			this.macOsProviderUrl || this.providerUrl
 		);
 
 		const datatoken = new Datatoken(
@@ -254,13 +267,27 @@ export class Commands {
 			serviceId: algoDdo.services[0].id,
 		};
 
+		const canStartCompute = isOrderable(
+			dataDdo,
+			dataDdo.services[0].id,
+			algo,
+			algoDdo
+		);
+		if (!canStartCompute) {
+			console.error(
+				"Error Cannot start compute job using the dataset DID & algorithm DID provided"
+			);
+			return;
+		}
+
+		console.log("Starting compute job using provider: ", providerURI);
 		const providerInitializeComputeJob =
 			await ProviderInstance.initializeCompute(
 				assets,
 				algo,
 				computeEnv.id,
 				computeValidUntil,
-				process.env.CUSTOM_PROVIDER_URL || this.providerUrl,
+				providerURI,
 				await this.signer.getAddress()
 			);
 		if (
@@ -276,6 +303,7 @@ export class Commands {
 			return;
 		}
 
+		console.log("Ordering algorithm: ", args[2]);
 		algo.transferTxId = await handleComputeOrder(
 			providerInitializeComputeJob.algorithm,
 			algoDdo,
@@ -285,7 +313,7 @@ export class Commands {
 			datatoken,
 			this.config,
 			providerInitializeComputeJob?.algorithm?.providerFee,
-			process.env.CUSTOM_PROVIDER_URL || this.providerUrl
+			providerURI
 		);
 		if (!algo.transferTxId) {
 			console.error(
@@ -297,6 +325,7 @@ export class Commands {
 		}
 
 		for (let i = 0; i < providerInitializeComputeJob.datasets.length; i++) {
+			console.log("Ordering dataset: ", args[1]);
 			assets[i].transferTxId = await handleComputeOrder(
 				providerInitializeComputeJob.datasets[i],
 				dataDdo,
@@ -306,7 +335,7 @@ export class Commands {
 				datatoken,
 				this.config,
 				providerInitializeComputeJob?.datasets[i].providerFee,
-				process.env.CUSTOM_PROVIDER_URL || this.providerUrl
+				providerURI
 			);
 			if (!assets[i].transferTxId) {
 				console.error(
@@ -319,7 +348,7 @@ export class Commands {
 		}
 		console.log("Starting compute job ...");
 		const computeJobs = await ProviderInstance.computeStart(
-			process.env.CUSTOM_PROVIDER_URL || this.providerUrl,
+			providerURI,
 			this.signer,
 			computeEnv.id,
 			assets[0],
@@ -330,11 +359,23 @@ export class Commands {
 	}
 
 	public async computeStop(args: string[]) {
+		const dataDdo = await this.aquarius.waitForAqua(args[1]);
+		if (!dataDdo) {
+			console.error(
+				"Error fetching DDO " + args[1] + ".  Does this asset exists?"
+			);
+			return;
+		}
+		const providerURI =
+			this.macOsProviderUrl && dataDdo.chainId === 8996
+				? this.macOsProviderUrl
+				: dataDdo.services[0].serviceEndpoint;
+
 		const jobStatus = await ProviderInstance.computeStop(
 			args[1],
 			await this.signer.getAddress(),
 			args[2],
-			process.env.CUSTOM_PROVIDER_URL || this.providerUrl,
+			providerURI,
 			this.signer
 		);
 		console.log(jobStatus);
@@ -392,7 +433,8 @@ export class Commands {
 			this.signer,
 			asset,
 			this.providerUrl,
-			this.aquarius
+			this.aquarius,
+			this.macOsProviderUrl
 		);
 		console.log("Asset updated " + txid);
 	}
@@ -449,14 +491,27 @@ export class Commands {
 			this.signer,
 			asset,
 			this.providerUrl,
-			this.aquarius
+			this.aquarius,
+			this.macOsProviderUrl
 		);
 		console.log("Asset updated " + txid);
 	}
 
 	public async getJobStatus(args: string[]) {
+		const dataDdo = await this.aquarius.waitForAqua(args[1]);
+		if (!dataDdo) {
+			console.error(
+				"Error fetching DDO " + args[1] + ".  Does this asset exists?"
+			);
+			return;
+		}
+		const providerURI =
+			this.macOsProviderUrl && dataDdo.chainId === 8996
+				? this.macOsProviderUrl
+				: dataDdo.services[0].serviceEndpoint;
+
 		const jobStatus = (await ProviderInstance.computeStatus(
-			this.providerUrl,
+			providerURI,
 			await this.signer.getAddress(),
 			args[2],
 			args[1]

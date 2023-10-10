@@ -25,6 +25,8 @@ import {
 	DownloadResponse,
 	Asset,
 	ProviderFees,
+	ComputeAlgorithm,
+	LoggerInstance,
 } from "@oceanprotocol/lib";
 
 export async function downloadFile(
@@ -70,7 +72,8 @@ export async function createAsset(
 	ddo: any,
 	providerUrl: string,
 	config: Config,
-	aquariusInstance: Aquarius
+	aquariusInstance: Aquarius,
+	macOsProviderUrl?: string
 ) {
 	const { chainId } = await owner.provider.getNetwork();
 	const nft = new Nft(owner, chainId);
@@ -149,7 +152,7 @@ export async function createAsset(
 	ddo.services[0].files = await ProviderInstance.encrypt(
 		assetUrl,
 		chainId,
-		process.env.CUSTOM_PROVIDER_URL || providerUrl
+		macOsProviderUrl || providerUrl
 	);
 	ddo.services[0].datatokenAddress = datatokenAddressAsset;
 	ddo.services[0].serviceEndpoint = providerUrl;
@@ -162,7 +165,7 @@ export async function createAsset(
 	const encryptedResponse = await ProviderInstance.encrypt(
 		ddo,
 		chainId,
-		process.env.CUSTOM_PROVIDER_URL || providerUrl
+		macOsProviderUrl || providerUrl
 	);
 	const validateResult = await aquariusInstance.validate(ddo);
 	await nft.setMetadata(
@@ -182,13 +185,14 @@ export async function updateAssetMetadata(
 	owner: Signer,
 	updatedDdo: DDO,
 	providerUrl: string,
-	aquariusInstance: Aquarius
+	aquariusInstance: Aquarius,
+	macOsProviderUrl?: string
 ) {
 	const nft = new Nft(owner, (await owner.provider.getNetwork()).chainId);
 	const providerResponse = await ProviderInstance.encrypt(
 		updatedDdo,
 		updatedDdo.chainId,
-		process.env.CUSTOM_PROVIDER_URL || providerUrl
+		macOsProviderUrl || providerUrl
 	);
 	const encryptedResponse = await providerResponse;
 	const validateResult = await aquariusInstance.validate(updatedDdo);
@@ -259,4 +263,35 @@ export async function handleComputeOrder(
 	const orderStartedTx = getEventFromTx(tx, "OrderStarted");
 
 	return orderStartedTx.transactionHash;
+}
+
+export async function isOrderable(
+	asset: Asset | DDO,
+	serviceId: string,
+	algorithm: ComputeAlgorithm,
+	algorithmDDO: Asset | DDO
+): Promise<boolean> {
+	const datasetService = asset.services.find((s) => s.id === serviceId);
+	if (!datasetService) return false;
+
+	if (datasetService.type === "compute") {
+		if (algorithm.meta) {
+			if (datasetService.compute.allowRawAlgorithm) return true;
+			return false;
+		}
+		if (algorithm.documentId) {
+			const algoService = algorithmDDO.services.find(
+				(s) => s.id === algorithm.serviceId
+			);
+			if (algoService && algoService.type === "compute") {
+				if (algoService.serviceEndpoint !== datasetService.serviceEndpoint) {
+					LoggerInstance.error(
+						"ERROR: Both assets with compute service are not served by the same provider"
+					);
+					return false;
+				}
+			}
+		}
+	}
+	return true;
 }

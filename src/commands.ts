@@ -30,21 +30,19 @@ export class Commands {
 	public config: Config;
 	public aquarius: Aquarius;
 	public providerUrl: string;
+	public macOsProviderUrl: string;
 
 	constructor(signer: Signer, network: string | number, config?: Config) {
 		this.signer = signer;
 		this.config = config || new ConfigHelper().getConfig(network);
 		this.providerUrl = process.env.PROVIDER_URL || this.config.providerUri;
 		if (this.config.chainId === 8996 && os.type() === "Darwin") {
-			process.env.CUSTOM_PROVIDER_URL = "http://127.0.0.1:8030";
+			this.macOsProviderUrl = "http://127.0.0.1:8030";
+			this.config.metadataCacheUri = "http://127.0.0.1:5000";
 		}
 		console.log("Using Provider :", this.providerUrl);
-		process.env.CUSTOM_PROVIDER_URL &&
-			console.log(" -> MacOS provider url :", process.env.CUSTOM_PROVIDER_URL);
-		this.config.metadataCacheUri =
-			this.config.chainId === 8996 && os.type() === "Darwin"
-				? "http://127.0.0.1:5000"
-				: null;
+		this.macOsProviderUrl &&
+			console.log(" -> MacOS provider url :", this.macOsProviderUrl);
 
 		this.aquarius = new Aquarius(
 			process.env.AQUARIUS_URL || this.config.metadataCacheUri
@@ -82,7 +80,8 @@ export class Commands {
 				asset,
 				this.providerUrl,
 				this.config,
-				this.aquarius
+				this.aquarius,
+				this.macOsProviderUrl
 			);
 			console.log("Asset published. ID:  " + urlAssetId);
 		} catch (e) {
@@ -111,7 +110,8 @@ export class Commands {
 			algoAsset,
 			this.providerUrl,
 			this.config,
-			this.aquarius
+			this.aquarius,
+			this.macOsProviderUrl
 		);
 		// add some more checks
 		console.log("Algorithm published. DID:  " + algoDid);
@@ -144,7 +144,8 @@ export class Commands {
 			this.signer,
 			asset,
 			this.providerUrl,
-			this.aquarius
+			this.aquarius,
+			this.macOsProviderUrl
 		);
 		console.log("Asset updated " + updateAssetTx);
 	}
@@ -177,7 +178,7 @@ export class Commands {
 			this.signer,
 			this.config,
 			datatoken,
-			process.env.CUSTOM_PROVIDER_URL || this.providerUrl
+			this.macOsProviderUrl || this.providerUrl
 		);
 
 		if (!tx) {
@@ -196,7 +197,7 @@ export class Commands {
 			dataDdo.services[0].id,
 			0,
 			orderTx.transactionHash,
-			process.env.CUSTOM_PROVIDER_URL || this.providerUrl,
+			this.macOsProviderUrl || this.providerUrl,
 			this.signer
 		);
 		try {
@@ -226,7 +227,7 @@ export class Commands {
 		}
 
 		const computeEnvs = await ProviderInstance.getComputeEnvironments(
-			process.env.CUSTOM_PROVIDER_URL || this.providerUrl
+			this.macOsProviderUrl || this.providerUrl
 		);
 
 		const datatoken = new Datatoken(
@@ -260,7 +261,7 @@ export class Commands {
 				algo,
 				computeEnv.id,
 				computeValidUntil,
-				process.env.CUSTOM_PROVIDER_URL || this.providerUrl,
+				this.macOsProviderUrl || this.providerUrl,
 				await this.signer.getAddress()
 			);
 		if (
@@ -285,7 +286,7 @@ export class Commands {
 			datatoken,
 			this.config,
 			providerInitializeComputeJob?.algorithm?.providerFee,
-			process.env.CUSTOM_PROVIDER_URL || this.providerUrl
+			this.macOsProviderUrl || this.providerUrl
 		);
 		if (!algo.transferTxId) {
 			console.error(
@@ -306,7 +307,7 @@ export class Commands {
 				datatoken,
 				this.config,
 				providerInitializeComputeJob?.datasets[i].providerFee,
-				process.env.CUSTOM_PROVIDER_URL || this.providerUrl
+				this.macOsProviderUrl || this.providerUrl
 			);
 			if (!assets[i].transferTxId) {
 				console.error(
@@ -319,7 +320,7 @@ export class Commands {
 		}
 		console.log("Starting compute job ...");
 		const computeJobs = await ProviderInstance.computeStart(
-			process.env.CUSTOM_PROVIDER_URL || this.providerUrl,
+			this.macOsProviderUrl || this.providerUrl,
 			this.signer,
 			computeEnv.id,
 			assets[0],
@@ -334,7 +335,7 @@ export class Commands {
 			args[1],
 			await this.signer.getAddress(),
 			args[2],
-			process.env.CUSTOM_PROVIDER_URL || this.providerUrl,
+			this.macOsProviderUrl || this.providerUrl,
 			this.signer
 		);
 		console.log(jobStatus);
@@ -392,7 +393,8 @@ export class Commands {
 			this.signer,
 			asset,
 			this.providerUrl,
-			this.aquarius
+			this.aquarius,
+			this.macOsProviderUrl
 		);
 		console.log("Asset updated " + txid);
 	}
@@ -449,7 +451,8 @@ export class Commands {
 			this.signer,
 			asset,
 			this.providerUrl,
-			this.aquarius
+			this.aquarius,
+			this.macOsProviderUrl
 		);
 		console.log("Asset updated " + txid);
 	}

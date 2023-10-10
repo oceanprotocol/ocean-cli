@@ -70,7 +70,8 @@ export async function createAsset(
 	ddo: any,
 	providerUrl: string,
 	config: Config,
-	aquariusInstance: Aquarius
+	aquariusInstance: Aquarius,
+	macOsProviderUrl?: string
 ) {
 	const { chainId } = await owner.provider.getNetwork();
 	const nft = new Nft(owner, chainId);
@@ -149,7 +150,7 @@ export async function createAsset(
 	ddo.services[0].files = await ProviderInstance.encrypt(
 		assetUrl,
 		chainId,
-		process.env.CUSTOM_PROVIDER_URL || providerUrl
+		macOsProviderUrl || providerUrl
 	);
 	ddo.services[0].datatokenAddress = datatokenAddressAsset;
 	ddo.services[0].serviceEndpoint = providerUrl;
@@ -162,7 +163,7 @@ export async function createAsset(
 	const encryptedResponse = await ProviderInstance.encrypt(
 		ddo,
 		chainId,
-		process.env.CUSTOM_PROVIDER_URL || providerUrl
+		macOsProviderUrl || providerUrl
 	);
 	const validateResult = await aquariusInstance.validate(ddo);
 	await nft.setMetadata(
@@ -182,13 +183,14 @@ export async function updateAssetMetadata(
 	owner: Signer,
 	updatedDdo: DDO,
 	providerUrl: string,
-	aquariusInstance: Aquarius
+	aquariusInstance: Aquarius,
+	macOsProviderUrl?: string
 ) {
 	const nft = new Nft(owner, (await owner.provider.getNetwork()).chainId);
 	const providerResponse = await ProviderInstance.encrypt(
 		updatedDdo,
 		updatedDdo.chainId,
-		process.env.CUSTOM_PROVIDER_URL || providerUrl
+		macOsProviderUrl || providerUrl
 	);
 	const encryptedResponse = await providerResponse;
 	const validateResult = await aquariusInstance.validate(updatedDdo);

@@ -59,12 +59,12 @@ function help() {
 async function start() {
 	const provider = new ethers.providers.JsonRpcProvider(process.env.RPC);
 	console.log("Using RPC: " + process.env.RPC);
-	let signer
+	let signer;
 	if (process.env.PRIVATE_KEY)
-		signer = new ethers.Wallet(process.env.MNEMONIC, provider);
-	else{
+		signer = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
+	else {
 		signer = ethers.Wallet.fromMnemonic(process.env.MNEMONIC);
-		signer = await signer.connect(provider)
+		signer = await signer.connect(provider);
 	}
 	console.log("Using account: " + (await signer.getAddress()));
 

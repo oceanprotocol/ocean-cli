@@ -42,7 +42,7 @@ npm install
 - Set a private key(by exporting env "PRIVATE_KEY") or a mnemonic (by exporting env "MNEMONIC")
 
 ```
-export PRIVATE_KEY"XXXX"
+export PRIVATE_KEY="XXXX"
 ```
 
 or

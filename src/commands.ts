@@ -216,19 +216,39 @@ export class Commands {
 
 	public async computeStart(args: string[]) {
 		const output = {};
-		const dataDdo = await this.aquarius.waitForAqua(args[1]);
+		const inputDatasetsString = args[1]
+		let inputDatasets = [] 
 
-		const providerURI =
-			this.macOsProviderUrl && dataDdo.chainId === 8996
-				? this.macOsProviderUrl
-				: dataDdo.services[0].serviceEndpoint;
+		if (inputDatasetsString.includes('[') || inputDatasetsString.includes(']')) {
+			const processedInput = inputDatasetsString.replaceAll(']','').replaceAll('[','')
+			inputDatasets = processedInput.split(',')
+		} else {
+			inputDatasets.push(inputDatasetsString) 
+		}
 
-		if (!dataDdo) {
+		var ddos = []
+
+		for (var dataset in inputDatasets) {
+			const dataDdo = await this.aquarius.waitForAqua(inputDatasets[dataset]);
+			if (!dataDdo) {
+				console.error(
+					"Error fetching DDO " + dataset[1] + ".  Does this asset exists?"
+				)
+				return
+			} else {
+				ddos.push(dataDdo)
+			}
+		}
+		if (ddos.length <= 0 || ddos.length != inputDatasets.length)  {
 			console.error(
-				"Error fetching DDO " + args[1] + ".  Does this asset exists?"
+				"Not all the data ddos are available."
 			);
 			return;
 		}
+		const providerURI =
+			this.macOsProviderUrl && ddos[0].chainId === 8996
+				? this.macOsProviderUrl
+				: ddos[0].services[0].serviceEndpoint;
 
 		const algoDdo = await this.aquarius.waitForAqua(args[2]);
 		if (!algoDdo) {
@@ -252,34 +272,33 @@ export class Commands {
 		mytime.setMinutes(mytime.getMinutes() + computeMinutes);
 		const computeValidUntil = Math.floor(mytime.getTime() / 1000);
 
-		const computeEnv = computeEnvs[dataDdo.chainId][0];
+		const computeEnv = computeEnvs[ddos[0].chainId][0];
 
-		const assets: ComputeAsset[] = [
-			{
-				documentId: dataDdo.id,
-				serviceId: dataDdo.services[0].id,
-			},
-		];
-
-		const dtAddressArray = [dataDdo.services[0].datatokenAddress];
 		const algo: ComputeAlgorithm = {
 			documentId: algoDdo.id,
 			serviceId: algoDdo.services[0].id,
 		};
 
-		const canStartCompute = isOrderable(
-			dataDdo,
-			dataDdo.services[0].id,
-			algo,
-			algoDdo
-		);
-		if (!canStartCompute) {
-			console.error(
-				"Error Cannot start compute job using the dataset DID & algorithm DID provided"
+		var assets = []
+		for (const dataDdo in ddos) {
+			const canStartCompute = isOrderable(
+				ddos[dataDdo],
+				ddos[dataDdo].services[0].id,
+				algo,
+				algoDdo
 			);
-			return;
+			if (!canStartCompute) {
+				console.error(
+					"Error Cannot start compute job using the datasets DIDs & algorithm DID provided"
+				);
+				return;
+			}
+			assets.push({
+				documentId: ddos[dataDdo].id,
+				serviceId: ddos[dataDdo].services[0].id,
+			})
 		}
-
+		
 		console.log("Starting compute job using provider: ", providerURI);
 		const providerInitializeComputeJob =
 			await ProviderInstance.initializeCompute(
@@ -325,10 +344,10 @@ export class Commands {
 		}
 
 		for (let i = 0; i < providerInitializeComputeJob.datasets.length; i++) {
-			console.log("Ordering dataset: ", args[1]);
+			console.log("Ordering dataset: ", ddos[i]);
 			assets[i].transferTxId = await handleComputeOrder(
 				providerInitializeComputeJob.datasets[i],
-				dataDdo,
+				ddos[i],
 				this.signer,
 				computeEnv.consumerAddress,
 				0,

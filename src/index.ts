@@ -36,7 +36,7 @@ function help() {
 		"\t disallowAlgo DATASET_DID ALGO_DID - removes an approved algorithm from the dataset approved algos"
 	);
 	console.log(
-		"\t startCompute DATASET_DID ALGO_DID - starts a compute job on the mentioned dataset using the inputed algorithm's id"
+		"\t startCompute [DATASET_DIDs] ALGO_DID - starts a compute job on the mentioned datasets using the inputed algorithm's id. Pass the DATASET_DIDs separated by comma"
 	);
 
 	console.log(

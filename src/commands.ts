@@ -371,7 +371,9 @@ export class Commands {
 			this.signer,
 			computeEnv.id,
 			assets[0],
-			algo
+			algo, 
+			null, 
+			assets.slice(1)
 		);
 		const { jobId } = computeJobs[0];
 		console.log("Compute started.  JobID: " + jobId);

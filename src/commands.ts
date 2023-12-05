@@ -191,7 +191,7 @@ export class Commands {
 			console.error(
 				"Error ordering access for " +
 					args[1] +
-					".  Do you have enought tokens?"
+					".  Do you have enough tokens?"
 			);
 			return;
 		}
@@ -338,7 +338,7 @@ export class Commands {
 			console.error(
 				"Error ordering compute for algorithm with DID: " +
 					args[2] +
-					".  Do you have enought tokens?"
+					".  Do you have enough tokens?"
 			);
 			return;
 		}
@@ -360,14 +360,14 @@ export class Commands {
 				console.error(
 					"Error ordering dataset with DID: " +
 						assets[i] +
-						".  Do you have enought tokens?"
+						".  Do you have enough tokens?"
 				);
 				return;
 			}
 		}
 
 		const additionalDatasets = (assets.length > 1) ? assets.slice(1) : null
-		console.log("Starting compute job on " + assets[0].documentId + " with additional datasets " + additionalDatasets[0].documentId)
+		console.log("Starting compute job on " + assets[0].documentId + " with additional datasets:" + ((!additionalDatasets) ? "none" : additionalDatasets[0].documentId))
 		const computeJobs = await ProviderInstance.computeStart(
 			providerURI,
 			this.signer,

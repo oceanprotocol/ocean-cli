@@ -71,6 +71,7 @@ export class Commands {
 			console.error(e);
 			return;
 		}
+		const encryptDDO = args[2] === "false" ? false : true;
 		try {
 			// add some more checks
 			const urlAssetId = await createAsset(
@@ -82,7 +83,8 @@ export class Commands {
 				this.providerUrl,
 				this.config,
 				this.aquarius,
-				this.macOsProviderUrl
+				this.macOsProviderUrl,
+				encryptDDO
 			);
 			console.log("Asset published. ID:  " + urlAssetId);
 		} catch (e) {

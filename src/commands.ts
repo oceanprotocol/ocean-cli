@@ -359,13 +359,15 @@ export class Commands {
 			if (!assets[i].transferTxId) {
 				console.error(
 					"Error ordering dataset with DID: " +
-						args[1] +
+						assets[i] +
 						".  Do you have enought tokens?"
 				);
 				return;
 			}
 		}
-		console.log("Starting compute job ...");
+
+		const additionalDatasets = (assets.length > 1) ? assets.slice(1) : null
+		console.log("Starting compute job on " + assets[0].documentId + " with additional datasets " + additionalDatasets[0].documentId)
 		const computeJobs = await ProviderInstance.computeStart(
 			providerURI,
 			this.signer,
@@ -373,7 +375,7 @@ export class Commands {
 			assets[0],
 			algo, 
 			null, 
-			(assets.length > 1) ? assets.slice(1) : null
+			additionalDatasets
 		);
 		const { jobId } = computeJobs[0];
 		console.log("Compute started.  JobID: " + jobId);

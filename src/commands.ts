@@ -343,8 +343,8 @@ export class Commands {
 			return;
 		}
 
-		for (let i = 0; i < providerInitializeComputeJob.datasets.length; i++) {
-			console.log("Ordering dataset: ", ddos[i]);
+		for (let i = 0; i < ddos.length; i++) {
+			// console.log("Ordering dataset: ", ddos[i]);
 			assets[i].transferTxId = await handleComputeOrder(
 				providerInitializeComputeJob.datasets[i],
 				ddos[i],
@@ -373,7 +373,7 @@ export class Commands {
 			assets[0],
 			algo, 
 			null, 
-			assets.slice(1)
+			(assets.length > 1) ? assets.slice(1) : null
 		);
 		const { jobId } = computeJobs[0];
 		console.log("Compute started.  JobID: " + jobId);

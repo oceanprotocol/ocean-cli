@@ -272,7 +272,19 @@ export class Commands {
 		mytime.setMinutes(mytime.getMinutes() + computeMinutes);
 		const computeValidUntil = Math.floor(mytime.getTime() / 1000);
 
-		const computeEnv = computeEnvs[ddos[0].chainId][0];
+		const computeEnvID = args[3]
+		const chainComputeEnvs = computeEnvs[algoDdo.chainId]
+		var computeEnv = chainComputeEnvs[0]
+		
+		if (computeEnvID && computeEnvID.length > 1) {
+			for (const index in chainComputeEnvs) {
+				if (computeEnvID == chainComputeEnvs[index].id) {
+					computeEnv = chainComputeEnvs[index]
+					continue
+				}
+			}
+		}
+
 
 		const algo: ComputeAlgorithm = {
 			documentId: algoDdo.id,

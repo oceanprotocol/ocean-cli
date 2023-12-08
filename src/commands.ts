@@ -252,7 +252,8 @@ export class Commands {
 		mytime.setMinutes(mytime.getMinutes() + computeMinutes);
 		const computeValidUntil = Math.floor(mytime.getTime() / 1000);
 
-		const computeEnv = computeEnvs[dataDdo.chainId][0];
+		const computeEnvID = ((args[3] && args[3].length > 1) ? args[3] : dataDdo.chainId)
+		const computeEnv = (computeEnvs[computeEnvID] ? computeEnvs[computeEnvID][0] : computeEnvs[dataDdo.chainId][0])
 
 		const assets: ComputeAsset[] = [
 			{
@@ -261,7 +262,6 @@ export class Commands {
 			},
 		];
 
-		const dtAddressArray = [dataDdo.services[0].datatokenAddress];
 		const algo: ComputeAlgorithm = {
 			documentId: algoDdo.id,
 			serviceId: algoDdo.services[0].id,

@@ -285,7 +285,6 @@ export class Commands {
 			}
 		}
 
-
 		const algo: ComputeAlgorithm = {
 			documentId: algoDdo.id,
 			serviceId: algoDdo.services[0].id,
@@ -356,7 +355,6 @@ export class Commands {
 		}
 
 		for (let i = 0; i < ddos.length; i++) {
-			// console.log("Ordering dataset: ", ddos[i]);
 			assets[i].transferTxId = await handleComputeOrder(
 				providerInitializeComputeJob.datasets[i],
 				ddos[i],

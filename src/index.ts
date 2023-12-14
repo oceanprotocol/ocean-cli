@@ -16,10 +16,10 @@ function help() {
 	console.log("\t getDDO DID - gets DDO for an asset using the asset did");
 
 	console.log(
-		"\t publish  METADATA_FILE - reads MEDATDATA_FILE and publishes a new asset with access service or compute service"
+		"\t publish METADATA_FILE ENCRYPT_DDO - reads MEDATDATA_FILE and publishes a new asset with access service or compute service, if boolean ENCRYPT_DDO is false publishes DDO withoud encrypting. "
 	);
 	console.log(
-		"\t publishAlgo  METADATA_FILE - reads MEDATDATA_FILE and publishes a new algo"
+		"\t publishAlgo METADATA_FILE ENCRYPT_DDO - reads MEDATDATA_FILE and publishes a new algo, if boolean ENCRYPT_DDO is false publishes DDO withoud encrypting. "
 	);
 
 	console.log(

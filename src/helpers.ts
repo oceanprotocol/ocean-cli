@@ -28,6 +28,7 @@ import {
 	ComputeAlgorithm,
 	LoggerInstance,
 } from "@oceanprotocol/lib";
+import { hexlify } from "ethers/lib/utils";
 
 export async function downloadFile(
 	url: string,
@@ -73,7 +74,8 @@ export async function createAsset(
 	providerUrl: string,
 	config: Config,
 	aquariusInstance: Aquarius,
-	macOsProviderUrl?: string
+	macOsProviderUrl?: string,
+	encryptDDO: boolean = true
 ) {
 	const { chainId } = await owner.provider.getNetwork();
 	const nft = new Nft(owner, chainId);
@@ -162,11 +164,19 @@ export async function createAsset(
 		"did:op:" +
 		SHA256(ethers.utils.getAddress(nftAddress) + chainId.toString(10));
 
-	const encryptedResponse = await ProviderInstance.encrypt(
-		ddo,
-		chainId,
-		macOsProviderUrl || providerUrl
-	);
+	let metadata;
+	if (encryptDDO) {
+		metadata = await ProviderInstance.encrypt(
+			ddo,
+			chainId,
+			macOsProviderUrl || providerUrl
+		);
+	} else {
+		const stringDDO = JSON.stringify(ddo);
+		const bytes = Buffer.from(stringDDO);
+		metadata = hexlify(bytes);
+	}
+
 	const validateResult = await aquariusInstance.validate(ddo);
 	await nft.setMetadata(
 		nftAddress,
@@ -175,7 +185,7 @@ export async function createAsset(
 		providerUrl,
 		"",
 		ethers.utils.hexlify(2),
-		encryptedResponse,
+		metadata,
 		validateResult.hash
 	);
 	return ddo.id;

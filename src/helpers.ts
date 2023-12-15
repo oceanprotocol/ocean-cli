@@ -37,12 +37,9 @@ export async function downloadFile(
 	index?: number
 ): Promise<DownloadResponse> {
 	const response = await fetch(url);
-	console.log('downloadFile url:', url);
 	if (!response.ok) {
 		throw new Error("Response error.");
 	}
-	console.log('download response:', response);
-
 	let filename: string;
 	try {
 		filename = response.headers

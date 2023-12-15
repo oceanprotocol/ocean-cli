@@ -2,6 +2,7 @@ import { SHA256 } from "crypto-js";
 import { ethers, Signer } from "ethers";
 import fetch from "cross-fetch";
 import { promises as fs } from "fs";
+import { createHash } from "crypto";
 import * as path from "path";
 
 import {
@@ -36,9 +37,11 @@ export async function downloadFile(
 	index?: number
 ): Promise<DownloadResponse> {
 	const response = await fetch(url);
+	console.log('downloadFile url:', url);
 	if (!response.ok) {
 		throw new Error("Response error.");
 	}
+	console.log('download response:', response);
 
 	let filename: string;
 	try {
@@ -110,7 +113,7 @@ export async function createAsset(
 		const dispenserParams: DispenserCreationParams = {
 			dispenserAddress: config.dispenserAddress,
 			maxTokens: "1",
-			maxBalance: "1",
+			maxBalance: "100000000",
 			withMint: true,
 			allowedSwapper: ZERO_ADDRESS,
 		};
@@ -165,19 +168,22 @@ export async function createAsset(
 		SHA256(ethers.utils.getAddress(nftAddress) + chainId.toString(10));
 
 	let metadata;
+	let metadataHash;
 	if (encryptDDO) {
 		metadata = await ProviderInstance.encrypt(
 			ddo,
 			chainId,
 			macOsProviderUrl || providerUrl
 		);
+		const validateResult = await aquariusInstance.validate(ddo);
+		metadataHash = validateResult.hash;
 	} else {
 		const stringDDO = JSON.stringify(ddo);
 		const bytes = Buffer.from(stringDDO);
 		metadata = hexlify(bytes);
+		metadataHash = "0x" + createHash("sha256").update(metadata).digest("hex");
 	}
 
-	const validateResult = await aquariusInstance.validate(ddo);
 	await nft.setMetadata(
 		nftAddress,
 		await owner.getAddress(),
@@ -186,7 +192,7 @@ export async function createAsset(
 		"",
 		ethers.utils.hexlify(2),
 		metadata,
-		validateResult.hash
+		metadataHash
 	);
 	return ddo.id;
 }

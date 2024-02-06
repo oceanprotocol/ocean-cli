@@ -131,9 +131,9 @@ export class Commands {
 		}
 		let updateJson;
 		try {
-			updateJson = JSON.parse(fs.readFileSync(args[1], "utf8"));
+			updateJson = JSON.parse(fs.readFileSync(args[2], "utf8"));
 		} catch (e) {
-			console.error("Cannot read metadata from " + args[1]);
+			console.error("Cannot read metadata from " + args[2]);
 			console.error(e);
 			return;
 		}
@@ -151,7 +151,7 @@ export class Commands {
 			this.aquarius,
 			this.macOsProviderUrl
 		);
-		console.log("Asset updated " + updateAssetTx);
+		console.log("Asset updated. Tx: " + JSON.stringify(updateAssetTx, null, 2));
 	}
 
 	public async getDDO(args: string[]) {

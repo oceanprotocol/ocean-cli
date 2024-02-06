@@ -175,13 +175,13 @@ export async function createAsset(
 		);
 		const validateResult = await aquariusInstance.validate(ddo);
 		metadataHash = validateResult.hash;
-		flags=2
+		flags = 2
 	} else {
 		const stringDDO = JSON.stringify(ddo);
 		const bytes = Buffer.from(stringDDO);
 		metadata = hexlify(bytes);
 		metadataHash = "0x" + createHash("sha256").update(metadata).digest("hex");
-		flags=0
+		flags = 0
 	}
 
 	await nft.setMetadata(

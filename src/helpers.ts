@@ -166,6 +166,7 @@ export async function createAsset(
 
 	let metadata;
 	let metadataHash;
+	let flags;
 	if (encryptDDO) {
 		metadata = await ProviderInstance.encrypt(
 			ddo,
@@ -174,11 +175,13 @@ export async function createAsset(
 		);
 		const validateResult = await aquariusInstance.validate(ddo);
 		metadataHash = validateResult.hash;
+		flags=2
 	} else {
 		const stringDDO = JSON.stringify(ddo);
 		const bytes = Buffer.from(stringDDO);
 		metadata = hexlify(bytes);
 		metadataHash = "0x" + createHash("sha256").update(metadata).digest("hex");
+		flags=0
 	}
 
 	await nft.setMetadata(
@@ -187,7 +190,7 @@ export async function createAsset(
 		0,
 		providerUrl,
 		"",
-		ethers.utils.hexlify(2),
+		ethers.utils.hexlify(flags),
 		metadata,
 		metadataHash
 	);

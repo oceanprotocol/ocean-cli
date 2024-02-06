@@ -129,6 +129,7 @@ export class Commands {
 			);
 			return;
 		}
+		const encryptDDO = args[3] === "false" ? false : true;
 		let updateJson;
 		try {
 			updateJson = JSON.parse(fs.readFileSync(args[2], "utf8"));
@@ -149,7 +150,8 @@ export class Commands {
 			asset,
 			this.providerUrl,
 			this.aquarius,
-			this.macOsProviderUrl
+			this.macOsProviderUrl,
+			encryptDDO
 		);
 		console.log("Asset updated. Tx: " + JSON.stringify(updateAssetTx, null, 2));
 	}
@@ -415,7 +417,7 @@ export class Commands {
 			);
 			return;
 		}
-
+		const encryptDDO = args[3] === "false" ? false : true;
 		const filesChecksum = await ProviderInstance.checkDidFiles(
 			algoAsset.id,
 			algoAsset.services[0].id,
@@ -437,7 +439,8 @@ export class Commands {
 			asset,
 			this.providerUrl,
 			this.aquarius,
-			this.macOsProviderUrl
+			this.macOsProviderUrl,
+			encryptDDO
 		);
 		console.log("Asset updated " + txid);
 	}
@@ -470,6 +473,7 @@ export class Commands {
 			);
 			return;
 		}
+		const encryptDDO = args[3] === "false" ? false : true;
 		const indexToDelete =
 			asset.services[0].compute.publisherTrustedAlgorithms.findIndex(
 				(item) => item.did === args[2]
@@ -495,7 +499,8 @@ export class Commands {
 			asset,
 			this.providerUrl,
 			this.aquarius,
-			this.macOsProviderUrl
+			this.macOsProviderUrl,
+			encryptDDO
 		);
 		console.log("Asset updated " + txid);
 	}

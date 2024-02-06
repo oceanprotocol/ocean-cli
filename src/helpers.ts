@@ -166,6 +166,7 @@ export async function createAsset(
 
 	let metadata;
 	let metadataHash;
+	let flags;
 	if (encryptDDO) {
 		metadata = await ProviderInstance.encrypt(
 			ddo,
@@ -174,11 +175,13 @@ export async function createAsset(
 		);
 		const validateResult = await aquariusInstance.validate(ddo);
 		metadataHash = validateResult.hash;
+		flags = 2
 	} else {
 		const stringDDO = JSON.stringify(ddo);
 		const bytes = Buffer.from(stringDDO);
 		metadata = hexlify(bytes);
 		metadataHash = "0x" + createHash("sha256").update(metadata).digest("hex");
+		flags = 0
 	}
 
 	await nft.setMetadata(
@@ -187,7 +190,7 @@ export async function createAsset(
 		0,
 		providerUrl,
 		"",
-		ethers.utils.hexlify(2),
+		ethers.utils.hexlify(flags),
 		metadata,
 		metadataHash
 	);
@@ -199,24 +202,38 @@ export async function updateAssetMetadata(
 	updatedDdo: DDO,
 	providerUrl: string,
 	aquariusInstance: Aquarius,
-	macOsProviderUrl?: string
+	macOsProviderUrl?: string,
+	encryptDDO: boolean = true
 ) {
 	const nft = new Nft(owner, (await owner.provider.getNetwork()).chainId);
-	const providerResponse = await ProviderInstance.encrypt(
-		updatedDdo,
-		updatedDdo.chainId,
-		macOsProviderUrl || providerUrl
-	);
-	const encryptedResponse = await providerResponse;
+	let flags;
+	let metadataHash;
+	let metadata;
 	const validateResult = await aquariusInstance.validate(updatedDdo);
+	if (encryptDDO) {
+		const providerResponse = await ProviderInstance.encrypt(
+			updatedDdo,
+			updatedDdo.chainId,
+			macOsProviderUrl || providerUrl
+		);
+		metadata = await providerResponse;
+		flags = 2
+	}
+	else{
+		const stringDDO = JSON.stringify(updatedDdo);
+		const bytes = Buffer.from(stringDDO);
+		metadata = hexlify(bytes);
+		flags = 0
+	}
+	
 	const updateDdoTX = await nft.setMetadata(
 		updatedDdo.nftAddress,
 		await owner.getAddress(),
 		0,
 		providerUrl,
 		"",
-		ethers.utils.hexlify(2),
-		encryptedResponse,
+		ethers.utils.hexlify(flags),
+		metadata,
 		validateResult.hash
 	);
 	return updateDdoTX;

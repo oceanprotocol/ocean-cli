@@ -222,18 +222,17 @@ export class Commands {
 	public async computeStart(args: string[]) {
 		const output = {};
 		const dataDdo = await this.aquarius.waitForAqua(args[1]);
-
-		const providerURI =
-			this.macOsProviderUrl && dataDdo.chainId === 8996
-				? this.macOsProviderUrl
-				: dataDdo.services[0].serviceEndpoint;
-
 		if (!dataDdo) {
 			console.error(
 				"Error fetching DDO " + args[1] + ".  Does this asset exists?"
 			);
 			return;
 		}
+
+		const providerURI =
+			this.macOsProviderUrl && dataDdo.chainId === 8996
+				? this.macOsProviderUrl
+				: dataDdo.services[0].serviceEndpoint;
 
 		const algoDdo = await this.aquarius.waitForAqua(args[2]);
 		if (!algoDdo) {

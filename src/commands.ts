@@ -47,7 +47,6 @@ export class Commands {
 		console.log("Using Provider :", this.providerUrl);
 		this.macOsProviderUrl &&
 			console.log(" -> MacOS provider url :", this.macOsProviderUrl);
-
 		if (
 			!process.env.AQUARIUS_URL &&
 			this.config.chainId === 8996 &&

@@ -37,14 +37,24 @@ export class Commands {
 		this.signer = signer;
 		this.config = config || new ConfigHelper().getConfig(network);
 		this.providerUrl = process.env.PROVIDER_URL || this.config.providerUri;
-		if (this.config.chainId === 8996 && os.type() === "Darwin") {
+		if (
+			!process.env.PROVIDER_URL &&
+			this.config.chainId === 8996 &&
+			os.type() === "Darwin"
+		) {
 			this.macOsProviderUrl = "http://127.0.0.1:8030";
-			this.config.metadataCacheUri = "http://127.0.0.1:5000";
 		}
 		console.log("Using Provider :", this.providerUrl);
 		this.macOsProviderUrl &&
 			console.log(" -> MacOS provider url :", this.macOsProviderUrl);
 
+		if (
+			!process.env.AQUARIUS_URL &&
+			this.config.chainId === 8996 &&
+			os.type() === "Darwin"
+		) {
+			this.config.metadataCacheUri = "http://127.0.0.1:5000";
+		}
 		this.aquarius = new Aquarius(
 			process.env.AQUARIUS_URL || this.config.metadataCacheUri
 		);

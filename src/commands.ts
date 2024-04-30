@@ -71,6 +71,7 @@ export class Commands {
 			console.error(e);
 			return;
 		}
+		const encryptDDO = args[2] === "false" ? false : true;
 		try {
 			// add some more checks
 			const urlAssetId = await createAsset(
@@ -82,7 +83,8 @@ export class Commands {
 				this.providerUrl,
 				this.config,
 				this.aquarius,
-				this.macOsProviderUrl
+				this.macOsProviderUrl,
+				encryptDDO
 			);
 			console.log("Asset published. ID:  " + urlAssetId);
 		} catch (e) {
@@ -101,7 +103,7 @@ export class Commands {
 			console.error(e);
 			return;
 		}
-
+		const encryptDDO = args[2] === "false" ? false : true;
 		// add some more checks
 		const algoDid = await createAsset(
 			algoAsset.nft.name,
@@ -112,7 +114,8 @@ export class Commands {
 			this.providerUrl,
 			this.config,
 			this.aquarius,
-			this.macOsProviderUrl
+			this.macOsProviderUrl,
+			encryptDDO
 		);
 		// add some more checks
 		console.log("Algorithm published. DID:  " + algoDid);
@@ -126,11 +129,12 @@ export class Commands {
 			);
 			return;
 		}
+		const encryptDDO = args[3] === "false" ? false : true;
 		let updateJson;
 		try {
-			updateJson = JSON.parse(fs.readFileSync(args[1], "utf8"));
+			updateJson = JSON.parse(fs.readFileSync(args[2], "utf8"));
 		} catch (e) {
-			console.error("Cannot read metadata from " + args[1]);
+			console.error("Cannot read metadata from " + args[2]);
 			console.error(e);
 			return;
 		}
@@ -146,9 +150,10 @@ export class Commands {
 			asset,
 			this.providerUrl,
 			this.aquarius,
-			this.macOsProviderUrl
+			this.macOsProviderUrl,
+			encryptDDO
 		);
-		console.log("Asset updated " + updateAssetTx);
+		console.log("Asset updated. Tx: " + JSON.stringify(updateAssetTx, null, 2));
 	}
 
 	public async getDDO(args: string[]) {
@@ -189,9 +194,7 @@ export class Commands {
 
 		if (!tx) {
 			console.error(
-				"Error ordering access for " +
-					args[1] +
-					".  Do you have enough tokens?"
+				"Error ordering access for " + args[1] + ".  Do you have enough tokens?"
 			);
 			return;
 		}
@@ -216,33 +219,36 @@ export class Commands {
 
 	public async computeStart(args: string[]) {
 		const output = {};
-		const inputDatasetsString = args[1]
-		let inputDatasets = [] 
+		const inputDatasetsString = args[1];
+		let inputDatasets = [];
 
-		if (inputDatasetsString.includes('[') || inputDatasetsString.includes(']')) {
-			const processedInput = inputDatasetsString.replaceAll(']','').replaceAll('[','')
-			inputDatasets = processedInput.split(',')
+		if (
+			inputDatasetsString.includes("[") ||
+			inputDatasetsString.includes("]")
+		) {
+			const processedInput = inputDatasetsString
+				.replaceAll("]", "")
+				.replaceAll("[", "");
+			inputDatasets = processedInput.split(",");
 		} else {
-			inputDatasets.push(inputDatasetsString) 
+			inputDatasets.push(inputDatasetsString);
 		}
 
-		var ddos = []
+		var ddos = [];
 
 		for (var dataset in inputDatasets) {
 			const dataDdo = await this.aquarius.waitForAqua(inputDatasets[dataset]);
 			if (!dataDdo) {
 				console.error(
 					"Error fetching DDO " + dataset[1] + ".  Does this asset exists?"
-				)
-				return
+				);
+				return;
 			} else {
-				ddos.push(dataDdo)
+				ddos.push(dataDdo);
 			}
 		}
-		if (ddos.length <= 0 || ddos.length != inputDatasets.length)  {
-			console.error(
-				"Not all the data ddos are available."
-			);
+		if (ddos.length <= 0 || ddos.length != inputDatasets.length) {
+			console.error("Not all the data ddos are available.");
 			return;
 		}
 		const providerURI =
@@ -272,15 +278,15 @@ export class Commands {
 		mytime.setMinutes(mytime.getMinutes() + computeMinutes);
 		const computeValidUntil = Math.floor(mytime.getTime() / 1000);
 
-		const computeEnvID = args[3]
-		const chainComputeEnvs = computeEnvs[algoDdo.chainId]
-		var computeEnv = chainComputeEnvs[0]
-		
+		const computeEnvID = args[3];
+		const chainComputeEnvs = computeEnvs[algoDdo.chainId];
+		var computeEnv = chainComputeEnvs[0];
+
 		if (computeEnvID && computeEnvID.length > 1) {
 			for (const index in chainComputeEnvs) {
 				if (computeEnvID == chainComputeEnvs[index].id) {
-					computeEnv = chainComputeEnvs[index]
-					continue
+					computeEnv = chainComputeEnvs[index];
+					continue;
 				}
 			}
 		}
@@ -290,7 +296,7 @@ export class Commands {
 			serviceId: algoDdo.services[0].id,
 		};
 
-		var assets = []
+		var assets = [];
 		for (const dataDdo in ddos) {
 			const canStartCompute = isOrderable(
 				ddos[dataDdo],
@@ -307,9 +313,9 @@ export class Commands {
 			assets.push({
 				documentId: ddos[dataDdo].id,
 				serviceId: ddos[dataDdo].services[0].id,
-			})
+			});
 		}
-		
+
 		console.log("Starting compute job using provider: ", providerURI);
 		const providerInitializeComputeJob =
 			await ProviderInstance.initializeCompute(
@@ -376,15 +382,20 @@ export class Commands {
 			}
 		}
 
-		const additionalDatasets = (assets.length > 1) ? assets.slice(1) : null
-		console.log("Starting compute job on " + assets[0].documentId + " with additional datasets:" + ((!additionalDatasets) ? "none" : additionalDatasets[0].documentId))
+		const additionalDatasets = assets.length > 1 ? assets.slice(1) : null;
+		console.log(
+			"Starting compute job on " +
+				assets[0].documentId +
+				" with additional datasets:" +
+				(!additionalDatasets ? "none" : additionalDatasets[0].documentId)
+		);
 		const computeJobs = await ProviderInstance.computeStart(
 			providerURI,
 			this.signer,
 			computeEnv.id,
 			assets[0],
-			algo, 
-			null, 
+			algo,
+			null,
 			additionalDatasets
 		);
 		const { jobId } = computeJobs[0];
@@ -445,7 +456,7 @@ export class Commands {
 			);
 			return;
 		}
-
+		const encryptDDO = args[3] === "false" ? false : true;
 		const filesChecksum = await ProviderInstance.checkDidFiles(
 			algoAsset.id,
 			algoAsset.services[0].id,
@@ -467,7 +478,8 @@ export class Commands {
 			asset,
 			this.providerUrl,
 			this.aquarius,
-			this.macOsProviderUrl
+			this.macOsProviderUrl,
+			encryptDDO
 		);
 		console.log("Asset updated " + txid);
 	}
@@ -500,6 +512,7 @@ export class Commands {
 			);
 			return;
 		}
+		const encryptDDO = args[3] === "false" ? false : true;
 		const indexToDelete =
 			asset.services[0].compute.publisherTrustedAlgorithms.findIndex(
 				(item) => item.did === args[2]
@@ -525,7 +538,8 @@ export class Commands {
 			asset,
 			this.providerUrl,
 			this.aquarius,
-			this.macOsProviderUrl
+			this.macOsProviderUrl,
+			encryptDDO
 		);
 		console.log("Asset updated " + txid);
 	}

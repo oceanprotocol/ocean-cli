@@ -16,24 +16,24 @@ function help() {
 	console.log("\t getDDO DID - gets DDO for an asset using the asset did");
 
 	console.log(
-		"\t publish  METADATA_FILE - reads MEDATDATA_FILE and publishes a new asset with access service or compute service"
+		"\t publish METADATA_FILE ENCRYPT_DDO - reads MEDATDATA_FILE and publishes a new asset with access service or compute service, if boolean ENCRYPT_DDO is false publishes DDO without encrypting. "
 	);
 	console.log(
-		"\t publishAlgo  METADATA_FILE - reads MEDATDATA_FILE and publishes a new algo"
+		"\t publishAlgo METADATA_FILE ENCRYPT_DDO - reads MEDATDATA_FILE and publishes a new algo, if boolean ENCRYPT_DDO is false publishes DDO without encrypting. "
 	);
 
 	console.log(
-		"\t editAsset DATASET_DID UPDATED_METADATA_FILE - updates DDO using the metadata items in the file."
+		"\t editAsset DATASET_DID UPDATED_METADATA_FILE ENCRYPT_DDO- updates DDO using the metadata items in the file, if boolean ENCRYPT_DDO is false publishes DDO without encrypting."
 	);
 
 	console.log(
 		"\t download DID DESTINATION_FOLDER - downloads an asset into downloads/DESTINATION_FOLDER"
 	);
 	console.log(
-		"\t allowAlgo DATASET_DID ALGO_DID - approves an algorithm to run on a dataset"
+		"\t allowAlgo DATASET_DID ALGO_DID ENCRYPT_DDO - approves an algorithm to run on a dataset, if boolean ENCRYPT_DDO is false publishes DDO without encrypting."
 	);
 	console.log(
-		"\t disallowAlgo DATASET_DID ALGO_DID - removes an approved algorithm from the dataset approved algos"
+		"\t disallowAlgo DATASET_DID ALGO_DID ENCRYPT_DDO- removes an approved algorithm from the dataset approved algos, if boolean ENCRYPT_DDO is false publishes DDO without encrypting."
 	);
 	console.log(
 		"\t startCompute [DATASET_DIDs] ALGO_DID COMPUTE_ENV_ID - starts a compute job on the selected compute environment with the datasets and the inputed algorithm. Pass the DATASET_DIDs separated by comma"

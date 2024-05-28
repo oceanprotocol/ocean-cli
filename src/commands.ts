@@ -141,7 +141,7 @@ export class Commands {
 		// Get keys and values
 		const keys = Object.keys(updateJson);
 
-		for (const key in keys) {
+		for (const key of keys) {
 			asset[key] = updateJson[key];
 		}
 

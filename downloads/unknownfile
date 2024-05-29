@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<rss version="2.0">
+        <channel>
+                <title>abstract10.xml.gz</title>
+                <link>http://download.wikimedia.org/enwiki/20231201</link>
+                <description>Wikimedia dump updates for enwiki</description>
+                <item>
+                        <title>http://download.wikimedia.org/enwiki/20231201</title>
+                        <link>http://download.wikimedia.org/enwiki/20231201</link>
+                        <description>&lt;a href="http://download.wikimedia.org/enwiki/20231201/enwiki-20231201-abstract10.xml.gz"&gt;enwiki-20231201-abstract10.xml.gz&lt;/a&gt;</description>
+                        <pubDate>Sat, 02 Dec 2023 16:55:47 GMT</pubDate>
+                </item>
+        </channel>
+</rss>

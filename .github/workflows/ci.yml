@@ -122,7 +122,7 @@ jobs:
         run: docker pull oceanprotocol/ocean-node:develop
 
       - name: Build Ocean Node
-        run: npm run ci && npm run build
+        run: npm ci && npm run build
       - name: Start Ocean Node
         run: npm run start
         env:

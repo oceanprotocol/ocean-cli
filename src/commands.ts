@@ -16,7 +16,6 @@ import {
 	ComputeJob,
 	Config,
 	ConfigHelper,
-	DDO,
 	Datatoken,
 	ProviderInstance,
 	amountToUnits,
@@ -229,7 +228,6 @@ export class Commands {
 	}
 
 	public async computeStart(args: string[]) {
-		const output = {};
 		const dataDdo = await this.aquarius.waitForAqua(args[1]);
 		if (!dataDdo) {
 			console.error(
@@ -274,7 +272,6 @@ export class Commands {
 			},
 		];
 
-		const dtAddressArray = [dataDdo.services[0].datatokenAddress];
 		const algo: ComputeAlgorithm = {
 			documentId: algoDdo.id,
 			serviceId: algoDdo.services[0].id,
@@ -551,7 +548,7 @@ export class Commands {
 		}
 	}
 
-	public async mintOceanTokens(args: string[]) {
+	public async mintOceanTokens() {
 		const minAbi = [
 			{
 				constant: false,

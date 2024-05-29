@@ -7,8 +7,8 @@
     "build": "npm run clean && npm run build:tsc",
     "build:tsc": "tsc --sourceMap",
     "clean": "rm -rf ./dist/ ./doc/ ./.nyc_output",
-    "lint": "eslint --ignore-path .gitignore --ext .ts,.tsx .",
-    "lint:fix": "eslint --ignore-path .gitignore --ext .ts,.tsx . --fix",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "format": "prettier --parser typescript --ignore-path .gitignore --write '**/*.{js,jsx,ts,tsx}'",
     "cli": "./node_modules/ts-node/dist/bin.js src/index.ts"
   },
@@ -26,5 +26,11 @@
     "decimal.js": "^10.4.1",
     "ethers": "^5.7.2",
     "ts-node": "^10.9.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.3.0",
+    "eslint": "^9.3.0",
+    "globals": "^15.3.0",
+    "typescript-eslint": "^7.11.0"
   }
 }

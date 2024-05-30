@@ -36,7 +36,7 @@ function help() {
 		"\t disallowAlgo DATASET_DID ALGO_DID ENCRYPT_DDO- removes an approved algorithm from the dataset approved algos, if boolean ENCRYPT_DDO is false publishes DDO without encrypting."
 	);
 	console.log(
-		"\t startCompute DATASET_DID ALGO_DID - starts a compute job on the mentioned dataset using the inputed algorithm's id"
+		"\t startCompute [DATASET_DIDs] ALGO_DID COMPUTE_ENV_ID - starts a compute job on the selected compute environment with the datasets and the inputed algorithm. Pass the DATASET_DIDs separated by comma"
 	);
 
 	console.log(

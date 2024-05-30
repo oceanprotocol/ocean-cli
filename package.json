@@ -19,7 +19,7 @@
   },
   "homepage": "https://github.com/oceanprotocol/ocean.js-cli#readme",
   "dependencies": {
-    "@oceanprotocol/contracts": "^2.0.3",
+    "@oceanprotocol/contracts": "^2.0.4",
     "@oceanprotocol/lib": "^3.3.0",
     "cross-fetch": "^3.1.5",
     "crypto-js": "^4.1.1",

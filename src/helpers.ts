@@ -289,6 +289,8 @@ export async function handleComputeOrder(
 		providerFees
 	);
 
+	if (!txStartOrder)
+		return
 	const tx = await txStartOrder.wait();
 	const orderStartedTx = getEventFromTx(tx, "OrderStarted");
 

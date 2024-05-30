@@ -12,7 +12,6 @@ import {
 	Aquarius,
 	Asset,
 	ComputeAlgorithm,
-	ComputeAsset,
 	ComputeJob,
 	Config,
 	ConfigHelper,
@@ -202,9 +201,7 @@ export class Commands {
 
 		if (!tx) {
 			console.error(
-				"Error ordering access for " +
-					args[1] +
-					".  Do you have enought tokens?"
+				"Error ordering access for " + args[1] + ".  Do you have enough tokens?"
 			);
 			return;
 		}
@@ -228,18 +225,42 @@ export class Commands {
 	}
 
 	public async computeStart(args: string[]) {
-		const dataDdo = await this.aquarius.waitForAqua(args[1]);
-		if (!dataDdo) {
-			console.error(
-				"Error fetching DDO " + args[1] + ".  Does this asset exists?"
-			);
-			return;
+		const inputDatasetsString = args[1];
+		let inputDatasets = [];
+
+		if (
+			inputDatasetsString.includes("[") ||
+			inputDatasetsString.includes("]")
+		) {
+			const processedInput = inputDatasetsString
+				.replaceAll("]", "")
+				.replaceAll("[", "");
+			inputDatasets = processedInput.split(",");
+		} else {
+			inputDatasets.push(inputDatasetsString);
 		}
 
+		const ddos = [];
+
+		for (const dataset in inputDatasets) {
+			const dataDdo = await this.aquarius.waitForAqua(inputDatasets[dataset]);
+			if (!dataDdo) {
+				console.error(
+					"Error fetching DDO " + dataset[1] + ".  Does this asset exists?"
+				);
+				return;
+			} else {
+				ddos.push(dataDdo);
+			}
+		}
+		if (ddos.length <= 0 || ddos.length != inputDatasets.length) {
+			console.error("Not all the data ddos are available.");
+			return;
+		}
 		const providerURI =
-			this.macOsProviderUrl && dataDdo.chainId === 8996
+			this.macOsProviderUrl && ddos[0].chainId === 8996
 				? this.macOsProviderUrl
-				: dataDdo.services[0].serviceEndpoint;
+				: ddos[0].services[0].serviceEndpoint;
 
 		const algoDdo = await this.aquarius.waitForAqua(args[2]);
 		if (!algoDdo) {
@@ -263,31 +284,42 @@ export class Commands {
 		mytime.setMinutes(mytime.getMinutes() + computeMinutes);
 		const computeValidUntil = Math.floor(mytime.getTime() / 1000);
 
-		const computeEnv = computeEnvs[dataDdo.chainId][0];
+		const computeEnvID = args[3];
+		const chainComputeEnvs = computeEnvs[algoDdo.chainId];
+		let computeEnv = chainComputeEnvs[0];
 
-		const assets: ComputeAsset[] = [
-			{
-				documentId: dataDdo.id,
-				serviceId: dataDdo.services[0].id,
-			},
-		];
+		if (computeEnvID && computeEnvID.length > 1) {
+			for (const index in chainComputeEnvs) {
+				if (computeEnvID == chainComputeEnvs[index].id) {
+					computeEnv = chainComputeEnvs[index];
+					continue;
+				}
+			}
+		}
 
 		const algo: ComputeAlgorithm = {
 			documentId: algoDdo.id,
 			serviceId: algoDdo.services[0].id,
 		};
 
-		const canStartCompute = isOrderable(
-			dataDdo,
-			dataDdo.services[0].id,
-			algo,
-			algoDdo
-		);
-		if (!canStartCompute) {
-			console.error(
-				"Error Cannot start compute job using the dataset DID & algorithm DID provided"
+		const assets = [];
+		for (const dataDdo in ddos) {
+			const canStartCompute = isOrderable(
+				ddos[dataDdo],
+				ddos[dataDdo].services[0].id,
+				algo,
+				algoDdo
 			);
-			return;
+			if (!canStartCompute) {
+				console.error(
+					"Error Cannot start compute job using the datasets DIDs & algorithm DID provided"
+				);
+				return;
+			}
+			assets.push({
+				documentId: ddos[dataDdo].id,
+				serviceId: ddos[dataDdo].services[0].id,
+			});
 		}
 
 		console.log("Starting compute job using provider: ", providerURI);
@@ -329,16 +361,15 @@ export class Commands {
 			console.error(
 				"Error ordering compute for algorithm with DID: " +
 					args[2] +
-					".  Do you have enought tokens?"
+					".  Do you have enough tokens?"
 			);
 			return;
 		}
 
-		for (let i = 0; i < providerInitializeComputeJob.datasets.length; i++) {
-			console.log("Ordering dataset: ", args[1]);
+		for (let i = 0; i < ddos.length; i++) {
 			assets[i].transferTxId = await handleComputeOrder(
 				providerInitializeComputeJob.datasets[i],
-				dataDdo,
+				ddos[i],
 				this.signer,
 				computeEnv.consumerAddress,
 				0,
@@ -350,19 +381,28 @@ export class Commands {
 			if (!assets[i].transferTxId) {
 				console.error(
 					"Error ordering dataset with DID: " +
-						args[1] +
-						".  Do you have enought tokens?"
+						assets[i] +
+						".  Do you have enough tokens?"
 				);
 				return;
 			}
 		}
-		console.log("Starting compute job ...");
+
+		const additionalDatasets = assets.length > 1 ? assets.slice(1) : null;
+		console.log(
+			"Starting compute job on " +
+				assets[0].documentId +
+				" with additional datasets:" +
+				(!additionalDatasets ? "none" : additionalDatasets[0].documentId)
+		);
 		const computeJobs = await ProviderInstance.computeStart(
 			providerURI,
 			this.signer,
 			computeEnv.id,
 			assets[0],
-			algo
+			algo,
+			null,
+			additionalDatasets
 		);
 		const { jobId } = computeJobs[0];
 		console.log("Compute started.  JobID: " + jobId);

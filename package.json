@@ -11,7 +11,7 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --parser typescript --ignore-path .gitignore --write '**/*.{js,jsx,ts,tsx}'",
     "cli": "./node_modules/ts-node/dist/bin.js src/index.ts",
-    "test:system": "mocha -r ts-node/register tests/system.test.ts"
+    "test:system": "mocha -r ts-node/register -r esm tests/system.test.ts"
   },
   "author": "Ocean Protocol <devops@oceanprotocol.com>",
   "license": "Apache-2.0",
@@ -35,6 +35,7 @@
     "axios": "^1.7.2",
     "chai": "^5.1.1",
     "eslint": "^8.56.0",
+    "esm": "^3.2.25",
     "globals": "^15.3.0",
     "mocha": "^10.4.0",
     "typescript-eslint": "^7.11.0"

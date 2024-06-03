@@ -117,19 +117,10 @@ jobs:
         run: docker logs ocean_ocean-contracts_1 && docker logs ocean_kindcluster_1 && docker logs ocean_computetodata_1 && docker logs ocean_typesense_1
         if: ${{ failure() }}
 
-      # Steps for setting up ocean-node
       - name: Pull Ocean Node Docker image
         run: docker pull oceanprotocol/ocean-node:develop
 
-      - name: Build Ocean Node
-        working-directory: ocean-node
-        run: |
-          npm ci --maxsockets 1
-          npm run build
-
       - name: Start Ocean Node
-        working-directory: ocean-node
-        run: npm run start
         env:
           PRIVATE_KEY: ${{ secrets.NODE1_PRIVATE_KEY }}
           NODE1_PRIVATE_KEY: ${{ secrets.NODE1_PRIVATE_KEY }}
@@ -141,3 +132,5 @@ jobs:
           DB_URL: 'http://localhost:8108/?apiKey=xyz'
           FEE_TOKENS: '{ "1": "0x967da4048cD07aB37855c090aAF366e4ce1b9F48", "137": "0x282d8efCe846A88B159800bd4130ad77443Fa1A1", "80001": "0xd8992Ed72C445c35Cb4A2be468568Ed1079357c8", "56": "0xDCe07662CA8EbC241316a15B611c89711414Dd1a" }'
           FEE_AMOUNT: '{ "amount": 1, "unit": "MB" }'
+        run: |
+          docker run -d --name ocean-node oceanprotocol/ocean-node:develop

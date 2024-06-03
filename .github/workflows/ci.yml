@@ -42,7 +42,7 @@ jobs:
       - name: Run lint
         run: npm run lint
 
-  test_integration:
+  test_system:
     runs-on: ubuntu-latest
 
     steps:
@@ -134,3 +134,5 @@ jobs:
           FEE_AMOUNT: '{ "amount": 1, "unit": "MB" }'
         run: |
           docker run -d --name ocean-node oceanprotocol/ocean-node:develop
+      - name: Run system tests 
+        run: npm run test:system

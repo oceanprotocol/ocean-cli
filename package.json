@@ -10,7 +10,8 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --parser typescript --ignore-path .gitignore --write '**/*.{js,jsx,ts,tsx}'",
-    "cli": "./node_modules/ts-node/dist/bin.js src/index.ts"
+    "cli": "./node_modules/ts-node/dist/bin.js src/index.ts",
+    "test:system": "mocha -r ts-node/register tests/system.test.ts"
   },
   "author": "Ocean Protocol <devops@oceanprotocol.com>",
   "license": "Apache-2.0",

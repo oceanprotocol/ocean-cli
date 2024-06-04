@@ -27,6 +27,10 @@ describe('Ocean Node Root Endpoint', () => {
       }
     }
   });
+});
+
+
+describe('Direct Command Endpoint', () => {
 
   it('should return correct status', async () => {
     const response = await fetch('http://localhost:8000/directCommand', {
@@ -56,5 +60,17 @@ describe('Ocean Node Root Endpoint', () => {
     // Check the values of some of the properties
     expect(responseBody.http).to.be.true;
     expect(responseBody.p2p).to.be.true;
+  });
+});
+
+
+describe('getOceanPeers Endpoint', () => {
+
+  it('should return correct status', async () => {
+    const response = await fetch('http://localhost:8000/getOceanPeers');
+    const responseBody = await response.json();
+
+    expect(response.status).to.equal(200);
+    expect(responseBody).to.be.an('array');
   });
 });

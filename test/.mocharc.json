@@ -1,9 +1,7 @@
 {
   "require": ["ts-node/register"],
-  "extension": ["ts"],
-  "spec": "**/*.test.ts",
   "full-trace": true,
   "bail": true,
   "exit": true,
-  "timeout": 20000
+  "timeout": "20000"
 }

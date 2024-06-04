@@ -135,4 +135,4 @@ jobs:
         run: |
           docker run -d --name ocean-node oceanprotocol/ocean-node:develop
       - name: Run system tests 
-        run: npm run test:system
+        run: npm run test

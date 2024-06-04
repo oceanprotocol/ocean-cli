@@ -117,10 +117,15 @@ jobs:
         run: docker logs ocean_ocean-contracts_1 && docker logs ocean_kindcluster_1 && docker logs ocean_computetodata_1 && docker logs ocean_typesense_1
         if: ${{ failure() }}
 
-      - name: Pull Ocean Node Docker image
-        run: docker pull oceanprotocol/ocean-node:develop
+      - name: Checkout Ocean Node
+        uses: actions/checkout@v3
+        with:
+          repository: 'oceanprotocol/ocean-node'
+          path: 'ocean-node'
+          ref: 'develop'
 
       - name: Start Ocean Node
+        working-directory: ${{ github.workspace }}/ocean-node
         env:
           PRIVATE_KEY: ${{ secrets.NODE1_PRIVATE_KEY }}
           NODE1_PRIVATE_KEY: ${{ secrets.NODE1_PRIVATE_KEY }}
@@ -132,10 +137,9 @@ jobs:
           DB_URL: 'http://localhost:8108/?apiKey=xyz'
           FEE_TOKENS: '{ "1": "0x967da4048cD07aB37855c090aAF366e4ce1b9F48", "137": "0x282d8efCe846A88B159800bd4130ad77443Fa1A1", "80001": "0xd8992Ed72C445c35Cb4A2be468568Ed1079357c8", "56": "0xDCe07662CA8EbC241316a15B611c89711414Dd1a" }'
           FEE_AMOUNT: '{ "amount": 1, "unit": "MB" }'
-          OCEAN_NODE_HOST: 'localhost'
-          OCEAN_NODE_PORT: '8000'
-        run: |
-          docker run -d --name ocean-node oceanprotocol/ocean-node:develop
+      - run: npm ci
+      - run: npm run build
+      - run: npm run start
       - name: Check Ocean Node is running
         run: |
           for i in $(seq 1 30); do
@@ -149,6 +153,4 @@ jobs:
           exit 1
       - name: Run system tests 
         run: npm run test
-        env:
-          OCEAN_NODE_HOST: 'localhost'
-          OCEAN_NODE_PORT: '8000'
+

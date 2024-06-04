@@ -1,6 +1,6 @@
 import 'ts-node/register';
 import fetch from 'cross-fetch';
-import { expect } from 'chai';
+import { expect, assert } from 'chai';
 
 describe('Ocean Node Root Endpoint', () => {
   it('should return 200 OK', async () => {
@@ -72,5 +72,21 @@ describe('getOceanPeers Endpoint', () => {
 
     expect(response.status).to.equal(200);
     expect(responseBody).to.be.an('array');
+  });
+});
+
+describe('Direct Command Endpoint', () => {
+
+  it('should return correct status', async () => {
+    const response = await fetch('http://localhost:8000/logs', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    const responseBody = await response.text();
+  
+    expect(response.status).to.equal(400);
+    assert(responseBody === "Missing signature")
   });
 });

@@ -10,8 +10,8 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --parser typescript --ignore-path .gitignore --write '**/*.{js,jsx,ts,tsx}'",
-    "cli": "./node_modules/ts-node/dist/bin.js src/index.ts",
-    "test": "npm run mocha 'test/**/*.test.ts'",
+    "cli": "TS_NODE_PROJECT='./tsconfig.json' ./node_modules/ts-node/dist/bin.js src/index.ts",
+    "test": "npm run build && npm run mocha 'test/**/*.test.ts'",
     "mocha": "TS_NODE_PROJECT='./test/tsconfig.json' mocha --config=test/.mocharc.json --node-env=test --exit"
   },
   "author": "Ocean Protocol <devops@oceanprotocol.com>",

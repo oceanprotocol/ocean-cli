@@ -2,7 +2,7 @@ import { expect } from "chai";
 import { exec } from "child_process";
 import path from "path";
 
-describe("Ocean CLI Tool", function() {
+describe("Ocean CLI Setup", function() {
     this.timeout(20000); // Set a longer timeout to allow the command to execute
 
     it("should return an error message for 'npm run cli h' without MNEMONIC or PRIVATE_KEY", function(done) {
@@ -30,11 +30,10 @@ describe("Ocean CLI Tool", function() {
         const projectRoot = path.resolve(__dirname, "..");
 
         // Set environment variables for the test
-        // process.env.MNEMONIC = "your-valid-mnemonic-here";
         process.env.PRIVATE_KEY = "0x1d751ded5a32226054cd2e71261039b65afb9ee1c746d055dd699b1150a5befc";
         process.env.RPC = "http://127.0.0.1:8545";
 
-        exec("npm run cli h", { cwd: projectRoot }, (error, stdout, stderr) => {
+        exec("npm run cli h", { cwd: projectRoot }, (error, stdout) => {
             // Check the stdout for the expected response
             try {
                 expect(stdout).to.contain("Available options:");

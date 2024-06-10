@@ -4,7 +4,7 @@ import { expect, assert } from 'chai';
 
 describe('Ocean Node Root Endpoint', () => {
   it('should return 200 OK', async () => {
-    const response = await fetch('http://localhost:8000/');
+    const response = await fetch('http://localhost:8001/');
     const responseBody = await response.json();
 
     expect(response.status).to.equal(200);
@@ -33,7 +33,7 @@ describe('Ocean Node Root Endpoint', () => {
 describe('Direct Command Endpoint', () => {
 
   it('should return correct status', async () => {
-    const response = await fetch('http://localhost:8000/directCommand', {
+    const response = await fetch('http://localhost:8001/directCommand', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -67,7 +67,7 @@ describe('Direct Command Endpoint', () => {
 describe('getOceanPeers Endpoint', () => {
 
   it('should return correct status', async () => {
-    const response = await fetch('http://localhost:8000/getOceanPeers');
+    const response = await fetch('http://localhost:8001/getOceanPeers');
     const responseBody = await response.json();
 
     expect(response.status).to.equal(200);
@@ -78,7 +78,7 @@ describe('getOceanPeers Endpoint', () => {
 describe('Direct Command Endpoint', () => {
 
   it('should return correct status', async () => {
-    const response = await fetch('http://localhost:8000/logs', {
+    const response = await fetch('http://localhost:8001/logs', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'

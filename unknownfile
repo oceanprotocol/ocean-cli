@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<rss version="2.0">
+        <channel>
+                <title>abstract10.xml.gz</title>
+                <link>http://download.wikimedia.org/enwiki/20240601</link>
+                <description>Wikimedia dump updates for enwiki</description>
+                <item>
+                        <title>http://download.wikimedia.org/enwiki/20240601</title>
+                        <link>http://download.wikimedia.org/enwiki/20240601</link>
+                        <description>&lt;a href="http://download.wikimedia.org/enwiki/20240601/enwiki-20240601-abstract10.xml.gz"&gt;enwiki-20240601-abstract10.xml.gz&lt;/a&gt;</description>
+                        <pubDate>Sun, 09 Jun 2024 09:54:55 GMT</pubDate>
+                </item>
+        </channel>
+</rss>

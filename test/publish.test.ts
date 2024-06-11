@@ -165,4 +165,11 @@ describe("Ocean CLI Publishing", function() {
             done()
         });
     });
+          
+    it("should get DDO using 'npm run cli getDDO' for python algorithm", function(done) {
+        exec(`npm run cli download ${downloadDatasetDid} ./`, { cwd: projectRoot }, (error, stdout) => {
+            expect(stdout).to.contain("File downloaded successfully");
+            done()
+        });
+    });
 });

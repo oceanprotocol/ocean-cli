@@ -145,7 +145,7 @@ jobs:
       - name: Check Ocean Node is running
         run: |
           for i in $(seq 1 30); do
-            if curl --output /dev/null --silent --head --fail "http://localhost:8000"; then
+            if curl --output /dev/null --silent --head --fail "http://localhost:8001"; then
               echo "Ocean Node is up"
               exit 0
             fi

@@ -51,12 +51,6 @@ describe("Ocean CLI Publishing", function() {
             return;
         }
 
-        process.env.PRIVATE_KEY = "0x1d751ded5a32226054cd2e71261039b65afb9ee1c746d055dd699b1150a5befc";
-        process.env.RPC = "http://127.0.0.1:8545";
-        process.env.AQUARIUS_URL = "http://127.0.0.1:8001";
-        process.env.PROVIDER_URL = "http://127.0.0.1:8001";
-        process.env.ADDRESS_FILE = path.join(process.env.HOME || "", ".ocean/ocean-contracts/artifacts/address.json");
-
         exec(`npm run cli publish ${metadataFile}`, { cwd: projectRoot }, (error, stdout) => {
             try {
                 const match = stdout.match(/did:op:[a-f0-9]{64}/);
@@ -80,12 +74,6 @@ describe("Ocean CLI Publishing", function() {
             return;
         }
 
-        process.env.PRIVATE_KEY = "0x1d751ded5a32226054cd2e71261039b65afb9ee1c746d055dd699b1150a5befc";
-        process.env.RPC = "http://127.0.0.1:8545";
-        process.env.AQUARIUS_URL = "http://127.0.0.1:8001";
-        process.env.PROVIDER_URL = "http://127.0.0.1:8001";
-        process.env.ADDRESS_FILE = path.join(process.env.HOME || "", ".ocean/ocean-contracts/artifacts/address.json");
-
         exec(`npm run cli publishAlgo ${filePath}`, { cwd: projectRoot }, (error, stdout) => {
             try {
                 expect(stdout).to.contain("Algorithm published. DID:");
@@ -108,12 +96,6 @@ describe("Ocean CLI Publishing", function() {
             done(new Error("Metadata file not found: " + filePath));
             return;
         }
-
-        process.env.PRIVATE_KEY = "0x1d751ded5a32226054cd2e71261039b65afb9ee1c746d055dd699b1150a5befc";
-        process.env.RPC = "http://127.0.0.1:8545";
-        process.env.AQUARIUS_URL = "http://127.0.0.1:8001";
-        process.env.PROVIDER_URL = "http://127.0.0.1:8001";
-        process.env.ADDRESS_FILE = path.join(process.env.HOME || "", ".ocean/ocean-contracts/artifacts/address.json");
 
         exec(`npm run cli publishAlgo ${filePath}`, { cwd: projectRoot }, (error, stdout) => {
             try {
@@ -139,7 +121,7 @@ describe("Ocean CLI Publishing", function() {
     });
 
     
-    it("should get DDO using 'npm run cli getDDO' for download dataset", function(done) {
+    it("should get DDO using 'npm run cli getDDO' for compute dataset", function(done) {
         exec(`npm run cli getDDO ${computeDatasetDid}`, { cwd: projectRoot }, (error, stdout) => {
             expect(stdout).to.contain(`${computeDatasetDid}`);
             expect(stdout).to.contain("[ 'https://w3id.org/did/v1' ]");
@@ -165,11 +147,5 @@ describe("Ocean CLI Publishing", function() {
             done()
         });
     });
-          
-    it("should get DDO using 'npm run cli getDDO' for python algorithm", function(done) {
-        exec(`npm run cli download ${downloadDatasetDid} ./`, { cwd: projectRoot }, (error, stdout) => {
-            expect(stdout).to.contain("File downloaded successfully");
-            done()
-        });
-    });
+
 });

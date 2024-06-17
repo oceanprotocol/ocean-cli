@@ -174,7 +174,7 @@ export class Commands {
 					args[1] +
 					".  Does this asset exists?"
 			);
-		} else console.log(resolvedDDO);
+		} else console.log(util.inspect(resolvedDDO, false, null, true));
 	}
 
 	public async download(args: string[]) {

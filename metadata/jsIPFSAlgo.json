@@ -30,7 +30,7 @@
     },
     "services": [
       {
-        "id": " ",
+        "id": "1234567890",
         "type": "compute",
         "files": {
           "datatokenAddress": "0x0",

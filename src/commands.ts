@@ -489,6 +489,7 @@ export class Commands {
 		const containerChecksum =
 			algoAsset.metadata.algorithm.container.entrypoint +
 			algoAsset.metadata.algorithm.container.checksum;
+		console.log("filesChecksum ", filesChecksum);
 		const trustedAlgorithm = {
 			did: algoAsset.id,
 			containerSectionChecksum: getHash(containerChecksum),

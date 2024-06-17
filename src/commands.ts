@@ -470,12 +470,21 @@ export class Commands {
 			return;
 		}
 		const encryptDDO = args[3] === "false" ? false : true;
-		const filesChecksum = await ProviderInstance.checkDidFiles(
-			algoAsset.id,
-			algoAsset.services[0].id,
-			algoAsset.services[0].serviceEndpoint,
-			true
-		);
+		console.log("id ", algoAsset.id);
+		console.log("service id ", algoAsset.services[0].id);
+		console.log("serviceEndpoint ", algoAsset.services[0].serviceEndpoint);
+		let filesChecksum;
+		try {
+			filesChecksum = await ProviderInstance.checkDidFiles(
+				algoAsset.id,
+				algoAsset.services[0].id,
+				algoAsset.services[0].serviceEndpoint,
+				true
+			);
+		} catch (e) {
+			console.error("Error checking algo files: ", e);
+			return;
+		}
 
 		const containerChecksum =
 			algoAsset.metadata.algorithm.container.entrypoint +
@@ -486,15 +495,20 @@ export class Commands {
 			filesChecksum: filesChecksum?.[0]?.checksum,
 		};
 		asset.services[0].compute.publisherTrustedAlgorithms.push(trustedAlgorithm);
-		const txid = await updateAssetMetadata(
-			this.signer,
-			asset,
-			this.providerUrl,
-			this.aquarius,
-			this.macOsProviderUrl,
-			encryptDDO
-		);
-		console.log("Asset updated " + txid);
+		try {
+			const txid = await updateAssetMetadata(
+				this.signer,
+				asset,
+				this.providerUrl,
+				this.aquarius,
+				this.macOsProviderUrl,
+				encryptDDO
+			);
+			console.log("Asset updated " + txid);
+		} catch (e) {
+			console.error("Error updating asset metadata: ", e);
+			return;
+		}
 	}
 
 	public async disallowAlgo(args: string[]) {

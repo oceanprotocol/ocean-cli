@@ -407,8 +407,12 @@ export class Commands {
 			null,
 			additionalDatasets
 		);
-		const { jobId } = computeJobs[0];
-		console.log("Compute started.  JobID: " + jobId);
+		if (computeJobs && computeJobs[0]) {
+			const { jobId } = computeJobs[0];
+			console.log("Compute started.  JobID: " + jobId);
+		} else {
+			console.log("Error while starting the compute job: ", computeJobs);
+		}
 	}
 
 	public async computeStop(args: string[]) {

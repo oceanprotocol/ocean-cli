@@ -1,0 +1,70 @@
+{
+    "@context": [
+      "https://w3id.org/did/v1"
+    ],
+    "id": "",
+    "nftAddress": "",
+    "version": "4.1.0",
+    "chainId": 8996,
+    "metadata": {
+      "created": "2023-08-01T17:09:39Z",
+      "updated": "2023-08-01T17:09:39Z",
+      "type": "algorithm",
+      "name": "avreage price real estate algo",
+      "description": "Cli algo",
+      "author": "OPF",
+      "license": "https://market.oceanprotocol.com/terms",
+      "additionalInformation": {
+        "termsAndConditions": true
+      },
+      "algorithm": {
+        "language": "",
+        "version": "0.1",
+        "container": {
+          "entrypoint": "node $ALGO",
+          "image": "node",
+          "tag": "latest",
+          "checksum": "sha256:1155995dda741e93afe4b1c6ced2d01734a6ec69865cc0997daf1f4db7259a36"
+        }
+      }
+    },
+    "services": [
+      {
+        "id": "1234567890",
+        "type": "compute",
+        "files": {
+          "datatokenAddress": "0x0",
+          "nftAddress": "0x0",
+          "files": [
+            {
+              "hash": "QmQN9hWcqN7chF3qrAL5HpZSkfc9kvjSH7o4LaGVMxs9gu",
+              "type" : "ipfs"
+            }
+          ]
+        },
+        "timeout": 86400,
+        "compute": {
+          "allowRawAlgorithm": false,
+          "allowNetworkAccess": true,
+          "publisherTrustedAlgorithmPublishers": [],
+          "publisherTrustedAlgorithms": []
+        }
+      }
+    ],
+    "stats": {
+      "allocated": 0,
+      "orders": 0,
+      "price": {
+        "value": "0"
+      }
+    },
+    "nft": {
+      "address": "",
+      "name": "Ocean Data NFT",
+      "symbol": "OCEAN-NFT",
+      "state": 5,
+      "tokenURI": "",
+      "owner": "",
+      "created": ""
+    }
+  }

@@ -174,7 +174,7 @@ export class Commands {
 					args[1] +
 					".  Does this asset exists?"
 			);
-		} else console.log(resolvedDDO);
+		} else console.log(util.inspect(resolvedDDO, false, null, true));
 	}
 
 	public async download(args: string[]) {
@@ -407,8 +407,12 @@ export class Commands {
 			null,
 			additionalDatasets
 		);
-		const { jobId } = computeJobs[0];
-		console.log("Compute started.  JobID: " + jobId);
+		if (computeJobs && computeJobs[0]) {
+			const { jobId } = computeJobs[0];
+			console.log("Compute started.  JobID: " + jobId);
+		} else {
+			console.log("Error while starting the compute job: ", computeJobs);
+		}
 	}
 
 	public async computeStop(args: string[]) {
@@ -466,12 +470,18 @@ export class Commands {
 			return;
 		}
 		const encryptDDO = args[3] === "false" ? false : true;
-		const filesChecksum = await ProviderInstance.checkDidFiles(
-			algoAsset.id,
-			algoAsset.services[0].id,
-			algoAsset.services[0].serviceEndpoint,
-			true
-		);
+		let filesChecksum;
+		try {
+			filesChecksum = await ProviderInstance.checkDidFiles(
+				algoAsset.id,
+				algoAsset.services[0].id,
+				algoAsset.services[0].serviceEndpoint,
+				true
+			);
+		} catch (e) {
+			console.error("Error checking algo files: ", e);
+			return;
+		}
 
 		const containerChecksum =
 			algoAsset.metadata.algorithm.container.entrypoint +
@@ -482,15 +492,20 @@ export class Commands {
 			filesChecksum: filesChecksum?.[0]?.checksum,
 		};
 		asset.services[0].compute.publisherTrustedAlgorithms.push(trustedAlgorithm);
-		const txid = await updateAssetMetadata(
-			this.signer,
-			asset,
-			this.providerUrl,
-			this.aquarius,
-			this.macOsProviderUrl,
-			encryptDDO
-		);
-		console.log("Asset updated " + txid);
+		try {
+			const txid = await updateAssetMetadata(
+				this.signer,
+				asset,
+				this.providerUrl,
+				this.aquarius,
+				this.macOsProviderUrl,
+				encryptDDO
+			);
+			console.log("Successfully updated asset metadata: " + txid);
+		} catch (e) {
+			console.error("Error updating asset metadata: ", e);
+			return;
+		}
 	}
 
 	public async disallowAlgo(args: string[]) {

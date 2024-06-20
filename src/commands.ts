@@ -470,9 +470,6 @@ export class Commands {
 			return;
 		}
 		const encryptDDO = args[3] === "false" ? false : true;
-		console.log("id ", algoAsset.id);
-		console.log("service id ", algoAsset.services[0].id);
-		console.log("serviceEndpoint ", algoAsset.services[0].serviceEndpoint);
 		let filesChecksum;
 		try {
 			filesChecksum = await ProviderInstance.checkDidFiles(
@@ -489,7 +486,6 @@ export class Commands {
 		const containerChecksum =
 			algoAsset.metadata.algorithm.container.entrypoint +
 			algoAsset.metadata.algorithm.container.checksum;
-		console.log("filesChecksum ", filesChecksum);
 		const trustedAlgorithm = {
 			did: algoAsset.id,
 			containerSectionChecksum: getHash(containerChecksum),
@@ -505,7 +501,7 @@ export class Commands {
 				this.macOsProviderUrl,
 				encryptDDO
 			);
-			console.log("Asset updated " + txid);
+			console.log("Successfully updated asset metadata: " + txid);
 		} catch (e) {
 			console.error("Error updating asset metadata: ", e);
 			return;

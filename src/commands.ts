@@ -440,9 +440,9 @@ export class Commands {
 			args[1],
 			await this.signer.getAddress(),
 			jobId,
-			hasAgreementId ? agreementId : null,
 			providerURI,
-			this.signer
+			this.signer,
+			agreementId
 		);
 		console.log(jobStatus);
 	}

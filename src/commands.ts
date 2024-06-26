@@ -12,11 +12,9 @@ import {
 	Aquarius,
 	Asset,
 	ComputeAlgorithm,
-	ComputeAsset,
 	ComputeJob,
 	Config,
 	ConfigHelper,
-	DDO,
 	Datatoken,
 	ProviderInstance,
 	amountToUnits,
@@ -227,7 +225,6 @@ export class Commands {
 	}
 
 	public async computeStart(args: string[]) {
-		const output = {};
 		const inputDatasetsString = args[1];
 		let inputDatasets = [];
 
@@ -243,9 +240,9 @@ export class Commands {
 			inputDatasets.push(inputDatasetsString);
 		}
 
-		var ddos = [];
+		const ddos = [];
 
-		for (var dataset in inputDatasets) {
+		for (const dataset in inputDatasets) {
 			const dataDdo = await this.aquarius.waitForAqua(inputDatasets[dataset]);
 			if (!dataDdo) {
 				console.error(
@@ -289,7 +286,7 @@ export class Commands {
 
 		const computeEnvID = args[3];
 		const chainComputeEnvs = computeEnvs[algoDdo.chainId];
-		var computeEnv = chainComputeEnvs[0];
+		let computeEnv = chainComputeEnvs[0];
 
 		if (computeEnvID && computeEnvID.length > 1) {
 			for (const index in chainComputeEnvs) {
@@ -305,7 +302,7 @@ export class Commands {
 			serviceId: algoDdo.services[0].id,
 		};
 
-		var assets = [];
+		const assets = [];
 		for (const dataDdo in ddos) {
 			const canStartCompute = isOrderable(
 				ddos[dataDdo],
@@ -606,7 +603,7 @@ export class Commands {
 		}
 	}
 
-	public async mintOceanTokens(args: string[]) {
+	public async mintOceanTokens() {
 		const minAbi = [
 			{
 				constant: false,

@@ -405,8 +405,9 @@ export class Commands {
 			additionalDatasets
 		);
 		if (computeJobs && computeJobs[0]) {
-			const { jobId } = computeJobs[0];
+			const { jobId, agreementId } = computeJobs[0];
 			console.log("Compute started.  JobID: " + jobId);
+			console.log("Agreement ID: " + agreementId);
 		} else {
 			console.log("Error while starting the compute job: ", computeJobs);
 		}

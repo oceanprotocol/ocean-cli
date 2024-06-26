@@ -107,7 +107,7 @@ async function start() {
 			await commands.downloadJobResults(myArgs);
 			break;
 		case "mintOcean":
-			await commands.mintOceanTokens(myArgs);
+			await commands.mintOceanTokens();
 			break;
 		case "h":
 			help();

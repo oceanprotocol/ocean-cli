@@ -469,6 +469,8 @@ export class Commands {
 		const encryptDDO = args[3] === "false" ? false : true;
 		let filesChecksum;
 		try {
+			console.log("serviceEndpoint: ", algoAsset.services[0].serviceEndpoint);
+			console.log("id: ", algoAsset.id);
 			filesChecksum = await ProviderInstance.checkDidFiles(
 				algoAsset.id,
 				algoAsset.services[0].id,

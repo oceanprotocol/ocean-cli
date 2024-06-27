@@ -475,6 +475,7 @@ export class Commands {
 				algoAsset.services[0].serviceEndpoint,
 				true
 			);
+			console.log("filesChecksum: ", filesChecksum);
 		} catch (e) {
 			console.error("Error checking algo files: ", e);
 			return;
@@ -488,6 +489,7 @@ export class Commands {
 			containerSectionChecksum: getHash(containerChecksum),
 			filesChecksum: filesChecksum?.[0]?.checksum,
 		};
+		console.log("trustedAlgorithm: ", trustedAlgorithm);
 		asset.services[0].compute.publisherTrustedAlgorithms.push(trustedAlgorithm);
 		try {
 			const txid = await updateAssetMetadata(

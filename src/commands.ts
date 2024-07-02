@@ -405,8 +405,9 @@ export class Commands {
 			additionalDatasets
 		);
 		if (computeJobs && computeJobs[0]) {
-			const { jobId } = computeJobs[0];
+			const { jobId, agreementId } = computeJobs[0];
 			console.log("Compute started.  JobID: " + jobId);
+			console.log("Agreement ID: " + agreementId);
 		} else {
 			console.log("Error while starting the compute job: ", computeJobs);
 		}
@@ -566,12 +567,22 @@ export class Commands {
 	}
 
 	public async getJobStatus(args: string[]) {
+		// args[1] - did (for checking if data asset exists, legacy)
+		// args[2] - jobId
+		// args[3] - agreementId
+		const hasAgreementId = args.length === 4;
+		
 		const dataDdo = await this.aquarius.waitForAqua(args[1]);
 		if (!dataDdo) {
 			console.error(
 				"Error fetching DDO " + args[1] + ".  Does this asset exists?"
 			);
 			return;
+		}
+		const jobId = args[2]
+		let agreementId = null;
+		if(hasAgreementId) {
+			agreementId = args[3];
 		}
 		const providerURI =
 			this.macOsProviderUrl && dataDdo.chainId === 8996
@@ -581,8 +592,8 @@ export class Commands {
 		const jobStatus = (await ProviderInstance.computeStatus(
 			providerURI,
 			await this.signer.getAddress(),
-			args[2],
-			args[1]
+			jobId,
+			agreementId
 		)) as ComputeJob;
 		console.log(util.inspect(jobStatus, false, null, true));
 	}

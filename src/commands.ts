@@ -421,6 +421,14 @@ export class Commands {
 			);
 			return;
 		}
+		const hasAgreementId = args.length === 4;
+
+		const jobId = args[2]
+		let agreementId = null;
+		if(hasAgreementId) {
+			agreementId = args[3];
+		}
+
 		const providerURI =
 			this.macOsProviderUrl && dataDdo.chainId === 8996
 				? this.macOsProviderUrl
@@ -429,9 +437,10 @@ export class Commands {
 		const jobStatus = await ProviderInstance.computeStop(
 			args[1],
 			await this.signer.getAddress(),
-			args[2],
+			jobId,
 			providerURI,
-			this.signer
+			this.signer,
+			agreementId
 		);
 		console.log(jobStatus);
 	}

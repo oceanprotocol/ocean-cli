@@ -296,12 +296,13 @@ export class Commands {
 				}
 			}
 		}
-
+		
 		const algo: ComputeAlgorithm = {
 			documentId: algoDdo.id,
 			serviceId: algoDdo.services[0].id,
+			meta: algoDdo.metadata.algorithm
 		};
-
+	
 		const assets = [];
 		for (const dataDdo in ddos) {
 			const canStartCompute = isOrderable(

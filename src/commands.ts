@@ -217,8 +217,9 @@ export class Commands {
 			this.signer
 		);
 		try {
-			const { filename } = await downloadFile(urlDownloadUrl, args[2]);
-			console.log("File downloaded successfully:", args[2] + "/" + filename);
+			const path = args[2] ? args[2] : '.';
+			const { filename } = await downloadFile(urlDownloadUrl, path);
+			console.log("File downloaded successfully:", path + "/" + filename);
 		} catch (e) {
 			console.log(`Download url dataset failed: ${e}`);
 		}
@@ -609,6 +610,7 @@ export class Commands {
 	}
 
 	public async downloadJobResults(args: string[]) {
+	
 		const jobResult = await ProviderInstance.getComputeResultUrl(
 			this.providerUrl,
 			this.signer,
@@ -616,9 +618,11 @@ export class Commands {
 			parseInt(args[2])
 		);
 		console.log("jobResult ", jobResult);
+
 		try {
-			const { filename } = await downloadFile(jobResult, args[3]);
-			console.log("File downloaded successfully:", args[3] + "/" + filename);
+			const path = args[3] ? args[3] : '.';
+			const { filename } = await downloadFile(jobResult, path, parseInt(args[2]));
+			console.log("File downloaded successfully:", path + "/" + filename);
 		} catch (e) {
 			console.log(`Download url dataset failed: ${e}`);
 		}

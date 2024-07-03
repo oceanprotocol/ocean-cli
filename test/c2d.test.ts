@@ -124,10 +124,9 @@ describe("C2D Tests", function() {
     });
 
     it("should start compute job with Python algorithm running on the compute dataset", function(done) {
-        this.timeout(120000);
-        exec(`npm run cli startCompute [${computeDatasetDid}] ${pythonAlgoDid} 0`, { cwd: projectRoot }, (error, stdout) => {
-            console.log('Running: ', `npm run cli startCompute [${computeDatasetDid}] ${pythonAlgoDid} 0`)
-            console.log("stdout", stdout)
+        this.timeout(60000);
+        const computeDatasetArray = JSON.stringify([computeDatasetDid]);
+        exec(`npm run cli startCompute ${computeDatasetArray} ${pythonAlgoDid} 0`, { cwd: projectRoot }, (error, stdout) => {
             expect(stdout).to.contain("Starting compute job using provider");
             expect(stdout).to.contain("Ordering algorithm");
             expect(stdout).to.contain(pythonAlgoDid);
@@ -140,6 +139,4 @@ describe("C2D Tests", function() {
             done()
         });
     });
-
-
 });

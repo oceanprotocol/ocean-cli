@@ -3,10 +3,9 @@ import { exec } from "child_process";
 import path from "path";
 import fs from "fs";
 
-describe("Ocean CLI Publishing", function() {
+describe("C2D Tests", function() {
     this.timeout(60000); // Set a longer timeout to allow the command to execute
 
-    let downloadDatasetDid: string
     let computeDatasetDid: string;
     let jsAlgoDid: string;
     let pythonAlgoDid: string;
@@ -114,5 +113,33 @@ describe("Ocean CLI Publishing", function() {
             done()
         });
     });
+
+    it("should allow Python algorithm to run on the compute dataset", function(done) {
+        exec(`npm run cli allowAlgo ${computeDatasetDid} ${pythonAlgoDid}`, { cwd: projectRoot }, (error, stdout) => {
+            console.log('running: ', `npm run cli allowAlgo ${computeDatasetDid} ${pythonAlgoDid}`)
+            console.log("stdout", stdout)
+            expect(stdout).to.contain("Successfully updated asset metadata:");
+            done()
+        });
+    });
+
+    it("should start compute job with Python algorithm running on the compute dataset", function(done) {
+        this.timeout(120000);
+        exec(`npm run cli startCompute [${computeDatasetDid}] ${pythonAlgoDid} 0`, { cwd: projectRoot }, (error, stdout) => {
+            console.log('Running: ', `npm run cli startCompute [${computeDatasetDid}] ${pythonAlgoDid} 0`)
+            console.log("stdout", stdout)
+            expect(stdout).to.contain("Starting compute job using provider");
+            expect(stdout).to.contain("Ordering algorithm");
+            expect(stdout).to.contain(pythonAlgoDid);
+            expect(stdout).to.contain("Ordering asset with DID");
+            expect(stdout).to.contain(computeDatasetDid);
+            expect(stdout).to.contain("Starting compute job on");
+            expect(stdout).to.contain("Consumer");
+            expect(stdout).to.contain("JobID");
+            expect(stdout).to.contain("Agreement ID");
+            done()
+        });
+    });
+
 
 });

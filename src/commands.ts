@@ -7,12 +7,14 @@ import {
 	updateAssetMetadata,
 	downloadFile,
 	isOrderable,
+	getMetadataURI,
 } from "./helpers";
 import {
 	Aquarius,
 	Asset,
 	ComputeAlgorithm,
 	ComputeJob,
+	ComputeOutput,
 	Config,
 	ConfigHelper,
 	Datatoken,
@@ -225,6 +227,7 @@ export class Commands {
 	}
 
 	public async computeStart(args: string[]) {
+
 		const inputDatasetsString = args[1];
 		let inputDatasets = [];
 
@@ -396,6 +399,11 @@ export class Commands {
 				" with additional datasets:" +
 				(!additionalDatasets ? "none" : additionalDatasets[0].documentId)
 		);
+
+		const output: ComputeOutput =  {
+			metadataUri: await getMetadataURI()
+		}
+
 		const computeJobs = await ProviderInstance.computeStart(
 			providerURI,
 			this.signer,
@@ -403,7 +411,8 @@ export class Commands {
 			assets[0],
 			algo,
 			null,
-			additionalDatasets
+			additionalDatasets,
+			output
 		);
 		if (computeJobs && computeJobs[0]) {
 			const { jobId, agreementId } = computeJobs[0];

@@ -90,7 +90,7 @@ describe("C2D Tests", function() {
     });
 
     
-    it("should get DDO using 'npm run cli getDDO' for compute dataset", async function(done) {
+    it("should get DDO using 'npm run cli getDDO' for compute dataset", function(done) {
 
         exec(`npm run cli getDDO ${computeDatasetDid}`, { cwd: projectRoot }, (error, stdout) => {
             expect(stdout).to.contain(`${computeDatasetDid}`);
@@ -212,11 +212,11 @@ describe("C2D Tests", function() {
     //     });
     // });
 
-    it("start compute job with JS algorithm should fail as it has not been allowed", function(done) {
-        const computeDatasetArray = JSON.stringify([computeDatasetDid]);
-        exec(`npm run cli startCompute ${computeDatasetArray} ${jsAlgoDid} 0`, { cwd: projectRoot }, (error, stdout) => {
-            console.log('stdout', stdout)
-            done()
-        });
-    });
+    // it("start compute job with JS algorithm should fail as it has not been allowed", function(done) {
+    //     const computeDatasetArray = JSON.stringify([computeDatasetDid]);
+    //     exec(`npm run cli startCompute ${computeDatasetArray} ${jsAlgoDid} 0`, { cwd: projectRoot }, (error, stdout) => {
+    //         console.log('stdout', stdout)
+    //         done()
+    //     });
+    // });
 });

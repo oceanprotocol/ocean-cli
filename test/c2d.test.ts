@@ -3,8 +3,6 @@ import { exec } from "child_process";
 import path from "path";
 import fs from "fs";
 
-const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
-
 describe("C2D Tests", function() {
     this.timeout(60000); // Set a longer timeout to allow the command to execute
 
@@ -131,33 +129,33 @@ describe("C2D Tests", function() {
         });
     });
 
-    // it("should start compute job with Python algorithm running on the compute dataset", function(done) {
-    //     this.timeout(60000);
-    //     const computeDatasetArray = JSON.stringify([computeDatasetDid]);
-    //     exec(`npm run cli startCompute ${computeDatasetArray} ${pythonAlgoDid} 0`, { cwd: projectRoot }, (error, stdout) => {
-    //         console.log('Running: ', `npm run cli startCompute ${computeDatasetArray} ${pythonAlgoDid} 0`);
-    //         console.log("stdout:", stdout);
-    //         if (error) {
-    //             console.error("Error:", error);
-    //             return done(error);
-    //         }
+    it("should start compute job with Python algorithm running on the compute dataset", function(done) {
+        this.timeout(60000);
+        const computeDatasetArray = JSON.stringify([computeDatasetDid]);
+        exec(`npm run cli startCompute ${computeDatasetArray} ${pythonAlgoDid} 0`, { cwd: projectRoot }, (error, stdout) => {
+            console.log('Running: ', `npm run cli startCompute ${computeDatasetArray} ${pythonAlgoDid} 0`);
+            console.log("stdout:", stdout);
+            if (error) {
+                console.error("Error:", error);
+                return done(error);
+            }
     
-    //         try {
-    //             expect(stdout).to.contain("Starting compute job using provider");
-    //             expect(stdout).to.contain("Ordering algorithm");
-    //             expect(stdout).to.contain(pythonAlgoDid);
-    //             expect(stdout).to.contain("Ordering asset with DID");
-    //             expect(stdout).to.contain(computeDatasetDid);
-    //             expect(stdout).to.contain("Starting compute job on");
-    //             expect(stdout).to.contain("Consumer");
-    //             expect(stdout).to.contain("JobID");
-    //             expect(stdout).to.contain("Agreement ID");
-    //             done();
-    //         } catch (assertionError) {
-    //             done(assertionError);
-    //         }
-    //     });
-    // });
+            try {
+                expect(stdout).to.contain("Starting compute job using provider");
+                expect(stdout).to.contain("Ordering algorithm");
+                expect(stdout).to.contain(pythonAlgoDid);
+                expect(stdout).to.contain("Ordering asset with DID");
+                expect(stdout).to.contain(computeDatasetDid);
+                expect(stdout).to.contain("Starting compute job on");
+                expect(stdout).to.contain("Consumer");
+                expect(stdout).to.contain("JobID");
+                expect(stdout).to.contain("Agreement ID");
+                done();
+            } catch (assertionError) {
+                done(assertionError);
+            }
+        });
+    });
     
 
     // it("should start compute job with Python algorithm running on the compute dataset", function(done) {

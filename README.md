@@ -91,6 +91,8 @@ npm run cli h
 
 E.g. run publish command
 
+Make sure to update chainId from the assets from `metadata` folder.
+
 ```
 npm run cli publish metadata/simpleDownloadDataset.json
 ```

@@ -5,7 +5,7 @@
   "id": "",
   "nftAddress": "",
   "version": "4.1.0",
-  "chainId": 137,
+  "chainId": 8996,
   "metadata": {
     "created": "2023-08-01T17:09:39Z",
     "updated": "2023-08-01T17:09:39Z",
@@ -18,7 +18,8 @@
       "termsAndConditions": true
     },
     "algorithm": {
-      "language": "py",
+      "language": "python",
+      "format": "docker-image",
       "version": "0.1",
       "container": {
         "entrypoint": "python $ALGO",
@@ -31,25 +32,20 @@
   "services": [
     {
       "id": "db164c1b981e4d2974e90e61bda121512e6909c1035c908d68933ae4cfaba6b0",
-      "type": "compute",
+      "type": "download",
       "files": {
         "datatokenAddress": "0x0",
         "nftAddress": "0x0",
         "files": [
           {
             "type": "url",
-            "url": "https://raw.githubusercontent.com/oceanprotocol/testdatasets/main/shs_dataset_test.txt",
+            "url": "https://raw.githubusercontent.com/oceanprotocol/c2d-examples/main/branin_and_gpr/gpr.py",
             "method": "GET"
           }
         ]
       },
       "timeout": 86400,
-      "compute": {
-        "allowRawAlgorithm": false,
-        "allowNetworkAccess": true,
-        "publisherTrustedAlgorithmPublishers": [],
-        "publisherTrustedAlgorithms": []
-      }
+      "serviceEndpoint": "http://10.84.128.6:8001"
     }
   ],
   "stats": {

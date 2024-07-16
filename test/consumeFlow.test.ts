@@ -149,4 +149,10 @@ describe("Ocean CLI Publishing", function() {
         });
     });
 
+    it("should download the download dataset", function(done) {
+        exec(`npm run cli download ${downloadDatasetDid} ./`, { cwd: projectRoot }, (error, stdout) => {
+            console.log('stdout', stdout)
+            done()
+        });
+    });
 });

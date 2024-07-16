@@ -142,7 +142,7 @@ jobs:
           FEE_AMOUNT: '{ "amount": 1, "unit": "MB" }'
           AUTHORIZED_DECRYPTERS: '["0xe2DD09d719Da89e5a3D0F2549c7E24566e947260"]'
           ALLOWED_ADMINS: '["0xe2DD09d719Da89e5a3D0F2549c7E24566e947260"]'
-          OPERATOR_SERVICE_URL: '["http://localhost:31000"]'
+          OPERATOR_SERVICE_URL: '["http://http://172.15.0.13:31000"]'
       - name: Check Ocean Node is running
         run: |
           for i in $(seq 1 30); do

@@ -204,40 +204,40 @@ export async function createDatatokenAndPricing(
 	config: Config,
 	price: number
 ) {
-  // --------------------------------------------------
-  // 1. Create Datatoken
-  // --------------------------------------------------
-  console.log('Creating datatoken...')
+	// --------------------------------------------------
+	// 1. Create Datatoken
+	// --------------------------------------------------
+	console.log('Creating datatoken...')
 
 	const { chainId } = await owner.provider.getNetwork();
 	if (ddo.chainId !== chainId) throw new Error(`Connected to different chain ${chainId}`);
 
 	const nft = new Nft(owner, chainId);
-  const publisherAccount = await owner.getAddress()
+	const publisherAccount = await owner.getAddress()
 
-  const datatokenAddress = await nft.createDatatoken(
-    ddo.nftAddress,
-    publisherAccount,
+	const datatokenAddress = await nft.createDatatoken(
+		ddo.nftAddress,
 		publisherAccount,
 		publisherAccount,
-    ZERO_ADDRESS,
-    config.oceanTokenAddress,
-    "0",
-    "100000",
-    "DataToken",
-    "DT",
-    1
-  )
+		publisherAccount,
+		ZERO_ADDRESS,
+		config.oceanTokenAddress,
+		"0",
+		"100000",
+		"DataToken",
+		"DT",
+		1
+	)
 
-  console.log('Datatoken created.', datatokenAddress)
+	console.log('Datatoken created.', datatokenAddress)
 
-  // --------------------------------------------------
-  // 2. Create Pricing
-  // --------------------------------------------------
-  const datatoken = new Datatoken(owner, chainId)
+	// --------------------------------------------------
+	// 2. Create Pricing
+	// --------------------------------------------------
+	const datatoken = new Datatoken(owner, chainId)
 
-  let pricingTransactionReceipt;
-  if (price > 0) {
+	let pricingTransactionReceipt;
+	if (price > 0) {
 		console.log(`Creating fixed rate exchange with price ${price} for datatoken ${datatokenAddress}`)
 
 		const freParams: FreCreationParams = {
@@ -278,8 +278,8 @@ export async function createDatatokenAndPricing(
 
 	const tx = await pricingTransactionReceipt.wait()
 	console.log('Pricing scheme created.')
-	
-  return { datatokenAddress, tx }
+
+	return { datatokenAddress, tx }
 }
 
 export async function updateAssetMetadata(

@@ -199,7 +199,7 @@ export class Commands {
 		service.serviceEndpoint = this.providerUrl;
 		asset.services.push(service)
 
-		const updateAssetTx = await updateAssetMetadata(
+		await updateAssetMetadata(
 			this.signer,
 			asset,
 			this.providerUrl,

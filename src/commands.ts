@@ -7,6 +7,7 @@ import {
 	updateAssetMetadata,
 	downloadFile,
 	isOrderable,
+	createDatatokenAndPricing,
 } from "./helpers";
 import {
 	Aquarius,
@@ -161,6 +162,52 @@ export class Commands {
 			encryptDDO
 		);
 		console.log("Asset updated. Tx: " + JSON.stringify(updateAssetTx, null, 2));
+	}
+
+	public async addService(args: string[]) {
+		const asset = await this.aquarius.waitForAqua(args[1]);
+		if (!asset) {
+			console.error("Error fetching DDO " + args[1] + ".  Does this asset exists?");
+			return;
+		}
+		let service;
+		try {
+			service = JSON.parse(fs.readFileSync(args[2], "utf8"));
+		} catch (e) {
+			console.error("Cannot read service data from" + args[2]);
+			console.error(e);
+			return;
+		}
+
+		const price = parseInt(args[3]) || 0
+
+		const { datatokenAddress } = await createDatatokenAndPricing(
+			asset,
+			this.signer,
+			this.config,
+			price
+		)
+
+		service.files.datatokenAddress = datatokenAddress;
+		service.files.nftAddress = asset.nftAddress;
+		service.files = await ProviderInstance.encrypt(
+			service.files,
+			asset.chainId,
+			this.providerUrl
+		);
+		service.datatokenAddress = datatokenAddress;
+		service.serviceEndpoint = this.providerUrl;
+		asset.services.push(service)
+
+		const updateAssetTx = await updateAssetMetadata(
+			this.signer,
+			asset,
+			this.providerUrl,
+			this.aquarius,
+			this.macOsProviderUrl,
+		);
+
+		console.log("Service added");
 	}
 
 	public async getDDO(args: string[]) {

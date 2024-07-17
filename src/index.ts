@@ -27,6 +27,10 @@ function help() {
 	);
 
 	console.log(
+		"\t addService DATASET_DID SERVICE_FILE PRICE - adds a new service to the dataset, reads the service file, creates a datatoken and pricing."
+	);
+
+	console.log(
 		"\t download DID DESTINATION_FOLDER - downloads an asset into downloads/DESTINATION_FOLDER"
 	);
 	console.log(
@@ -83,6 +87,9 @@ async function start() {
 			break;
 		case "edit":
 			await commands.editAsset(myArgs);
+			break;
+		case "addService":
+			await commands.addService(myArgs);
 			break;
 		case "download":
 			await commands.download(myArgs);

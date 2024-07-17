@@ -28,6 +28,7 @@ import {
 	ProviderFees,
 	ComputeAlgorithm,
 	LoggerInstance,
+	DispenserParams,
 } from "@oceanprotocol/lib";
 import { hexlify } from "ethers/lib/utils";
 
@@ -195,6 +196,90 @@ export async function createAsset(
 		metadataHash
 	);
 	return ddo.id;
+}
+
+export async function createDatatokenAndPricing(
+	ddo: Asset,
+	owner: Signer,
+	config: Config,
+	price: number
+) {
+  // --------------------------------------------------
+  // 1. Create Datatoken
+  // --------------------------------------------------
+  console.log('Creating datatoken...')
+
+	const { chainId } = await owner.provider.getNetwork();
+	if (ddo.chainId !== chainId) throw new Error(`Connected to different chain ${chainId}`);
+
+	const nft = new Nft(owner, chainId);
+  const publisherAccount = await owner.getAddress()
+
+  const datatokenAddress = await nft.createDatatoken(
+    ddo.nftAddress,
+    publisherAccount,
+		publisherAccount,
+		publisherAccount,
+    ZERO_ADDRESS,
+    config.oceanTokenAddress,
+    "0",
+    "100000",
+    "DataToken",
+    "DT",
+    1
+  )
+
+  console.log('Datatoken created.', datatokenAddress)
+
+  // --------------------------------------------------
+  // 2. Create Pricing
+  // --------------------------------------------------
+  const datatoken = new Datatoken(owner, chainId)
+
+  let pricingTransactionReceipt;
+  if (price > 0) {
+		console.log(`Creating fixed rate exchange with price ${price} for datatoken ${datatokenAddress}`)
+
+		const freParams: FreCreationParams = {
+			fixedRateAddress: config.fixedRateExchangeAddress,
+			baseTokenAddress: config.oceanTokenAddress,
+			owner: publisherAccount,
+			marketFeeCollector: publisherAccount,
+			baseTokenDecimals: 18,
+			datatokenDecimals: 18,
+			fixedRate: ethers.utils.parseEther(price.toString()).toString(),
+			marketFee: "0",
+			allowedConsumer: publisherAccount,
+			withMint: true,
+		}
+
+		pricingTransactionReceipt = await datatoken.createFixedRate(
+			datatokenAddress,
+			publisherAccount,
+			freParams
+		)
+	} else {
+		console.log(`Creating dispenser for datatoken ${datatokenAddress}`)
+
+		const dispenserParams: DispenserParams = {
+			maxTokens: ethers.utils.parseEther("1").toString(),
+			maxBalance: ethers.utils.parseEther("1").toString(),
+			withMint: true,
+			allowedSwapper: ZERO_ADDRESS
+		}
+
+		pricingTransactionReceipt = await datatoken.createDispenser(
+			datatokenAddress,
+			publisherAccount,
+			config.dispenserAddress,
+			dispenserParams
+		)
+	}
+
+	const tx = await pricingTransactionReceipt.wait()
+	console.log('Pricing scheme created.')
+	
+  return { datatokenAddress, tx }
 }
 
 export async function updateAssetMetadata(

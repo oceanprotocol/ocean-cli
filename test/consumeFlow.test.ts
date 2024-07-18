@@ -2,16 +2,25 @@ import { expect } from "chai";
 import { exec } from "child_process";
 import path from "path";
 import fs from "fs";
+import crypto from "crypto";
 
 describe("Ocean CLI Publishing", function() {
     this.timeout(60000); // Set a longer timeout to allow the command to execute
 
-    let downloadDatasetDid: string
+    let downloadDatasetDid: string;
     let computeDatasetDid: string;
     let jsAlgoDid: string;
     let pythonAlgoDid: string;
 
     const projectRoot = path.resolve(__dirname, "..");
+
+    // Function to compute hash of a file
+    const computeFileHash = (filePath: string): string => {
+        const fileBuffer = fs.readFileSync(filePath);
+        const hashSum = crypto.createHash('sha256');
+        hashSum.update(fileBuffer);
+        return hashSum.digest('hex');
+    };
 
     it("should publish a dataset using 'npm run cli publish'", function(done) {
         const metadataFile = path.resolve(projectRoot, "metadata/simpleDownloadDataset.json");
@@ -113,46 +122,59 @@ describe("Ocean CLI Publishing", function() {
 
     it("should get DDO using 'npm run cli getDDO' for download dataset", function(done) {
         exec(`npm run cli getDDO ${downloadDatasetDid}`, { cwd: projectRoot }, (error, stdout) => {
-            console.log('stdout', stdout)
+            console.log('stdout', stdout);
             expect(stdout).to.contain(`${downloadDatasetDid}`);
             expect(stdout).to.contain("https://w3id.org/did/v1");
             expect(stdout).to.contain("Datatoken");
-            done()
+            done();
         });
     });
 
-    
     it("should get DDO using 'npm run cli getDDO' for compute dataset", function(done) {
         exec(`npm run cli getDDO ${computeDatasetDid}`, { cwd: projectRoot }, (error, stdout) => {
             expect(stdout).to.contain(`${computeDatasetDid}`);
             expect(stdout).to.contain("https://w3id.org/did/v1");
             expect(stdout).to.contain("Datatoken");
-            done()
+            done();
         });
     });
-  
+
     it("should get DDO using 'npm run cli getDDO' for JS algorithm", function(done) {
         exec(`npm run cli getDDO ${jsAlgoDid}`, { cwd: projectRoot }, (error, stdout) => {
             expect(stdout).to.contain(`${jsAlgoDid}`);
             expect(stdout).to.contain("https://w3id.org/did/v1");
             expect(stdout).to.contain("Datatoken");
-            done()
+            done();
         });
     });
-      
+
     it("should get DDO using 'npm run cli getDDO' for python algorithm", function(done) {
         exec(`npm run cli getDDO ${pythonAlgoDid}`, { cwd: projectRoot }, (error, stdout) => {
             expect(stdout).to.contain(`${pythonAlgoDid}`);
             expect(stdout).to.contain("https://w3id.org/did/v1");
             expect(stdout).to.contain("Datatoken");
-            done()
+            done();
         });
     });
 
     it("should download the download dataset", function(done) {
-        exec(`npm run cli download ${downloadDatasetDid} ./`, { cwd: projectRoot }, (error, stdout) => {
-            console.log('stdout', stdout)
-            done()
+        const originalFilePath = path.resolve(projectRoot, "metadata/simpleDownloadDataset.json");
+        const downloadedFilePath = path.resolve(projectRoot, "downloadedFile.json");
+        const originalFileHash = computeFileHash(originalFilePath);
+
+        exec(`npm run cli download ${downloadDatasetDid} ${downloadedFilePath}`, { cwd: projectRoot }, (error, stdout) => {
+            console.log('stdout', stdout);
+            expect(stdout).to.contain("File downloaded successfully");
+
+            // Log the content of the downloaded file
+            const downloadedFileContent = fs.readFileSync(downloadedFilePath, 'utf8');
+            console.log('Downloaded file content:', downloadedFileContent);
+
+            // Verify the downloaded file content hash matches the original file hash
+            const downloadedFileHash = computeFileHash(downloadedFilePath);
+            expect(downloadedFileHash).to.equal(originalFileHash);
+
+            done();
         });
     });
 });

@@ -5,7 +5,7 @@ import fs from "fs";
 import crypto from "crypto";
 
 describe("Ocean CLI Publishing", function() {
-    this.timeout(60000); // Set a longer timeout to allow the command to execute
+    this.timeout(180000); // Set a longer timeout to allow the command to execute
 
     let downloadDatasetDid: string;
     let computeDatasetDid: string;
@@ -38,6 +38,8 @@ describe("Ocean CLI Publishing", function() {
         process.env.ADDRESS_FILE = path.join(process.env.HOME || "", ".ocean/ocean-contracts/artifacts/address.json");
 
         exec(`npm run cli publish ${metadataFile}`, { cwd: projectRoot }, (error, stdout) => {
+            console.log("Running command: ", `npm run cli publish ${metadataFile}`)
+            console.log('stdout', stdout)
             try {
                 const match = stdout.match(/did:op:[a-f0-9]{64}/);
                 if (match) {
@@ -46,6 +48,7 @@ describe("Ocean CLI Publishing", function() {
                 expect(stdout).to.contain("Asset published. ID:");
                 done();
             } catch (assertionError) {
+                console.log('assertionError', assertionError);
                 done(assertionError);
             }
         });

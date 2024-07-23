@@ -40,17 +40,17 @@ export async function downloadFile(
 	if (!response.ok) {
 		throw new Error("Response error.");
 	}
-	let filename: string;
+
+	const defaultName = !isNaN(index) && index > -1 ? `file_${index}.out` : 'file.out'
+	let filename: string
+
 	try {
+		// try to get it from headers
 		filename = response.headers
 			.get("content-disposition")
 			.match(/attachment;filename=(.+)/)[1];
 	} catch {
-		try {
-			filename = url.split("/").pop();
-		} catch {
-			filename = `file${index}`;
-		}
+		filename = defaultName;
 	}
 
 	const filePath = path.join(downloadPath, filename);

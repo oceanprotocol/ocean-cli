@@ -326,3 +326,67 @@ export async function isOrderable(
 	}
 	return true;
 }
+
+
+// The ranges and the amount of usable IP's:
+
+// 10.0.0.0 - 10.255.255.255 Addresses: 16,777,216
+// 172.16.0.0 - 172.31.255.255 Addresses: 1,048,576
+// 192.168.0.0 - 192.168.255.255 Addresses: 65,536
+
+// check if IP is private or not
+export function isPrivateIP(ip): boolean {
+
+	const reg = /^(127\.[\d.]+|[0:]+1|localhost)$/
+	const result = ip.match(reg)
+	if(result!==null) {
+		// is loopback address
+		return true
+	}
+	const parts = ip.split('.');
+	return parts[0] === '10' || 
+	   (parts[0] === '172' && (parseInt(parts[1], 10) >= 16 && parseInt(parts[1], 10) <= 31)) || 
+	   (parts[0] === '192' && parts[1] === '168');
+ }
+
+ // get public IP address using free service API
+ export async function getPublicIP(): Promise<string> {
+
+	try {
+		const response = await fetch('https://api.ipify.org?format=json')
+		const data = await response.json()
+		if(data) {
+			return data.ip
+		}
+	}catch(err) {
+		console.error('Erro getting public IP: ',err.message)
+	}
+	
+    return null
+ }
+
+ export async function getMetadataURI() {
+	const metadataURI = process.env.AQUARIUS_URL
+	const parsed = new URL(metadataURI);
+	let ip = metadataURI // by default
+	// has port number?
+	const hasPort = parsed.port && !isNaN( Number(parsed.port))
+	if(hasPort) {
+		// remove the port, just get the host part
+		ip = parsed.hostname
+	} 
+	// check if is private or loopback
+	if(isPrivateIP(ip)) {
+		// get public V4 ip address
+		ip = await getPublicIP()
+		if(!ip) {
+			return metadataURI
+		}
+	} 
+	// if we removed the port add it back
+	if(hasPort) {
+		ip = `http://${ip}:${parsed.port}`
+	}
+	return ip
+ }
+

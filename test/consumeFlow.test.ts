@@ -164,16 +164,16 @@ describe("Ocean CLI Publishing", function() {
         const originalFilePath = path.resolve(projectRoot, "metadata/simpleDownloadDataset.json");
         const originalFileHash = computeFileHash(originalFilePath);
 
-        exec(`npm run cli download ${downloadDatasetDid} ./`, { cwd: projectRoot }, (error, stdout) => {
+        exec(`npm run cli download ${downloadDatasetDid} .`, { cwd: projectRoot }, (error, stdout) => {
             console.log('stdout', stdout);
             expect(stdout).to.contain("File downloaded successfully");
 
             // Log the content of the downloaded file
-            const downloadedFileContent = fs.readFileSync('./UNKNOWNFILE', 'utf8');
+            const downloadedFileContent = fs.readFileSync('./enwiki-latest-abstract10.xml.gz-rss.xml', 'utf8');
             console.log('Downloaded file content:', downloadedFileContent);
 
             // Verify the downloaded file content hash matches the original file hash
-            const downloadedFileHash = computeFileHash('./UNKNOWNFILE');
+            const downloadedFileHash = computeFileHash('./enwiki-latest-abstract10.xml.gz-rss.xml');
             expect(downloadedFileHash).to.equal(originalFileHash);
 
             done();

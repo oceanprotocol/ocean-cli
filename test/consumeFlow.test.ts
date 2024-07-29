@@ -55,8 +55,6 @@ describe("Ocean CLI Publishing", function() {
         process.env.ADDRESS_FILE = path.join(process.env.HOME || "", ".ocean/ocean-contracts/artifacts/address.json");
 
         exec(`npm run cli publish ${metadataFile}`, { cwd: projectRoot }, (error, stdout) => {
-            console.log("Running command: ", `npm run cli publish ${metadataFile}`)
-            console.log('stdout', stdout)
             try {
                 const match = stdout.match(/did:op:[a-f0-9]{64}/);
                 if (match) {
@@ -142,7 +140,6 @@ describe("Ocean CLI Publishing", function() {
 
     it("should get DDO using 'npm run cli getDDO' for download dataset", function(done) {
         exec(`npm run cli getDDO ${downloadDatasetDid}`, { cwd: projectRoot }, (error, stdout) => {
-            console.log('stdout', stdout);
             expect(stdout).to.contain(`${downloadDatasetDid}`);
             expect(stdout).to.contain("https://w3id.org/did/v1");
             expect(stdout).to.contain("Datatoken");
@@ -182,7 +179,7 @@ describe("Ocean CLI Publishing", function() {
     
         (async () => {
             try {
-                const { stdout, error } = await new Promise<{ stdout: string, error: Error | null }>((resolve, reject) => {
+                const { stdout } = await new Promise<{ stdout: string, error: Error | null }>((resolve, reject) => {
                     exec(`npm run cli download ${downloadDatasetDid} .`, { cwd: projectRoot }, (error, stdout) => {
                         if (error) {
                             reject(error);
@@ -192,7 +189,6 @@ describe("Ocean CLI Publishing", function() {
                     });
                 });
     
-                console.log('stdout', stdout);
                 expect(stdout).to.contain("File downloaded successfully");
     
                 // Path to the downloaded file

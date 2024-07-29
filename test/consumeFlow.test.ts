@@ -3,6 +3,7 @@ import { exec } from "child_process";
 import path from "path";
 import fs from "fs";
 import crypto from "crypto";
+import https from "https";
 
 describe("Ocean CLI Publishing", function() {
     this.timeout(180000); // Set a longer timeout to allow the command to execute
@@ -21,6 +22,22 @@ describe("Ocean CLI Publishing", function() {
         hashSum.update(fileBuffer);
         return hashSum.digest('hex');
     };
+
+    const downloadFile = async (url: string, dest: string): Promise<void> => {
+        return new Promise((resolve, reject) => {
+            const file = fs.createWriteStream(dest);
+            https.get(url, (response) => {
+                response.pipe(file);
+                file.on('finish', () => {
+                    file.close(() => resolve());
+                });
+            }).on('error', (err) => {
+                fs.unlink(dest, () => reject(err));
+            });
+        });
+    };
+    
+    
 
     it("should publish a dataset using 'npm run cli publish'", function(done) {
         const metadataFile = path.resolve(projectRoot, "metadata/simpleDownloadDataset.json");
@@ -161,22 +178,43 @@ describe("Ocean CLI Publishing", function() {
     });
 
     it("should download the download dataset", function(done) {
-        const originalFilePath = path.resolve(projectRoot, "metadata/simpleDownloadDataset.json");
-        const originalFileHash = computeFileHash(originalFilePath);
-
-        exec(`npm run cli download ${downloadDatasetDid} .`, { cwd: projectRoot }, (error, stdout) => {
-            console.log('stdout', stdout);
-            expect(stdout).to.contain("File downloaded successfully");
-
-            // Log the content of the downloaded file
-            const downloadedFileContent = fs.readFileSync('./enwiki-latest-abstract10.xml.gz-rss.xml', 'utf8');
-            console.log('Downloaded file content:', downloadedFileContent);
-
-            // Verify the downloaded file content hash matches the original file hash
-            const downloadedFileHash = computeFileHash('./enwiki-latest-abstract10.xml.gz-rss.xml');
-            expect(downloadedFileHash).to.equal(originalFileHash);
-
-            done();
-        });
+        this.timeout(10000); // Increase timeout if needed
+    
+        (async () => {
+            try {
+                const { stdout, error } = await new Promise<{ stdout: string, error: Error | null }>((resolve, reject) => {
+                    exec(`npm run cli download ${downloadDatasetDid} .`, { cwd: projectRoot }, (error, stdout) => {
+                        if (error) {
+                            reject(error);
+                        } else {
+                            resolve({ stdout, error: null });
+                        }
+                    });
+                });
+    
+                console.log('stdout', stdout);
+                expect(stdout).to.contain("File downloaded successfully");
+    
+                // Path to the downloaded file
+                const downloadedFilePath = './enwiki-latest-abstract10.xml.gz-rss.xml';
+    
+                // Verify the downloaded file content hash matches the original file hash
+                const downloadedFileHash = computeFileHash(downloadedFilePath);
+                const originalFilePath = './metadata/enwiki-latest-abstract10.xml.gz-rss.xml';
+    
+                await downloadFile("https://dumps.wikimedia.org/enwiki/latest/enwiki-latest-abstract10.xml.gz-rss.xml", originalFilePath);
+                const originalFileHash = computeFileHash(originalFilePath);
+    
+                expect(downloadedFileHash).to.equal(originalFileHash);
+    
+                // Clean up downloaded original file
+                fs.unlinkSync(originalFilePath);
+    
+                done();
+            } catch (err) {
+                done(err);
+            }
+        })();
     });
+    
 });

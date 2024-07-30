@@ -61,7 +61,7 @@ describe("Ocean CLI Publishing", function() {
                     downloadDatasetDid = match[0];
                 }
                 expect(stdout).to.contain("Asset published. ID:");
-                done();
+                done()
             } catch (assertionError) {
                 console.log('assertionError', assertionError);
                 done(assertionError);
@@ -85,7 +85,7 @@ describe("Ocean CLI Publishing", function() {
                     computeDatasetDid = match[0];
                 }
                 expect(stdout).to.contain("Asset published. ID:");
-                done();
+                done()
             } catch (assertionError) {
                 done(assertionError);
             }
@@ -108,7 +108,7 @@ describe("Ocean CLI Publishing", function() {
                 if (match) {
                     jsAlgoDid = match[0];
                 }
-                done();
+                done()
             } catch (assertionError) {
                 done(assertionError);
             }
@@ -131,7 +131,7 @@ describe("Ocean CLI Publishing", function() {
                 if (match) {
                     pythonAlgoDid = match[0];
                 }
-                done();
+                done()
             } catch (assertionError) {
                 done(assertionError);
             }
@@ -143,7 +143,7 @@ describe("Ocean CLI Publishing", function() {
             expect(stdout).to.contain(`${downloadDatasetDid}`);
             expect(stdout).to.contain("https://w3id.org/did/v1");
             expect(stdout).to.contain("Datatoken");
-            done();
+            done()
         });
     });
 
@@ -152,7 +152,7 @@ describe("Ocean CLI Publishing", function() {
             expect(stdout).to.contain(`${computeDatasetDid}`);
             expect(stdout).to.contain("https://w3id.org/did/v1");
             expect(stdout).to.contain("Datatoken");
-            done();
+            done()
         });
     });
 
@@ -161,7 +161,7 @@ describe("Ocean CLI Publishing", function() {
             expect(stdout).to.contain(`${jsAlgoDid}`);
             expect(stdout).to.contain("https://w3id.org/did/v1");
             expect(stdout).to.contain("Datatoken");
-            done();
+            done()
         });
     });
 
@@ -170,7 +170,7 @@ describe("Ocean CLI Publishing", function() {
             expect(stdout).to.contain(`${pythonAlgoDid}`);
             expect(stdout).to.contain("https://w3id.org/did/v1");
             expect(stdout).to.contain("Datatoken");
-            done();
+            done()
         });
     });
 
@@ -206,7 +206,7 @@ describe("Ocean CLI Publishing", function() {
                 // Clean up downloaded original file
                 fs.unlinkSync(originalFilePath);
     
-                done();
+                done()
             } catch (err) {
                 done(err);
             }

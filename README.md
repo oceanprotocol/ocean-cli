@@ -97,6 +97,25 @@ Make sure to update chainId from the assets from `metadata` folder.
 npm run cli publish metadata/simpleDownloadDataset.json
 ```
 
+### Use case - Publish a download asset with multiple services
+
+1. publish a download asset `metadata/simpleDownloadDataset.json`. Make sure to update `chainId` and `stats.price.value` - this will be the price for the first service.
+
+```
+npm run cli publish metadata/simpleDownloadDataset.json
+```
+
+2. publish a second service for the same asset. Make sure the service `id` is different from the first service. The price is specified as a third argument.
+
+```
+npm run cli addService <did> metadata/downloadService.json 5
+```
+
+3. Optionally edit the DDO with `offchain` metadata - [link](https://github.com/oceanprotocol/ocean-node/issues/525) to ocean-node issue. After the issue is fixed this won't be necessary.
+```
+npm run cli edit <did> <path-to-json>
+```
+
 ## 🏛 License
 
 ```

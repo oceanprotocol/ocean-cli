@@ -23,6 +23,7 @@ import {
 	sendTx,
 } from "@oceanprotocol/lib";
 import { Signer, ethers } from "ethers";
+import { interactiveFlow } from "./interactiveFlow";
 
 export class Commands {
 	public signer: Signer;
@@ -60,6 +61,13 @@ export class Commands {
 			process.env.AQUARIUS_URL || this.config.metadataCacheUri
 		);
 	}
+
+	// start the interactive publish flow
+	public async start() {
+		console.log("Starting the CLI flow...");
+		await interactiveFlow(); // Call the CLI logic
+	  }
+
 	// utils
 	public async sleep(ms: number) {
 		return new Promise((resolve) => {

@@ -17,7 +17,7 @@ interface Answers {
   customParameter?: string;
 }
 
-async function askQuestions() {
+export async function interactiveFlow() {
   try {
     // Prompting for basic information
     const basicAnswers = await prompt<Answers>([
@@ -120,5 +120,3 @@ async function askQuestions() {
     console.error('An error occurred during the prompt:', error);
   }
 }
-
-askQuestions();

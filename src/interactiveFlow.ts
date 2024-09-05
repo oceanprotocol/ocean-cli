@@ -78,8 +78,8 @@ export async function interactiveFlow() {
       },
     ]);
 
-    // Continue with further technical details
-    const technicalAnswers = await prompt<Partial<Answers>>([
+    // Prompt for whether the asset is charged or free
+    const { isCharged } = await prompt<{ isCharged: Answers['isCharged'] }>([
       {
         type: 'toggle',
         name: 'isCharged',
@@ -88,18 +88,25 @@ export async function interactiveFlow() {
         enabled: 'Paid',
         disabled: 'Free',
       },
-      {
-        type: 'input',
-        name: 'token',
-        message: 'What token will you accept payments in?\n',
-        skip: (answers: Partial<Answers>) => answers.isCharged === 'Free',
-      },
-      {
-        type: 'input',
-        name: 'price',
-        message: 'What is the price to access your asset?\n',
-        skip: (answers: Partial<Answers>) => answers.isCharged === 'Free',
-      },
+    ]);
+
+    // Continue with further technical details, conditional prompts based on isCharged
+    const paymentDetails = isCharged === 'Paid'
+      ? await prompt<Partial<Answers>>([
+          {
+            type: 'input',
+            name: 'token',
+            message: 'What token will you accept payments in?\n',
+          },
+          {
+            type: 'input',
+            name: 'price',
+            message: 'What is the price to access your asset?\n',
+          },
+        ])
+      : {};
+
+    const technicalAnswers = await prompt<Partial<Answers>>([
       {
         type: 'select',
         name: 'network',
@@ -133,7 +140,15 @@ export async function interactiveFlow() {
     ]);
 
     // Combine all answers
-    const allAnswers = { ...basicAnswers, storageType, assetLocation, ...technicalAnswers, ...advancedAnswers };
+    const allAnswers = { 
+      ...basicAnswers, 
+      storageType, 
+      assetLocation, 
+      isCharged, 
+      ...paymentDetails, 
+      ...technicalAnswers, 
+      ...advancedAnswers 
+    };
 
     console.log('\nHere are your responses:');
     console.log(allAnswers);

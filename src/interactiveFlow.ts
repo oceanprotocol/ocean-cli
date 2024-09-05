@@ -135,7 +135,8 @@ export async function interactiveFlow() {
             type: 'select',
             name: 'template',
             message: 'Which template would you like to use?\n',
-            choices: ['Template A', 'Template B', 'Template C'],
+            choices: ['Template 1 - user can buy, sell & hold datatokens.', 
+              'Template 2 - assets are purchased with basetokens and the effective supply of datatokens is is always zero.'], 
           },
         ])
       : {};

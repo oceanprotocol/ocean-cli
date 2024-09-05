@@ -9,7 +9,7 @@ interface Answers {
   storageType: 'IPFS' | 'Arweave' | 'URL';
   assetLocation: string;
   isCharged: 'Paid' | 'Free';
-  token?: string;
+  token?: 'OCEAN' | 'H2O';
   price?: string;
   network: 'Oasis Sapphire' | 'Ethereum' | 'Polygon';
   template?: string;
@@ -94,9 +94,10 @@ export async function interactiveFlow() {
     const paymentDetails = isCharged === 'Paid'
       ? await prompt<Partial<Answers>>([
           {
-            type: 'input',
+            type: 'select',
             name: 'token',
             message: 'What token will you accept payments in?\n',
+            choices: ['OCEAN', 'H2O'],
           },
           {
             type: 'input',
@@ -106,7 +107,8 @@ export async function interactiveFlow() {
         ])
       : {};
 
-    const technicalAnswers = await prompt<Partial<Answers>>([
+    // Prompt for network selection
+    const { network } = await prompt<{ network: Answers['network'] }>([
       {
         type: 'select',
         name: 'network',
@@ -114,14 +116,19 @@ export async function interactiveFlow() {
         choices: ['Oasis Sapphire', 'Ethereum', 'Polygon'],
         initial: 0,
       },
-      {
-        type: 'select',
-        name: 'template',
-        message: 'Which template would you like to use?\n',
-        choices: ['Template A', 'Template B', 'Template C'],
-        skip: (answers: Partial<Answers>) => answers.network === 'Oasis Sapphire',
-      },
     ]);
+
+    // Conditionally prompt for template if the network is not 'Oasis Sapphire'
+    const templateAnswer = network !== 'Oasis Sapphire'
+      ? await prompt<Partial<Answers>>([
+          {
+            type: 'select',
+            name: 'template',
+            message: 'Which template would you like to use?\n',
+            choices: ['Template A', 'Template B', 'Template C'],
+          },
+        ])
+      : {};
 
     // Prompting for advanced options
     const advancedAnswers = await prompt<Partial<Answers>>([
@@ -146,7 +153,8 @@ export async function interactiveFlow() {
       assetLocation, 
       isCharged, 
       ...paymentDetails, 
-      ...technicalAnswers, 
+      network, 
+      ...templateAnswer, 
       ...advancedAnswers 
     };
 

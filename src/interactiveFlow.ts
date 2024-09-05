@@ -20,7 +20,7 @@ interface Answers {
 export async function interactiveFlow() {
   try {
     // Prompting for basic information
-    const basicAnswers = await prompt<Answers>([
+    const basicAnswers = await prompt<Partial<Answers>>([
       {
         type: 'input',
         name: 'title',
@@ -49,19 +49,37 @@ export async function interactiveFlow() {
       },
     ]);
 
-    // Prompting for technical details
-    const technicalAnswers = await prompt<Answers>([
+    // Prompting for technical details - first, get storage type
+    const { storageType } = await prompt<{ storageType: Answers['storageType'] }>([
       {
         type: 'select',
         name: 'storageType',
         message: 'How is your asset stored?\n',
         choices: ['IPFS', 'Arweave', 'URL'],
       },
+    ]);
+
+    // Determine assetLocation message based on storageType
+    let assetLocationMessage = 'Please provide the location of your asset:\n';
+    if (storageType === 'IPFS') {
+      assetLocationMessage = 'Please provide the IPFS hash for your asset:\n';
+    } else if (storageType === 'Arweave') {
+      assetLocationMessage = 'Please provide the Arweave transaction ID for your asset:\n';
+    } else if (storageType === 'URL') {
+      assetLocationMessage = 'Please provide the URL for your asset:\n';
+    }
+
+    // Prompt for asset location
+    const { assetLocation } = await prompt<{ assetLocation: string }>([
       {
         type: 'input',
         name: 'assetLocation',
-        message: 'Please provide the URL / hash / txID for your asset:\n',
+        message: assetLocationMessage,
       },
+    ]);
+
+    // Continue with further technical details
+    const technicalAnswers = await prompt<Partial<Answers>>([
       {
         type: 'confirm',
         name: 'isCharged',
@@ -72,13 +90,13 @@ export async function interactiveFlow() {
         type: 'input',
         name: 'token',
         message: 'What token will you accept payments in?\n',
-        skip: (answers: Answers) => !answers.isCharged,
+        skip: (answers: Partial<Answers>) => !answers.isCharged,
       },
       {
         type: 'input',
         name: 'price',
         message: 'What is the price to access your asset?\n',
-        skip: (answers: Answers) => !answers.isCharged,
+        skip: (answers: Partial<Answers>) => !answers.isCharged,
       },
       {
         type: 'select',
@@ -92,12 +110,12 @@ export async function interactiveFlow() {
         name: 'template',
         message: 'Which template would you like to use?\n',
         choices: ['Template A', 'Template B', 'Template C'],
-        skip: (answers: Answers) => answers.network === 'Oasis Sapphire',
+        skip: (answers: Partial<Answers>) => answers.network === 'Oasis Sapphire',
       },
     ]);
 
     // Prompting for advanced options
-    const advancedAnswers = await prompt<Answers>([
+    const advancedAnswers = await prompt<Partial<Answers>>([
       {
         type: 'confirm',
         name: 'showAdvanced',
@@ -108,12 +126,12 @@ export async function interactiveFlow() {
         type: 'input',
         name: 'customParameter',
         message: 'Please provide any user-defined parameters:\n',
-        skip: (answers: Answers) => !answers.showAdvanced,
+        skip: (answers: Partial<Answers>) => !answers.showAdvanced,
       },
     ]);
 
     // Combine all answers
-    const allAnswers = { ...basicAnswers, ...technicalAnswers, ...advancedAnswers };
+    const allAnswers = { ...basicAnswers, storageType, assetLocation, ...technicalAnswers, ...advancedAnswers };
 
     console.log('\nHere are your responses:');
     console.log(allAnswers);

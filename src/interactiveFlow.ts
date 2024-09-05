@@ -17,6 +17,11 @@ interface Answers {
   customParameter?: string;
 }
 
+// Validation functions
+const validateIPFS = (input: string) => /^Qm[1-9A-HJ-NP-Za-km-z]{44}$/.test(input) || 'Invalid IPFS hash format.';
+const validateArweave = (input: string) => /^[a-zA-Z0-9_-]{43,}$/.test(input) || 'Invalid Arweave transaction ID format.';
+const validateURL = (input: string) => /^(https?:\/\/)[^\s/$.?#].[^\s]*$/.test(input) || 'Invalid URL format.';
+
 export async function interactiveFlow() {
   try {
     // Prompting for basic information
@@ -59,22 +64,27 @@ export async function interactiveFlow() {
       },
     ]);
 
-    // Determine assetLocation message based on storageType
+    // Determine assetLocation message and validation based on storageType
     let assetLocationMessage = 'Please provide the location of your asset:\n';
+    let validateFunction;
     if (storageType === 'IPFS') {
       assetLocationMessage = 'Please provide the IPFS hash for your asset:\n';
+      validateFunction = validateIPFS;
     } else if (storageType === 'Arweave') {
       assetLocationMessage = 'Please provide the Arweave transaction ID for your asset:\n';
+      validateFunction = validateArweave;
     } else if (storageType === 'URL') {
       assetLocationMessage = 'Please provide the URL for your asset:\n';
+      validateFunction = validateURL;
     }
 
-    // Prompt for asset location
+    // Prompt for asset location with validation
     const { assetLocation } = await prompt<{ assetLocation: string }>([
       {
         type: 'input',
         name: 'assetLocation',
         message: assetLocationMessage,
+        validate: validateFunction,
       },
     ]);
 

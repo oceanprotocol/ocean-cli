@@ -64,7 +64,7 @@ export class Commands {
 
 	// start the interactive publish flow
 	public async start() {
-		console.log("Starting the CLI flow...");
+		console.log("Starting the CLI flow...\n\n");
 		await interactiveFlow(); // Call the CLI logic
 	  }
 

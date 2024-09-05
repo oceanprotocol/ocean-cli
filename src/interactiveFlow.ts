@@ -141,20 +141,20 @@ export async function interactiveFlow() {
       : {};
 
     // Prompting for advanced options
-    const advancedAnswers = await prompt<Partial<Answers>>([
-      {
-        type: 'confirm',
-        name: 'showAdvanced',
-        message: 'Would you like to consider all of the advanced options for your asset?\n',
-        initial: false,
-      },
-      {
-        type: 'input',
-        name: 'customParameter',
-        message: 'Please provide any user-defined parameters:\n',
-        skip: (answers: Partial<Answers>) => !answers.showAdvanced,
-      },
-    ]);
+    // const advancedAnswers = await prompt<Partial<Answers>>([
+    //   {
+    //     type: 'confirm',
+    //     name: 'showAdvanced',
+    //     message: 'Would you like to consider all of the advanced options for your asset?\n',
+    //     initial: false,
+    //   },
+    //   {
+    //     type: 'input',
+    //     name: 'customParameter',
+    //     message: 'Please provide any user-defined parameters:\n',
+    //     skip: (answers: Partial<Answers>) => !answers.showAdvanced,
+    //   },
+    // ]);
 
     // Combine all answers
     const allAnswers = { 
@@ -164,8 +164,7 @@ export async function interactiveFlow() {
       isCharged, 
       ...paymentDetails, 
       network, 
-      ...templateAnswer, 
-      ...advancedAnswers 
+      ...templateAnswer
     };
 
     console.log('\nHere are your responses:');

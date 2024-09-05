@@ -8,7 +8,7 @@ interface Answers {
   accessDuration: 'Forever' | '1 day' | '1 week' | '1 month' | '1 year';
   storageType: 'IPFS' | 'Arweave' | 'URL';
   assetLocation: string;
-  isCharged: boolean;
+  isCharged: 'Paid' | 'Free';
   token?: string;
   price?: string;
   network: 'Oasis Sapphire' | 'Ethereum' | 'Polygon';
@@ -81,22 +81,24 @@ export async function interactiveFlow() {
     // Continue with further technical details
     const technicalAnswers = await prompt<Partial<Answers>>([
       {
-        type: 'confirm',
+        type: 'toggle',
         name: 'isCharged',
         message: 'Will you charge for this asset?\n',
-        initial: false,
+        initial: 'Paid',
+        enabled: 'Paid',
+        disabled: 'Free',
       },
       {
         type: 'input',
         name: 'token',
         message: 'What token will you accept payments in?\n',
-        skip: (answers: Partial<Answers>) => !answers.isCharged,
+        skip: (answers: Partial<Answers>) => answers.isCharged === 'Free',
       },
       {
         type: 'input',
         name: 'price',
         message: 'What is the price to access your asset?\n',
-        skip: (answers: Partial<Answers>) => !answers.isCharged,
+        skip: (answers: Partial<Answers>) => answers.isCharged === 'Free',
       },
       {
         type: 'select',

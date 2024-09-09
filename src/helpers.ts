@@ -101,12 +101,12 @@ export async function createAsset(
 	};
 
 	let bundleNFT;
-	if (!ddo.stats.price.value) {
+	if (!ddo.stats?.price?.value) {
 		bundleNFT = await nftFactory.createNftWithDatatoken(
 			nftParamsAsset,
 			datatokenParams
 		);
-	} else if (ddo.stats.price.value === "0") {
+	} else if (ddo?.stats?.price?.value === "0") {
 		const dispenserParams: DispenserCreationParams = {
 			dispenserAddress: config.dispenserAddress,
 			maxTokens: "1",

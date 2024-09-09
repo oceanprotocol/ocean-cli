@@ -64,7 +64,7 @@ export class Commands {
 	}
 
 	public async start() {
-		console.log('Starting the CLI flow...\n\n');
+		console.log('Starting the interactive CLI flow...\n\n');
 		const data = await interactiveFlow(this.providerUrl); // Collect data via CLI
 		await publishAsset(data, this.signer, this.config); // Publish asset with collected data
 	  }

@@ -44,14 +44,15 @@ export async function publishAsset(params: PublishAssetParams, signer: Signer, c
         description: params.description,
         author: params.author,
         license: 'MIT',
-        tags: params.tags,
-        additionalInformation: {
-          accessDuration: params.accessDuration,
-          isCharged: params.isCharged,
-          token: params.token,
-          price: params.price,
-        },
+        tags: params.tags
       },
+      stats: {
+        allocated: 0,
+        orders: 0,
+        price: {
+          value: "0"
+        }
+    },
       services: [
         {
           id: 'access',
@@ -63,6 +64,15 @@ export async function publishAsset(params: PublishAssetParams, signer: Signer, c
           timeout: 0,
         },
       ],
+      nft: {
+        address: "",
+        name: "Ocean Data NFT",
+        symbol: "OCEAN-NFT",
+        state: 5,
+        tokenURI: "",
+        owner: "",
+        created: ""
+      }
     };
 
     // Asset URL setup based on storage type

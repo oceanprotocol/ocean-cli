@@ -4,7 +4,7 @@ import {
   Aquarius,
   DDO,
 } from '@oceanprotocol/lib';
-import { createAsset } from './helpers'; // Import the helper function
+import { createAsset, updateAssetMetadata } from './helpers'; // Import helper functions
 
 export interface PublishAssetParams {
   title: string;
@@ -24,18 +24,18 @@ export interface PublishAssetParams {
 
 export async function publishAsset(params: PublishAssetParams, signer: Signer, config: Config) {
   try {
-    console.log('Publishing asset using helper function...');
+    console.log('Publishing asset using helper functions...');
 
     const provider = signer.provider as providers.JsonRpcProvider;
     const aquarius = new Aquarius(config.metadataCacheUri);
 
-    // Prepare metadata for the asset
+    // Prepare initial metadata for the asset
     const metadata: DDO = {
       '@context': ['https://w3id.org/did/v1'],
-      id: '',
+      id: '', // Will be updated after creating asset
       version: '4.1.0',
       chainId: await provider.getNetwork().then(n => n.chainId),
-      nftAddress: '0x0',
+      nftAddress: '0x0', // Will be updated after creating asset
       metadata: {
         created: new Date().toISOString(),
         updated: new Date().toISOString(),
@@ -44,22 +44,21 @@ export async function publishAsset(params: PublishAssetParams, signer: Signer, c
         description: params.description,
         author: params.author,
         license: 'MIT',
-        tags: params.tags
+        tags: params.tags,
+        additionalInformation: {
+          accessDuration: params.accessDuration,
+          isCharged: params.isCharged,
+          token: params.token,
+          price: params.price,
+        },
       },
-      stats: {
-        allocated: "0",
-        orders: "0",
-        price: {
-          value: "0"
-        }
-  },
       services: [
         {
           id: 'access',
           type: 'access',
           description: 'Access service',
           files: '',
-          datatokenAddress: '0x0',
+          datatokenAddress: '0x0', // Will be updated after creating asset
           serviceEndpoint: params.providerUrl,
           timeout: 0,
         },
@@ -68,12 +67,12 @@ export async function publishAsset(params: PublishAssetParams, signer: Signer, c
 
     // Asset URL setup based on storage type
     const assetUrl = {
-      nftAddress: '0x0',
-      datatokenAddress: '0x0',
+      nftAddress: '0x0', // Will be updated after creating asset
+      datatokenAddress: '0x0', // Will be updated after creating asset
       files: [{ type: 'url', url: params.assetLocation, method: 'GET' }],
     };
 
-    // Call the helper function to create the asset
+    // Create the asset using the helper function
     const did = await createAsset(
       params.title,
       'DATATOKEN', // Assuming a standard symbol for now
@@ -86,6 +85,21 @@ export async function publishAsset(params: PublishAssetParams, signer: Signer, c
     );
 
     console.log(`Asset successfully published with DID: ${did}`);
+
+    // Update the metadata with the asset's DID
+    metadata.id = did;
+    metadata.nftAddress = assetUrl.nftAddress; // Update with the correct NFT address
+    metadata.services[0].datatokenAddress = assetUrl.datatokenAddress; // Update with the correct Datatoken address
+
+    // Use the helper function to update the metadata on the NFT
+    await updateAssetMetadata(
+      signer,
+      metadata,
+      params.providerUrl,
+      aquarius
+    );
+
+    console.log(`Metadata successfully updated for DID: ${did}`);
   } catch (error) {
     console.error('Error publishing asset:', error);
   }

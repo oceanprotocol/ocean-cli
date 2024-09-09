@@ -100,22 +100,24 @@ export async function interactiveFlow() {
       },
     ]);
 
-    // Continue with further technical details, conditional prompts based on isCharged
-    const paymentDetails = isCharged === 'Paid'
-      ? await prompt<Partial<Answers>>([
-          {
-            type: 'select',
-            name: 'token',
-            message: 'What token will you accept payments in?\n',
-            choices: ['OCEAN', 'H2O'],
-          },
-          {
-            type: 'input',
-            name: 'price',
-            message: 'What is the price to access your asset?\n',
-          },
-        ])
-      : {};
+    // Check if isCharged is 'Paid' to ask further questions about payment
+    let paymentDetails = {};
+    
+    if (isCharged) {
+      paymentDetails = await prompt<Partial<Answers>>([
+        {
+          type: 'select',
+          name: 'token',
+          message: 'What token will you accept payments in?\n',
+          choices: ['OCEAN', 'H2O'],
+        },
+        {
+          type: 'input',
+          name: 'price',
+          message: 'What is the price to access your asset?\n',
+        },
+      ]);
+    }
 
     // Prompt for network selection
     const { network } = await prompt<{ network: Answers['network'] }>([
@@ -135,37 +137,23 @@ export async function interactiveFlow() {
             type: 'select',
             name: 'template',
             message: 'Which template would you like to use?\n',
-            choices: ['Template 1 - user can buy, sell & hold datatokens.', 
-              'Template 2 - assets are purchased with basetokens and the effective supply of datatokens is is always zero.'], 
+            choices: [
+              'Template 1 - user can buy, sell & hold datatokens.',
+              'Template 2 - assets are purchased with basetokens and the effective supply of datatokens is is always zero.',
+            ],
           },
         ])
       : {};
 
-    // Prompting for advanced options
-    // const advancedAnswers = await prompt<Partial<Answers>>([
-    //   {
-    //     type: 'confirm',
-    //     name: 'showAdvanced',
-    //     message: 'Would you like to consider all of the advanced options for your asset?\n',
-    //     initial: false,
-    //   },
-    //   {
-    //     type: 'input',
-    //     name: 'customParameter',
-    //     message: 'Please provide any user-defined parameters:\n',
-    //     skip: (answers: Partial<Answers>) => !answers.showAdvanced,
-    //   },
-    // ]);
-
     // Combine all answers
-    const allAnswers = { 
-      ...basicAnswers, 
-      storageType, 
-      assetLocation, 
-      isCharged, 
-      ...paymentDetails, 
-      network, 
-      ...templateAnswer
+    const allAnswers = {
+      ...basicAnswers,
+      storageType,
+      assetLocation,
+      isCharged,
+      ...paymentDetails,
+      network,
+      ...templateAnswer,
     };
 
     console.log('\nHere are your responses:');

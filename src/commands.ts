@@ -24,6 +24,7 @@ import {
 } from "@oceanprotocol/lib";
 import { Signer, ethers } from "ethers";
 import { interactiveFlow } from "./interactiveFlow";
+import { publishAsset } from "./publishAsset";
 
 export class Commands {
 	public signer: Signer;
@@ -62,10 +63,10 @@ export class Commands {
 		);
 	}
 
-	// start the interactive publish flow
 	public async start() {
-		console.log("Starting the CLI flow...\n\n");
-		await interactiveFlow(); // Call the CLI logic
+		console.log('Starting the CLI flow...\n\n');
+		const data = await interactiveFlow(this.providerUrl); // Collect data via CLI
+		await publishAsset(data, this.signer, this.config); // Publish asset with collected data
 	  }
 
 	// utils

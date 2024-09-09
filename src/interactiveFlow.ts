@@ -1,66 +1,60 @@
+// interactiveFlow.ts
 import { prompt } from 'enquirer';
-
-interface Answers {
-  title: string;
-  description: string;
-  author: string;
-  tags: string;
-  accessDuration: 'Forever' | '1 day' | '1 week' | '1 month' | '1 year';
-  storageType: 'IPFS' | 'Arweave' | 'URL';
-  assetLocation: string;
-  isCharged: 'Paid' | 'Free';
-  token?: 'OCEAN' | 'H2O';
-  price?: string;
-  network: 'Oasis Sapphire' | 'Ethereum' | 'Polygon';
-  template?: string;
-  showAdvanced: boolean;
-  customParameter?: string;
-}
+import { PublishAssetParams } from './publishAsset'; // Import the correct type
 
 // Validation functions
-const validateIPFS = (input: string) => /^Qm[1-9A-HJ-NP-Za-km-z]{44}$/.test(input) || 'Invalid IPFS hash format.';
-const validateArweave = (input: string) => /^[a-zA-Z0-9_-]{43,}$/.test(input) || 'Invalid Arweave transaction ID format.';
-const validateURL = (input: string) => /^(https?:\/\/)[^\s/$.?#].[^\s]*$/.test(input) || 'Invalid URL format.';
+const validateIPFS = (input: string) =>
+  /^Qm[1-9A-HJ-NP-Za-km-z]{44}$/.test(input) || 'Invalid IPFS hash format.';
+const validateArweave = (input: string) =>
+  /^[a-zA-Z0-9_-]{43,}$/.test(input) || 'Invalid Arweave transaction ID format.';
+const validateURL = (input: string) =>
+  /^(https?:\/\/)[^\s/$.?#].[^\s]*$/.test(input) || 'Invalid URL format.';
 
-export async function interactiveFlow() {
+export async function interactiveFlow(providerUrl: string): Promise<PublishAssetParams> {
   try {
     // Prompting for basic information
-    const basicAnswers = await prompt<Partial<Answers>>([
+    const basicAnswers = await prompt<PublishAssetParams>([
       {
         type: 'input',
         name: 'title',
         message: 'What is the title of your asset?\n',
+        required: true
       },
       {
         type: 'input',
         name: 'description',
         message: 'Please provide a description of your asset:\n',
+        required: true
       },
       {
         type: 'input',
         name: 'author',
         message: 'Who is the Author of this asset?\n',
+        required: true
       },
       {
         type: 'list',
         name: 'tags',
         message: 'Please provide tags to make this asset more easily discoverable (comma separated):\n',
+        required: true
       },
       {
         type: 'select',
         name: 'accessDuration',
         message: 'After purchasing your asset, how long should the consumer be allowed to access it for?\n',
         choices: ['Forever', '1 day', '1 week', '1 month', '1 year'],
+        required: true
       },
     ]);
 
     // Prompting for technical details - first, get storage type
-    const { storageType } = await prompt<{ storageType: Answers['storageType'] }>([
+    const { storageType } = await prompt<{ storageType: PublishAssetParams['storageType'] }>([
       {
         type: 'select',
         name: 'storageType',
         message: 'How is your asset stored?\n',
         choices: ['IPFS', 'Arweave', 'URL'],
+        required: true
       },
     ]);
 
@@ -85,11 +79,12 @@ export async function interactiveFlow() {
         name: 'assetLocation',
         message: assetLocationMessage,
         validate: validateFunction,
+        required: true
       },
     ]);
 
     // Prompt for whether the asset is charged or free
-    const { isCharged } = await prompt<{ isCharged: Answers['isCharged'] }>([
+    const { isCharged } = await prompt<{ isCharged: PublishAssetParams['isCharged'] }>([
       {
         type: 'toggle',
         name: 'isCharged',
@@ -97,14 +92,14 @@ export async function interactiveFlow() {
         initial: 'Paid',
         enabled: 'Paid',
         disabled: 'Free',
+        required: true
       },
     ]);
 
     // Check if isCharged is 'Paid' to ask further questions about payment
     let paymentDetails = {};
-    
-    if (isCharged) {
-      paymentDetails = await prompt<Partial<Answers>>([
+    if (isCharged === 'Paid') {
+      paymentDetails = await prompt<Partial<PublishAssetParams>>([
         {
           type: 'select',
           name: 'token',
@@ -120,33 +115,34 @@ export async function interactiveFlow() {
     }
 
     // Prompt for network selection
-    const { network } = await prompt<{ network: Answers['network'] }>([
+    const { network } = await prompt<{ network: PublishAssetParams['network'] }>([
       {
         type: 'select',
         name: 'network',
         message: 'What network will your asset be available for purchase through?\n',
         choices: ['Oasis Sapphire', 'Ethereum', 'Polygon'],
         initial: 0,
+        required: true
       },
     ]);
 
     // Conditionally prompt for template if the network is not 'Oasis Sapphire'
     const templateAnswer = network !== 'Oasis Sapphire'
-      ? await prompt<Partial<Answers>>([
+      ? await prompt<Partial<PublishAssetParams>>([
           {
             type: 'select',
             name: 'template',
             message: 'Which template would you like to use?\n',
             choices: [
               'Template 1 - user can buy, sell & hold datatokens.',
-              'Template 2 - assets are purchased with basetokens and the effective supply of datatokens is is always zero.',
+              'Template 2 - assets are purchased with basetokens and the effective supply of datatokens is always zero.',
             ],
           },
         ])
       : {};
 
     // Combine all answers
-    const allAnswers = {
+    const allAnswers: PublishAssetParams = {
       ...basicAnswers,
       storageType,
       assetLocation,
@@ -154,11 +150,15 @@ export async function interactiveFlow() {
       ...paymentDetails,
       network,
       ...templateAnswer,
+      providerUrl // Add provider URL directly here
     };
 
     console.log('\nHere are your responses:');
     console.log(allAnswers);
+
+    return allAnswers; 
   } catch (error) {
     console.error('An error occurred during the prompt:', error);
+    throw error;
   }
 }

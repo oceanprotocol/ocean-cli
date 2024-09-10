@@ -74,8 +74,9 @@ export async function createAsset(
 	providerUrl: string,
 	config: Config,
 	aquariusInstance: Aquarius,
+	templateIndex: number = 1,
 	macOsProviderUrl?: string,
-	encryptDDO: boolean = true
+	encryptDDO: boolean = true,
 ) {
 	const { chainId } = await owner.provider.getNetwork();
 	const nft = new Nft(owner, chainId);
@@ -85,13 +86,13 @@ export async function createAsset(
 	const nftParamsAsset: NftCreateData = {
 		name,
 		symbol,
-		templateIndex: 1,
+		templateIndex,
 		tokenURI: "aaa",
 		transferable: true,
 		owner: await owner.getAddress(),
 	};
 	const datatokenParams: DatatokenCreateParams = {
-		templateIndex: 1,
+		templateIndex,
 		cap: "100000",
 		feeAmount: "0",
 		paymentCollector: await owner.getAddress(),

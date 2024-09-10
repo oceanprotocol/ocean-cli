@@ -18,7 +18,7 @@ export interface PublishAssetParams {
   token?: 'OCEAN' | 'H2O';
   price?: string;
   network: 'Oasis Sapphire' | 'Ethereum' | 'Polygon';
-  template?: string;
+  template?: number;
   providerUrl: string;
 }
 
@@ -91,7 +91,8 @@ export async function publishAsset(params: PublishAssetParams, signer: Signer, c
       metadata,
       params.providerUrl,
       config,
-      aquarius
+      aquarius,
+      params.template
     );
 
     console.log(`Asset successfully published with DID: ${did}`);

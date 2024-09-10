@@ -99,6 +99,7 @@ export class Commands {
 				this.providerUrl,
 				this.config,
 				this.aquarius,
+				1,
 				this.macOsProviderUrl,
 				encryptDDO
 			);
@@ -130,6 +131,7 @@ export class Commands {
 			this.providerUrl,
 			this.config,
 			this.aquarius,
+			1,
 			this.macOsProviderUrl,
 			encryptDDO
 		);

@@ -134,8 +134,8 @@ export async function interactiveFlow(providerUrl: string): Promise<PublishAsset
             name: 'template',
             message: 'Which template would you like to use?\n',
             choices: [
-              'Template 1 - user can buy, sell & hold datatokens.',
-              'Template 2 - assets are purchased with basetokens and the effective supply of datatokens is always zero.',
+              { name: 'Template 1 - user can buy, sell & hold datatokens.', value: 1 },
+              { name: 'Template 2 - assets are purchased with basetokens and the effective supply of datatokens is always zero.', value: 2 },
             ],
           },
         ])

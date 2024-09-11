@@ -1,3 +1,4 @@
+// src/publishAsset.ts
 import { Signer } from 'ethers';
 import {
   Config,
@@ -91,7 +92,7 @@ export async function publishAsset(params: PublishAssetParams, signer: Signer, c
       params.providerUrl,
       config,
       aquarius,
-      params.template
+      1
     );
 
     console.log(`Asset successfully published with DID: ${did}`);

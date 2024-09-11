@@ -1,6 +1,6 @@
 // interactiveFlow.ts
 import { prompt } from 'enquirer';
-import { PublishAssetParams } from './publishAsset'; // Import the correct type
+import { PublishAssetParams } from './publishAsset';
 
 // Validation functions
 const validateIPFS = (input: string) =>
@@ -13,7 +13,7 @@ const validateURL = (input: string) =>
 export async function interactiveFlow(providerUrl: string): Promise<PublishAssetParams> {
   try {
     // Prompting for basic information
-    const basicAnswers = await prompt<PublishAssetParams>([
+    const basicAnswers = await prompt<Omit<PublishAssetParams, 'isCharged' | 'chainId' | 'timeout'>>([
       {
         type: 'input',
         name: 'title',
@@ -38,42 +38,46 @@ export async function interactiveFlow(providerUrl: string): Promise<PublishAsset
         message: 'Please provide tags to make this asset more easily discoverable (comma separated):\n',
         required: true
       },
-      {
-        type: 'select',
-        name: 'timeout',
-        message: 'After purchasing your asset, how long should the consumer be allowed to access it for?\n',
-        choices: [
-          {name: 'Forever', value: 0},
-          {name: '1 day', value: 86400},
-          {name: '1 week', value: 604800},
-          {name: '1 month', value: 2592000},
-          {name: '1 year', value: 31536000}
-        ],
-        required: true
-      },
     ]);
 
-    // Prompting for technical details - first, get storage type
-    const { storageType } = await prompt<{ storageType: PublishAssetParams['storageType'] }>([
-      {
-        type: 'select',
-        name: 'storageType',
-        message: 'How is your asset stored?\n',
-        choices: [{name: 'IPFS', value: 'ipfs'}, {name: 'Arweave', value: 'arweave'}, {name: 'URL', value: 'url'}],
-        required: true
-      },
-    ]);
+    // Timeout prompt
+    const { timeout } = await prompt<{ timeout: number }>({
+      type: 'select',
+      name: 'timeout',
+      message: 'After purchasing your asset, how long should the consumer be allowed to access it for?\n',
+      choices: [
+        {name: 'Forever', value: 0},
+        {name: '1 day', value: 86400},
+        {name: '1 week', value: 604800},
+        {name: '1 month', value: 2592000},
+        {name: '1 year', value: 31536000}
+      ],
+      result(value) {
+        return this.choices.find(choice => choice.name === value).value;
+      }
+    });
+
+    // Storage type prompt
+    const { storageType } = await prompt<{ storageType: PublishAssetParams['storageType'] }>({
+      type: 'select',
+      name: 'storageType',
+      message: 'How is your asset stored?\n',
+      choices: [{name: 'IPFS', value: 'ipfs'}, {name: 'Arweave', value: 'arweave'}, {name: 'URL', value: 'url'}],
+      result(value) {
+        return this.choices.find(choice => choice.name === value).value;
+      }
+    });
 
     // Determine assetLocation message and validation based on storageType
     let assetLocationMessage = 'Please provide the location of your asset:\n';
     let validateFunction;
-    if (storageType === 'IPFS') {
+    if (storageType === 'ipfs') {
       assetLocationMessage = 'Please provide the IPFS hash for your asset:\n';
       validateFunction = validateIPFS;
-    } else if (storageType === 'Arweave') {
+    } else if (storageType === 'arweave') {
       assetLocationMessage = 'Please provide the Arweave transaction ID for your asset:\n';
       validateFunction = validateArweave;
-    } else if (storageType === 'URL') {
+    } else if (storageType === 'url') {
       assetLocationMessage = 'Please provide the URL for your asset:\n';
       validateFunction = validateURL;
     }
@@ -89,23 +93,19 @@ export async function interactiveFlow(providerUrl: string): Promise<PublishAsset
       },
     ]);
 
-    // Prompt for whether the asset is charged or free
-    const { isCharged } = await prompt<{ isCharged: PublishAssetParams['isCharged'] }>([
-      {
-        type: 'toggle',
-        name: 'isCharged',
-        message: 'Will you charge for this asset?\n',
-        initial: 'Paid',
-        enabled: 'Paid',
-        disabled: 'Free',
-        required: true
-      },
-    ]);
+    // Is charged prompt
+    const { isCharged } = await prompt<{ isCharged: boolean }>({
+      type: 'toggle',
+      name: 'isCharged',
+      message: 'Will you charge for this asset?\n',
+      enabled: 'Paid',
+      disabled: 'Free',
+    });
 
-    // Check if isCharged is 'Paid' to ask further questions about payment
-    let paymentDetails = {};
-    if (isCharged === 'Paid') {
-      paymentDetails = await prompt<Partial<PublishAssetParams>>([
+    // Check if isCharged is true to ask further questions about payment
+    let paymentDetails: { token?: 'OCEAN' | 'H2O'; price?: string } = {};
+    if (isCharged) {
+      paymentDetails = await prompt<{ token: 'OCEAN' | 'H2O'; price: string }>([
         {
           type: 'select',
           name: 'token',
@@ -120,43 +120,46 @@ export async function interactiveFlow(providerUrl: string): Promise<PublishAsset
       ]);
     }
 
-    // Prompt for network selection
-    const { network } = await prompt<{ network: PublishAssetParams['network'] }>([
-      {
-        type: 'select',
-        name: 'chainId',
-        message: 'What network will your asset be available for purchase through?\n',
-        choices: [{name: 'Oasis Sapphire', value: 23294}, {name: 'Ethereum', value: 1}, {name: 'Polygon', value: 137}],
-        initial: 0,
-        required: true
-      },
-    ]);
+    // Chain ID prompt
+    const { chainId } = await prompt<{ chainId: number }>({
+      type: 'select',
+      name: 'chainId',
+      message: 'What network will your asset be available for purchase through?\n',
+      choices: [{name: 'Oasis Sapphire', value: 23294}, {name: 'Ethereum', value: 1}, {name: 'Polygon', value: 137}],
+      result(value) {
+        return this.choices.find(choice => choice.name === value).value;
+      }
+    });
 
-    // Conditionally prompt for template if the network is not 'Oasis Sapphire'
-    const templateAnswer = network !== 'Oasis Sapphire'
-      ? await prompt<Partial<PublishAssetParams>>([
-          {
-            type: 'select',
-            name: 'template',
-            message: 'Which template would you like to use?\n',
-            choices: [
-              { name: 'Template 1 - user can buy, sell & hold datatokens.', value: 1 },
-              { name: 'Template 2 - assets are purchased with basetokens and the effective supply of datatokens is always zero.', value: 2 },
-            ],
-          },
-        ])
-      : {};
+    // Template prompt
+    let template: number | undefined;
+    if (chainId !== 23294) {
+      const templateAnswer = await prompt<{ template: number }>({
+        type: 'select',
+        name: 'template',
+        message: 'Which template would you like to use?\n',
+        choices: [
+          { name: 'Template 1 - user can buy, sell & hold datatokens.', value: 1 },
+          { name: 'Template 2 - assets are purchased with basetokens and the effective supply of datatokens is always zero.', value: 2 },
+        ],
+        result(value) {
+          return this.choices.find(choice => choice.name === value).value;
+        }
+      });
+      template = templateAnswer.template;
+    }
 
     // Combine all answers
     const allAnswers: PublishAssetParams = {
       ...basicAnswers,
+      timeout,
       storageType,
       assetLocation,
       isCharged,
       ...paymentDetails,
-      network,
-      ...templateAnswer,
-      providerUrl // Add provider URL directly here
+      chainId,
+      template,
+      providerUrl
     };
 
     console.log('\nHere are your responses:');

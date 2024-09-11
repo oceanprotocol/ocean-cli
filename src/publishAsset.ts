@@ -1,4 +1,4 @@
-import { Signer, providers } from 'ethers';
+import { Signer } from 'ethers';
 import {
   Config,
   Aquarius,
@@ -11,13 +11,13 @@ export interface PublishAssetParams {
   description: string;
   author: string;
   tags: string[];
-  accessDuration: string;
-  storageType: 'IPFS' | 'Arweave' | 'URL';
+  timeout: number;
+  storageType: 'ipfs' | 'arweave' | 'url';
   assetLocation: string;
-  isCharged: 'Paid' | 'Free';
+  isCharged: boolean;
   token?: 'OCEAN' | 'H2O';
   price?: string;
-  network: 'Oasis Sapphire' | 'Ethereum' | 'Polygon';
+  chainId: number;
   template?: number;
   providerUrl: string;
 }
@@ -26,7 +26,6 @@ export async function publishAsset(params: PublishAssetParams, signer: Signer, c
   try {
     console.log('Publishing asset using helper functions...');
 
-    const provider = signer.provider as providers.JsonRpcProvider;
     const aquarius = new Aquarius(config.metadataCacheUri);
 
     // Prepare initial metadata for the asset
@@ -34,7 +33,7 @@ export async function publishAsset(params: PublishAssetParams, signer: Signer, c
       '@context': ['https://w3id.org/did/v1'],
       id: '', // Will be updated after creating asset
       version: '4.1.0',
-      chainId: await provider.getNetwork().then(n => n.chainId),
+      chainId: params.chainId,
       nftAddress: '0x0', // Will be updated after creating asset
       metadata: {
         created: new Date().toISOString(),

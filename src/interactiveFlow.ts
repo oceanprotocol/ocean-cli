@@ -40,9 +40,15 @@ export async function interactiveFlow(providerUrl: string): Promise<PublishAsset
       },
       {
         type: 'select',
-        name: 'accessDuration',
+        name: 'timeout',
         message: 'After purchasing your asset, how long should the consumer be allowed to access it for?\n',
-        choices: ['Forever', '1 day', '1 week', '1 month', '1 year'],
+        choices: [
+          {name: 'Forever', value: 0},
+          {name: '1 day', value: 86400},
+          {name: '1 week', value: 604800},
+          {name: '1 month', value: 2592000},
+          {name: '1 year', value: 31536000}
+        ],
         required: true
       },
     ]);
@@ -53,7 +59,7 @@ export async function interactiveFlow(providerUrl: string): Promise<PublishAsset
         type: 'select',
         name: 'storageType',
         message: 'How is your asset stored?\n',
-        choices: ['IPFS', 'Arweave', 'URL'],
+        choices: [{name: 'IPFS', value: 'ipfs'}, {name: 'Arweave', value: 'arweave'}, {name: 'URL', value: 'url'}],
         required: true
       },
     ]);
@@ -118,9 +124,9 @@ export async function interactiveFlow(providerUrl: string): Promise<PublishAsset
     const { network } = await prompt<{ network: PublishAssetParams['network'] }>([
       {
         type: 'select',
-        name: 'network',
+        name: 'chainId',
         message: 'What network will your asset be available for purchase through?\n',
-        choices: ['Oasis Sapphire', 'Ethereum', 'Polygon'],
+        choices: [{name: 'Oasis Sapphire', value: 23294}, {name: 'Ethereum', value: 1}, {name: 'Polygon', value: 137}],
         initial: 0,
         required: true
       },

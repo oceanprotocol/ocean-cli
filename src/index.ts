@@ -84,6 +84,9 @@ async function start() {
 		case "edit":
 			await commands.editAsset(myArgs);
 			break;
+		case "addService":
+			await commands.addService(myArgs);
+			break;
 		case "download":
 			await commands.download(myArgs);
 			break;

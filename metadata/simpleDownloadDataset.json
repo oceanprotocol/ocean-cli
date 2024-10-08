@@ -1,20 +1,16 @@
 {
-  "@context": [
-    "https://w3id.org/did/v1"
-  ],
+  "@context": ["https://w3id.org/did/v1"],
   "id": "",
   "nftAddress": "",
   "version": "4.1.0",
-  "chainId": 80001,
+  "chainId": 8996,
   "metadata": {
     "created": "2021-12-20T14:35:20Z",
     "updated": "2021-12-20T14:35:20Z",
     "type": "dataset",
     "name": "ocean-cli demo asset",
     "description": "asset published using ocean cli tool",
-    "tags": [
-      "test"
-    ],
+    "tags": ["test"],
     "author": "oceanprotocol",
     "license": "https://market.oceanprotocol.com/terms",
     "additionalInformation": {
@@ -41,8 +37,7 @@
       "timeout": 86400
     }
   ],
-  "event": {
-  },
+  "event": {},
   "nft": {
     "address": "",
     "name": "Ocean Data NFT",
@@ -55,13 +50,12 @@
   "purgatory": {
     "state": false
   },
-  "datatokens": [
-  ],
+  "datatokens": [],
   "stats": {
     "allocated": 0,
     "orders": 0,
     "price": {
-      "value": "2"
+      "value": "0"
     }
   }
 }

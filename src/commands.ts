@@ -7,6 +7,8 @@ import {
 	updateAssetMetadata,
 	downloadFile,
 	isOrderable,
+	createAssetV5,
+	createDatatokenAndPricing,
 } from "./helpers";
 import {
 	Aquarius,
@@ -67,9 +69,14 @@ export class Commands {
 		});
 	}
 
+	isVerifiableCredential = (ddo: { type?: string[] | string }): boolean => {
+		return ddo.type && Array.isArray(ddo.type) && ddo.type.includes('VerifiableCredential')
+	}
+
+
 	// commands
-	public async publish(args: string[]) {
-		console.log("start publishing");
+	public async publishV4(args: string[]) {
+		console.log("start publishing v4");
 		let asset: Asset;
 		try {
 			asset = JSON.parse(fs.readFileSync(args[1], "utf8"));
@@ -80,7 +87,6 @@ export class Commands {
 		}
 		const encryptDDO = args[2] === "false" ? false : true;
 		try {
-			// add some more checks
 			const urlAssetId = await createAsset(
 				asset.nft.name,
 				asset.nft.symbol,
@@ -98,6 +104,68 @@ export class Commands {
 			console.error("Error when publishing dataset from file: " + args[1]);
 			console.error(e);
 			return;
+		}
+	}
+
+	private async publishAssetV5(
+		asset: Asset,
+		signer: Signer,
+		encryptDDO: boolean
+	): Promise<string> {
+		const name = asset.credentialSubject.metadata.name;
+		const symbol = asset.credentialSubject.metadata.symbol;
+		const files = asset.credentialSubject.services[0].files;
+
+		const urlAssetId = await createAssetV5(
+			name,
+			symbol,
+			signer,
+			files,
+			asset,
+			this.providerUrl,
+			this.config,
+			this.aquarius,
+			this.macOsProviderUrl,
+			encryptDDO
+		);
+
+		return urlAssetId;
+	}
+
+	public async publishV5(args: string[]) {
+		console.log("start publishing version 5");
+
+		let asset: Asset;
+		try {
+			asset = JSON.parse(fs.readFileSync(args[1], "utf8"));
+		} catch (e) {
+			console.error("Cannot read metadata from " + args[1]);
+			console.error(e);
+			return;
+		}
+
+		const encryptDDO = args[2] === "false" ? false : true;
+
+		try {
+			const urlAssetId = await this.publishAssetV5(
+				asset,
+				this.signer,
+				encryptDDO
+			);
+			console.log("Version 5.0.0 Asset published. ID:", urlAssetId);
+		} catch (e) {
+			console.error("Error when publishing dataset from file:", args[1]);
+			console.error(e);
+			return;
+		}
+	}
+
+	public async publish(args: string[]) {
+		const asset = JSON.parse(fs.readFileSync(args[1], "utf8"));
+		if (this.isVerifiableCredential(asset)) {
+			await this.publishV5(args)
+		} else {
+			await this.publishV4(args)
 		}
 	}
 
@@ -169,8 +237,8 @@ export class Commands {
 		if (!resolvedDDO) {
 			console.error(
 				"Error fetching Asset with DID: " +
-					args[1] +
-					".  Does this asset exists?"
+				args[1] +
+				".  Does this asset exists?"
 			);
 		} else console.log(util.inspect(resolvedDDO, false, null, true));
 	}
@@ -297,13 +365,13 @@ export class Commands {
 				}
 			}
 		}
-		
+
 		const algo: ComputeAlgorithm = {
 			documentId: algoDdo.id,
 			serviceId: algoDdo.services[0].id,
 			meta: algoDdo.metadata.algorithm
 		};
-	
+
 		const assets = [];
 		for (const dataDdo in ddos) {
 			const canStartCompute = isOrderable(
@@ -340,9 +408,9 @@ export class Commands {
 		) {
 			console.error(
 				"Error initializing Provider for the compute job using dataset DID " +
-					args[1] +
-					" and algorithm DID " +
-					args[2]
+				args[1] +
+				" and algorithm DID " +
+				args[2]
 			);
 			return;
 		}
@@ -362,8 +430,8 @@ export class Commands {
 		if (!algo.transferTxId) {
 			console.error(
 				"Error ordering compute for algorithm with DID: " +
-					args[2] +
-					".  Do you have enough tokens?"
+				args[2] +
+				".  Do you have enough tokens?"
 			);
 			return;
 		}
@@ -383,8 +451,8 @@ export class Commands {
 			if (!assets[i].transferTxId) {
 				console.error(
 					"Error ordering dataset with DID: " +
-						assets[i] +
-						".  Do you have enough tokens?"
+					assets[i] +
+					".  Do you have enough tokens?"
 				);
 				return;
 			}
@@ -393,9 +461,9 @@ export class Commands {
 		const additionalDatasets = assets.length > 1 ? assets.slice(1) : null;
 		console.log(
 			"Starting compute job on " +
-				assets[0].documentId +
-				" with additional datasets:" +
-				(!additionalDatasets ? "none" : additionalDatasets[0].documentId)
+			assets[0].documentId +
+			" with additional datasets:" +
+			(!additionalDatasets ? "none" : additionalDatasets[0].documentId)
 		);
 		const computeJobs = await ProviderInstance.computeStart(
 			providerURI,
@@ -427,7 +495,7 @@ export class Commands {
 
 		const jobId = args[2]
 		let agreementId = null;
-		if(hasAgreementId) {
+		if (hasAgreementId) {
 			agreementId = args[3];
 		}
 
@@ -466,8 +534,8 @@ export class Commands {
 		if (asset.services[0].type !== "compute") {
 			console.error(
 				"Error getting computeService for " +
-					args[1] +
-					".  Does this asset has an computeService?"
+				args[1] +
+				".  Does this asset has an computeService?"
 			);
 			return;
 		}
@@ -534,8 +602,8 @@ export class Commands {
 		if (asset.services[0].type !== "compute") {
 			console.error(
 				"Error getting computeService for " +
-					args[1] +
-					".  Does this asset has an computeService?"
+				args[1] +
+				".  Does this asset has an computeService?"
 			);
 			return;
 		}
@@ -559,9 +627,9 @@ export class Commands {
 		} else {
 			console.error(
 				" " +
-					args[2] +
-					".  is not allowed by the publisher to run on " +
-					args[1]
+				args[2] +
+				".  is not allowed by the publisher to run on " +
+				args[1]
 			);
 			return;
 		}
@@ -582,7 +650,7 @@ export class Commands {
 		// args[2] - jobId
 		// args[3] - agreementId
 		const hasAgreementId = args.length === 4;
-		
+
 		const dataDdo = await this.aquarius.waitForAqua(args[1]);
 		if (!dataDdo) {
 			console.error(
@@ -592,7 +660,7 @@ export class Commands {
 		}
 		const jobId = args[2]
 		let agreementId = null;
-		if(hasAgreementId) {
+		if (hasAgreementId) {
 			agreementId = args[3];
 		}
 		const providerURI =
@@ -610,7 +678,7 @@ export class Commands {
 	}
 
 	public async downloadJobResults(args: string[]) {
-	
+
 		const jobResult = await ProviderInstance.getComputeResultUrl(
 			this.providerUrl,
 			this.signer,
@@ -661,5 +729,50 @@ export class Commands {
 			await this.signer.getAddress(),
 			amountToUnits(null, null, "1000", 18)
 		);
+	}
+
+	public async addService(args: string[]) {
+		const asset = await this.aquarius.waitForAqua(args[1]);
+		if (!asset) {
+			console.error("Error fetching DDO " + args[1] + ".  Does this asset exists?");
+			return;
+		}
+		let service;
+		try {
+			service = JSON.parse(fs.readFileSync(args[2], "utf8"));
+		} catch (e) {
+			console.error("Cannot read service data from" + args[2]);
+			console.error(e);
+			return;
+		}
+
+		const price = parseInt(args[3]) || 0
+
+		const { datatokenAddress } = await createDatatokenAndPricing(
+			asset,
+			this.signer,
+			this.config,
+			price
+		)
+		console.log("datatokenAddress:", datatokenAddress)
+		service.files.datatokenAddress = datatokenAddress;
+		service.files.nftAddress = asset.credentialSubject.nftAddress;
+		service.files = await ProviderInstance.encrypt(
+			service.files,
+			asset.credentialSubject.chainId,
+			this.providerUrl
+		);
+		service.datatokenAddress = datatokenAddress;
+		service.serviceEndpoint = this.providerUrl;
+		asset.credentialSubject.services.push(service)
+		await updateAssetMetadata(
+			this.signer,
+			asset,
+			this.providerUrl,
+			this.aquarius,
+			this.macOsProviderUrl,
+		);
+
+		console.log("Service added");
 	}
 }

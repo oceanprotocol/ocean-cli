@@ -135,7 +135,7 @@ export async function interactiveFlow(providerUrl: string): Promise<PublishAsset
       type: 'select',
       name: 'chainId',
       message: chalk.green('What network will your asset be available for purchase through?\n'),
-      choices: [{name: 'Oasis Sapphire', value: 23294}, {name: 'Ethereum', value: 1}, {name: 'Polygon', value: 137}],
+      choices: [{name: 'Oasis Sapphire', value: 23295}, {name: 'Ethereum', value: 1}, {name: 'Polygon', value: 137}],
       result(value) {
         return this.choices.find(choice => choice.name === value).value;
       }
@@ -143,7 +143,7 @@ export async function interactiveFlow(providerUrl: string): Promise<PublishAsset
 
     // Template prompt
     let template: number | undefined;
-    if (chainId !== 23294) {
+    if (chainId !== 23295) {
       const templateAnswer = await prompt<{ template: number }>({
         type: 'select',
         name: 'template',

@@ -1,14 +1,12 @@
 // src/publishAsset.ts
-import { Signer, ethers } from 'ethers';
+import { Signer } from 'ethers';
 import {
   Config,
   Aquarius,
-  DDO,
-  Datatoken4
+  DDO
 } from '@oceanprotocol/lib';
 import { createAsset, createSapphireAsset, updateAssetMetadata } from './helpers';
 import * as sapphire from '@oasisprotocol/sapphire-paratime';
-import ERC20Template4 from '@oceanprotocol/contracts/artifacts/contracts/templates/ERC20Template4.sol/ERC20Template4.json';
 
 export interface PublishAssetParams {
   title: string;
@@ -31,6 +29,8 @@ export async function publishAsset(params: PublishAssetParams, signer: Signer, c
     console.log('Publishing asset using helper functions...');
 
     const aquarius = new Aquarius(config.metadataCacheUri);
+
+    console.log('asset timeout: ', params.timeout)
 
     // Prepare initial metadata for the asset
     const metadata: DDO = {
@@ -64,7 +64,7 @@ export async function publishAsset(params: PublishAssetParams, signer: Signer, c
           files: '',
           datatokenAddress: '0x0', // Will be updated after creating asset
           serviceEndpoint: params.providerUrl,
-          timeout: params.timeout,
+          timeout: 0,
         },
       ],
       nft: {
@@ -87,27 +87,11 @@ export async function publishAsset(params: PublishAssetParams, signer: Signer, c
 
     let did: string;
 
-    if (params.chainId === 23294) {
+    if (params.chainId === 23295) {
       // Oasis Sapphire
       console.log('Publishing to Oasis Sapphire network...');
       
       const wrappedSigner = sapphire.wrap(signer);
-      
-      const filesObject = [
-        {
-          url: params.assetLocation,
-          contentType: 'text/plain', // Adjust this based on your asset type
-          encoding: 'UTF-8'
-        }
-      ];
-
-      const datatoken = new Datatoken4(
-        wrappedSigner,
-        ethers.utils.toUtf8Bytes(JSON.stringify(filesObject)),
-        params.chainId,
-        config,
-        ERC20Template4.abi
-      );
 
       did = await createSapphireAsset(
         params.title,
@@ -118,8 +102,9 @@ export async function publishAsset(params: PublishAssetParams, signer: Signer, c
         params.providerUrl,
         config,
         aquarius,
-        datatoken,
-        params.template || 1
+        params.template || 1,
+        undefined, // macOsProviderUrl
+        true // encryptDDO
       );
     } else {
       // Other networks

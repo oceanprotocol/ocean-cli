@@ -4,8 +4,9 @@ import fetch from "cross-fetch";
 import { promises as fs } from "fs";
 import { createHash } from "crypto";
 import * as path from "path";
-
+import * as sapphire from '@oasisprotocol/sapphire-paratime';
 import {
+	AccesslistFactory,
 	Aquarius,
 	DatatokenCreateParams,
 	Nft,
@@ -201,146 +202,184 @@ export async function createAsset(
 
 
 export async function createSapphireAsset(
-	name: string,
-	symbol: string,
-	owner: Signer,
-	assetUrl: any,
-	ddo: any,
-	providerUrl: string,
-	config: Config,
-	aquariusInstance: Aquarius,
-	datatoken: Datatoken4,
-	templateIndex: number = 1,
-	macOsProviderUrl?: string,
-	encryptDDO: boolean = true,
+    name: string,
+    symbol: string,
+    owner: Signer,
+    assetUrl: any,
+    ddo: any,
+    providerUrl: string,
+    config: Config,
+    aquariusInstance: Aquarius,
+    templateIndex: number = 1,
+    macOsProviderUrl?: string,
+    encryptDDO: boolean = true,
 ) {
-	const { chainId } = await owner.provider.getNetwork();
-	const nft = new Nft(owner, chainId);
-	const nftFactory = new NftFactory(config.nftFactoryAddress, owner);
+    const { chainId } = await owner.provider.getNetwork();
+    console.log("Chain ID: ", chainId);
+    const nftFactory = new NftFactory(config.nftFactoryAddress, owner);
 
-	ddo.chainId = parseInt(chainId.toString(10));
-	const nftParamsAsset: NftCreateData = {
-		name,
-		symbol,
-		templateIndex,
-		tokenURI: "aaa",
-		transferable: true,
-		owner: await owner.getAddress(),
-	};
-	const datatokenParams: DatatokenCreateParams = {
-		templateIndex,
-		cap: "100000",
-		feeAmount: "0",
-		paymentCollector: await owner.getAddress(),
-		feeToken: config.oceanTokenAddress,
-		minter: await owner.getAddress(),
-		mpFeeAddress: ZERO_ADDRESS,
-	};
+    // Wrap the signer for Sapphire
+    const wrappedSigner = sapphire.wrap(owner);
 
-	let bundleNFT;
-	if (!ddo.stats?.price?.value) {
-		bundleNFT = await nftFactory.createNftWithDatatoken(
-			nftParamsAsset,
-			datatokenParams
-		);
-	} else if (ddo?.stats?.price?.value === "0") {
-		const dispenserParams: DispenserCreationParams = {
-			dispenserAddress: config.dispenserAddress,
-			maxTokens: "1",
-			maxBalance: "100000000",
-			withMint: true,
-			allowedSwapper: ZERO_ADDRESS,
-		};
+    // Create Access List Factory
+    const accessListFactory = new AccesslistFactory(config.accessListFactory, wrappedSigner, chainId);
 
-		bundleNFT = await nftFactory.createNftWithDatatokenWithDispenser(
-			nftParamsAsset,
-			datatokenParams,
-			dispenserParams
-		);
-	} else {
-		const fixedPriceParams: FreCreationParams = {
-			fixedRateAddress: config.fixedRateExchangeAddress,
-			baseTokenAddress: config.oceanTokenAddress,
-			owner: await owner.getAddress(),
-			marketFeeCollector: await owner.getAddress(),
-			baseTokenDecimals: 18,
-			datatokenDecimals: 18,
-			fixedRate: ddo.stats.price.value,
-			marketFee: "0",
-			allowedConsumer: await owner.getAddress(),
-			withMint: true,
-		};
+    // Create Allow List
+    const allowListAddress = await accessListFactory.deployAccessListContract(
+        'AllowList',
+        'ALLOW',
+        ['https://oceanprotocol.com/nft/'],
+        false,
+        await owner.getAddress(),
+        [await owner.getAddress(), ZERO_ADDRESS]
+    );
+    console.log("Allow List Address: ", allowListAddress);
 
-		bundleNFT = await nftFactory.createNftWithDatatokenWithFixedRate(
-			nftParamsAsset,
-			datatokenParams,
-			fixedPriceParams
-		);
-	}
+    ddo.chainId = parseInt(chainId.toString(10));
+    console.log("DDO Chain ID: ", ddo.chainId);
+    const nftParamsAsset: NftCreateData = {
+        name,
+        symbol,
+        templateIndex,
+        tokenURI: "aaa",
+        transferable: true,
+        owner: await owner.getAddress(),
+    };
+    const datatokenParams: DatatokenCreateParams = {
+        templateIndex,
+        cap: "100000",
+        feeAmount: "0",
+        paymentCollector: await owner.getAddress(),
+        feeToken: config.oceanTokenAddress,
+        minter: await owner.getAddress(),
+        mpFeeAddress: ZERO_ADDRESS,
+    };
 
-	const trxReceipt = await bundleNFT.wait();
-	// events have been emitted
-	const nftCreatedEvent = getEventFromTx(trxReceipt, "NFTCreated");
-	const tokenCreatedEvent = getEventFromTx(trxReceipt, "TokenCreated");
+    let bundleNFT;
+    if (!ddo.stats?.price?.value) {
+        bundleNFT = await nftFactory.createNftWithDatatoken(
+            nftParamsAsset,
+            datatokenParams
+        );
+    } else if (ddo?.stats?.price?.value === "0") {
+        const dispenserParams: DispenserCreationParams = {
+            dispenserAddress: config.dispenserAddress,
+            maxTokens: "1",
+            maxBalance: "100000000",
+            withMint: true,
+            allowedSwapper: ZERO_ADDRESS,
+        };
 
-	const nftAddress = nftCreatedEvent.args.newTokenAddress;
-	const datatokenAddressAsset = tokenCreatedEvent.args.newTokenAddress;
-	// create the files encrypted string
-	assetUrl.datatokenAddress = datatokenAddressAsset;
-	assetUrl.nftAddress = nftAddress;
-	ddo.services[0].files = await ProviderInstance.encrypt(
-		assetUrl,
-		chainId,
-		macOsProviderUrl || providerUrl
-	);
-	ddo.services[0].datatokenAddress = datatokenAddressAsset;
-	ddo.services[0].serviceEndpoint = providerUrl;
+        bundleNFT = await nftFactory.createNftWithDatatokenWithDispenser(
+            nftParamsAsset,
+            datatokenParams,
+            dispenserParams
+        );
+    } else {
+        const fixedPriceParams: FreCreationParams = {
+            fixedRateAddress: config.fixedRateExchangeAddress,
+            baseTokenAddress: config.oceanTokenAddress,
+            owner: await owner.getAddress(),
+            marketFeeCollector: await owner.getAddress(),
+            baseTokenDecimals: 18,
+            datatokenDecimals: 18,
+            fixedRate: ddo.stats.price.value,
+            marketFee: "0",
+            allowedConsumer: await owner.getAddress(),
+            withMint: true,
+        };
 
-	ddo.nftAddress = nftAddress;
-	ddo.id =
-		"did:op:" +
-		SHA256(ethers.utils.getAddress(nftAddress) + chainId.toString(10));
+        bundleNFT = await nftFactory.createNftWithDatatokenWithFixedRate(
+            nftParamsAsset,
+            datatokenParams,
+            fixedPriceParams
+        );
+    }
 
-	let metadata;
-	let metadataHash;
-	let flags;
-	if (encryptDDO) {
-		metadata = await ProviderInstance.encrypt(
-			ddo,
-			chainId,
-			macOsProviderUrl || providerUrl
-		);
-		const validateResult = await aquariusInstance.validate(ddo);
-		metadataHash = validateResult.hash;
-		flags = 2
-	} else {
-		const stringDDO = JSON.stringify(ddo);
-		const bytes = Buffer.from(stringDDO);
-		metadata = hexlify(bytes);
-		metadataHash = "0x" + createHash("sha256").update(metadata).digest("hex");
-		flags = 0
-	}
+    const trxReceipt = await bundleNFT.wait();
+    const nftCreatedEvent = getEventFromTx(trxReceipt, "NFTCreated");
+    const tokenCreatedEvent = getEventFromTx(trxReceipt, "TokenCreated");
 
-	// Use Datatoken4 to set metadata
-	await datatoken.setFileObject(
-		datatokenAddressAsset,
-		await owner.getAddress(),
-		true // assuming confidentialEVM is true for Sapphire
-	);
+    const nftAddress = nftCreatedEvent.args.newTokenAddress;
+	console.log("NFT Address: ", nftAddress);
+    const datatokenAddressAsset = tokenCreatedEvent.args.newTokenAddress;
+	console.log("Datatoken Address: ", datatokenAddressAsset)
 
-	await nft.setMetadata(
-		nftAddress,
-		await owner.getAddress(),
-		0,
-		providerUrl,
-		"",
-		ethers.utils.hexlify(flags),
-		metadata,
-		metadataHash
-	);
-	return ddo.id;
+    assetUrl.datatokenAddress = datatokenAddressAsset;
+    assetUrl.nftAddress = nftAddress;
+    ddo.services[0].files = await ProviderInstance.encrypt(
+        assetUrl,
+        chainId,
+        macOsProviderUrl || providerUrl
+    );
+    ddo.services[0].datatokenAddress = datatokenAddressAsset;
+    ddo.services[0].serviceEndpoint = providerUrl;
+
+    ddo.nftAddress = nftAddress;
+    ddo.id =
+        "did:op:" +
+        SHA256(ethers.utils.getAddress(nftAddress) + chainId.toString(10));
+
+    let metadata;
+    let metadataHash;
+    let flags;
+    if (encryptDDO) {
+        metadata = await ProviderInstance.encrypt(
+            ddo,
+            chainId,
+            macOsProviderUrl || providerUrl
+        );
+        const validateResult = await aquariusInstance.validate(ddo);
+        metadataHash = validateResult.hash;
+        flags = 2
+    } else {
+        const stringDDO = JSON.stringify(ddo);
+        const bytes = Buffer.from(stringDDO);
+        metadata = hexlify(bytes);
+        metadataHash = "0x" + createHash("sha256").update(metadata).digest("hex");
+        flags = 0
+    }
+
+    // Use Nft class to set metadata on the NFT
+    const nft = new Nft(wrappedSigner, chainId);
+console.log("setting metadata")
+    // Set metadata using Nft
+    await nft.setMetadata(
+        nftAddress,
+        await owner.getAddress(),
+        0,
+        providerUrl,
+        "",
+        ethers.utils.hexlify(flags),
+        metadata,
+        metadataHash
+    );
+	console.log('metadata updated')
+
+    // Use Datatoken4 for file object
+	console.log('Use Datatoken4 for file object')
+    const datatoken = new Datatoken4(
+        wrappedSigner,
+        ethers.utils.toUtf8Bytes(JSON.stringify(assetUrl.files)),
+        chainId,
+        config
+    );
+
+    // Set file object
+	console.log('Set file object')
+    await datatoken.setFileObject(datatokenAddressAsset, await wrappedSigner.getAddress());
+
+    // Set allow list for the datatoken
+	console.log('Set allow list for the datatoken')
+    await datatoken.setAllowListContract(
+        datatokenAddressAsset,
+        allowListAddress,
+        await wrappedSigner.getAddress()
+    );
+
+	console.log('returning ddo.id')
+    return ddo.id;
 }
-
 
 
 export async function updateAssetMetadata(

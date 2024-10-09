@@ -28,6 +28,7 @@ import {
 	ProviderFees,
 	ComputeAlgorithm,
 	LoggerInstance,
+	Datatoken4 
 } from "@oceanprotocol/lib";
 import { hexlify } from "ethers/lib/utils";
 
@@ -197,6 +198,150 @@ export async function createAsset(
 	);
 	return ddo.id;
 }
+
+
+export async function createSapphireAsset(
+	name: string,
+	symbol: string,
+	owner: Signer,
+	assetUrl: any,
+	ddo: any,
+	providerUrl: string,
+	config: Config,
+	aquariusInstance: Aquarius,
+	datatoken: Datatoken4,
+	templateIndex: number = 1,
+	macOsProviderUrl?: string,
+	encryptDDO: boolean = true,
+) {
+	const { chainId } = await owner.provider.getNetwork();
+	const nft = new Nft(owner, chainId);
+	const nftFactory = new NftFactory(config.nftFactoryAddress, owner);
+
+	ddo.chainId = parseInt(chainId.toString(10));
+	const nftParamsAsset: NftCreateData = {
+		name,
+		symbol,
+		templateIndex,
+		tokenURI: "aaa",
+		transferable: true,
+		owner: await owner.getAddress(),
+	};
+	const datatokenParams: DatatokenCreateParams = {
+		templateIndex,
+		cap: "100000",
+		feeAmount: "0",
+		paymentCollector: await owner.getAddress(),
+		feeToken: config.oceanTokenAddress,
+		minter: await owner.getAddress(),
+		mpFeeAddress: ZERO_ADDRESS,
+	};
+
+	let bundleNFT;
+	if (!ddo.stats?.price?.value) {
+		bundleNFT = await nftFactory.createNftWithDatatoken(
+			nftParamsAsset,
+			datatokenParams
+		);
+	} else if (ddo?.stats?.price?.value === "0") {
+		const dispenserParams: DispenserCreationParams = {
+			dispenserAddress: config.dispenserAddress,
+			maxTokens: "1",
+			maxBalance: "100000000",
+			withMint: true,
+			allowedSwapper: ZERO_ADDRESS,
+		};
+
+		bundleNFT = await nftFactory.createNftWithDatatokenWithDispenser(
+			nftParamsAsset,
+			datatokenParams,
+			dispenserParams
+		);
+	} else {
+		const fixedPriceParams: FreCreationParams = {
+			fixedRateAddress: config.fixedRateExchangeAddress,
+			baseTokenAddress: config.oceanTokenAddress,
+			owner: await owner.getAddress(),
+			marketFeeCollector: await owner.getAddress(),
+			baseTokenDecimals: 18,
+			datatokenDecimals: 18,
+			fixedRate: ddo.stats.price.value,
+			marketFee: "0",
+			allowedConsumer: await owner.getAddress(),
+			withMint: true,
+		};
+
+		bundleNFT = await nftFactory.createNftWithDatatokenWithFixedRate(
+			nftParamsAsset,
+			datatokenParams,
+			fixedPriceParams
+		);
+	}
+
+	const trxReceipt = await bundleNFT.wait();
+	// events have been emitted
+	const nftCreatedEvent = getEventFromTx(trxReceipt, "NFTCreated");
+	const tokenCreatedEvent = getEventFromTx(trxReceipt, "TokenCreated");
+
+	const nftAddress = nftCreatedEvent.args.newTokenAddress;
+	const datatokenAddressAsset = tokenCreatedEvent.args.newTokenAddress;
+	// create the files encrypted string
+	assetUrl.datatokenAddress = datatokenAddressAsset;
+	assetUrl.nftAddress = nftAddress;
+	ddo.services[0].files = await ProviderInstance.encrypt(
+		assetUrl,
+		chainId,
+		macOsProviderUrl || providerUrl
+	);
+	ddo.services[0].datatokenAddress = datatokenAddressAsset;
+	ddo.services[0].serviceEndpoint = providerUrl;
+
+	ddo.nftAddress = nftAddress;
+	ddo.id =
+		"did:op:" +
+		SHA256(ethers.utils.getAddress(nftAddress) + chainId.toString(10));
+
+	let metadata;
+	let metadataHash;
+	let flags;
+	if (encryptDDO) {
+		metadata = await ProviderInstance.encrypt(
+			ddo,
+			chainId,
+			macOsProviderUrl || providerUrl
+		);
+		const validateResult = await aquariusInstance.validate(ddo);
+		metadataHash = validateResult.hash;
+		flags = 2
+	} else {
+		const stringDDO = JSON.stringify(ddo);
+		const bytes = Buffer.from(stringDDO);
+		metadata = hexlify(bytes);
+		metadataHash = "0x" + createHash("sha256").update(metadata).digest("hex");
+		flags = 0
+	}
+
+	// Use Datatoken4 to set metadata
+	await datatoken.setFileObject(
+		datatokenAddressAsset,
+		await owner.getAddress(),
+		true // assuming confidentialEVM is true for Sapphire
+	);
+
+	await nft.setMetadata(
+		nftAddress,
+		await owner.getAddress(),
+		0,
+		providerUrl,
+		"",
+		ethers.utils.hexlify(flags),
+		metadata,
+		metadataHash
+	);
+	return ddo.id;
+}
+
+
 
 export async function updateAssetMetadata(
 	owner: Signer,

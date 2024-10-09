@@ -1,11 +1,14 @@
 // src/publishAsset.ts
-import { Signer } from 'ethers';
+import { Signer, ethers } from 'ethers';
 import {
   Config,
   Aquarius,
   DDO,
+  Datatoken4
 } from '@oceanprotocol/lib';
-import { createAsset, updateAssetMetadata } from './helpers'; // Import helper functions
+import { createAsset, createSapphireAsset, updateAssetMetadata } from './helpers';
+import * as sapphire from '@oasisprotocol/sapphire-paratime';
+import ERC20Template4 from '@oceanprotocol/contracts/artifacts/contracts/templates/ERC20Template4.sol/ERC20Template4.json';
 
 export interface PublishAssetParams {
   title: string;
@@ -50,9 +53,9 @@ export async function publishAsset(params: PublishAssetParams, signer: Signer, c
         allocated: 0,
         orders: 0,
         price: {
-          value: "0"
+          value: params.isCharged ? params.price : "0"
         }
-    },
+      },
       services: [
         {
           id: 'access',
@@ -61,7 +64,7 @@ export async function publishAsset(params: PublishAssetParams, signer: Signer, c
           files: '',
           datatokenAddress: '0x0', // Will be updated after creating asset
           serviceEndpoint: params.providerUrl,
-          timeout: 0,
+          timeout: params.timeout,
         },
       ],
       nft: {
@@ -79,21 +82,59 @@ export async function publishAsset(params: PublishAssetParams, signer: Signer, c
     const assetUrl = {
       nftAddress: '0x0', // Will be updated after creating asset
       datatokenAddress: '0x0', // Will be updated after creating asset
-      files: [{ type: 'url', url: params.assetLocation, method: 'GET' }],
+      files: [{ type: params.storageType, url: params.assetLocation, method: 'GET' }],
     };
 
-    // Create the asset using the helper function
-    const did = await createAsset(
-      params.title,
-      'DATATOKEN', // Assuming a standard symbol for now
-      signer,
-      assetUrl,
-      metadata,
-      params.providerUrl,
-      config,
-      aquarius,
-      1
-    );
+    let did: string;
+
+    if (params.chainId === 23294) {
+      // Oasis Sapphire
+      console.log('Publishing to Oasis Sapphire network...');
+      
+      const wrappedSigner = sapphire.wrap(signer);
+      
+      const filesObject = [
+        {
+          url: params.assetLocation,
+          contentType: 'text/plain', // Adjust this based on your asset type
+          encoding: 'UTF-8'
+        }
+      ];
+
+      const datatoken = new Datatoken4(
+        wrappedSigner,
+        ethers.utils.toUtf8Bytes(JSON.stringify(filesObject)),
+        params.chainId,
+        config,
+        ERC20Template4.abi
+      );
+
+      did = await createSapphireAsset(
+        params.title,
+        'DATATOKEN', // Assuming a standard symbol for now
+        wrappedSigner,
+        assetUrl,
+        metadata,
+        params.providerUrl,
+        config,
+        aquarius,
+        datatoken,
+        params.template || 1
+      );
+    } else {
+      // Other networks
+      did = await createAsset(
+        params.title,
+        'DATATOKEN', // Assuming a standard symbol for now
+        signer,
+        assetUrl,
+        metadata,
+        params.providerUrl,
+        config,
+        aquarius,
+        params.template || 1
+      );
+    }
 
     console.log(`Asset successfully published with DID: ${did}`);
 

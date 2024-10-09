@@ -31,6 +31,7 @@ import {
 	DispenserParams,
 } from "@oceanprotocol/lib";
 import { hexlify } from "ethers/lib/utils";
+import { uploadToIPFS } from "./ipfs";
 
 export async function downloadFile(
 	url: string,
@@ -298,40 +299,74 @@ export async function createAssetV5(
 
 	ddo.id = "did:op:" + SHA256(ethers.utils.getAddress(nftAddress) + chainId.toString(10));
 
-	let metadata;
-	let metadataHash;
-	let flags;
+	let metadataIPFS: string
+	let flags: number
+	const validateResult = await aquariusInstance.validate(ddo);
+	if (!validateResult.valid) {
+		throw new Error("Invalid ddo")
+	}
+	// if (encryptDDO) {
+	// 	metadataDDO = await ProviderInstance.encrypt(
+	// 		ddo,
+	// 		chainId,
+	// 		macOsProviderUrl || providerUrl
+	// 	);
+	// 	metadataDDOHash = validateResult.hash;
+	// 	flags = 2;
+	// } else {
+	// 	const stringDDO = JSON.stringify(ddo);
+	// 	const bytes = Buffer.from(stringDDO);
+	// 	metadataDDO = hexlify(bytes);
+	// 	metadataDDOHash = "0x" + createHash("sha256").update(metadataDDO).digest("hex");
+	// 	flags = 0;
+	// }
+
+	const stringMetadata = JSON.stringify(ddo);
+	const bytesDDO = Buffer.from(stringMetadata);
+	const metadata = hexlify(bytesDDO);
+	const metadataDDOHash = "0x" + createHash("sha256").update(metadata).digest("hex");
+
+	const data = { encryptedData: metadata };
+	const ipfsHash = await uploadToIPFS(data);
+	const remoteDDO = {
+		remote: {
+			type: 'ipfs',
+			hash: ipfsHash,
+		},
+	}
+
 	if (encryptDDO) {
-		//TODO get only things to be on chain from ddo
-		metadata = await ProviderInstance.encrypt(
-			ddo,
+		metadataIPFS = await ProviderInstance.encrypt(
+			remoteDDO,
 			chainId,
 			macOsProviderUrl || providerUrl
 		);
-		const validateResult = await aquariusInstance.validate(ddo);
-		metadataHash = validateResult.hash;
 		flags = 2;
 	} else {
-		// TODO get only things to be on chain from ddo
-		const stringDDO = JSON.stringify(ddo);
+		const stringDDO = JSON.stringify(remoteDDO);
 		const bytes = Buffer.from(stringDDO);
-		metadata = hexlify(bytes);
-		metadataHash = "0x" + createHash("sha256").update(metadata).digest("hex");
+		metadataIPFS = hexlify(bytes);
 		flags = 0;
 	}
 
 	// Set metadata for the NFT
-	await nft.setMetadata(
-		nftAddress,
-		await owner.getAddress(),
-		0,
-		providerUrl,
-		"",
-		ethers.utils.hexlify(flags),
-		metadata,
-		metadataHash
-	);
+	try {
+		await nft.setMetadata(
+			nftAddress,
+			await owner.getAddress(),
+			0,
+			providerUrl,
+			"",
+			ethers.utils.hexlify(flags),
+			metadataIPFS,
+			metadataDDOHash
+		);
+	} catch (error) {
+		console.log("error:", error)
+		throw new Error(error)
+	}
 
+	console.log("after setMetadata:")
 	return ddo.id;
 }
 

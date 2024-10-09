@@ -146,6 +146,7 @@ export class Commands {
 
 		const encryptDDO = args[2] === "false" ? false : true;
 
+
 		try {
 			const urlAssetId = await this.publishAssetV5(
 				asset,

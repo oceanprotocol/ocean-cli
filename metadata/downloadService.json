@@ -1,7 +1,11 @@
 {
   "id": "ccb398c50d6abd5b456e8d7242bd856a1767a890b537c2f8c10ba8b8a10e6026",
   "name": "Service 2",
-  "description": "testing 2",
+  "description": {
+    "@value": "Service 2 for accessing the dataset",
+    "@language": "en",
+    "@direction": "ltr"
+  },
   "type": "access",
   "datatokenAddress": "",
   "files": {
@@ -15,6 +19,7 @@
       }
     ]
   },
+  "credentials": [],
   "serviceEndpoint": "",
   "timeout": 86400
 }

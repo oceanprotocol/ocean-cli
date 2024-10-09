@@ -111,7 +111,7 @@ export async function publishAsset(params: PublishAssetParams, signer: Signer, c
 
       did = await createSapphireAsset(
         params.title,
-        'DATATOKEN', // Assuming a standard symbol for now
+        'OCEAN-NFT',
         wrappedSigner,
         assetUrl,
         metadata,
@@ -125,7 +125,7 @@ export async function publishAsset(params: PublishAssetParams, signer: Signer, c
       // Other networks
       did = await createAsset(
         params.title,
-        'DATATOKEN', // Assuming a standard symbol for now
+        'OCEAN-NFT',
         signer,
         assetUrl,
         metadata,

@@ -23,7 +23,7 @@ export async function interactiveFlow(providerUrl: string): Promise<PublishAsset
     console.log(chalk.cyan('Welcome to the Ocean Protocol Asset Publisher!\n'));
 
     // Prompting for basic information
-    const basicAnswers = await prompt<Omit<PublishAssetParams, 'isCharged' | 'chainId' | 'timeout'>>([
+    const basicAnswers = await prompt<Omit<PublishAssetParams, 'isCharged' | 'chainId' | 'storageType' | 'assetLocation'>>([
       {
         type: 'input',
         name: 'title',
@@ -48,24 +48,22 @@ export async function interactiveFlow(providerUrl: string): Promise<PublishAsset
         message: chalk.green('Please provide tags to make this asset more easily discoverable (comma separated):\n'),
         required: true
       },
+      {
+        type: 'select',
+        name: 'timeout',
+        message: chalk.green('After purchasing your asset, how long should the consumer be allowed to access it for?\n'),
+        choices: [
+          {name: 'Forever', value: "0"},
+          {name: '1 day', value: "86400"},
+          {name: '1 week', value: "604800"},
+          {name: '1 month', value: "2592000"},
+          {name: '1 year', value: "31536000"}
+        ],
+        result(value) {
+          return this.choices.find(choice => choice.name === value).value;
+        }
+      },
     ]);
-
-    // Timeout prompt
-    const { timeout } = await prompt<{ timeout: number }>({
-      type: 'select',
-      name: 'timeout',
-      message: chalk.green('After purchasing your asset, how long should the consumer be allowed to access it for?\n'),
-      choices: [
-        {name: 'Forever', value: 0},
-        {name: '1 day', value: 86400},
-        {name: '1 week', value: 604800},
-        {name: '1 month', value: 2592000},
-        {name: '1 year', value: 31536000}
-      ],
-      result(value) {
-        return this.choices.find(choice => choice.name === value).value;
-      }
-    });
 
     // Storage type prompt
     const { storageType } = await prompt<{ storageType: PublishAssetParams['storageType'] }>({
@@ -135,7 +133,7 @@ export async function interactiveFlow(providerUrl: string): Promise<PublishAsset
       type: 'select',
       name: 'chainId',
       message: chalk.green('What network will your asset be available for purchase through?\n'),
-      choices: [{name: 'Oasis Sapphire', value: 23295}, {name: 'Ethereum', value: 1}, {name: 'Polygon', value: 137}],
+      choices: [{name: 'Oasis Sapphire', value: 23294}, {name: 'Oasis Sapphire Testnet', value: 23295}, {name: 'Ethereum', value: 1}, {name: 'Polygon', value: 137}],
       result(value) {
         return this.choices.find(choice => choice.name === value).value;
       }
@@ -143,7 +141,7 @@ export async function interactiveFlow(providerUrl: string): Promise<PublishAsset
 
     // Template prompt
     let template: number | undefined;
-    if (chainId !== 23295) {
+    if (chainId !== 23295 && chainId !== 23294) {
       const templateAnswer = await prompt<{ template: number }>({
         type: 'select',
         name: 'template',
@@ -162,7 +160,6 @@ export async function interactiveFlow(providerUrl: string): Promise<PublishAsset
     // Combine all answers
     const allAnswers: PublishAssetParams = {
       ...basicAnswers,
-      timeout,
       storageType,
       assetLocation,
       isCharged,

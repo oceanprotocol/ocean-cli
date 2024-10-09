@@ -215,7 +215,6 @@ export async function createSapphireAsset(
     encryptDDO: boolean = true,
 ) {
     const { chainId } = await owner.provider.getNetwork();
-    console.log("Chain ID: ", chainId);
     const nftFactory = new NftFactory(config.nftFactoryAddress, owner);
 
     // Wrap the signer for Sapphire
@@ -233,10 +232,8 @@ export async function createSapphireAsset(
         await owner.getAddress(),
         [await owner.getAddress(), ZERO_ADDRESS]
     );
-    console.log("Allow List Address: ", allowListAddress);
 
     ddo.chainId = parseInt(chainId.toString(10));
-    console.log("DDO Chain ID: ", ddo.chainId);
     const nftParamsAsset: NftCreateData = {
         name,
         symbol,
@@ -301,9 +298,9 @@ export async function createSapphireAsset(
     const tokenCreatedEvent = getEventFromTx(trxReceipt, "TokenCreated");
 
     const nftAddress = nftCreatedEvent.args.newTokenAddress;
-	console.log("NFT Address: ", nftAddress);
+	console.log("NFT publish with address: ", nftAddress);
     const datatokenAddressAsset = tokenCreatedEvent.args.newTokenAddress;
-	console.log("Datatoken Address: ", datatokenAddressAsset)
+	console.log("Datatoken published with address: ", datatokenAddressAsset)
 
     assetUrl.datatokenAddress = datatokenAddressAsset;
     assetUrl.nftAddress = nftAddress;
@@ -342,7 +339,6 @@ export async function createSapphireAsset(
 
     // Use Nft class to set metadata on the NFT
     const nft = new Nft(wrappedSigner, chainId);
-console.log("setting metadata")
     // Set metadata using Nft
     await nft.setMetadata(
         nftAddress,
@@ -354,10 +350,8 @@ console.log("setting metadata")
         metadata,
         metadataHash
     );
-	console.log('metadata updated')
 
     // Use Datatoken4 for file object
-	console.log('Use Datatoken4 for file object')
     const datatoken = new Datatoken4(
         wrappedSigner,
         ethers.utils.toUtf8Bytes(JSON.stringify(assetUrl.files)),
@@ -366,18 +360,15 @@ console.log("setting metadata")
     );
 
     // Set file object
-	console.log('Set file object')
     await datatoken.setFileObject(datatokenAddressAsset, await wrappedSigner.getAddress());
 
     // Set allow list for the datatoken
-	console.log('Set allow list for the datatoken')
     await datatoken.setAllowListContract(
         datatokenAddressAsset,
         allowListAddress,
         await wrappedSigner.getAddress()
     );
 
-	console.log('returning ddo.id')
     return ddo.id;
 }
 

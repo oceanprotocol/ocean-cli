@@ -13,7 +13,7 @@ export interface PublishAssetParams {
   description: string;
   author: string;
   tags: string[];
-  timeout: number;
+  timeout: string;
   storageType: 'ipfs' | 'arweave' | 'url';
   assetLocation: string;
   isCharged: boolean;
@@ -26,11 +26,7 @@ export interface PublishAssetParams {
 
 export async function publishAsset(params: PublishAssetParams, signer: Signer, config: Config) {
   try {
-    console.log('Publishing asset using helper functions...');
-
     const aquarius = new Aquarius(config.metadataCacheUri);
-
-    console.log('asset timeout: ', params.timeout)
 
     // Prepare initial metadata for the asset
     const metadata: DDO = {
@@ -64,7 +60,7 @@ export async function publishAsset(params: PublishAssetParams, signer: Signer, c
           files: '',
           datatokenAddress: '0x0', // Will be updated after creating asset
           serviceEndpoint: params.providerUrl,
-          timeout: 0,
+          timeout: Number(params.timeout),
         },
       ],
       nft: {
@@ -87,7 +83,7 @@ export async function publishAsset(params: PublishAssetParams, signer: Signer, c
 
     let did: string;
 
-    if (params.chainId === 23295) {
+    if (params.chainId === 23295 || params.chainId === 23294) {
       // Oasis Sapphire
       console.log('Publishing to Oasis Sapphire network...');
       

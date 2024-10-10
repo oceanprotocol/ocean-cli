@@ -324,7 +324,7 @@ export async function createAssetV5(
 	const stringMetadata = JSON.stringify(ddo);
 	const bytesDDO = Buffer.from(stringMetadata);
 	const metadata = hexlify(bytesDDO);
-	const metadataDDOHash = "0x" + createHash("sha256").update(metadata).digest("hex");
+	// const metadataDDOHash = "0x" + createHash("sha256").update(metadata).digest("hex");
 
 	const data = { encryptedData: metadata };
 	const ipfsHash = await uploadToIPFS(data);
@@ -334,7 +334,6 @@ export async function createAssetV5(
 			hash: ipfsHash,
 		},
 	}
-
 	if (encryptDDO) {
 		metadataIPFS = await ProviderInstance.encrypt(
 			remoteDDO,
@@ -348,7 +347,8 @@ export async function createAssetV5(
 		metadataIPFS = hexlify(bytes);
 		flags = 0;
 	}
-
+	const stringDDO = JSON.stringify(data);
+	const metadataIPFSHash = "0x" + createHash("sha256").update(stringDDO).digest("hex")
 	// Set metadata for the NFT
 	try {
 		await nft.setMetadata(
@@ -359,14 +359,13 @@ export async function createAssetV5(
 			"",
 			ethers.utils.hexlify(flags),
 			metadataIPFS,
-			metadataDDOHash
+			metadataIPFSHash
 		);
 	} catch (error) {
 		console.log("error:", error)
 		throw new Error(error)
 	}
 
-	console.log("after setMetadata:")
 	return ddo.id;
 }
 

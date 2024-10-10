@@ -382,10 +382,11 @@ export async function updateAssetMetadata(
 	let flags;
 	let metadata;
 	const validateResult = await aquariusInstance.validate(updatedDdo);
+	const chainId = updatedDdo.credentialSubject ? updatedDdo.credentialSubject.chainId : updatedDdo.chainId
 	if (encryptDDO) {
 		const providerResponse = await ProviderInstance.encrypt(
 			updatedDdo,
-			updatedDdo.credentialSubject.chainId,
+			chainId,
 			macOsProviderUrl || providerUrl
 		);
 		metadata = await providerResponse;
@@ -397,9 +398,9 @@ export async function updateAssetMetadata(
 		metadata = hexlify(bytes);
 		flags = 0
 	}
-
+	const nftAddress = updatedDdo.credentialSubject ? updatedDdo.credentialSubject.nftAddress : updatedDdo.nftAddress
 	const updateDdoTX = await nft.setMetadata(
-		updatedDdo.credentialSubject.nftAddress,
+		nftAddress,
 		await owner.getAddress(),
 		0,
 		providerUrl,

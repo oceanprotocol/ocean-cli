@@ -755,17 +755,27 @@ export class Commands {
 			this.config,
 			price
 		)
-		console.log("datatokenAddress:", datatokenAddress)
 		service.files.datatokenAddress = datatokenAddress;
-		service.files.nftAddress = asset.credentialSubject.nftAddress;
-		service.files = await ProviderInstance.encrypt(
-			service.files,
-			asset.credentialSubject.chainId,
-			this.providerUrl
-		);
 		service.datatokenAddress = datatokenAddress;
 		service.serviceEndpoint = this.providerUrl;
-		asset.credentialSubject.services.push(service)
+		if (asset.credentialSubject) {
+			service.files.nftAddress = asset.credentialSubject.nftAddress;
+			service.files = await ProviderInstance.encrypt(
+				service.files,
+				asset.credentialSubject.chainId,
+				this.providerUrl
+			);
+			asset.credentialSubject.services.push(service)
+		} else {
+			service.files.nftAddress = asset.nftAddress;
+			service.files = await ProviderInstance.encrypt(
+				service.files,
+				asset.chainId,
+				this.providerUrl
+			);
+			asset.services.push(service)
+		}
+
 		await updateAssetMetadata(
 			this.signer,
 			asset,

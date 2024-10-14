@@ -5,8 +5,7 @@ import {
   Aquarius,
   DDO
 } from '@oceanprotocol/lib';
-import { createAsset, createSapphireAsset, updateAssetMetadata } from './helpers';
-import * as sapphire from '@oasisprotocol/sapphire-paratime';
+import { createAsset, updateAssetMetadata } from './helpers';
 
 export interface PublishAssetParams {
   title: string;
@@ -81,30 +80,8 @@ export async function publishAsset(params: PublishAssetParams, signer: Signer, c
       files: [{ type: params.storageType, url: params.assetLocation, method: 'GET' }],
     };
 
-    let did: string;
-
-    if (params.chainId === 23295 || params.chainId === 23294) {
-      // Oasis Sapphire
-      console.log('Publishing to Oasis Sapphire network...');
-      
-      const wrappedSigner = sapphire.wrap(signer);
-
-      did = await createSapphireAsset(
-        params.title,
-        'OCEAN-NFT',
-        wrappedSigner,
-        assetUrl,
-        metadata,
-        params.providerUrl,
-        config,
-        aquarius,
-        params.template || 1,
-        undefined, // macOsProviderUrl
-        true // encryptDDO
-      );
-    } else {
       // Other networks
-      did = await createAsset(
+      const did = await createAsset(
         params.title,
         'OCEAN-NFT',
         signer,
@@ -115,7 +92,7 @@ export async function publishAsset(params: PublishAssetParams, signer: Signer, c
         aquarius,
         params.template || 1
       );
-    }
+
 
     console.log(`Asset successfully published with DID: ${did}`);
 

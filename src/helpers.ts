@@ -174,7 +174,7 @@ export async function createAsset(
 	// create the files encrypted string
 	assetUrl.datatokenAddress = datatokenAddressAsset;
 	assetUrl.nftAddress = nftAddress;
-	ddo.services[0].files = await ProviderInstance.encrypt(
+	ddo.services[0].files = templateIndex === 4 ? '' : await ProviderInstance.encrypt(
 		assetUrl,
 		chainId,
 		macOsProviderUrl || providerUrl

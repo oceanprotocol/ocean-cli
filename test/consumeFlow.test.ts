@@ -2,16 +2,42 @@ import { expect } from "chai";
 import { exec } from "child_process";
 import path from "path";
 import fs from "fs";
+import crypto from "crypto";
+import https from "https";
 
 describe("Ocean CLI Publishing", function() {
-    this.timeout(60000); // Set a longer timeout to allow the command to execute
+    this.timeout(180000); // Set a longer timeout to allow the command to execute
 
-    let downloadDatasetDid: string
+    let downloadDatasetDid: string;
     let computeDatasetDid: string;
     let jsAlgoDid: string;
     let pythonAlgoDid: string;
 
     const projectRoot = path.resolve(__dirname, "..");
+
+    // Function to compute hash of a file
+    const computeFileHash = (filePath: string): string => {
+        const fileBuffer = fs.readFileSync(filePath);
+        const hashSum = crypto.createHash('sha256');
+        hashSum.update(fileBuffer);
+        return hashSum.digest('hex');
+    };
+
+    const downloadFile = async (url: string, dest: string): Promise<void> => {
+        return new Promise((resolve, reject) => {
+            const file = fs.createWriteStream(dest);
+            https.get(url, (response) => {
+                response.pipe(file);
+                file.on('finish', () => {
+                    file.close(() => resolve());
+                });
+            }).on('error', (err) => {
+                fs.unlink(dest, () => reject(err));
+            });
+        });
+    };
+    
+    
 
     it("should publish a dataset using 'npm run cli publish'", function(done) {
         const metadataFile = path.resolve(projectRoot, "metadata/simpleDownloadDataset.json");
@@ -35,8 +61,9 @@ describe("Ocean CLI Publishing", function() {
                     downloadDatasetDid = match[0];
                 }
                 expect(stdout).to.contain("Asset published. ID:");
-                done();
+                done()
             } catch (assertionError) {
+                console.log('assertionError', assertionError);
                 done(assertionError);
             }
         });
@@ -58,7 +85,7 @@ describe("Ocean CLI Publishing", function() {
                     computeDatasetDid = match[0];
                 }
                 expect(stdout).to.contain("Asset published. ID:");
-                done();
+                done()
             } catch (assertionError) {
                 done(assertionError);
             }
@@ -81,7 +108,7 @@ describe("Ocean CLI Publishing", function() {
                 if (match) {
                     jsAlgoDid = match[0];
                 }
-                done();
+                done()
             } catch (assertionError) {
                 done(assertionError);
             }
@@ -104,7 +131,7 @@ describe("Ocean CLI Publishing", function() {
                 if (match) {
                     pythonAlgoDid = match[0];
                 }
-                done();
+                done()
             } catch (assertionError) {
                 done(assertionError);
             }
@@ -113,7 +140,6 @@ describe("Ocean CLI Publishing", function() {
 
     it("should get DDO using 'npm run cli getDDO' for download dataset", function(done) {
         exec(`npm run cli getDDO ${downloadDatasetDid}`, { cwd: projectRoot }, (error, stdout) => {
-            console.log('stdout', stdout)
             expect(stdout).to.contain(`${downloadDatasetDid}`);
             expect(stdout).to.contain("https://w3id.org/did/v1");
             expect(stdout).to.contain("Datatoken");
@@ -121,7 +147,6 @@ describe("Ocean CLI Publishing", function() {
         });
     });
 
-    
     it("should get DDO using 'npm run cli getDDO' for compute dataset", function(done) {
         exec(`npm run cli getDDO ${computeDatasetDid}`, { cwd: projectRoot }, (error, stdout) => {
             expect(stdout).to.contain(`${computeDatasetDid}`);
@@ -130,7 +155,7 @@ describe("Ocean CLI Publishing", function() {
             done()
         });
     });
-  
+
     it("should get DDO using 'npm run cli getDDO' for JS algorithm", function(done) {
         exec(`npm run cli getDDO ${jsAlgoDid}`, { cwd: projectRoot }, (error, stdout) => {
             expect(stdout).to.contain(`${jsAlgoDid}`);
@@ -139,7 +164,7 @@ describe("Ocean CLI Publishing", function() {
             done()
         });
     });
-      
+
     it("should get DDO using 'npm run cli getDDO' for python algorithm", function(done) {
         exec(`npm run cli getDDO ${pythonAlgoDid}`, { cwd: projectRoot }, (error, stdout) => {
             expect(stdout).to.contain(`${pythonAlgoDid}`);
@@ -149,4 +174,43 @@ describe("Ocean CLI Publishing", function() {
         });
     });
 
+    it("should download the download dataset", function(done) {
+        this.timeout(10000); // Increase timeout if needed
+    
+        (async () => {
+            try {
+                const { stdout } = await new Promise<{ stdout: string, error: Error | null }>((resolve, reject) => {
+                    exec(`npm run cli download ${downloadDatasetDid} .`, { cwd: projectRoot }, (error, stdout) => {
+                        if (error) {
+                            reject(error);
+                        } else {
+                            resolve({ stdout, error: null });
+                        }
+                    });
+                });
+    
+                expect(stdout).to.contain("File downloaded successfully");
+    
+                // Path to the downloaded file
+                const downloadedFilePath = './enwiki-latest-abstract10.xml.gz-rss.xml';
+    
+                // Verify the downloaded file content hash matches the original file hash
+                const downloadedFileHash = computeFileHash(downloadedFilePath);
+                const originalFilePath = './metadata/enwiki-latest-abstract10.xml.gz-rss.xml';
+    
+                await downloadFile("https://dumps.wikimedia.org/enwiki/latest/enwiki-latest-abstract10.xml.gz-rss.xml", originalFilePath);
+                const originalFileHash = computeFileHash(originalFilePath);
+    
+                expect(downloadedFileHash).to.equal(originalFileHash);
+    
+                // Clean up downloaded original file
+                fs.unlinkSync(originalFilePath);
+    
+                done()
+            } catch (err) {
+                done(err);
+            }
+        })();
+    });
+    
 });

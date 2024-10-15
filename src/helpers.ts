@@ -305,26 +305,10 @@ export async function createAssetV5(
 	if (!validateResult.valid) {
 		throw new Error("Invalid ddo")
 	}
-	// if (encryptDDO) {
-	// 	metadataDDO = await ProviderInstance.encrypt(
-	// 		ddo,
-	// 		chainId,
-	// 		macOsProviderUrl || providerUrl
-	// 	);
-	// 	metadataDDOHash = validateResult.hash;
-	// 	flags = 2;
-	// } else {
-	// 	const stringDDO = JSON.stringify(ddo);
-	// 	const bytes = Buffer.from(stringDDO);
-	// 	metadataDDO = hexlify(bytes);
-	// 	metadataDDOHash = "0x" + createHash("sha256").update(metadataDDO).digest("hex");
-	// 	flags = 0;
-	// }
 
 	const stringMetadata = JSON.stringify(ddo);
 	const bytesDDO = Buffer.from(stringMetadata);
 	const metadata = hexlify(bytesDDO);
-	// const metadataDDOHash = "0x" + createHash("sha256").update(metadata).digest("hex");
 
 	const data = { encryptedData: metadata };
 	const ipfsHash = await uploadToIPFS(data);

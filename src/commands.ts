@@ -181,18 +181,36 @@ export class Commands {
 		}
 		const encryptDDO = args[2] === "false" ? false : true;
 		// add some more checks
-		const algoDid = await createAsset(
-			algoAsset.nft.name,
-			algoAsset.nft.symbol,
-			this.signer,
-			algoAsset.services[0].files,
-			algoAsset,
-			this.providerUrl,
-			this.config,
-			this.aquarius,
-			this.macOsProviderUrl,
-			encryptDDO
-		);
+		let algoDid
+		if (this.isVerifiableCredential(algoAsset)) {
+			console.log("verifiable")
+			algoDid = await createAssetV5(
+				algoAsset.credentialSubject.nft.name,
+				algoAsset.credentialSubject.nft.symbol,
+				this.signer,
+				algoAsset.credentialSubject.services[0].files,
+				algoAsset,
+				this.providerUrl,
+				this.config,
+				this.aquarius,
+				this.macOsProviderUrl,
+				encryptDDO
+			);
+		} else {
+			algoDid = await createAsset(
+				algoAsset.nft.name,
+				algoAsset.nft.symbol,
+				this.signer,
+				algoAsset.services[0].files,
+				algoAsset,
+				this.providerUrl,
+				this.config,
+				this.aquarius,
+				this.macOsProviderUrl,
+				encryptDDO
+			);
+		}
+
 		// add some more checks
 		console.log("Algorithm published. DID:  " + algoDid);
 	}
@@ -252,14 +270,26 @@ export class Commands {
 			);
 			return;
 		}
-
+		let chainId
+		let serviceEndpoint
+		let serviceId
+		if (this.isVerifiableCredential(dataDdo)) {
+			chainId = dataDdo.credentialSubject.chainId
+			serviceEndpoint = dataDdo.credentialSubject.services[0].serviceEndpoint
+			serviceId = dataDdo.credentialSubject.services[0].id
+		} else {
+			chainId = dataDdo.chainId
+			serviceEndpoint = dataDdo.services[0].serviceEndpoint
+			serviceId = dataDdo.services[0].id
+		}
 		const providerURI =
-			this.macOsProviderUrl && dataDdo.chainId === 8996
+			this.macOsProviderUrl && chainId === 8996
 				? this.macOsProviderUrl
-				: dataDdo.services[0].serviceEndpoint;
+				: serviceEndpoint;
 		console.log("Downloading asset using provider: ", providerURI);
 		const datatoken = new Datatoken(this.signer, this.config.chainId);
 
+		//TODO update in oceanJs also for v5 (add credentialSubject)
 		const tx = await orderAsset(
 			dataDdo,
 			this.signer,
@@ -279,7 +309,7 @@ export class Commands {
 
 		const urlDownloadUrl = await ProviderInstance.getDownloadUrl(
 			dataDdo.id,
-			dataDdo.services[0].id,
+			serviceId,
 			0,
 			orderTx.transactionHash,
 			providerURI,
@@ -516,6 +546,7 @@ export class Commands {
 		console.log(jobStatus);
 	}
 
+
 	public async allowAlgo(args: string[]) {
 		const asset = await this.aquarius.waitForAqua(args[1]);
 		if (!asset) {
@@ -524,15 +555,23 @@ export class Commands {
 			);
 			return;
 		}
-
-		if (asset.nft.owner !== (await this.signer.getAddress())) {
+		let assetOwner
+		let serviceType
+		if (this.isVerifiableCredential(asset)) {
+			assetOwner = asset.credentialSubject.nft.owner
+			serviceType = asset.credentialSubject.services[0].type
+		} else {
+			assetOwner = asset.nft.owner
+			serviceType = asset.services[0].type
+		}
+		if (assetOwner !== (await this.signer.getAddress())) {
 			console.error(
 				"You are not the owner of this asset, and there for you cannot update it."
 			);
 			return;
 		}
 
-		if (asset.services[0].type !== "compute") {
+		if (serviceType !== "compute") {
 			console.error(
 				"Error getting computeService for " +
 				args[1] +
@@ -549,27 +588,47 @@ export class Commands {
 		}
 		const encryptDDO = args[3] === "false" ? false : true;
 		let filesChecksum;
+		let serviceId
+		let serviceEndpoint
+		let containerChecksum
 		try {
+			if (this.isVerifiableCredential(algoAsset)) {
+				serviceId = algoAsset.credentialSubject.services[0].id
+				serviceEndpoint = algoAsset.credentialSubject.services[0].serviceEndpoint
+				containerChecksum =
+					algoAsset.credentialSubject.metadata.algorithm.container.entrypoint +
+					algoAsset.credentialSubject.metadata.algorithm.container.checksum;
+			} else {
+				serviceId = algoAsset.services[0].id
+				serviceEndpoint = algoAsset.services[0].serviceEndpoint
+				containerChecksum =
+					algoAsset.metadata.algorithm.container.entrypoint +
+					algoAsset.metadata.algorithm.container.checksum;
+			}
 			filesChecksum = await ProviderInstance.checkDidFiles(
 				algoAsset.id,
-				algoAsset.services[0].id,
-				algoAsset.services[0].serviceEndpoint,
+				serviceId,
+				serviceEndpoint,
 				true
 			);
+
 		} catch (e) {
 			console.error("Error checking algo files: ", e);
 			return;
 		}
 
-		const containerChecksum =
-			algoAsset.metadata.algorithm.container.entrypoint +
-			algoAsset.metadata.algorithm.container.checksum;
+
 		const trustedAlgorithm = {
 			did: algoAsset.id,
 			containerSectionChecksum: getHash(containerChecksum),
 			filesChecksum: filesChecksum?.[0]?.checksum,
 		};
-		asset.services[0].compute.publisherTrustedAlgorithms.push(trustedAlgorithm);
+		if (this.isVerifiableCredential(asset)) {
+			asset.services[0].compute.publisherTrustedAlgorithms.push(trustedAlgorithm);
+		} else {
+			asset.credentialSubject.services[0].compute.publisherTrustedAlgorithms.push(trustedAlgorithm);
+		}
+
 		try {
 			const txid = await updateAssetMetadata(
 				this.signer,
@@ -594,13 +653,26 @@ export class Commands {
 			);
 			return;
 		}
-		if (asset.nft.owner !== (await this.signer.getAddress())) {
+		let nftOwner
+		let serviceType
+		let publisherTrustedAlgorithms
+		if (this.isVerifiableCredential(asset)) {
+			nftOwner = asset.credentialSubject.nft.owner
+			serviceType = asset.credentialSubject.services[0].type
+			publisherTrustedAlgorithms = asset.credentialSubject.services[0].compute.publisherTrustedAlgorithms
+		} else {
+			nftOwner = asset.nft.owner
+			serviceType = asset.services[0].type
+			publisherTrustedAlgorithms = asset.services[0].compute.publisherTrustedAlgorithms
+
+		}
+		if (nftOwner !== (await this.signer.getAddress())) {
 			console.error(
 				"You are not the owner of this asset, and there for you cannot update it."
 			);
 			return;
 		}
-		if (asset.services[0].type !== "compute") {
+		if (serviceType !== "compute") {
 			console.error(
 				"Error getting computeService for " +
 				args[1] +
@@ -608,32 +680,55 @@ export class Commands {
 			);
 			return;
 		}
-		if (asset.services[0].compute.publisherTrustedAlgorithms) {
+		if (!publisherTrustedAlgorithms) {
 			console.error(
 				" " + args[1] + ".  Does this asset has an computeService?"
 			);
 			return;
 		}
 		const encryptDDO = args[3] === "false" ? false : true;
-		const indexToDelete =
-			asset.services[0].compute.publisherTrustedAlgorithms.findIndex(
-				(item) => item.did === args[2]
-			);
+		if (this.isVerifiableCredential(asset)) {
+			const indexToDelete =
+				asset.credentialSubject.services[0].compute.publisherTrustedAlgorithms.findIndex(
+					(item) => item.did === args[2]
+				);
 
-		if (indexToDelete !== -1) {
-			asset.services[0].compute.publisherTrustedAlgorithms.splice(
-				indexToDelete,
-				1
-			);
+			if (indexToDelete !== -1) {
+				asset.credentialSubject.services[0].compute.publisherTrustedAlgorithms.splice(
+					indexToDelete,
+					1
+				);
+			} else {
+				console.error(
+					" " +
+					args[2] +
+					".  is not allowed by the publisher to run on " +
+					args[1]
+				);
+				return;
+			}
 		} else {
-			console.error(
-				" " +
-				args[2] +
-				".  is not allowed by the publisher to run on " +
-				args[1]
-			);
-			return;
+			const indexToDelete =
+				asset.services[0].compute.publisherTrustedAlgorithms.findIndex(
+					(item) => item.did === args[2]
+				);
+
+			if (indexToDelete !== -1) {
+				asset.services[0].compute.publisherTrustedAlgorithms.splice(
+					indexToDelete,
+					1
+				);
+			} else {
+				console.error(
+					" " +
+					args[2] +
+					".  is not allowed by the publisher to run on " +
+					args[1]
+				);
+				return;
+			}
 		}
+
 
 		const txid = await updateAssetMetadata(
 			this.signer,

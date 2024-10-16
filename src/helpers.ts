@@ -284,7 +284,8 @@ export async function createAssetV5(
 
 	const nftAddress = nftCreatedEvent.args.newTokenAddress;
 	const datatokenAddressAsset = tokenCreatedEvent.args.newTokenAddress;
-
+	assetUrl.datatokenAddress = datatokenAddressAsset;
+	assetUrl.nftAddress = nftAddress;
 	ddo.credentialSubject.services[0].files = await ProviderInstance.encrypt(
 		assetUrl,
 		chainId,
@@ -365,7 +366,7 @@ export async function updateAssetMetadata(
 	let flags;
 	let metadata;
 	const validateResult = await aquariusInstance.validate(updatedDdo);
-	const chainId = updatedDdo.credentialSubject ? updatedDdo.credentialSubject.chainId : updatedDdo.chainId
+	const chainId = (updatedDdo as any).credentialSubject ? (updatedDdo as any).credentialSubject.chainId : updatedDdo.chainId
 	if (encryptDDO) {
 		const providerResponse = await ProviderInstance.encrypt(
 			updatedDdo,
@@ -381,7 +382,7 @@ export async function updateAssetMetadata(
 		metadata = hexlify(bytes);
 		flags = 0
 	}
-	const nftAddress = updatedDdo.credentialSubject ? updatedDdo.credentialSubject.nftAddress : updatedDdo.nftAddress
+	const nftAddress = (updatedDdo as any).credentialSubject ? (updatedDdo as any).credentialSubject.nftAddress : updatedDdo.nftAddress
 	const updateDdoTX = await nft.setMetadata(
 		nftAddress,
 		await owner.getAddress(),
@@ -496,13 +497,13 @@ export async function createDatatokenAndPricing(
 	console.log('Creating datatoken...')
 
 	const { chainId } = await owner.provider.getNetwork();
-	if (ddo.credentialSubject.chainId !== chainId) throw new Error(`Connected to different chain ${chainId}`);
+	if ((ddo as any).credentialSubject.chainId !== chainId) throw new Error(`Connected to different chain ${chainId}`);
 
 	const nft = new Nft(owner, chainId);
 	const publisherAccount = await owner.getAddress()
 
 	const datatokenAddress = await nft.createDatatoken(
-		ddo.credentialSubject.nftAddress,
+		(ddo as any).credentialSubject.nftAddress,
 		publisherAccount,
 		publisherAccount,
 		publisherAccount,

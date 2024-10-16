@@ -39,7 +39,17 @@
         "datatokenAddress": "0x0",
         "nftAddress": "",
         "serviceEndpoint": "https://v4.provider.oceanprotocol.com",
-        "files": "https://dumps.wikimedia.org/enwiki/latest/enwiki-latest-abstract10.xml.gz-rss.xml",
+        "files": {
+          "datatokenAddress": "0x0",
+          "nftAddress": "0x0",
+          "files": [
+            {
+              "type": "url",
+              "url": "https://dumps.wikimedia.org/enwiki/latest/enwiki-latest-abstract10.xml.gz-rss.xml",
+              "method": "GET"
+            }
+          ]
+        },
         "timeout": 86400,
         "compute": {
           "allowRawAlgorithm": false,

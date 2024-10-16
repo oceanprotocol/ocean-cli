@@ -69,7 +69,7 @@ export class Commands {
 		});
 	}
 
-	isVerifiableCredential = (ddo: { type?: string[] | string }): boolean => {
+	isVerifiableCredential = (ddo: any): boolean => {
 		return ddo.type && Array.isArray(ddo.type) && ddo.type.includes('VerifiableCredential')
 	}
 
@@ -112,9 +112,9 @@ export class Commands {
 		signer: Signer,
 		encryptDDO: boolean
 	): Promise<string> {
-		const name = asset.credentialSubject.metadata.name;
-		const symbol = asset.credentialSubject.metadata.symbol;
-		const files = asset.credentialSubject.services[0].files;
+		const name = (asset as any).credentialSubject.metadata.name;
+		const symbol = (asset as any).credentialSubject.metadata.symbol;
+		const files = (asset as any).credentialSubject.services[0].files;
 
 		const urlAssetId = await createAssetV5(
 			name,
@@ -274,9 +274,9 @@ export class Commands {
 		let serviceEndpoint
 		let serviceId
 		if (this.isVerifiableCredential(dataDdo)) {
-			chainId = dataDdo.credentialSubject.chainId
-			serviceEndpoint = dataDdo.credentialSubject.services[0].serviceEndpoint
-			serviceId = dataDdo.credentialSubject.services[0].id
+			chainId = (dataDdo as any).credentialSubject.chainId
+			serviceEndpoint = (dataDdo as any).credentialSubject.services[0].serviceEndpoint
+			serviceId = (dataDdo as any).credentialSubject.services[0].id
 		} else {
 			chainId = dataDdo.chainId
 			serviceEndpoint = dataDdo.services[0].serviceEndpoint
@@ -315,6 +315,7 @@ export class Commands {
 			providerURI,
 			this.signer
 		);
+		console.log("urlDownloadUrl", urlDownloadUrl)
 		try {
 			const path = args[2] ? args[2] : '.';
 			const { filename } = await downloadFile(urlDownloadUrl, path);
@@ -558,8 +559,8 @@ export class Commands {
 		let assetOwner
 		let serviceType
 		if (this.isVerifiableCredential(asset)) {
-			assetOwner = asset.credentialSubject.nft.owner
-			serviceType = asset.credentialSubject.services[0].type
+			assetOwner = (asset as any).credentialSubject.nft.owner
+			serviceType = (asset as any).credentialSubject.services[0].type
 		} else {
 			assetOwner = asset.nft.owner
 			serviceType = asset.services[0].type
@@ -593,11 +594,11 @@ export class Commands {
 		let containerChecksum
 		try {
 			if (this.isVerifiableCredential(algoAsset)) {
-				serviceId = algoAsset.credentialSubject.services[0].id
-				serviceEndpoint = algoAsset.credentialSubject.services[0].serviceEndpoint
+				serviceId = (algoAsset as any).credentialSubject.services[0].id
+				serviceEndpoint = (algoAsset as any).credentialSubject.services[0].serviceEndpoint
 				containerChecksum =
-					algoAsset.credentialSubject.metadata.algorithm.container.entrypoint +
-					algoAsset.credentialSubject.metadata.algorithm.container.checksum;
+					(algoAsset as any).credentialSubject.metadata.algorithm.container.entrypoint +
+					(algoAsset as any).credentialSubject.metadata.algorithm.container.checksum;
 			} else {
 				serviceId = algoAsset.services[0].id
 				serviceEndpoint = algoAsset.services[0].serviceEndpoint
@@ -626,7 +627,7 @@ export class Commands {
 		if (this.isVerifiableCredential(asset)) {
 			asset.services[0].compute.publisherTrustedAlgorithms.push(trustedAlgorithm);
 		} else {
-			asset.credentialSubject.services[0].compute.publisherTrustedAlgorithms.push(trustedAlgorithm);
+			(asset as any).credentialSubject.services[0].compute.publisherTrustedAlgorithms.push(trustedAlgorithm);
 		}
 
 		try {
@@ -657,9 +658,9 @@ export class Commands {
 		let serviceType
 		let publisherTrustedAlgorithms
 		if (this.isVerifiableCredential(asset)) {
-			nftOwner = asset.credentialSubject.nft.owner
-			serviceType = asset.credentialSubject.services[0].type
-			publisherTrustedAlgorithms = asset.credentialSubject.services[0].compute.publisherTrustedAlgorithms
+			nftOwner = (asset as any).credentialSubject.nft.owner
+			serviceType = (asset as any).credentialSubject.services[0].type
+			publisherTrustedAlgorithms = (asset as any).credentialSubject.services[0].compute.publisherTrustedAlgorithms
 		} else {
 			nftOwner = asset.nft.owner
 			serviceType = asset.services[0].type
@@ -689,12 +690,12 @@ export class Commands {
 		const encryptDDO = args[3] === "false" ? false : true;
 		if (this.isVerifiableCredential(asset)) {
 			const indexToDelete =
-				asset.credentialSubject.services[0].compute.publisherTrustedAlgorithms.findIndex(
+				(asset as any).credentialSubject.services[0].compute.publisherTrustedAlgorithms.findIndex(
 					(item) => item.did === args[2]
 				);
 
 			if (indexToDelete !== -1) {
-				asset.credentialSubject.services[0].compute.publisherTrustedAlgorithms.splice(
+				(asset as any).credentialSubject.services[0].compute.publisherTrustedAlgorithms.splice(
 					indexToDelete,
 					1
 				);
@@ -853,14 +854,14 @@ export class Commands {
 		service.files.datatokenAddress = datatokenAddress;
 		service.datatokenAddress = datatokenAddress;
 		service.serviceEndpoint = this.providerUrl;
-		if (asset.credentialSubject) {
-			service.files.nftAddress = asset.credentialSubject.nftAddress;
+		if ((asset as any).credentialSubject) {
+			service.files.nftAddress = (asset as any).credentialSubject.nftAddress;
 			service.files = await ProviderInstance.encrypt(
 				service.files,
-				asset.credentialSubject.chainId,
+				(asset as any).credentialSubject.chainId,
 				this.providerUrl
 			);
-			asset.credentialSubject.services.push(service)
+			(asset as any).credentialSubject.services.push(service)
 		} else {
 			service.files.nftAddress = asset.nftAddress;
 			service.files = await ProviderInstance.encrypt(

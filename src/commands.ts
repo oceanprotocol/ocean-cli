@@ -112,8 +112,8 @@ export class Commands {
 		signer: Signer,
 		encryptDDO: boolean
 	): Promise<string> {
-		const name = (asset as any).credentialSubject.metadata.name;
-		const symbol = (asset as any).credentialSubject.metadata.symbol;
+		const name = (asset as any).credentialSubject.nft.name;
+		const symbol = (asset as any).credentialSubject.nft.symbol;
 		const files = (asset as any).credentialSubject.services[0].files;
 
 		const urlAssetId = await createAssetV5(
@@ -270,14 +270,17 @@ export class Commands {
 			);
 			return;
 		}
-		let chainId
-		let serviceEndpoint
-		let serviceId
+		let chainId: number
+		let serviceEndpoint: string
+		let serviceId: string
+		let did: string
 		if (this.isVerifiableCredential(dataDdo)) {
+			did = (dataDdo as any).credentialSubject.id
 			chainId = (dataDdo as any).credentialSubject.chainId
 			serviceEndpoint = (dataDdo as any).credentialSubject.services[0].serviceEndpoint
 			serviceId = (dataDdo as any).credentialSubject.services[0].id
 		} else {
+			did = dataDdo.id
 			chainId = dataDdo.chainId
 			serviceEndpoint = dataDdo.services[0].serviceEndpoint
 			serviceId = dataDdo.services[0].id
@@ -308,7 +311,7 @@ export class Commands {
 		const orderTx = await tx.wait();
 
 		const urlDownloadUrl = await ProviderInstance.getDownloadUrl(
-			dataDdo.id,
+			did,
 			serviceId,
 			0,
 			orderTx.transactionHash,

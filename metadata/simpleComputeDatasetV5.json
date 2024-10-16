@@ -1,13 +1,13 @@
 {
   "@context": ["https://w3id.org/did/v1"],
-  "id": "",
   "version": "5.0.0",
   "credentialSubject": {
+    "id": "",
     "metadata": {
       "created": "2021-12-20T14:35:20Z",
       "updated": "2021-12-20T14:35:20Z",
       "type": "dataset",
-      "name": "cli fixed asset",
+      "name": "CLi fixed asset",
       "description": {
         "@value": "New asset published using ocean CLI tool with version 5.0.0",
         "@language": "en",
@@ -15,6 +15,8 @@
       },
       "tags": ["test"],
       "author": "oceanprotocol",
+      "providedBy": "oceanprotocol",
+      "copyrightHolder": "copirightHolder",
       "license": "https://market.oceanprotocol.com/terms",
       "additionalInformation": {
         "termsAndConditions": true
@@ -24,6 +26,7 @@
       {
         "id": "ccb398c50d6abd5b456e8d7242bd856a1767a890b537c2f8c10ba8b8a10e6025",
         "type": "compute",
+        "name": "service 1",
         "files": {
           "datatokenAddress": "0x0",
           "nftAddress": "0x0",
@@ -42,18 +45,12 @@
           "allowRawAlgorithm": false,
           "allowNetworkAccess": true,
           "publisherTrustedAlgorithmPublishers": [],
-          "publisherTrustedAlgorithms": [
-            {
-              "did": "did:op:e6708f459239520c870243727331703488c75f416a20a62dba57d7969399b032",
-              "filesChecksum": "sha256:1155995dda741e93afe4b1c6ced2d01734a6ec69865cc0997daf1f4db7259a36",
-              "containerSectionChecksum": ""
-            }
-          ]
+          "publisherTrustedAlgorithms": []
         },
-        "credentials": []
+        "credentials": [],
+        "state": 0
       }
     ],
-    "event": {},
     "nft": {
       "address": "",
       "name": "Ocean Data NFT",
@@ -79,6 +76,5 @@
     "nftAddress": ""
   },
   "issuer": "did:op:issuer-did",
-  "type": ["VerifiableCredential"],
-  "additionalDdos": []
+  "type": ["VerifiableCredential"]
 }

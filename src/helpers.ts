@@ -298,7 +298,7 @@ export async function createAssetV5(
 
 	ddo.credentialSubject.nftAddress = nftAddress;
 
-	ddo.id = "did:op:" + SHA256(ethers.utils.getAddress(nftAddress) + chainId.toString(10));
+	ddo.credentialSubject.id = "did:op:" + SHA256(ethers.utils.getAddress(nftAddress) + chainId.toString(10));
 
 	let metadataIPFS: string
 	let flags: number
@@ -351,7 +351,7 @@ export async function createAssetV5(
 		throw new Error(error)
 	}
 
-	return ddo.id;
+	return ddo.credentialSubject.id;
 }
 
 export async function updateAssetMetadata(

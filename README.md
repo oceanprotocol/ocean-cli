@@ -57,13 +57,19 @@ export MNEMONIC="XXXX"
 export RPC='XXXX'
 ```
 
-- Optional set metadataCache URL if you want to use a custom Aquarius version instead of the default one.
+- Set an Ocean Node URL
+
+```
+export NODE_URL='XXXX'
+```
+
+- Optional set metadataCache URL if you want to use a custom Aquarius version instead of the default one. This will not be used if you have set an Ocean Node url.
 
 ```
 export AQUARIUS_URL='XXXX'
 ```
 
-- Optional set Provider URL if you want to use a custom Provider version instead of the default one.
+- Optional set Provider URL if you want to use a custom Provider version instead of the default one. This will not be used if you have set an Ocean Node url.
 
 ```
 export PROVIDER_URL='XXXX'

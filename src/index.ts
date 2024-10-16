@@ -72,6 +72,9 @@ async function start() {
 	const commands = new Commands(signer, chainId);
 	const myArgs = process.argv.slice(2);
 	switch (myArgs[0]) {
+		case "start":
+			await commands.start()
+			break
 		case "getDDO":
 			await commands.getDDO(myArgs);
 			break;

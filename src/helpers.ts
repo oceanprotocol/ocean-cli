@@ -4,8 +4,9 @@ import fetch from "cross-fetch";
 import { promises as fs } from "fs";
 import { createHash } from "crypto";
 import * as path from "path";
-
+import * as sapphire from '@oasisprotocol/sapphire-paratime';
 import {
+	AccesslistFactory,
 	Aquarius,
 	DatatokenCreateParams,
 	Nft,
@@ -28,6 +29,7 @@ import {
 	ProviderFees,
 	ComputeAlgorithm,
 	LoggerInstance,
+	Datatoken4 
 } from "@oceanprotocol/lib";
 import { hexlify } from "ethers/lib/utils";
 
@@ -74,24 +76,45 @@ export async function createAsset(
 	providerUrl: string,
 	config: Config,
 	aquariusInstance: Aquarius,
+	templateIndex: number = 1,
 	macOsProviderUrl?: string,
-	encryptDDO: boolean = true
+	encryptDDO: boolean = true,
 ) {
 	const { chainId } = await owner.provider.getNetwork();
 	const nft = new Nft(owner, chainId);
 	const nftFactory = new NftFactory(config.nftFactoryAddress, owner);
 
+	let wrappedSigner
+	let allowListAddress
+	if(templateIndex === 4){
+		// Wrap the signer for Sapphire
+		wrappedSigner = sapphire.wrap(owner);
+
+		// Create Access List Factory
+		const accessListFactory = new AccesslistFactory(config.accessListFactory, wrappedSigner, chainId);
+
+		// Create Allow List
+		allowListAddress = await accessListFactory.deployAccessListContract(
+			'AllowList',
+			'ALLOW',
+			['https://oceanprotocol.com/nft/'],
+			false,
+			await owner.getAddress(),
+			[await owner.getAddress(), ZERO_ADDRESS]
+		);
+	}
+
 	ddo.chainId = parseInt(chainId.toString(10));
 	const nftParamsAsset: NftCreateData = {
 		name,
 		symbol,
-		templateIndex: 1,
+		templateIndex,
 		tokenURI: "aaa",
 		transferable: true,
 		owner: await owner.getAddress(),
 	};
 	const datatokenParams: DatatokenCreateParams = {
-		templateIndex: 1,
+		templateIndex,
 		cap: "100000",
 		feeAmount: "0",
 		paymentCollector: await owner.getAddress(),
@@ -101,12 +124,12 @@ export async function createAsset(
 	};
 
 	let bundleNFT;
-	if (!ddo.stats.price.value) {
+	if (!ddo.stats?.price?.value) {
 		bundleNFT = await nftFactory.createNftWithDatatoken(
 			nftParamsAsset,
 			datatokenParams
 		);
-	} else if (ddo.stats.price.value === "0") {
+	} else if (ddo?.stats?.price?.value === "0") {
 		const dispenserParams: DispenserCreationParams = {
 			dispenserAddress: config.dispenserAddress,
 			maxTokens: "1",
@@ -151,7 +174,7 @@ export async function createAsset(
 	// create the files encrypted string
 	assetUrl.datatokenAddress = datatokenAddressAsset;
 	assetUrl.nftAddress = nftAddress;
-	ddo.services[0].files = await ProviderInstance.encrypt(
+	ddo.services[0].files = templateIndex === 4 ? '' : await ProviderInstance.encrypt(
 		assetUrl,
 		chainId,
 		macOsProviderUrl || providerUrl
@@ -194,8 +217,29 @@ export async function createAsset(
 		metadata,
 		metadataHash
 	);
+
+	   if(templateIndex === 4){ // Use Datatoken4 for file object
+		const datatoken = new Datatoken4(
+			wrappedSigner,
+			ethers.utils.toUtf8Bytes(JSON.stringify(assetUrl.files)),
+			chainId,
+			config
+		);
+	
+		// Set file object
+		await datatoken.setFileObject(datatokenAddressAsset, await wrappedSigner.getAddress());
+	
+		// Set allow list for the datatoken
+		await datatoken.setAllowListContract(
+			datatokenAddressAsset,
+			allowListAddress,
+			await wrappedSigner.getAddress()
+		);}
+
 	return ddo.id;
 }
+
+
 
 export async function updateAssetMetadata(
 	owner: Signer,

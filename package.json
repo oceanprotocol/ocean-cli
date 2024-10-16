@@ -43,11 +43,13 @@
   },
   "dependencies": {
     "@oceanprotocol/contracts": "^2.0.4",
-    "@oceanprotocol/lib": "^3.3.3",
+    "@oceanprotocol/lib": "^3.4.1",
     "cross-fetch": "^3.1.5",
     "crypto-js": "^4.1.1",
     "decimal.js": "^10.4.1",
+    "enquirer": "^2.4.1",
     "ethers": "^5.7.2",
+    "figlet": "^1.7.0",
     "ts-node": "^10.9.1"
   }
 }

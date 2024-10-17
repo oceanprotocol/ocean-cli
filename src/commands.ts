@@ -9,6 +9,7 @@ import {
 	isOrderable,
 	createAssetV5,
 	createDatatokenAndPricing,
+	isVerifiableCredential,
 } from "./helpers";
 import {
 	Aquarius,
@@ -68,11 +69,6 @@ export class Commands {
 			setTimeout(resolve, ms);
 		});
 	}
-
-	isVerifiableCredential = (ddo: any): boolean => {
-		return ddo.type && Array.isArray(ddo.type) && ddo.type.includes('VerifiableCredential')
-	}
-
 
 	// commands
 	public async publishV4(args: string[]) {
@@ -163,7 +159,7 @@ export class Commands {
 
 	public async publish(args: string[]) {
 		const asset = JSON.parse(fs.readFileSync(args[1], "utf8"));
-		if (this.isVerifiableCredential(asset)) {
+		if (isVerifiableCredential(asset)) {
 			await this.publishV5(args)
 		} else {
 			await this.publishV4(args)
@@ -182,7 +178,7 @@ export class Commands {
 		const encryptDDO = args[2] === "false" ? false : true;
 		// add some more checks
 		let algoDid
-		if (this.isVerifiableCredential(algoAsset)) {
+		if (isVerifiableCredential(algoAsset)) {
 			console.log("verifiable")
 			algoDid = await createAssetV5(
 				algoAsset.credentialSubject.nft.name,
@@ -274,7 +270,7 @@ export class Commands {
 		let serviceEndpoint: string
 		let serviceId: string
 		let did: string
-		if (this.isVerifiableCredential(dataDdo)) {
+		if (isVerifiableCredential(dataDdo)) {
 			did = (dataDdo as any).credentialSubject.id
 			chainId = (dataDdo as any).credentialSubject.chainId
 			serviceEndpoint = (dataDdo as any).credentialSubject.services[0].serviceEndpoint
@@ -361,10 +357,20 @@ export class Commands {
 			console.error("Not all the data ddos are available.");
 			return;
 		}
+
+		let chainId
+		let serviceEndpoint
+		if (isVerifiableCredential(ddos[0])) {
+			chainId = (ddos[0] as any).credentialSubject.chainId
+			serviceEndpoint = (ddos[0] as any).credentialSubject.services[0].serviceEndpoint
+		} else {
+			chainId = ddos[0].chainId
+			serviceEndpoint = ddos[0].services[0].serviceEndpoint
+		}
 		const providerURI =
-			this.macOsProviderUrl && ddos[0].chainId === 8996
+			this.macOsProviderUrl && chainId === 8996
 				? this.macOsProviderUrl
-				: ddos[0].services[0].serviceEndpoint;
+				: serviceEndpoint;
 
 		const algoDdo = await this.aquarius.waitForAqua(args[2]);
 		if (!algoDdo) {
@@ -389,7 +395,22 @@ export class Commands {
 		const computeValidUntil = Math.floor(mytime.getTime() / 1000);
 
 		const computeEnvID = args[3];
-		const chainComputeEnvs = computeEnvs[algoDdo.chainId];
+		let algoChainId
+		let algoId
+		let algoServiceId
+		let algoMetadataAlgoritm
+		if (isVerifiableCredential(algoDdo)) {
+			algoChainId = algoDdo.credentialSubject.chainId
+			algoId = algoDdo.credentialSubject.id
+			algoServiceId = algoDdo.credentialSubject.services[0].id
+			algoMetadataAlgoritm = algoDdo.credentialSubject.metadata.algoritm
+		} else {
+			algoChainId = algoDdo.chainId
+			algoId = algoDdo.id
+			algoServiceId = algoDdo.services[0].id
+			algoMetadataAlgoritm = algoDdo.metadata.algoritm
+		}
+		const chainComputeEnvs = computeEnvs[algoChainId];
 		let computeEnv = chainComputeEnvs[0];
 
 		if (computeEnvID && computeEnvID.length > 1) {
@@ -402,16 +423,25 @@ export class Commands {
 		}
 
 		const algo: ComputeAlgorithm = {
-			documentId: algoDdo.id,
-			serviceId: algoDdo.services[0].id,
-			meta: algoDdo.metadata.algorithm
+			documentId: algoId,
+			serviceId: algoServiceId,
+			meta: algoMetadataAlgoritm
 		};
 
 		const assets = [];
 		for (const dataDdo in ddos) {
+			let serviceId
+			let id
+			if (isVerifiableCredential(ddos[dataDdo])) {
+				serviceId = ddos[dataDdo].credentialSubject.services[0].id
+				id = ddos[dataDdo].credentialSubject.id
+			} else {
+				serviceId = ddos[dataDdo].services[0].id
+				id = ddos[dataDdo].id
+			}
 			const canStartCompute = isOrderable(
 				ddos[dataDdo],
-				ddos[dataDdo].services[0].id,
+				serviceId,
 				algo,
 				algoDdo
 			);
@@ -422,8 +452,8 @@ export class Commands {
 				return;
 			}
 			assets.push({
-				documentId: ddos[dataDdo].id,
-				serviceId: ddos[dataDdo].services[0].id,
+				documentId: id,
+				serviceId: serviceId,
 			});
 		}
 
@@ -561,7 +591,7 @@ export class Commands {
 		}
 		let assetOwner
 		let serviceType
-		if (this.isVerifiableCredential(asset)) {
+		if (isVerifiableCredential(asset)) {
 			assetOwner = (asset as any).credentialSubject.nft.owner
 			serviceType = (asset as any).credentialSubject.services[0].type
 		} else {
@@ -591,18 +621,21 @@ export class Commands {
 			return;
 		}
 		const encryptDDO = args[3] === "false" ? false : true;
-		let filesChecksum;
+		let filesChecksum
 		let serviceId
 		let serviceEndpoint
 		let containerChecksum
+		let did
 		try {
-			if (this.isVerifiableCredential(algoAsset)) {
+			if (isVerifiableCredential(algoAsset)) {
+				did = (algoAsset as any).credentialSubject.id
 				serviceId = (algoAsset as any).credentialSubject.services[0].id
 				serviceEndpoint = (algoAsset as any).credentialSubject.services[0].serviceEndpoint
 				containerChecksum =
 					(algoAsset as any).credentialSubject.metadata.algorithm.container.entrypoint +
 					(algoAsset as any).credentialSubject.metadata.algorithm.container.checksum;
 			} else {
+				did = algoAsset.id
 				serviceId = algoAsset.services[0].id
 				serviceEndpoint = algoAsset.services[0].serviceEndpoint
 				containerChecksum =
@@ -610,7 +643,7 @@ export class Commands {
 					algoAsset.metadata.algorithm.container.checksum;
 			}
 			filesChecksum = await ProviderInstance.checkDidFiles(
-				algoAsset.id,
+				did,
 				serviceId,
 				serviceEndpoint,
 				true
@@ -623,11 +656,11 @@ export class Commands {
 
 
 		const trustedAlgorithm = {
-			did: algoAsset.id,
+			did: did,
 			containerSectionChecksum: getHash(containerChecksum),
 			filesChecksum: filesChecksum?.[0]?.checksum,
 		};
-		if (this.isVerifiableCredential(asset)) {
+		if (isVerifiableCredential(asset)) {
 			asset.services[0].compute.publisherTrustedAlgorithms.push(trustedAlgorithm);
 		} else {
 			(asset as any).credentialSubject.services[0].compute.publisherTrustedAlgorithms.push(trustedAlgorithm);
@@ -660,7 +693,7 @@ export class Commands {
 		let nftOwner
 		let serviceType
 		let publisherTrustedAlgorithms
-		if (this.isVerifiableCredential(asset)) {
+		if (isVerifiableCredential(asset)) {
 			nftOwner = (asset as any).credentialSubject.nft.owner
 			serviceType = (asset as any).credentialSubject.services[0].type
 			publisherTrustedAlgorithms = (asset as any).credentialSubject.services[0].compute.publisherTrustedAlgorithms
@@ -691,7 +724,7 @@ export class Commands {
 			return;
 		}
 		const encryptDDO = args[3] === "false" ? false : true;
-		if (this.isVerifiableCredential(asset)) {
+		if (isVerifiableCredential(asset)) {
 			const indexToDelete =
 				(asset as any).credentialSubject.services[0].compute.publisherTrustedAlgorithms.findIndex(
 					(item) => item.did === args[2]

@@ -33,6 +33,10 @@ import {
 import { hexlify } from "ethers/lib/utils";
 import { uploadToIPFS } from "./ipfs";
 
+export const isVerifiableCredential = (ddo: any): boolean => {
+	return ddo.type && Array.isArray(ddo.type) && ddo.type.includes('VerifiableCredential')
+}
+
 export async function downloadFile(
 	url: string,
 	downloadPath: string,
@@ -366,7 +370,15 @@ export async function updateAssetMetadata(
 	let flags;
 	let metadata;
 	const validateResult = await aquariusInstance.validate(updatedDdo);
-	const chainId = (updatedDdo as any).credentialSubject ? (updatedDdo as any).credentialSubject.chainId : updatedDdo.chainId
+	let chainId
+	let nftAddress
+	if (isVerifiableCredential(updatedDdo)) {
+		chainId = (updatedDdo as any).credentialSubject.chainId
+		nftAddress = (updatedDdo as any).credentialSubject.nftAddress
+	} else {
+		chainId = updatedDdo.chainId
+		nftAddress = updatedDdo.nftAddress
+	}
 	if (encryptDDO) {
 		const providerResponse = await ProviderInstance.encrypt(
 			updatedDdo,
@@ -382,7 +394,6 @@ export async function updateAssetMetadata(
 		metadata = hexlify(bytes);
 		flags = 0
 	}
-	const nftAddress = (updatedDdo as any).credentialSubject ? (updatedDdo as any).credentialSubject.nftAddress : updatedDdo.nftAddress
 	const updateDdoTX = await nft.setMetadata(
 		nftAddress,
 		await owner.getAddress(),
@@ -413,20 +424,29 @@ export async function handleComputeOrder(
 			 - have validOrder and providerFees -> then order is valid but providerFees are not valid, we need to call reuseOrder and pay only providerFees
 			 - no validOrder -> we need to call startOrder, to pay 1 DT & providerFees
 		*/
+	let dataTokenAddress
+	let assetId
+	if (isVerifiableCredential(asset)) {
+		dataTokenAddress = asset.credentialSubject.services[0].datatokenAddress
+		assetId = asset.credentialSubject.id
+	} else {
+		dataTokenAddress = asset.services[0].datatokenAddress
+		assetId = asset.id
+	}
 	if (order.providerFee && order.providerFee.providerFeeAmount) {
 		await approveWei(
 			payerAccount,
 			config,
 			await payerAccount.getAddress(),
 			order.providerFee.providerFeeToken,
-			asset.services[0].datatokenAddress,
+			dataTokenAddress,
 			order.providerFee.providerFeeAmount
 		);
 	}
 	if (order.validOrder) {
 		if (!order.providerFee) return order.validOrder;
 		const tx = await datatoken.reuseOrder(
-			asset.services[0].datatokenAddress,
+			dataTokenAddress,
 			order.validOrder,
 			order.providerFee
 		);
@@ -434,7 +454,7 @@ export async function handleComputeOrder(
 		const orderReusedTx = getEventFromTx(reusedTx, "OrderReused");
 		return orderReusedTx.transactionHash;
 	}
-	console.log("Ordering asset with DID: ", asset.id);
+	console.log("Ordering asset with DID: ", assetId);
 	const txStartOrder = await orderAsset(
 		asset,
 		payerAccount,
@@ -460,7 +480,13 @@ export async function isOrderable(
 	algorithm: ComputeAlgorithm,
 	algorithmDDO: Asset | DDO
 ): Promise<boolean> {
-	const datasetService = asset.services.find((s) => s.id === serviceId);
+	let datasetService
+	if (isVerifiableCredential(asset)) {
+		datasetService = (asset as any).credentialSubject.services.find((s) => s.id === serviceId);
+	} else {
+		datasetService = asset.services.find((s) => s.id === serviceId);
+	}
+
 	if (!datasetService) return false;
 
 	if (datasetService.type === "compute") {
@@ -497,13 +523,22 @@ export async function createDatatokenAndPricing(
 	console.log('Creating datatoken...')
 
 	const { chainId } = await owner.provider.getNetwork();
-	if ((ddo as any).credentialSubject.chainId !== chainId) throw new Error(`Connected to different chain ${chainId}`);
+	let ddoChainId
+	let nftAddress
+	if (isVerifiableCredential(ddo)) {
+		ddoChainId = (ddo as any).credentialSubject.chainId
+		nftAddress = (ddo as any).credentialSubject.nftAddress
+	} else {
+		ddoChainId = ddo.chainId
+		nftAddress = ddo.nftAddress
+	}
+	if (ddoChainId !== chainId) throw new Error(`Connected to different chain ${chainId}`);
 
 	const nft = new Nft(owner, chainId);
 	const publisherAccount = await owner.getAddress()
 
 	const datatokenAddress = await nft.createDatatoken(
-		(ddo as any).credentialSubject.nftAddress,
+		nftAddress,
 		publisherAccount,
 		publisherAccount,
 		publisherAccount,

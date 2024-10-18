@@ -85,6 +85,7 @@ export async function createAsset(
 ) {
 	const { chainId } = await owner.provider.getNetwork();
 	const nft = new Nft(owner, chainId);
+	console.log("config.nftfac", config.nftFactoryAddress)
 	const nftFactory = new NftFactory(config.nftFactoryAddress, owner);
 
 	ddo.chainId = parseInt(chainId.toString(10));
@@ -244,12 +245,12 @@ export async function createAssetV5(
 	};
 
 	let bundleNFT;
-	if (!ddo.credentialSubject.stats.price.value) {
+	if (!ddo.stats.price.value) {
 		bundleNFT = await nftFactory.createNftWithDatatoken(
 			nftParamsAsset,
 			datatokenParams
 		);
-	} else if (ddo.credentialSubject.stats.price.value === "0") {
+	} else if (ddo.stats.price.value === "0") {
 		const dispenserParams: DispenserCreationParams = {
 			dispenserAddress: config.dispenserAddress,
 			maxTokens: "1",
@@ -270,7 +271,7 @@ export async function createAssetV5(
 			marketFeeCollector: await owner.getAddress(),
 			baseTokenDecimals: 18,
 			datatokenDecimals: 18,
-			fixedRate: ddo.credentialSubject.stats.price.value,
+			fixedRate: ddo.stats.price.value,
 			marketFee: "0",
 			allowedConsumer: await owner.getAddress(),
 			withMint: true,

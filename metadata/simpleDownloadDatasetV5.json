@@ -58,26 +58,26 @@
         "credentials": []
       }
     ],
-    "nft": {
-      "address": "",
-      "name": "Ocean Data NFT",
-      "symbol": "OCEAN-NFT",
-      "state": 5,
-      "tokenURI": "",
-      "owner": "",
-      "created": ""
-    },
     "credentials": [],
     "chainId": 8996,
-    "nftAddress": "",
-    "stats": {
-      "allocated": 0,
-      "orders": 0,
-      "price": {
-        "value": "0"
-      }
-    }
+    "nftAddress": ""
   },
   "issuer": "did:op:issuer-did",
-  "type": ["VerifiableCredential"]
+  "type": ["VerifiableCredential"],
+  "nft": {
+    "address": "",
+    "name": "Ocean Data NFT",
+    "symbol": "OCEAN-NFT",
+    "state": 5,
+    "tokenURI": "",
+    "owner": "",
+    "created": ""
+  },
+  "stats": {
+    "allocated": 0,
+    "orders": 0,
+    "price": {
+      "value": "0"
+    }
+  }
 }

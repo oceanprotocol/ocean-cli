@@ -64,25 +64,25 @@
       }
     ],
     "credentials": [],
-    "nftAddress": "",
-    "stats": {
-      "allocated": 0,
-      "orders": 0,
-      "price": {
-        "value": "0"
-      }
-    },
-    "nft": {
-      "address": "",
-      "name": "Ocean Data NFT",
-      "symbol": "OCEAN-NFT",
-      "state": 5,
-      "tokenURI": "",
-      "owner": "",
-      "created": ""
-    }
+    "nftAddress": ""
   },
   "issuer": "did:op:issuer-did",
   "type": ["VerifiableCredential"],
-  "additionalDdos": []
+  "additionalDdos": [],
+  "stats": {
+    "allocated": 0,
+    "orders": 0,
+    "price": {
+      "value": "0"
+    }
+  },
+  "nft": {
+    "address": "",
+    "name": "Ocean Data NFT",
+    "symbol": "OCEAN-NFT",
+    "state": 5,
+    "tokenURI": "",
+    "owner": "",
+    "created": ""
+  }
 }

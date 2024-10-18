@@ -108,8 +108,8 @@ export class Commands {
 		signer: Signer,
 		encryptDDO: boolean
 	): Promise<string> {
-		const name = (asset as any).credentialSubject.nft.name;
-		const symbol = (asset as any).credentialSubject.nft.symbol;
+		const name = asset.nft.name;
+		const symbol = asset.nft.symbol;
 		const files = (asset as any).credentialSubject.services[0].files;
 
 		const urlAssetId = await createAssetV5(
@@ -181,8 +181,8 @@ export class Commands {
 		if (isVerifiableCredential(algoAsset)) {
 			console.log("verifiable")
 			algoDid = await createAssetV5(
-				algoAsset.credentialSubject.nft.name,
-				algoAsset.credentialSubject.nft.symbol,
+				algoAsset.nft.name,
+				algoAsset.nft.symbol,
 				this.signer,
 				algoAsset.credentialSubject.services[0].files,
 				algoAsset,
@@ -589,13 +589,11 @@ export class Commands {
 			);
 			return;
 		}
-		let assetOwner
+		const assetOwner = asset.nft.owner
 		let serviceType
 		if (isVerifiableCredential(asset)) {
-			assetOwner = (asset as any).credentialSubject.nft.owner
 			serviceType = (asset as any).credentialSubject.services[0].type
 		} else {
-			assetOwner = asset.nft.owner
 			serviceType = asset.services[0].type
 		}
 		if (assetOwner !== (await this.signer.getAddress())) {
@@ -690,15 +688,13 @@ export class Commands {
 			);
 			return;
 		}
-		let nftOwner
+		const nftOwner = asset.nft.owner
 		let serviceType
 		let publisherTrustedAlgorithms
 		if (isVerifiableCredential(asset)) {
-			nftOwner = (asset as any).credentialSubject.nft.owner
 			serviceType = (asset as any).credentialSubject.services[0].type
 			publisherTrustedAlgorithms = (asset as any).credentialSubject.services[0].compute.publisherTrustedAlgorithms
 		} else {
-			nftOwner = asset.nft.owner
 			serviceType = asset.services[0].type
 			publisherTrustedAlgorithms = asset.services[0].compute.publisherTrustedAlgorithms
 

@@ -400,15 +400,15 @@ export class Commands {
 		let algoServiceId
 		let algoMetadataAlgoritm
 		if (isVerifiableCredential(algoDdo)) {
-			algoChainId = algoDdo.credentialSubject.chainId
-			algoId = algoDdo.credentialSubject.id
-			algoServiceId = algoDdo.credentialSubject.services[0].id
-			algoMetadataAlgoritm = algoDdo.credentialSubject.metadata.algoritm
+			algoChainId = (algoDdo as any).credentialSubject.chainId
+			algoId = (algoDdo as any).credentialSubject.id
+			algoServiceId = (algoDdo as any).credentialSubject.services[0].id
+			algoMetadataAlgoritm = (algoDdo as any).credentialSubject.metadata.algorithm
 		} else {
 			algoChainId = algoDdo.chainId
 			algoId = algoDdo.id
 			algoServiceId = algoDdo.services[0].id
-			algoMetadataAlgoritm = algoDdo.metadata.algoritm
+			algoMetadataAlgoritm = algoDdo.metadata.algorithm
 		}
 		const chainComputeEnvs = computeEnvs[algoChainId];
 		let computeEnv = chainComputeEnvs[0];

@@ -428,8 +428,8 @@ export async function handleComputeOrder(
 	let dataTokenAddress
 	let assetId
 	if (isVerifiableCredential(asset)) {
-		dataTokenAddress = asset.credentialSubject.services[0].datatokenAddress
-		assetId = asset.credentialSubject.id
+		dataTokenAddress = (asset as any).credentialSubject.services[0].datatokenAddress
+		assetId = (asset as any).credentialSubject.id
 	} else {
 		dataTokenAddress = asset.services[0].datatokenAddress
 		assetId = asset.id

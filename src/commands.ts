@@ -71,17 +71,8 @@ export class Commands {
 	}
 
 	// commands
-	public async publishV4(args: string[]) {
+	public async publishV4(asset: Asset, encryptDDO: boolean) {
 		console.log("start publishing v4");
-		let asset: Asset;
-		try {
-			asset = JSON.parse(fs.readFileSync(args[1], "utf8"));
-		} catch (e) {
-			console.error("Cannot read metadata from " + args[1]);
-			console.error(e);
-			return;
-		}
-		const encryptDDO = args[2] === "false" ? false : true;
 		try {
 			const urlAssetId = await createAsset(
 				asset.nft.name,
@@ -97,15 +88,13 @@ export class Commands {
 			);
 			console.log("Asset published. ID:  " + urlAssetId);
 		} catch (e) {
-			console.error("Error when publishing dataset from file: " + args[1]);
 			console.error(e);
 			return;
 		}
 	}
 
-	private async publishAssetV5(
+	private async publishV5(
 		asset: Asset,
-		signer: Signer,
 		encryptDDO: boolean
 	): Promise<string> {
 		const name = asset.nft.name;
@@ -115,7 +104,7 @@ export class Commands {
 		const urlAssetId = await createAssetV5(
 			name,
 			symbol,
-			signer,
+			this.signer,
 			files,
 			asset,
 			this.providerUrl,
@@ -128,9 +117,7 @@ export class Commands {
 		return urlAssetId;
 	}
 
-	public async publishV5(args: string[]) {
-		console.log("start publishing version 5");
-
+	public async publish(args: string[]) {
 		let asset: Asset;
 		try {
 			asset = JSON.parse(fs.readFileSync(args[1], "utf8"));
@@ -139,30 +126,20 @@ export class Commands {
 			console.error(e);
 			return;
 		}
-
 		const encryptDDO = args[2] === "false" ? false : true;
-
-
-		try {
-			const urlAssetId = await this.publishAssetV5(
-				asset,
-				this.signer,
-				encryptDDO
-			);
-			console.log("Version 5.0.0 Asset published. ID:", urlAssetId);
-		} catch (e) {
-			console.error("Error when publishing dataset from file:", args[1]);
-			console.error(e);
-			return;
-		}
-	}
-
-	public async publish(args: string[]) {
-		const asset = JSON.parse(fs.readFileSync(args[1], "utf8"));
+		// const assetDDO = DDOFactory.createDDO(assetData);
+		// if (assetDDO instanceof VerifiableCredential) {
+		// 	await this.publishV5(args, asset);
+		// } else if (assetDDO instanceof DDO_V4) {
+		// 	await this.publishV4(args, asset);
+		// } else {
+		// 	console.error("Unsupported asset type");
+		// 	return;
+		// }
 		if (isVerifiableCredential(asset)) {
-			await this.publishV5(args)
+			await this.publishV5(asset, encryptDDO)
 		} else {
-			await this.publishV4(args)
+			await this.publishV4(asset, encryptDDO)
 		}
 	}
 
@@ -322,6 +299,7 @@ export class Commands {
 		} catch (e) {
 			console.log(`Download url dataset failed: ${e}`);
 		}
+		return
 	}
 
 	public async computeStart(args: string[]) {

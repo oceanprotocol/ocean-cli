@@ -18,7 +18,6 @@ import {
 	ConsumeMarketFee,
 	Datatoken,
 	Config,
-	DDO,
 	orderAsset,
 	getEventFromTx,
 	DispenserCreationParams,
@@ -361,7 +360,7 @@ export async function createAssetV5(
 
 export async function updateAssetMetadata(
 	owner: Signer,
-	updatedDdo: DDO,
+	updatedDdo: Asset,
 	providerUrl: string,
 	aquariusInstance: Aquarius,
 	macOsProviderUrl?: string,
@@ -476,10 +475,10 @@ export async function handleComputeOrder(
 }
 
 export async function isOrderable(
-	asset: Asset | DDO,
+	asset: Asset,
 	serviceId: string,
 	algorithm: ComputeAlgorithm,
-	algorithmDDO: Asset | DDO
+	algorithmDDO: Asset
 ): Promise<boolean> {
 	let datasetService
 	if (isVerifiableCredential(asset)) {

@@ -2,7 +2,6 @@ import fs from "fs";
 import os from "os";
 import util from "util";
 import {
-	createAsset,
 	handleComputeOrder,
 	updateAssetMetadata,
 	downloadFile,
@@ -10,6 +9,7 @@ import {
 	createAssetV5,
 	createDatatokenAndPricing,
 	isVerifiableCredential,
+	createAssetV4,
 } from "./helpers";
 import {
 	Aquarius,
@@ -26,6 +26,7 @@ import {
 	sendTx,
 } from "@oceanprotocol/lib";
 import { Signer, ethers } from "ethers";
+import { DDOVersion } from "./ddoVersions";
 
 export class Commands {
 	public signer: Signer;
@@ -71,52 +72,6 @@ export class Commands {
 	}
 
 	// commands
-	public async publishV4(asset: Asset, encryptDDO: boolean) {
-		console.log("start publishing v4");
-		try {
-			const urlAssetId = await createAsset(
-				asset.nft.name,
-				asset.nft.symbol,
-				this.signer,
-				asset.services[0].files,
-				asset,
-				this.providerUrl,
-				this.config,
-				this.aquarius,
-				this.macOsProviderUrl,
-				encryptDDO
-			);
-			console.log("Asset published. ID:  " + urlAssetId);
-		} catch (e) {
-			console.error(e);
-			return;
-		}
-	}
-
-	private async publishV5(
-		asset: Asset,
-		encryptDDO: boolean
-	): Promise<string> {
-		const name = asset.nft.name;
-		const symbol = asset.nft.symbol;
-		const files = (asset as any).credentialSubject.services[0].files;
-
-		const urlAssetId = await createAssetV5(
-			name,
-			symbol,
-			this.signer,
-			files,
-			asset,
-			this.providerUrl,
-			this.config,
-			this.aquarius,
-			this.macOsProviderUrl,
-			encryptDDO
-		);
-
-		return urlAssetId;
-	}
-
 	public async publish(args: string[]) {
 		let asset: Asset;
 		try {
@@ -127,19 +82,42 @@ export class Commands {
 			return;
 		}
 		const encryptDDO = args[2] === "false" ? false : true;
-		// const assetDDO = DDOFactory.createDDO(assetData);
-		// if (assetDDO instanceof VerifiableCredential) {
-		// 	await this.publishV5(args, asset);
-		// } else if (assetDDO instanceof DDO_V4) {
-		// 	await this.publishV4(args, asset);
-		// } else {
-		// 	console.error("Unsupported asset type");
-		// 	return;
-		// }
-		if (isVerifiableCredential(asset)) {
-			await this.publishV5(asset, encryptDDO)
-		} else {
-			await this.publishV4(asset, encryptDDO)
+		switch (asset.version) {
+			case DDOVersion.V4_1_0:
+			case DDOVersion.V4_3_0:
+			case DDOVersion.V4_5_0:
+				await createAssetV4(
+					asset.nft.name,
+					asset.nft.symbol,
+					this.signer,
+					asset.services[0].files,
+					asset,
+					this.providerUrl,
+					this.config,
+					this.aquarius,
+					this.macOsProviderUrl,
+					encryptDDO
+				);
+				break;
+
+			case DDOVersion.V5_0_0:
+				await createAssetV5(
+					asset.nft.name,
+					asset.nft.symbol,
+					this.signer,
+					asset.credentialSubject.services[0].files,
+					asset,
+					this.providerUrl,
+					this.config,
+					this.aquarius,
+					this.macOsProviderUrl,
+					encryptDDO
+				);
+				break;
+
+			default:
+				console.error("Unsupported asset type or version");
+				return;
 		}
 	}
 
@@ -153,39 +131,38 @@ export class Commands {
 			return;
 		}
 		const encryptDDO = args[2] === "false" ? false : true;
-		// add some more checks
-		let algoDid
-		if (isVerifiableCredential(algoAsset)) {
-			console.log("verifiable")
-			algoDid = await createAssetV5(
-				algoAsset.nft.name,
-				algoAsset.nft.symbol,
-				this.signer,
-				algoAsset.credentialSubject.services[0].files,
-				algoAsset,
-				this.providerUrl,
-				this.config,
-				this.aquarius,
-				this.macOsProviderUrl,
-				encryptDDO
-			);
-		} else {
-			algoDid = await createAsset(
-				algoAsset.nft.name,
-				algoAsset.nft.symbol,
-				this.signer,
-				algoAsset.services[0].files,
-				algoAsset,
-				this.providerUrl,
-				this.config,
-				this.aquarius,
-				this.macOsProviderUrl,
-				encryptDDO
-			);
+		switch (algoAsset.version) {
+			case DDOVersion.V4_1_0:
+			case DDOVersion.V4_3_0:
+			case DDOVersion.V4_5_0:
+				await createAssetV4(
+					algoAsset.nft.name,
+					algoAsset.nft.symbol,
+					this.signer,
+					algoAsset.services[0].files,
+					algoAsset,
+					this.providerUrl,
+					this.config,
+					this.aquarius,
+					this.macOsProviderUrl,
+					encryptDDO
+				);
+				break
+			case DDOVersion.V5_0_0:
+				await createAssetV5(
+					algoAsset.nft.name,
+					algoAsset.nft.symbol,
+					this.signer,
+					algoAsset.credentialSubject.services[0].files,
+					algoAsset,
+					this.providerUrl,
+					this.config,
+					this.aquarius,
+					this.macOsProviderUrl,
+					encryptDDO
+				);
+				break
 		}
-
-		// add some more checks
-		console.log("Algorithm published. DID:  " + algoDid);
 	}
 
 	public async editAsset(args: string[]) {

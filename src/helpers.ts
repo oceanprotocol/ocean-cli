@@ -31,6 +31,7 @@ import {
 } from "@oceanprotocol/lib";
 import { hexlify } from "ethers/lib/utils";
 import { uploadToIPFS } from "./ipfs";
+import { signVC } from "./sign";
 
 export const isVerifiableCredential = (ddo: any): boolean => {
 	return ddo.type && Array.isArray(ddo.type) && ddo.type.includes('VerifiableCredential')
@@ -70,7 +71,7 @@ export async function downloadFile(
 	return { data, filename };
 }
 
-export async function createAsset(
+export async function createAssetV4(
 	name: string,
 	symbol: string,
 	owner: Signer,
@@ -169,7 +170,6 @@ export async function createAsset(
 	ddo.id =
 		"did:op:" +
 		SHA256(ethers.utils.getAddress(nftAddress) + chainId.toString(10));
-
 	let metadata;
 	let metadataHash;
 	let flags;
@@ -304,6 +304,15 @@ export async function createAssetV5(
 
 	ddo.credentialSubject.id = "did:op:" + SHA256(ethers.utils.getAddress(nftAddress) + chainId.toString(10));
 
+	const proof = await signVC(ddo)
+	ddo.proof = {
+		type: "jws",
+		proofPurpose: "assertionMethod",
+		created: new Date(Date.now()).toISOString(),
+		verificationMethod: proof.method,
+		jws: proof.jws
+	}
+
 	let metadataIPFS: string
 	let flags: number
 	const validateResult = await aquariusInstance.validate(ddo);
@@ -354,8 +363,7 @@ export async function createAssetV5(
 		console.log("error:", error)
 		throw new Error(error)
 	}
-
-	return ddo.credentialSubject.id;
+	console.log("Version 5.0.0 Asset published. ID:", ddo.credentialSubject.id);
 }
 
 export async function updateAssetMetadata(

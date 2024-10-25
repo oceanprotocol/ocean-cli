@@ -203,6 +203,22 @@ export async function createAssetV4(
 	return ddo.id;
 }
 
+export function getDataDownalodV4(ddo: any) {
+	const did = ddo.id
+	const chainId = ddo.chainId
+	const serviceEndpoint = ddo.services[0].serviceEndpoint
+	const serviceId = ddo.services[0].id
+	return { chainId, serviceEndpoint, serviceId, did }
+}
+
+export function getDataDownalodV5(ddo: any) {
+	const did = ddo.credentialSubject.id
+	const chainId = ddo.credentialSubject.chainId
+	const serviceEndpoint = ddo.credentialSubject.services[0].serviceEndpoint
+	const serviceId = ddo.credentialSubject.services[0].id
+	return { chainId, serviceEndpoint, serviceId, did }
+}
+
 export async function createAssetV5(
 	name: string,
 	symbol: string,

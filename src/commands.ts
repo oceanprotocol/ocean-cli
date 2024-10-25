@@ -10,6 +10,8 @@ import {
 	createDatatokenAndPricing,
 	isVerifiableCredential,
 	createAssetV4,
+	getDataDownalodV4,
+	getDataDownalodV5,
 } from "./helpers";
 import {
 	Aquarius,
@@ -220,21 +222,26 @@ export class Commands {
 			);
 			return;
 		}
+
 		let chainId: number
 		let serviceEndpoint: string
 		let serviceId: string
 		let did: string
-		if (isVerifiableCredential(dataDdo)) {
-			did = (dataDdo as any).credentialSubject.id
-			chainId = (dataDdo as any).credentialSubject.chainId
-			serviceEndpoint = (dataDdo as any).credentialSubject.services[0].serviceEndpoint
-			serviceId = (dataDdo as any).credentialSubject.services[0].id
-		} else {
-			did = dataDdo.id
-			chainId = dataDdo.chainId
-			serviceEndpoint = dataDdo.services[0].serviceEndpoint
-			serviceId = dataDdo.services[0].id
+		switch (dataDdo.version) {
+			case DDOVersion.V4_1_0:
+			case DDOVersion.V4_3_0:
+			case DDOVersion.V4_5_0:
+				({ chainId, serviceEndpoint, serviceId, did } = getDataDownalodV4(dataDdo));
+				break;
+			case DDOVersion.V5_0_0:
+				({ chainId, serviceEndpoint, serviceId, did } = getDataDownalodV5(dataDdo));
+				break;
+
+			default:
+				console.error("Unsupported asset type or version");
+				return;
 		}
+
 		const providerURI =
 			this.macOsProviderUrl && chainId === 8996
 				? this.macOsProviderUrl

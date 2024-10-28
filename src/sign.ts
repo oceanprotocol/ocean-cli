@@ -48,7 +48,7 @@ async function signCredential(verifiableCredential) {
     .setIssuer(publicKeyHex)
     .sign(key);
 
-  return { jws, method: "key" }
+  return { jws, method: "key", issuer: publicKeyHex }
 }
 
 async function signCredentialWithWalt(verifiableCredential) {
@@ -73,7 +73,7 @@ async function signCredentialWithWalt(verifiableCredential) {
       subjectDid: verifiableCredential.credentialSubject.id
     });
     const jws = response.data;
-    return { jws, method: "waltId" }
+    return { jws, method: "waltId", issuer: issuerDid }
   } catch (error) {
     console.error('Error signing credential with Walt:', error);
     throw error;

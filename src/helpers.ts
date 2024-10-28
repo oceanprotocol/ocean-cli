@@ -328,7 +328,7 @@ export async function createAssetV5(
 		verificationMethod: proof.method,
 		jws: proof.jws
 	}
-
+	ddo.issuer = proof.issuer
 	let metadataIPFS: string
 	let flags: number
 	const validateResult = await aquariusInstance.validate(ddo);

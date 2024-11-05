@@ -130,6 +130,7 @@ export async function createAsset(
 			datatokenParams
 		);
 	} else if (ddo?.stats?.price?.value === "0") {
+		
 		const dispenserParams: DispenserCreationParams = {
 			dispenserAddress: config.dispenserAddress,
 			maxTokens: "1",
@@ -137,7 +138,6 @@ export async function createAsset(
 			withMint: true,
 			allowedSwapper: ZERO_ADDRESS,
 		};
-
 		bundleNFT = await nftFactory.createNftWithDatatokenWithDispenser(
 			nftParamsAsset,
 			datatokenParams,
@@ -299,7 +299,10 @@ export async function handleComputeOrder(
        - have validOrder and providerFees -> then order is valid but providerFees are not valid, we need to call reuseOrder and pay only providerFees
        - no validOrder -> we need to call startOrder, to pay 1 DT & providerFees
     */
-	if (order.providerFee && order.providerFee.providerFeeAmount) {
+   const hasProviderFees = order.providerFee && order.providerFee.providerFeeAmount
+   // no need to approve if it is 0
+	if (hasProviderFees && Number(order.providerFee.providerFeeAmount) > 0) {
+		
 		await approveWei(
 			payerAccount,
 			config,
@@ -308,6 +311,7 @@ export async function handleComputeOrder(
 			asset.services[0].datatokenAddress,
 			order.providerFee.providerFeeAmount
 		);
+		
 	}
 	if (order.validOrder) {
 		if (!order.providerFee) return order.validOrder;

@@ -411,6 +411,10 @@ export class Commands {
 				" with additional datasets:" +
 				(!additionalDatasets ? "none" : additionalDatasets[0].documentId)
 		);
+		if(additionalDatasets!==null) {
+			console.log('Adding additional datasets to dataset, according to C2D V2 specs')
+			assets.push(additionalDatasets)
+		}
 
 		const output: ComputeOutput =  {
 			metadataUri: await getMetadataURI()
@@ -420,12 +424,14 @@ export class Commands {
 			providerURI,
 			this.signer,
 			computeEnv.id,
-			assets[0],
+			assets, // assets[0] // only c2d v1,
 			algo,
 			null,
-			additionalDatasets,
-			output
+			// additionalDatasets, only c2d v1
+			output,
+			computeEnv.free ? true : false //
 		);
+
 		if (computeJobs && computeJobs[0]) {
 			const { jobId, agreementId } = computeJobs[0];
 			console.log("Compute started.  JobID: " + jobId);

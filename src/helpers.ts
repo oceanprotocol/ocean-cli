@@ -1,8 +1,6 @@
-import { SHA256 } from "crypto-js";
 import { ethers, Signer } from "ethers";
 import fetch from "cross-fetch";
 import { promises as fs } from "fs";
-import { createHash } from "crypto";
 import * as path from "path";
 import * as sapphire from '@oasisprotocol/sapphire-paratime';
 import {
@@ -24,7 +22,6 @@ import {
 	ProviderFees,
 	ComputeAlgorithm,
 	LoggerInstance,
-	Datatoken4,
 	createAsset
 } from "@oceanprotocol/lib";
 import { hexlify } from "ethers/lib/utils";

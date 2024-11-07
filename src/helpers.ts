@@ -29,7 +29,7 @@ import {
 	ProviderFees,
 	ComputeAlgorithm,
 	LoggerInstance,
-	Datatoken4 
+	Datatoken4
 } from "@oceanprotocol/lib";
 import { hexlify } from "ethers/lib/utils";
 
@@ -174,6 +174,9 @@ export async function createAsset(
 	// create the files encrypted string
 	assetUrl.datatokenAddress = datatokenAddressAsset;
 	assetUrl.nftAddress = nftAddress;
+	if(!assetUrl.type) {
+		assetUrl.type = 'url'
+	}
 	ddo.services[0].files = templateIndex === 4 ? '' : await ProviderInstance.encrypt(
 		assetUrl,
 		chainId,

@@ -321,14 +321,13 @@ export async function createAssetV5(
 	ddo.credentialSubject.id = "did:op:" + SHA256(ethers.utils.getAddress(nftAddress) + chainId.toString(10));
 
 	const proof = await signVC(ddo)
-	ddo.proof = {
-		type: "jws",
-		proofPurpose: "assertionMethod",
-		created: new Date(Date.now()).toISOString(),
-		verificationMethod: proof.method,
-		jws: proof.jws
-	}
+
 	ddo.issuer = proof.issuer
+	const jwsDDO = {
+		header: proof.header,
+		payload: ddo,
+		signature: proof.jws
+	}
 	let metadataIPFS: string
 	let flags: number
 	const validateResult = await aquariusInstance.validate(ddo);
@@ -336,7 +335,7 @@ export async function createAssetV5(
 		throw new Error("Invalid ddo")
 	}
 
-	const stringMetadata = JSON.stringify(ddo);
+	const stringMetadata = JSON.stringify(jwsDDO);
 	const bytesDDO = Buffer.from(stringMetadata);
 	const metadata = hexlify(bytesDDO);
 

@@ -25,9 +25,9 @@ async function signCredential(verifiableCredential) {
   const yBuffer = publicKeyBuffer.slice(33, 65);
 
   // Base64url-encode the values
-  const d = base64url.encode(privateKeyBuffer);
-  const x = base64url.encode(xBuffer);
-  const y = base64url.encode(yBuffer);
+  const d = base64url.encode(privateKeyBuffer as any as Uint8Array);
+  const x = base64url.encode(xBuffer as any as Uint8Array);
+  const y = base64url.encode(yBuffer as any as Uint8Array);
 
   // Construct the JWK
   const privateJwk = {
@@ -47,15 +47,15 @@ async function signCredential(verifiableCredential) {
     .setIssuedAt()
     .setIssuer(publicKeyHex)
     .sign(key);
-
-  return { jws, method: "key", issuer: publicKeyHex }
+  const header = { alg: "ES256K" }
+  return { jws, header, issuer: publicKeyHex }
 }
 
 async function signCredentialWithWalt(verifiableCredential) {
   const issuerKey = {
     "type": "jwk",
     "jwk": {
-      "kty": "OKP",
+      "kty": process.env.ISSUER_KTY,
       "d": process.env.ISSUER_KEY_D,
       "crv": process.env.ISSUER_KEY_CRV,
       "kid": process.env.ISSUER_KEY_KID,
@@ -73,7 +73,8 @@ async function signCredentialWithWalt(verifiableCredential) {
       subjectDid: verifiableCredential.credentialSubject.id
     });
     const jws = response.data;
-    return { jws, method: "waltId", issuer: issuerDid }
+    const header = { alg: process.env.ISSUER_KTY }
+    return { jws, header, issuer: issuerDid }
   } catch (error) {
     console.error('Error signing credential with Walt:', error);
     throw error;
@@ -81,6 +82,7 @@ async function signCredentialWithWalt(verifiableCredential) {
 }
 
 export async function signVC(vc) {
+  console.log(process.env.SSI)
   if (process.env.SSI) {
     console.log("Signing with Walt.id...");
     return signCredentialWithWalt(vc)

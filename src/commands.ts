@@ -2,7 +2,7 @@ import fs from "fs";
 import os from "os";
 import util from "util";
 import {
-	createAsset,
+	createAssetUtil,
 	handleComputeOrder,
 	updateAssetMetadata,
 	downloadFile,
@@ -92,17 +92,15 @@ export class Commands {
 		const encryptDDO = args[2] === "false" ? false : true;
 		try {
 			// add some more checks
-			const urlAssetId = await createAsset(
+			const urlAssetId = await createAssetUtil(
 				asset.nft.name,
 				asset.nft.symbol,
 				this.signer,
 				asset.services[0].files,
 				asset,
-				this.providerUrl,
+				this.providerUrl || this.macOsProviderUrl,
 				this.config,
 				this.aquarius,
-				1,
-				this.macOsProviderUrl,
 				encryptDDO
 			);
 			console.log("Asset published. ID:  " + urlAssetId);
@@ -124,17 +122,15 @@ export class Commands {
 		}
 		const encryptDDO = args[2] === "false" ? false : true;
 		// add some more checks
-		const algoDid = await createAsset(
+		const algoDid = await createAssetUtil(
 			algoAsset.nft.name,
 			algoAsset.nft.symbol,
 			this.signer,
 			algoAsset.services[0].files,
 			algoAsset,
-			this.providerUrl,
+			this.providerUrl || this.macOsProviderUrl,
 			this.config,
 			this.aquarius,
-			1,
-			this.macOsProviderUrl,
 			encryptDDO
 		);
 		// add some more checks

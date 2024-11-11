@@ -33,21 +33,21 @@ async function verifyCredential(jws: string, issuerPublicKey: string) {
 }
 
 //TODO still not working
-async function verifyCredentialWithWalt(jws: string) {
-  const waltIdVerifierApi = process.env.WALT_ID_VERIFIER_API || "http://localhost:7003/openid4vc/verify";
-  try {
-    const response = await axios.post(waltIdVerifierApi, { jws });
-    if (response.data.verified) {
-      console.log("JWT Verified by Walt:", response.data);
-      return response.data.payload;
-    } else {
-      throw new Error("JWT verification failed with Walt");
-    }
-  } catch (error) {
-    console.error("Error verifying with Walt:", error);
-    throw error;
-  }
-}
+// async function verifyCredentialWithWalt(jws: string) {
+//   const waltIdVerifierApi = process.env.WALT_ID_VERIFIER_API || "http://localhost:7003/openid4vc/verify";
+//   try {
+//     const response = await axios.post(waltIdVerifierApi, { jws });
+//     if (response.data.verified) {
+//       console.log("JWT Verified by Walt:", response.data);
+//       return response.data.payload;
+//     } else {
+//       throw new Error("JWT verification failed with Walt");
+//     }
+//   } catch (error) {
+//     console.error("Error verifying with Walt:", error);
+//     throw error;
+//   }
+// }
 
 async function signCredential(verifiableCredential) {
   const privateKeyHex = process.env.PRIVATE_KEY;

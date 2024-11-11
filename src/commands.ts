@@ -181,7 +181,7 @@ export class Commands {
 				);
 				break
 		}
-		console.log("Asset published. ID:", id);
+		console.log("Algorithm published. DID:", id);
 	}
 
 	public async editAsset(args: string[]) {

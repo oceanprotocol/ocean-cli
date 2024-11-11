@@ -4,8 +4,9 @@ import fetch from "cross-fetch";
 import { promises as fs } from "fs";
 import { createHash } from "crypto";
 import * as path from "path";
-
+import * as sapphire from '@oasisprotocol/sapphire-paratime';
 import {
+	AccesslistFactory,
 	Aquarius,
 	DatatokenCreateParams,
 	Nft,
@@ -28,6 +29,7 @@ import {
 	ComputeAlgorithm,
 	LoggerInstance,
 	DispenserParams,
+	Datatoken4
 } from "@oceanprotocol/lib";
 import { hexlify } from "ethers/lib/utils";
 import { uploadToIPFS } from "./ipfs";
@@ -80,25 +82,45 @@ export async function createAssetV4(
 	providerUrl: string,
 	config: Config,
 	aquariusInstance: Aquarius,
+	templateIndex: number = 1,
 	macOsProviderUrl?: string,
-	encryptDDO: boolean = true
+	encryptDDO: boolean = true,
 ) {
 	const { chainId } = await owner.provider.getNetwork();
 	const nft = new Nft(owner, chainId);
-	console.log("config.nftfac", config.nftFactoryAddress)
 	const nftFactory = new NftFactory(config.nftFactoryAddress, owner);
+
+	let wrappedSigner
+	let allowListAddress
+	if (templateIndex === 4) {
+		// Wrap the signer for Sapphire
+		wrappedSigner = sapphire.wrap(owner);
+
+		// Create Access List Factory
+		const accessListFactory = new AccesslistFactory(config.accessListFactory, wrappedSigner, chainId);
+
+		// Create Allow List
+		allowListAddress = await accessListFactory.deployAccessListContract(
+			'AllowList',
+			'ALLOW',
+			['https://oceanprotocol.com/nft/'],
+			false,
+			await owner.getAddress(),
+			[await owner.getAddress(), ZERO_ADDRESS]
+		);
+	}
 
 	ddo.chainId = parseInt(chainId.toString(10));
 	const nftParamsAsset: NftCreateData = {
 		name,
 		symbol,
-		templateIndex: 1,
+		templateIndex,
 		tokenURI: "aaa",
 		transferable: true,
 		owner: await owner.getAddress(),
 	};
 	const datatokenParams: DatatokenCreateParams = {
-		templateIndex: 1,
+		templateIndex,
 		cap: "100000",
 		feeAmount: "0",
 		paymentCollector: await owner.getAddress(),
@@ -108,12 +130,12 @@ export async function createAssetV4(
 	};
 
 	let bundleNFT;
-	if (!ddo.stats.price.value) {
+	if (!ddo.stats?.price?.value) {
 		bundleNFT = await nftFactory.createNftWithDatatoken(
 			nftParamsAsset,
 			datatokenParams
 		);
-	} else if (ddo.stats.price.value === "0") {
+	} else if (ddo?.stats?.price?.value === "0") {
 		const dispenserParams: DispenserCreationParams = {
 			dispenserAddress: config.dispenserAddress,
 			maxTokens: "1",
@@ -147,7 +169,6 @@ export async function createAssetV4(
 			fixedPriceParams
 		);
 	}
-
 	const trxReceipt = await bundleNFT.wait();
 	// events have been emitted
 	const nftCreatedEvent = getEventFromTx(trxReceipt, "NFTCreated");
@@ -158,7 +179,7 @@ export async function createAssetV4(
 	// create the files encrypted string
 	assetUrl.datatokenAddress = datatokenAddressAsset;
 	assetUrl.nftAddress = nftAddress;
-	ddo.services[0].files = await ProviderInstance.encrypt(
+	ddo.services[0].files = templateIndex === 4 ? '' : await ProviderInstance.encrypt(
 		assetUrl,
 		chainId,
 		macOsProviderUrl || providerUrl
@@ -189,7 +210,6 @@ export async function createAssetV4(
 		metadataHash = "0x" + createHash("sha256").update(metadata).digest("hex");
 		flags = 0
 	}
-
 	await nft.setMetadata(
 		nftAddress,
 		await owner.getAddress(),
@@ -200,6 +220,25 @@ export async function createAssetV4(
 		metadata,
 		metadataHash
 	);
+	if (templateIndex === 4) { // Use Datatoken4 for file object
+		const datatoken = new Datatoken4(
+			wrappedSigner,
+			ethers.utils.toUtf8Bytes(JSON.stringify(assetUrl.files)),
+			chainId,
+			config
+		);
+
+		// Set file object
+		await datatoken.setFileObject(datatokenAddressAsset, await wrappedSigner.getAddress());
+
+		// Set allow list for the datatoken
+		await datatoken.setAllowListContract(
+			datatokenAddressAsset,
+			allowListAddress,
+			await wrappedSigner.getAddress()
+		);
+	}
+	console.log("Asset published. ID:", ddo.id);
 	return ddo.id;
 }
 
@@ -379,7 +418,10 @@ export async function createAssetV5(
 		throw new Error(error)
 	}
 	console.log("Version 5.0.0 Asset published. ID:", ddo.credentialSubject.id);
+	return ddo.credentialSubject.id
 }
+
+
 
 export async function updateAssetMetadata(
 	owner: Signer,
@@ -626,3 +668,67 @@ export async function createDatatokenAndPricing(
 
 	return { datatokenAddress, tx }
 }
+
+
+// The ranges and the amount of usable IP's:
+
+// 10.0.0.0 - 10.255.255.255 Addresses: 16,777,216
+// 172.16.0.0 - 172.31.255.255 Addresses: 1,048,576
+// 192.168.0.0 - 192.168.255.255 Addresses: 65,536
+
+// check if IP is private or not
+export function isPrivateIP(ip): boolean {
+
+	const reg = /^(127\.[\d.]+|[0:]+1|localhost)$/
+	const result = ip.match(reg)
+	if (result !== null) {
+		// is loopback address
+		return true
+	}
+	const parts = ip.split('.');
+	return parts[0] === '10' ||
+		(parts[0] === '172' && (parseInt(parts[1], 10) >= 16 && parseInt(parts[1], 10) <= 31)) ||
+		(parts[0] === '192' && parts[1] === '168');
+}
+
+// get public IP address using free service API
+export async function getPublicIP(): Promise<string> {
+
+	try {
+		const response = await fetch('https://api.ipify.org?format=json')
+		const data = await response.json()
+		if (data) {
+			return data.ip
+		}
+	} catch (err) {
+		console.error('Erro getting public IP: ', err.message)
+	}
+
+	return null
+}
+
+export async function getMetadataURI() {
+	const metadataURI = process.env.AQUARIUS_URL
+	const parsed = new URL(metadataURI);
+	let ip = metadataURI // by default
+	// has port number?
+	const hasPort = parsed.port && !isNaN(Number(parsed.port))
+	if (hasPort) {
+		// remove the port, just get the host part
+		ip = parsed.hostname
+	}
+	// check if is private or loopback
+	if (isPrivateIP(ip)) {
+		// get public V4 ip address
+		ip = await getPublicIP()
+		if (!ip) {
+			return metadataURI
+		}
+	}
+	// if we removed the port add it back
+	if (hasPort) {
+		ip = `http://${ip}:${parsed.port}`
+	}
+	return ip
+}
+

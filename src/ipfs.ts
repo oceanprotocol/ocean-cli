@@ -14,5 +14,4 @@ export async function uploadToIPFS(data: any): Promise<string> {
     console.log("error:", error)
     throw new Error('Failed to upload data to Pinata');
   }
-
 }

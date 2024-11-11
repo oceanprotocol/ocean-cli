@@ -12,12 +12,14 @@ import {
 	createAssetV4,
 	getDataDownalodV4,
 	getDataDownalodV5,
+	getMetadataURI,
 } from "./helpers";
 import {
 	Aquarius,
 	Asset,
 	ComputeAlgorithm,
 	ComputeJob,
+	ComputeOutput,
 	Config,
 	ConfigHelper,
 	Datatoken,
@@ -29,6 +31,8 @@ import {
 } from "@oceanprotocol/lib";
 import { Signer, ethers } from "ethers";
 import { DDOVersion } from "./ddoVersions";
+import { interactiveFlow } from "./interactiveFlow";
+import { publishAsset } from "./publishAsset";
 
 export class Commands {
 	public signer: Signer;
@@ -40,9 +44,9 @@ export class Commands {
 	constructor(signer: Signer, network: string | number, config?: Config) {
 		this.signer = signer;
 		this.config = config || new ConfigHelper().getConfig(network);
-		this.providerUrl = process.env.PROVIDER_URL || this.config.providerUri;
+		this.providerUrl = process.env.NODE_URL || process.env.PROVIDER_URL || this.config.providerUri;
 		if (
-			!process.env.PROVIDER_URL &&
+			!process.env.PROVIDER_URL && !process.env.NODE_URL &&
 			this.config.chainId === 8996 &&
 			os.type() === "Darwin"
 		) {
@@ -52,20 +56,27 @@ export class Commands {
 		this.macOsProviderUrl &&
 			console.log(" -> MacOS provider url :", this.macOsProviderUrl);
 		if (
-			!process.env.AQUARIUS_URL &&
+			!process.env.AQUARIUS_URL && !process.env.NODE_URL &&
 			this.config.chainId === 8996 &&
 			os.type() === "Darwin"
 		) {
 			this.config.metadataCacheUri = "http://127.0.0.1:5000";
 		}
 		this.aquarius = new Aquarius(
-			process.env.AQUARIUS_URL || this.config.metadataCacheUri
+			process.env.NODE_URL || process.env.AQUARIUS_URL || this.config.metadataCacheUri
 		);
 		console.log(
 			"Using Aquarius :",
-			process.env.AQUARIUS_URL || this.config.metadataCacheUri
+			process.env.NODE_URL || process.env.AQUARIUS_URL || this.config.metadataCacheUri
 		);
 	}
+
+	public async start() {
+		console.log('Starting the interactive CLI flow...\n\n');
+		const data = await interactiveFlow(this.providerUrl); // Collect data via CLI
+		await publishAsset(data, this.signer, this.config); // Publish asset with collected data
+	}
+
 	// utils
 	public async sleep(ms: number) {
 		return new Promise((resolve) => {
@@ -97,6 +108,7 @@ export class Commands {
 					this.providerUrl,
 					this.config,
 					this.aquarius,
+					1,
 					this.macOsProviderUrl,
 					encryptDDO
 				);
@@ -146,6 +158,7 @@ export class Commands {
 					this.providerUrl,
 					this.config,
 					this.aquarius,
+					1,
 					this.macOsProviderUrl,
 					encryptDDO
 				);
@@ -287,6 +300,7 @@ export class Commands {
 	}
 
 	public async computeStart(args: string[]) {
+
 		const inputDatasetsString = args[1];
 		let inputDatasets = [];
 
@@ -492,6 +506,11 @@ export class Commands {
 			" with additional datasets:" +
 			(!additionalDatasets ? "none" : additionalDatasets[0].documentId)
 		);
+
+		const output: ComputeOutput = {
+			metadataUri: await getMetadataURI()
+		}
+
 		const computeJobs = await ProviderInstance.computeStart(
 			providerURI,
 			this.signer,
@@ -499,7 +518,8 @@ export class Commands {
 			assets[0],
 			algo,
 			null,
-			additionalDatasets
+			additionalDatasets,
+			output
 		);
 		if (computeJobs && computeJobs[0]) {
 			const { jobId, agreementId } = computeJobs[0];

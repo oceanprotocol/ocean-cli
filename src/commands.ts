@@ -100,6 +100,7 @@ export class Commands {
 			case DDOVersion.V4_1_0:
 			case DDOVersion.V4_3_0:
 			case DDOVersion.V4_5_0:
+			case DDOVersion.V4_7_0:
 				id = await createAssetV4(
 					asset.nft.name,
 					asset.nft.symbol,
@@ -152,6 +153,7 @@ export class Commands {
 			case DDOVersion.V4_1_0:
 			case DDOVersion.V4_3_0:
 			case DDOVersion.V4_5_0:
+			case DDOVersion.V4_7_0:
 				id = await createAssetV4(
 					algoAsset.nft.name,
 					algoAsset.nft.symbol,
@@ -248,6 +250,7 @@ export class Commands {
 			case DDOVersion.V4_1_0:
 			case DDOVersion.V4_3_0:
 			case DDOVersion.V4_5_0:
+			case DDOVersion.V4_7_0:
 				({ chainId, serviceEndpoint, serviceId, did } = getDataDownalodV4(dataDdo));
 				break;
 			case DDOVersion.V5_0_0:

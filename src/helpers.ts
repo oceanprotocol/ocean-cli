@@ -238,7 +238,6 @@ export async function createAssetV4(
 			await wrappedSigner.getAddress()
 		);
 	}
-	console.log("Asset published. ID:", ddo.id);
 	return ddo.id;
 }
 
@@ -417,7 +416,6 @@ export async function createAssetV5(
 		console.log("error:", error)
 		throw new Error(error)
 	}
-	console.log("Version 5.0.0 Asset published. ID:", ddo.credentialSubject.id);
 	return ddo.credentialSubject.id
 }
 

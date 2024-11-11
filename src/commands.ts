@@ -145,11 +145,12 @@ export class Commands {
 			return;
 		}
 		const encryptDDO = args[2] === "false" ? false : true;
+		let id
 		switch (algoAsset.version) {
 			case DDOVersion.V4_1_0:
 			case DDOVersion.V4_3_0:
 			case DDOVersion.V4_5_0:
-				await createAssetV4(
+				id = await createAssetV4(
 					algoAsset.nft.name,
 					algoAsset.nft.symbol,
 					this.signer,
@@ -164,7 +165,7 @@ export class Commands {
 				);
 				break
 			case DDOVersion.V5_0_0:
-				await createAssetV5(
+				id = await createAssetV5(
 					algoAsset.nft.name,
 					algoAsset.nft.symbol,
 					this.signer,
@@ -178,6 +179,7 @@ export class Commands {
 				);
 				break
 		}
+		console.log("Asset published. ID:", id);
 	}
 
 	public async editAsset(args: string[]) {

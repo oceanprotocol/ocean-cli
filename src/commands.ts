@@ -95,11 +95,12 @@ export class Commands {
 			return;
 		}
 		const encryptDDO = args[2] === "false" ? false : true;
+		let id: string
 		switch (asset.version) {
 			case DDOVersion.V4_1_0:
 			case DDOVersion.V4_3_0:
 			case DDOVersion.V4_5_0:
-				await createAssetV4(
+				id = await createAssetV4(
 					asset.nft.name,
 					asset.nft.symbol,
 					this.signer,
@@ -115,7 +116,7 @@ export class Commands {
 				break;
 
 			case DDOVersion.V5_0_0:
-				await createAssetV5(
+				id = await createAssetV5(
 					asset.nft.name,
 					asset.nft.symbol,
 					this.signer,
@@ -133,6 +134,7 @@ export class Commands {
 				console.error("Unsupported asset type or version");
 				return;
 		}
+		console.log("Asset published. ID:", id);
 	}
 
 	public async publishAlgo(args: string[]) {

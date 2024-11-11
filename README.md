@@ -81,6 +81,47 @@ export PROVIDER_URL='XXXX'
 export ADDRESS_FILE='path-to-address-file'
 ```
 
+- Optional set IPFS_API_KEY and IPFS_SECRET_API_KEY if you want to publish an asset v5.0.0
+
+```
+export IPFS_API_KEY='xxx'
+export IPFS_SECRET_API_KEY='xxx'
+```
+
+- Optional set issuers env if you want to sign an asset v5.0.0 with waltId (SSI ON)
+WALT_ID_ISSUER_API is api of waltId
+```
+export WALT_ID_ISSUER_API=
+```
+ISSUER_ID is the DID of the issuer
+```
+export ISSUER_iD=
+```
+ISSUER_KTY is the key type, for example OKP (Octet key pair)
+```
+export ISSUER_KTY=
+```
+ISSUER_KEY_D rapresents a parameter of private key in JWK - Private RSA JWK "dp" (First Factor CRT Exponent)
+```
+export ISSUER_KEY_D=
+```
+ISSUER_KEY_CRV is the cryptographic curve used like "Ed25519"
+```
+export ISSUER_KEY_CRV=
+```
+ISSUER_KEY_KID is the key id which helps systems identify which key to use when multiple keys might be available
+```
+export ISSUER_KEY_KID=
+```
+ISSUER_KEY_X is the public key used for verifying signatures
+```
+export ISSUER_KEY_X=
+```
+SSI indicated if should sign with waltId or with web3
+```
+export SSI=true
+```
+
 ### Build the TypeScript code
 
 ```

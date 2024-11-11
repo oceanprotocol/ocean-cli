@@ -1,6 +1,53 @@
-import { base64url, importJWK, JWTPayload, SignJWT } from "jose";
+import { base64url, importJWK, JWTPayload, jwtVerify, SignJWT } from "jose";
 import axios from 'axios';
 import { ethers } from "ethers";
+
+async function verifyCredential(jws: string, issuerPublicKey: string) {
+  const publicKeyBuffer = Buffer.from(issuerPublicKey.substring(2), "hex");
+  const xBuffer = publicKeyBuffer.slice(1, 33);
+  const yBuffer = publicKeyBuffer.slice(33, 65);
+
+  const x = base64url.encode(xBuffer as any as Uint8Array);
+  const y = base64url.encode(yBuffer as any as Uint8Array);
+
+  // Construct the JWK for verification
+  const publicJwk = {
+    kty: "EC",
+    crv: "secp256k1",
+    x: x,
+    y: y,
+    alg: "ES256K",
+    use: "sig",
+  };
+
+  const key = await importJWK(publicJwk, "ES256K");
+
+  try {
+    const { payload } = await jwtVerify(jws, key);
+    console.log("JWT Verified passed");
+    return payload;
+  } catch (error) {
+    console.error("Local verification failed:", error);
+    throw error;
+  }
+}
+
+//TODO still not working
+async function verifyCredentialWithWalt(jws: string) {
+  const waltIdVerifierApi = process.env.WALT_ID_VERIFIER_API || "http://localhost:7003/openid4vc/verify";
+  try {
+    const response = await axios.post(waltIdVerifierApi, { jws });
+    if (response.data.verified) {
+      console.log("JWT Verified by Walt:", response.data);
+      return response.data.payload;
+    } else {
+      throw new Error("JWT verification failed with Walt");
+    }
+  } catch (error) {
+    console.error("Error verifying with Walt:", error);
+    throw error;
+  }
+}
 
 async function signCredential(verifiableCredential) {
   const privateKeyHex = process.env.PRIVATE_KEY;
@@ -48,6 +95,8 @@ async function signCredential(verifiableCredential) {
     .setIssuer(publicKeyHex)
     .sign(key);
   const header = { alg: "ES256K" }
+  await verifyCredential(jws, publicKeyHex)
+
   return { jws, header, issuer: publicKeyHex }
 }
 
@@ -74,12 +123,15 @@ async function signCredentialWithWalt(verifiableCredential) {
     });
     const jws = response.data;
     const header = { alg: process.env.ISSUER_KTY }
+    //await verifyCredentialWithWalt(jws)
     return { jws, header, issuer: issuerDid }
   } catch (error) {
     console.error('Error signing credential with Walt:', error);
     throw error;
   }
 }
+
+
 
 export async function signVC(vc) {
   console.log(process.env.SSI)

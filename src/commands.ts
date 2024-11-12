@@ -334,8 +334,9 @@ export class Commands {
 			}
 			assets.push({
 				documentId: ddos[dataDdo].id,
-				serviceId: ddos[dataDdo].services[0].id,
+				serviceId: ddos[dataDdo].services[0].id
 			});
+
 		}
 
 		console.log("Starting compute job using provider: ", providerURI);
@@ -346,7 +347,7 @@ export class Commands {
 				computeEnv.id,
 				computeValidUntil,
 				providerURI,
-				await this.signer.getAddress()
+				this.signer // V1 was this.signer.getAddress()
 			);
 		if (
 			!providerInitializeComputeJob ||

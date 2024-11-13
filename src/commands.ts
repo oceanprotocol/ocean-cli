@@ -96,44 +96,33 @@ export class Commands {
 		}
 		const encryptDDO = args[2] === "false" ? false : true;
 		let id: string
-		switch (asset.version) {
-			case DDOVersion.V4_1_0:
-			case DDOVersion.V4_3_0:
-			case DDOVersion.V4_5_0:
-			case DDOVersion.V4_7_0:
-				id = await createAssetV4(
-					asset.nft.name,
-					asset.nft.symbol,
-					this.signer,
-					asset.services[0].files,
-					asset,
-					this.providerUrl,
-					this.config,
-					this.aquarius,
-					1,
-					this.macOsProviderUrl,
-					encryptDDO
-				);
-				break;
-
-			case DDOVersion.V5_0_0:
-				id = await createAssetV5(
-					asset.nft.name,
-					asset.nft.symbol,
-					this.signer,
-					asset.credentialSubject.services[0].files,
-					asset,
-					this.providerUrl,
-					this.config,
-					this.aquarius,
-					this.macOsProviderUrl,
-					encryptDDO
-				);
-				break;
-
-			default:
-				console.error("Unsupported asset type or version");
-				return;
+		if (asset.version === DDOVersion.V5_0_0) {
+			id = await createAssetV5(
+				asset.nft.name,
+				asset.nft.symbol,
+				this.signer,
+				asset.credentialSubject.services[0].files,
+				asset,
+				this.providerUrl,
+				this.config,
+				this.aquarius,
+				this.macOsProviderUrl,
+				encryptDDO
+			);
+		} else {
+			id = await createAssetV4(
+				asset.nft.name,
+				asset.nft.symbol,
+				this.signer,
+				asset.services[0].files,
+				asset,
+				this.providerUrl,
+				this.config,
+				this.aquarius,
+				1,
+				this.macOsProviderUrl,
+				encryptDDO
+			);
 		}
 		console.log("Asset published. ID:", id);
 	}
@@ -149,39 +138,33 @@ export class Commands {
 		}
 		const encryptDDO = args[2] === "false" ? false : true;
 		let id
-		switch (algoAsset.version) {
-			case DDOVersion.V4_1_0:
-			case DDOVersion.V4_3_0:
-			case DDOVersion.V4_5_0:
-			case DDOVersion.V4_7_0:
-				id = await createAssetV4(
-					algoAsset.nft.name,
-					algoAsset.nft.symbol,
-					this.signer,
-					algoAsset.services[0].files,
-					algoAsset,
-					this.providerUrl,
-					this.config,
-					this.aquarius,
-					1,
-					this.macOsProviderUrl,
-					encryptDDO
-				);
-				break
-			case DDOVersion.V5_0_0:
-				id = await createAssetV5(
-					algoAsset.nft.name,
-					algoAsset.nft.symbol,
-					this.signer,
-					algoAsset.credentialSubject.services[0].files,
-					algoAsset,
-					this.providerUrl,
-					this.config,
-					this.aquarius,
-					this.macOsProviderUrl,
-					encryptDDO
-				);
-				break
+		if (algoAsset.version === DDOVersion.V5_0_0) {
+			id = await createAssetV5(
+				algoAsset.nft.name,
+				algoAsset.nft.symbol,
+				this.signer,
+				algoAsset.credentialSubject.services[0].files,
+				algoAsset,
+				this.providerUrl,
+				this.config,
+				this.aquarius,
+				this.macOsProviderUrl,
+				encryptDDO
+			);
+		} else {
+			id = await createAssetV4(
+				algoAsset.nft.name,
+				algoAsset.nft.symbol,
+				this.signer,
+				algoAsset.services[0].files,
+				algoAsset,
+				this.providerUrl,
+				this.config,
+				this.aquarius,
+				1,
+				this.macOsProviderUrl,
+				encryptDDO
+			);
 		}
 		console.log("Algorithm published. DID:", id);
 	}
@@ -246,20 +229,11 @@ export class Commands {
 		let serviceEndpoint: string
 		let serviceId: string
 		let did: string
-		switch (dataDdo.version) {
-			case DDOVersion.V4_1_0:
-			case DDOVersion.V4_3_0:
-			case DDOVersion.V4_5_0:
-			case DDOVersion.V4_7_0:
-				({ chainId, serviceEndpoint, serviceId, did } = getDataDownalodV4(dataDdo));
-				break;
-			case DDOVersion.V5_0_0:
-				({ chainId, serviceEndpoint, serviceId, did } = getDataDownalodV5(dataDdo));
-				break;
 
-			default:
-				console.error("Unsupported asset type or version");
-				return;
+		if (dataDdo.version === DDOVersion.V5_0_0) {
+			({ chainId, serviceEndpoint, serviceId, did } = getDataDownalodV5(dataDdo));
+		} else {
+			({ chainId, serviceEndpoint, serviceId, did } = getDataDownalodV4(dataDdo));
 		}
 
 		const providerURI =

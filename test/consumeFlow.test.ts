@@ -6,7 +6,7 @@ import crypto from "crypto";
 import https from "https";
 
 describe("Ocean CLI Publishing", function() {
-    this.timeout(240000); // Set a longer timeout to allow the command to execute
+    this.timeout(180000); // Set a longer timeout to allow the command to execute
 
     let downloadDatasetDid: string;
     let computeDatasetDid: string;
@@ -59,6 +59,7 @@ describe("Ocean CLI Publishing", function() {
                 const match = stdout.match(/did:op:[a-f0-9]{64}/);
                 if (match) {
                     downloadDatasetDid = match[0];
+                    console.log('match: ', match[0])
                 }
                 expect(stdout).to.contain("Asset published. ID:");
                 done()

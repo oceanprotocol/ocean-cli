@@ -80,17 +80,17 @@ export async function publishAsset(params: PublishAssetParams, signer: Signer, c
       files: [{ type: params.storageType, url: params.assetLocation, method: 'GET' }],
     };
 
-      // Other networks
-      const did = await createAssetUtil(
-        params.title,
-        'OCEAN-NFT',
-        signer,
-        assetUrl,
-        metadata,
-        params.providerUrl,
-        config,
-        aquarius
-      );
+    // Other networks
+    const did = await createAssetUtil(
+      params.title,
+      'OCEAN-NFT',
+      signer,
+      assetUrl,
+      metadata,
+      params.providerUrl,
+      config,
+      aquarius
+    );
 
 
     console.log(`Asset successfully published with DID: ${did}`);

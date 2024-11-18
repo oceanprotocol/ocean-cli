@@ -6,7 +6,7 @@ import crypto from "crypto";
 import https from "https";
 
 describe("Ocean CLI Publishing", function() {
-    this.timeout(180000); // Set a longer timeout to allow the command to execute
+    this.timeout(240000); // Set a longer timeout to allow the command to execute
 
     let downloadDatasetDid: string;
     let computeDatasetDid: string;

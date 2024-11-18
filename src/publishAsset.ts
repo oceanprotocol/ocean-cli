@@ -2,8 +2,7 @@
 import { Signer } from 'ethers';
 import {
   Config,
-  Aquarius,
-  DDO
+  Aquarius
 } from '@oceanprotocol/lib';
 import { createAssetUtil, updateAssetMetadata } from './helpers';
 
@@ -28,7 +27,7 @@ export async function publishAsset(params: PublishAssetParams, signer: Signer, c
     const aquarius = new Aquarius(config.metadataCacheUri);
 
     // Prepare initial metadata for the asset
-    const metadata: DDO = {
+    const metadata: any = {
       '@context': ['https://w3id.org/did/v1'],
       id: '', // Will be updated after creating asset
       version: '4.1.0',

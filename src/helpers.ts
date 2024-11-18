@@ -79,10 +79,9 @@ export async function createAssetUtil(
 	
 ) {
 	const { chainId } = await owner.provider.getNetwork();
-	let wrappedSigner
 	if(templateIndex === 4){
 		// Wrap the signer for Sapphire
-		wrappedSigner = sapphire.wrap(owner);
+		const wrappedSigner = sapphire.wrap(owner);
 
 		// Create Access List Factory
 		const accessListFactoryObj = new AccesslistFactory(config.accessListFactory, wrappedSigner, chainId);
@@ -98,7 +97,9 @@ export async function createAssetUtil(
 		)
 		return await createAsset(name, symbol, wrappedSigner, assetUrl, templateIndex, ddo, encryptDDO, providerUrl || macOsProviderUrl, providerFeeToken, aquariusInstance, accessListFactory, allowAccessList, denyAccessList);
 	}
-	return await createAsset(name, symbol, owner, assetUrl, templateIndex, ddo, encryptDDO, providerUrl || macOsProviderUrl, providerFeeToken, aquariusInstance);
+	const did = await createAsset(name, symbol, owner, assetUrl, templateIndex, ddo, encryptDDO, providerUrl || macOsProviderUrl, providerFeeToken, aquariusInstance);
+	console.log('did: ', did)
+	return did
 }
 
 

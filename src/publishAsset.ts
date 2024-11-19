@@ -58,23 +58,6 @@ export async function publishAsset(params: PublishAssetParams, signer: Signer, c
       ],
     };
 
-    // stats: {
-    //   allocated: 0,
-    //   orders: 0,
-    //   price: {
-    //     value: params.isCharged ? params.price : "0"
-    //   }
-    // },
-    // nft: {
-    //   address: "",
-    //   name: "Ocean Data NFT",
-    //   symbol: "OCEAN-NFT",
-    //   state: 5,
-    //   tokenURI: "",
-    //   owner: "",
-    //   created: ""
-    // }
-
     // Asset URL setup based on storage type
     const assetUrl = {
       nftAddress: '0x0', // Will be updated after creating asset

@@ -41,6 +41,7 @@ describe("Ocean CLI Publishing", function() {
 
     it("should publish a dataset using 'npm run cli publish'", function(done) {
         const metadataFile = path.resolve(projectRoot, "metadata/simpleDownloadDataset.json");
+        console.log('metadataFile 1 ', metadataFile);
 
         // Ensure the metadata file exists
         if (!fs.existsSync(metadataFile)) {
@@ -53,13 +54,16 @@ describe("Ocean CLI Publishing", function() {
         process.env.AQUARIUS_URL = "http://127.0.0.1:8001";
         process.env.PROVIDER_URL = "http://127.0.0.1:8001";
         process.env.ADDRESS_FILE = path.join(process.env.HOME || "", ".ocean/ocean-contracts/artifacts/address.json");
-
+        console.log('RPC', process.env.RPC);
+        console.log('AQUARIUS_URL', process.env.AQUARIUS_URL);
+        console.log('PROVIDER_URL', process.env.PROVIDER_URL);
+        console.log('ADDRESS_FILE', process.env.ADDRESS_FILE);
         exec(`npm run cli publish ${metadataFile}`, { cwd: projectRoot }, (error, stdout) => {
             try {
                 const match = stdout.match(/did:op:[a-f0-9]{64}/);
                 if (match) {
                     downloadDatasetDid = match[0];
-                    console.log('match: ', match[0])
+                    console.log('match 1: ', match[0])
                 }
                 expect(stdout).to.contain("Asset published. ID:");
                 done()
@@ -72,7 +76,7 @@ describe("Ocean CLI Publishing", function() {
 
     it("should publish a compute dataset using 'npm run cli publish'", function(done) {
         const metadataFile = path.resolve(projectRoot, "metadata/simpleComputeDataset.json");
-
+        console.log('metadataFile', metadataFile);
         // Ensure the metadata file exists
         if (!fs.existsSync(metadataFile)) {
             done(new Error("Metadata file not found: " + metadataFile));

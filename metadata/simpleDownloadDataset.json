@@ -5,7 +5,7 @@
   "id": "",
   "nftAddress": "",
   "version": "4.1.0",
-  "chainId": "",
+  "chainId": null,
   "metadata": {
     "created": "2021-12-20T14:35:20Z",
     "updated": "2021-12-20T14:35:20Z",

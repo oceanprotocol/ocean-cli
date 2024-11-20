@@ -97,9 +97,7 @@ export async function createAssetUtil(
 		)
 		return await createAsset(name, symbol, wrappedSigner, assetUrl, templateIndex, ddo, encryptDDO, providerUrl || macOsProviderUrl, providerFeeToken, aquariusInstance, accessListFactory, allowAccessList, denyAccessList);
 	}
-	const did = await createAsset(name, symbol, owner, assetUrl, templateIndex, ddo, encryptDDO, providerUrl || macOsProviderUrl, providerFeeToken, aquariusInstance);
-	console.log('did: ', did)
-	return did
+	return await createAsset(name, symbol, owner, assetUrl, templateIndex, ddo, encryptDDO, providerUrl || macOsProviderUrl, providerFeeToken, aquariusInstance);
 }
 
 

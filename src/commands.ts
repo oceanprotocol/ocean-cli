@@ -122,19 +122,26 @@ export class Commands {
 		}
 		const encryptDDO = args[2] === "false" ? false : true;
 		// add some more checks
-		const algoDid = await createAssetUtil(
-			algoAsset.nft.name,
-			algoAsset.nft.symbol,
-			this.signer,
-			algoAsset.services[0].files,
-			algoAsset,
-			this.providerUrl || this.macOsProviderUrl,
-			this.config,
-			this.aquarius,
-			encryptDDO
-		);
-		// add some more checks
+		try{ 
+				const algoDid = await createAssetUtil(
+					algoAsset.nft.name,
+					algoAsset.nft.symbol,
+					this.signer,
+					algoAsset.services[0].files,
+					algoAsset,
+					this.providerUrl || this.macOsProviderUrl,
+					this.config,
+					this.aquarius,
+					encryptDDO
+				);
+				// add some more checks
 		console.log("Algorithm published. DID:  " + algoDid);
+			} catch (e) {
+				console.error("Error when publishing dataset from file: " + args[1]);
+				console.error(e);
+				return;
+			}
+		
 	}
 
 	public async editAsset(args: string[]) {

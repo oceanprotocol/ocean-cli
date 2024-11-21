@@ -70,7 +70,7 @@ export async function createAssetUtil(
 	config: Config,
 	aquariusInstance: Aquarius,
 	encryptDDO: boolean = true,
-	templateIndex: number = 1,
+	templateId: number = 1,
 	providerFeeToken: string = ZERO_ADDRESS,
 	accessListFactory?: string,
 	allowAccessList?: string,
@@ -79,7 +79,7 @@ export async function createAssetUtil(
 	
 ) {
 	const { chainId } = await owner.provider.getNetwork();
-	if(templateIndex === 4){
+	if(templateId === 4){
 		// Wrap the signer for Sapphire
 		const wrappedSigner = sapphire.wrap(owner);
 
@@ -95,9 +95,9 @@ export async function createAssetUtil(
 			await owner.getAddress(),
 			[await owner.getAddress(), ZERO_ADDRESS]
 		)
-		return await createAsset(name, symbol, wrappedSigner, assetUrl, templateIndex, ddo, encryptDDO, providerUrl || macOsProviderUrl, providerFeeToken, aquariusInstance, accessListFactory, allowAccessList, denyAccessList);
+		return await createAsset(name, symbol, wrappedSigner, assetUrl, templateId, ddo, encryptDDO, providerUrl || macOsProviderUrl, providerFeeToken, aquariusInstance, accessListFactory, allowAccessList, denyAccessList);
 	}
-	return await createAsset(name, symbol, owner, assetUrl, templateIndex, ddo, encryptDDO, providerUrl || macOsProviderUrl, providerFeeToken, aquariusInstance);
+	return await createAsset(name, symbol, owner, assetUrl, templateId, ddo, encryptDDO, providerUrl || macOsProviderUrl, providerFeeToken, aquariusInstance);
 }
 
 

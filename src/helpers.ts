@@ -79,7 +79,7 @@ export async function createAssetUtil(
 	
 ) {
 	const { chainId } = await owner.provider.getNetwork();
-	if(templateId === 4){
+	if(templateId === 4 && config.sdk === 'oasis'){
 		// Wrap the signer for Sapphire
 		const wrappedSigner = sapphire.wrap(owner);
 

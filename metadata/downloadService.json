@@ -1,0 +1,25 @@
+{
+  "id": "ccb398c50d6abd5b456e8d7242bd856a1767a890b537c2f8c10ba8b8a10e6026",
+  "name": "Service 2",
+  "description": {
+    "@value": "Service 2 for accessing the dataset",
+    "@language": "en",
+    "@direction": "ltr"
+  },
+  "type": "access",
+  "datatokenAddress": "",
+  "files": {
+    "datatokenAddress": "",
+    "nftAddress": "",
+    "files": [
+      {
+        "type": "url",
+        "url": "https://dumps.wikimedia.org/enwiki/latest/enwiki-latest-abstract10.xml.gz-rss.xml",
+        "method": "GET"
+      }
+    ]
+  },
+  "credentials": [],
+  "serviceEndpoint": "",
+  "timeout": 86400
+}

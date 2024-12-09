@@ -78,7 +78,7 @@ export async function createAsset(
 	aquariusInstance: Aquarius,
 	templateIndex: number = 1,
 	macOsProviderUrl?: string,
-	encryptDDO: boolean = true,
+	encryptDDO: boolean = true
 ) {
 	const { chainId } = await owner.provider.getNetwork();
 	const nft = new Nft(owner, chainId);
@@ -118,7 +118,7 @@ export async function createAsset(
 		cap: "100000",
 		feeAmount: "0",
 		paymentCollector: await owner.getAddress(),
-		feeToken: config.oceanTokenAddress,
+		feeToken: ddo.stats.price.tokenAddress ? ddo.stats.price.tokenAddress : config.oceanTokenAddress,	
 		minter: await owner.getAddress(),
 		mpFeeAddress: ZERO_ADDRESS,
 	};

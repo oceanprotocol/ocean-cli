@@ -78,7 +78,7 @@ export async function createAsset(
 	aquariusInstance: Aquarius,
 	templateIndex: number = 1,
 	macOsProviderUrl?: string,
-	encryptDDO: boolean = true
+	encryptDDO: boolean = true,
 ) {
 	const { chainId } = await owner.provider.getNetwork();
 	const nft = new Nft(owner, chainId);

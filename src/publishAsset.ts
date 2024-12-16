@@ -5,7 +5,7 @@ import {
   Aquarius,
   DDO
 } from '@oceanprotocol/lib';
-import { createAsset, updateAssetMetadata } from './helpers';
+import { createAssetUtil, updateAssetMetadata } from './helpers';
 
 export interface PublishAssetParams {
   title: string;
@@ -44,13 +44,7 @@ export async function publishAsset(params: PublishAssetParams, signer: Signer, c
         license: 'MIT',
         tags: params.tags
       },
-      stats: {
-        allocated: 0,
-        orders: 0,
-        price: {
-          value: params.isCharged ? params.price : "0"
-        }
-      },
+     
       services: [
         {
           id: 'access',
@@ -62,15 +56,6 @@ export async function publishAsset(params: PublishAssetParams, signer: Signer, c
           timeout: Number(params.timeout),
         },
       ],
-      nft: {
-        address: "",
-        name: "Ocean Data NFT",
-        symbol: "OCEAN-NFT",
-        state: 5,
-        tokenURI: "",
-        owner: "",
-        created: ""
-      }
     };
 
     // Asset URL setup based on storage type
@@ -80,18 +65,17 @@ export async function publishAsset(params: PublishAssetParams, signer: Signer, c
       files: [{ type: params.storageType, url: params.assetLocation, method: 'GET' }],
     };
 
-      // Other networks
-      const did = await createAsset(
-        params.title,
-        'OCEAN-NFT',
-        signer,
-        assetUrl,
-        metadata,
-        params.providerUrl,
-        config,
-        aquarius,
-        params.template || 1
-      );
+    // Other networks
+    const did = await createAssetUtil(
+      params.title,
+      'OCEAN-NFT',
+      signer,
+      assetUrl,
+      metadata,
+      params.providerUrl,
+      config,
+      aquarius
+    );
 
 
     console.log(`Asset successfully published with DID: ${did}`);

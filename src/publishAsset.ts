@@ -5,7 +5,7 @@ import {
   Aquarius,
   DDO
 } from '@oceanprotocol/lib';
-import { createAsset, updateAssetMetadata } from './helpers';
+import { createAssetV4, updateAssetMetadata } from './helpers';
 
 export interface PublishAssetParams {
   title: string;
@@ -81,7 +81,7 @@ export async function publishAsset(params: PublishAssetParams, signer: Signer, c
     };
 
       // Other networks
-      const did = await createAsset(
+      const did = await createAssetV4(
         params.title,
         'OCEAN-NFT',
         signer,

@@ -1,0 +1,84 @@
+{
+  "@context": ["https://www.w3.org/2018/credentials/v1"],
+  "version": "5.0.0",
+  "credentialSubject": {
+    "id": "",
+    "metadata": {
+      "created": "2024-10-03T14:35:20Z",
+      "updated": "2024-10-03T14:35:20Z",
+      "type": "dataset",
+      "name": "DDO 5.0.0 Asset",
+      "description": {
+        "@value": "New asset published using ocean CLI tool with version 5.0.0",
+        "@language": "en",
+        "@direction": "ltr"
+      },
+      "copyrightHolder": "",
+      "providedBy": "",
+      "author": "oceanprotocol",
+      "license": {
+        "name": "https://market.oceanprotocol.com/terms"
+      },
+      "tags": ["version-5", "new-schema"],
+      "categories": ["data", "ocean-protocol"],
+      "additionalInformation": {
+        "termsAndConditions": true
+      }
+    },
+    "services": [
+      {
+        "id": "ccb398c50d6abd5b456e8d7242bd856a1767a890b537c2f8c10ba8b8a10e6025",
+        "type": "access",
+        "name": "Access Service",
+        "description": {
+          "@value": "Service for accessing the dataset",
+          "@language": "en",
+          "@direction": "ltr"
+        },
+        "datatokenAddress": "0x0",
+        "nftAddress": "",
+        "serviceEndpoint": "https://v4.provider.oceanprotocol.com",
+        "files": {
+          "datatokenAddress": "0x0",
+          "nftAddress": "0x0",
+          "files": [
+            {
+              "type": "url",
+              "url": "https://dumps.wikimedia.org/enwiki/latest/enwiki-latest-abstract10.xml.gz-rss.xml",
+              "method": "GET"
+            }
+          ]
+        },
+        "timeout": 86400,
+        "compute": {
+          "allowRawAlgorithm": false,
+          "allowNetworkAccess": true
+        },
+        "state": 0,
+        "credentials": []
+      }
+    ],
+    "credentials": [],
+    "chainId": 8996,
+    "nftAddress": ""
+  },
+  "issuer": "did:op:issuer-did",
+  "type": ["VerifiableCredential"],
+  "nft": {
+    "address": "",
+    "name": "Ocean Data NFT",
+    "symbol": "OCEAN-NFT",
+    "state": 5,
+    "tokenURI": "",
+    "owner": "",
+    "created": ""
+  },
+  "stats": {
+    "allocated": 0,
+    "orders": 0,
+    "price": {
+      "value": "0"
+    }
+  },
+  "additionalsDdos": []
+}

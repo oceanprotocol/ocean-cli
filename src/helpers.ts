@@ -82,7 +82,7 @@ export async function createAsset(
 ) {
 	const { chainId } = await owner.provider.getNetwork();
 	const nft = new Nft(owner, chainId);
-	const nftFactory = new NftFactory(config.nftFactoryAddress, owner);
+	const nftFactory = new NftFactory(config.nftFactoryAddress, owner, chainId, config);
 
 	let wrappedSigner
 	let allowListAddress
@@ -91,7 +91,7 @@ export async function createAsset(
 		wrappedSigner = sapphire.wrap(owner);
 
 		// Create Access List Factory
-		const accessListFactory = new AccesslistFactory(config.accessListFactory, wrappedSigner, chainId);
+		const accessListFactory = new AccesslistFactory(config.accessListFactory, wrappedSigner, chainId, config);
 
 		// Create Allow List
 		allowListAddress = await accessListFactory.deployAccessListContract(

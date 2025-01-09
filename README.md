@@ -81,6 +81,18 @@ export PROVIDER_URL='XXXX'
 export ADDRESS_FILE='path-to-address-file'
 ```
 
+- Optional set INDEXING_MAX_RETRIES to the max number of retries when waiting for an asset to be indexed. Default is 100 retries max.
+
+```
+export INDEXING_MAX_RETRIES='100'
+```
+
+- Optional set INDEXING_RETRY_INTERVAL to the interval (in miliseconds) for each retry when waiting for an asset to be indexed. Default is 3 seconds.
+
+```
+export INDEXING_RETRY_INTERVAL='3000'
+```
+
 ### Build the TypeScript code
 
 ```

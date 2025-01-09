@@ -118,7 +118,7 @@ export async function createAsset(
 		cap: "100000",
 		feeAmount: "0",
 		paymentCollector: await owner.getAddress(),
-		feeToken: config.oceanTokenAddress,
+		feeToken: ddo?.stats?.price?.tokenAddress ? ddo.stats.price.tokenAddress : config.oceanTokenAddress,	
 		minter: await owner.getAddress(),
 		mpFeeAddress: ZERO_ADDRESS,
 	};
@@ -433,4 +433,38 @@ export function isPrivateIP(ip): boolean {
 	}
 	return ip
  }
+ // for waiting for an asset to index
+ export interface IndexerWaitParams {
+	maxRetries: number,
+	retryInterval: number
+ }
 
+ // defines how much time we wait for an asset to index + the interval for retries
+ export function getIndexingWaitSettings(): IndexerWaitParams {
+	const indexingParams: IndexerWaitParams = {
+		maxRetries: 100, // 100 retries
+		retryInterval: 3000 // retries every 3 seconds
+	}
+	try {
+
+		if(!isNaN(Number(process.env.INDEXING_RETRY_INTERVAL))) {
+			
+			indexingParams.retryInterval = Number(process.env.INDEXING_RETRY_INTERVAL)
+			if(indexingParams.retryInterval < 0) {
+				indexingParams.retryInterval = 3000
+			}
+
+		}
+		if(!isNaN(Number(process.env.INDEXING_MAX_RETRIES))) {
+			
+			indexingParams.maxRetries = Number(process.env.INDEXING_MAX_RETRIES)
+			if(indexingParams.maxRetries < 0) {
+				indexingParams.maxRetries = 100
+			}
+		}
+	}catch(err) {
+		console.error('Error getting indexing wait arguments:' , err)
+	}
+	
+	return indexingParams
+ }

@@ -118,7 +118,7 @@ export async function createAsset(
 		cap: "100000",
 		feeAmount: "0",
 		paymentCollector: await owner.getAddress(),
-		feeToken: config.oceanTokenAddress,
+		feeToken: ddo?.stats?.price?.tokenAddress ? ddo.stats.price.tokenAddress : config.oceanTokenAddress,	
 		minter: await owner.getAddress(),
 		mpFeeAddress: ZERO_ADDRESS,
 	};

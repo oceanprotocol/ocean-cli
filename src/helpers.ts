@@ -126,7 +126,7 @@ export async function createAsset(
 
 	let bundleNFT;
 	const hasStatsPrice = ddo.stats && ddo.stats.price // are price stats defined?
-	const hasPriceValue = hasStatsPrice && !isNaN(ddo.stats.price) // avoid confusion with value '0'
+	const hasPriceValue = hasStatsPrice && !isNaN(ddo.stats.price.value) // avoid confusion with value '0'
 	// no price set
 	if (!hasPriceValue) { // !ddo.stats?.price?.value
 		bundleNFT = await nftFactory.createNftWithDatatoken(
@@ -134,7 +134,7 @@ export async function createAsset(
 			datatokenParams
 		);
 		// price is 0
-	} else if (hasPriceValue && Number(ddo.stats.price) === 0) { // ddo?.stats?.price?.value === "0"
+	} else if (hasPriceValue && Number(ddo.stats.price.value) === 0) { // ddo?.stats?.price?.value === "0"
 		const dispenserParams: DispenserCreationParams = {
 			dispenserAddress: config.dispenserAddress,
 			maxTokens: "1",

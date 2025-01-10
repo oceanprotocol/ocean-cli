@@ -82,7 +82,7 @@ export async function createAsset(
 ) {
 	const { chainId } = await owner.provider.getNetwork();
 	const nft = new Nft(owner, chainId);
-	const nftFactory = new NftFactory(config.nftFactoryAddress, owner);
+	const nftFactory = new NftFactory(config.nftFactoryAddress, owner, chainId, config);
 
 	let wrappedSigner
 	let allowListAddress
@@ -91,7 +91,7 @@ export async function createAsset(
 		wrappedSigner = sapphire.wrap(owner);
 
 		// Create Access List Factory
-		const accessListFactory = new AccesslistFactory(config.accessListFactory, wrappedSigner, chainId);
+		const accessListFactory = new AccesslistFactory(config.accessListFactory, wrappedSigner, chainId, config);
 
 		// Create Allow List
 		allowListAddress = await accessListFactory.deployAccessListContract(
@@ -118,18 +118,23 @@ export async function createAsset(
 		cap: "100000",
 		feeAmount: "0",
 		paymentCollector: await owner.getAddress(),
+		// use ocean token as default for fees, only if we don't have another specific fee token
 		feeToken: ddo?.stats?.price?.tokenAddress ? ddo.stats.price.tokenAddress : config.oceanTokenAddress,	
 		minter: await owner.getAddress(),
 		mpFeeAddress: ZERO_ADDRESS,
 	};
 
 	let bundleNFT;
-	if (!ddo.stats?.price?.value) {
+	const hasStatsPrice = ddo.stats && ddo.stats.price // are price stats defined?
+	const hasPriceValue = hasStatsPrice && !isNaN(ddo.stats.price.value) // avoid confusion with value '0'
+	// no price set
+	if (!hasPriceValue) { // !ddo.stats?.price?.value
 		bundleNFT = await nftFactory.createNftWithDatatoken(
 			nftParamsAsset,
 			datatokenParams
 		);
-	} else if (ddo?.stats?.price?.value === "0") {
+		// price is 0
+	} else if (hasPriceValue && Number(ddo.stats.price.value) === 0) { // ddo?.stats?.price?.value === "0"
 		const dispenserParams: DispenserCreationParams = {
 			dispenserAddress: config.dispenserAddress,
 			maxTokens: "1",
@@ -144,6 +149,7 @@ export async function createAsset(
 			dispenserParams
 		);
 	} else {
+		// price is <> 0
 		const fixedPriceParams: FreCreationParams = {
 			fixedRateAddress: config.fixedRateExchangeAddress,
 			baseTokenAddress: config.oceanTokenAddress,
@@ -151,7 +157,7 @@ export async function createAsset(
 			marketFeeCollector: await owner.getAddress(),
 			baseTokenDecimals: 18,
 			datatokenDecimals: 18,
-			fixedRate: ddo.stats.price.value,
+			fixedRate: ddo.stats.price.value, // we have a fixed rate price here
 			marketFee: "0",
 			allowedConsumer: await owner.getAddress(),
 			withMint: true,

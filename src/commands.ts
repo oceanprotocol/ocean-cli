@@ -207,7 +207,7 @@ export class Commands {
 				? this.macOsProviderUrl
 				: dataDdo.services[0].serviceEndpoint;
 		console.log("Downloading asset using provider: ", providerURI);
-		const datatoken = new Datatoken(this.signer, this.config.chainId);
+		const datatoken = new Datatoken(this.signer, this.config.chainId, this.config);
 
 		const tx = await orderAsset(
 			dataDdo,
@@ -296,7 +296,8 @@ export class Commands {
 
 		const datatoken = new Datatoken(
 			this.signer,
-			(await this.signer.provider.getNetwork()).chainId
+			(await this.signer.provider.getNetwork()).chainId,
+			this.config
 		);
 
 		const mytime = new Date();

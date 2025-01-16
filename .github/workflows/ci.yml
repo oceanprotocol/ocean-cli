@@ -96,8 +96,6 @@ jobs:
           docker image rm node:20-alpine
           docker image rm node:18
           docker image rm node:18-alpine
-          docker image rm node:16
-          docker image rm node:16-alpine
           docker image rm debian:10
           docker image rm debian:11
           docker image rm ubuntu:22.04
@@ -142,6 +140,7 @@ jobs:
           FEE_AMOUNT: '{ "amount": 1, "unit": "MB" }'
           AUTHORIZED_DECRYPTERS: '["0xe2DD09d719Da89e5a3D0F2549c7E24566e947260"]'
           ALLOWED_ADMINS: '["0xe2DD09d719Da89e5a3D0F2549c7E24566e947260"]'
+          MAX_REQ_PER_MINUTE: 320
       - name: Check Ocean Node is running
         run: |
           for i in $(seq 1 30); do

@@ -21,9 +21,6 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Link dependencies
-        run: npm link @oceanprotocol/lib
-
       - name: Run build
         run: npm run build
 

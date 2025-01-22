@@ -8,6 +8,8 @@ import {
 	downloadFile,
 	isOrderable,
 	getMetadataURI,
+	getIndexingWaitSettings,
+	IndexerWaitParams,
 } from "./helpers";
 import {
 	Aquarius,
@@ -34,11 +36,14 @@ export class Commands {
 	public aquarius: Aquarius;
 	public providerUrl: string;
 	public macOsProviderUrl: string;
+	// optional settings for indexing wait time
+	private indexingParams: IndexerWaitParams;
 
 	constructor(signer: Signer, network: string | number, config?: Config) {
 		this.signer = signer;
 		this.config = config || new ConfigHelper().getConfig(network);
 		this.providerUrl = process.env.NODE_URL || process.env.PROVIDER_URL || this.config.providerUri;
+		this.indexingParams = getIndexingWaitSettings();
 		if (
 			!process.env.PROVIDER_URL && !process.env.NODE_URL &&
 			this.config.chainId === 8996 &&
@@ -145,7 +150,7 @@ export class Commands {
 	}
 
 	public async editAsset(args: string[]) {
-		const asset = await this.aquarius.waitForAqua(args[1]);
+		const asset = await this.aquarius.waitForIndexer(args[1],null,null, this.indexingParams.retryInterval, this.indexingParams.maxRetries);
 		if (!asset) {
 			console.error(
 				"Error fetching DDO " + args[1] + ".  Does this asset exists?"
@@ -181,7 +186,7 @@ export class Commands {
 
 	public async getDDO(args: string[]) {
 		console.log("Resolving Asset with DID: " + args[1]);
-		const resolvedDDO = await this.aquarius.waitForAqua(args[1]);
+		const resolvedDDO = await this.aquarius.waitForIndexer(args[1],null,null, this.indexingParams.retryInterval, this.indexingParams.maxRetries);
 		if (!resolvedDDO) {
 			console.error(
 				"Error fetching Asset with DID: " +
@@ -192,7 +197,7 @@ export class Commands {
 	}
 
 	public async download(args: string[]) {
-		const dataDdo = await this.aquarius.waitForAqua(args[1]);
+		const dataDdo = await this.aquarius.waitForIndexer(args[1],null,null, this.indexingParams.retryInterval, this.indexingParams.maxRetries);
 		if (!dataDdo) {
 			console.error(
 				"Error fetching DDO " + args[1] + ".  Does this asset exists?"
@@ -205,7 +210,7 @@ export class Commands {
 				? this.macOsProviderUrl
 				: dataDdo.services[0].serviceEndpoint;
 		console.log("Downloading asset using provider: ", providerURI);
-		const datatoken = new Datatoken(this.signer, this.config.chainId);
+		const datatoken = new Datatoken(this.signer, this.config.chainId, this.config);
 
 		const tx = await orderAsset(
 			dataDdo,
@@ -261,7 +266,7 @@ export class Commands {
 		const ddos = [];
 
 		for (const dataset in inputDatasets) {
-			const dataDdo = await this.aquarius.waitForAqua(inputDatasets[dataset]);
+			const dataDdo = await this.aquarius.waitForIndexer(inputDatasets[dataset],null,null, this.indexingParams.retryInterval, this.indexingParams.maxRetries);
 			if (!dataDdo) {
 				console.error(
 					"Error fetching DDO " + dataset[1] + ".  Does this asset exists?"
@@ -280,7 +285,7 @@ export class Commands {
 				? this.macOsProviderUrl
 				: ddos[0].services[0].serviceEndpoint;
 
-		const algoDdo = await this.aquarius.waitForAqua(args[2]);
+		const algoDdo = await this.aquarius.waitForIndexer(args[2],null,null, this.indexingParams.retryInterval, this.indexingParams.maxRetries);
 		if (!algoDdo) {
 			console.error(
 				"Error fetching DDO " + args[1] + ".  Does this asset exists?"
@@ -294,7 +299,8 @@ export class Commands {
 
 		const datatoken = new Datatoken(
 			this.signer,
-			(await this.signer.provider.getNetwork()).chainId
+			(await this.signer.provider.getNetwork()).chainId,
+			this.config
 		);
 
 		const mytime = new Date();
@@ -439,7 +445,7 @@ export class Commands {
 	}
 
 	public async computeStop(args: string[]) {
-		const dataDdo = await this.aquarius.waitForAqua(args[1]);
+		const dataDdo = await this.aquarius.waitForIndexer(args[1],null,null, this.indexingParams.retryInterval, this.indexingParams.maxRetries);
 		if (!dataDdo) {
 			console.error(
 				"Error fetching DDO " + args[1] + ".  Does this asset exists?"
@@ -471,7 +477,7 @@ export class Commands {
 	}
 
 	public async allowAlgo(args: string[]) {
-		const asset = await this.aquarius.waitForAqua(args[1]);
+		const asset = await this.aquarius.waitForIndexer(args[1],null,null, this.indexingParams.retryInterval, this.indexingParams.maxRetries);
 		if (!asset) {
 			console.error(
 				"Error fetching DDO " + args[1] + ".  Does this asset exists?"
@@ -494,7 +500,7 @@ export class Commands {
 			);
 			return;
 		}
-		const algoAsset = await this.aquarius.waitForAqua(args[2]);
+		const algoAsset = await this.aquarius.waitForIndexer(args[2],null,null, this.indexingParams.retryInterval, this.indexingParams.maxRetries);
 		if (!algoAsset) {
 			console.error(
 				"Error fetching DDO " + args[2] + ".  Does this asset exists?"
@@ -541,7 +547,7 @@ export class Commands {
 	}
 
 	public async disallowAlgo(args: string[]) {
-		const asset = await this.aquarius.waitForAqua(args[1]);
+		const asset = await this.aquarius.waitForIndexer(args[1],null,null, this.indexingParams.retryInterval, this.indexingParams.maxRetries);
 		if (!asset) {
 			console.error(
 				"Error fetching DDO " + args[1] + ".  Does this asset exists?"
@@ -606,7 +612,7 @@ export class Commands {
 		// args[3] - agreementId
 		const hasAgreementId = args.length === 4;
 		
-		const dataDdo = await this.aquarius.waitForAqua(args[1]);
+		const dataDdo = await this.aquarius.waitForIndexer(args[1],null,null, this.indexingParams.retryInterval, this.indexingParams.maxRetries);
 		if (!dataDdo) {
 			console.error(
 				"Error fetching DDO " + args[1] + ".  Does this asset exists?"

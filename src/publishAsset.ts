@@ -3,7 +3,7 @@ import { Signer } from 'ethers';
 import {
   Config,
   Aquarius,
-  DDO
+  Asset
 } from '@oceanprotocol/lib';
 import { createAssetUtil, updateAssetMetadata } from './helpers';
 
@@ -28,7 +28,7 @@ export async function publishAsset(params: PublishAssetParams, signer: Signer, c
     const aquarius = new Aquarius(config.metadataCacheUri);
 
     // Prepare initial metadata for the asset
-    const metadata: DDO = {
+    const metadata: Asset = {
       '@context': ['https://w3id.org/did/v1'],
       id: '', // Will be updated after creating asset
       version: '4.1.0',
@@ -44,7 +44,13 @@ export async function publishAsset(params: PublishAssetParams, signer: Signer, c
         license: 'MIT',
         tags: params.tags
       },
-     
+      stats: {
+        allocated: 0,
+        orders: 0,
+        price: {
+          value: params.isCharged ? Number(params.price) : 0
+        }
+      },
       services: [
         {
           id: 'access',
@@ -56,6 +62,18 @@ export async function publishAsset(params: PublishAssetParams, signer: Signer, c
           timeout: Number(params.timeout),
         },
       ],
+      nft: {
+        address: "",
+        name: "Ocean Data NFT",
+        symbol: "OCEAN-NFT",
+        state: 5,
+        tokenURI: "",
+        owner: "",
+        created: ""
+      },
+      datatokens: [],
+      event: undefined,
+      purgatory: undefined
     };
 
     // Asset URL setup based on storage type

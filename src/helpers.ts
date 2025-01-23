@@ -22,7 +22,8 @@ import {
 	ProviderFees,
 	ComputeAlgorithm,
 	LoggerInstance,
-	createAsset
+	createAsset,
+	calculateActiveTemplateIndex
 } from "@oceanprotocol/lib";
 import { hexlify } from "ethers/lib/utils";
 
@@ -79,6 +80,7 @@ export async function createAssetUtil(
 	
 ) {
 	const { chainId } = await owner.provider.getNetwork();
+	const templateIndex = await calculateActiveTemplateIndex(owner, config.nftFactoryAddress, templateId);
 	if(templateId === 4 && config.sdk === 'oasis'){
 		// Wrap the signer for Sapphire
 		const wrappedSigner = sapphire.wrap(owner);
@@ -95,9 +97,9 @@ export async function createAssetUtil(
 			await owner.getAddress(),
 			[await owner.getAddress(), ZERO_ADDRESS]
 		)
-		return await createAsset(name, symbol, wrappedSigner, assetUrl, templateId, ddo, encryptDDO, providerUrl || macOsProviderUrl, providerFeeToken, aquariusInstance, accessListFactory, allowAccessList, denyAccessList);
+		return await createAsset(name, symbol, wrappedSigner, assetUrl, templateIndex, ddo, encryptDDO, providerUrl || macOsProviderUrl, providerFeeToken, aquariusInstance, accessListFactory, allowAccessList, denyAccessList);
 	}
-	return await createAsset(name, symbol, owner, assetUrl, templateId, ddo, encryptDDO, providerUrl || macOsProviderUrl, providerFeeToken, aquariusInstance);
+	return await createAsset(name, symbol, owner, assetUrl, templateIndex, ddo, encryptDDO, providerUrl || macOsProviderUrl, providerFeeToken, aquariusInstance);
 }
 
 

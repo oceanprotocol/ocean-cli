@@ -7,6 +7,7 @@ import {
 	AccesslistFactory,
 	Aquarius,
 	Nft,
+	NftFactory,
 	ProviderInstance,
 	ZERO_ADDRESS,
 	approveWei,
@@ -22,10 +23,11 @@ import {
 	ProviderFees,
 	ComputeAlgorithm,
 	LoggerInstance,
-	createAsset,
-	calculateActiveTemplateIndex
+	createAsset
 } from "@oceanprotocol/lib";
 import { hexlify } from "ethers/lib/utils";
+import ERC20Template from '@oceanprotocol/contracts/artifacts/contracts/templates/ERC20Template.sol/ERC20Template.json';
+
 
 export async function downloadFile(
 	url: string,
@@ -60,6 +62,42 @@ export async function downloadFile(
 
 	return { data, filename };
 }
+
+export async function calculateActiveTemplateIndex(
+	owner: Signer,
+	nftContractAddress: string, // addresses.ERC721Factory,
+	template: string | number
+  ): Promise<number> {
+	// is an ID number?
+	const isTemplateID = typeof template === 'number'
+  
+	const factoryERC721 = new NftFactory(nftContractAddress, owner)
+	const currentTokenCount = await factoryERC721.getCurrentTokenTemplateCount()
+	for (let i = 1; i <= currentTokenCount; i++) {
+	  const tokenTemplate = await factoryERC721.getTokenTemplate(i)
+  
+	  const erc20Template = new ethers.Contract(
+		tokenTemplate.templateAddress,
+		ERC20Template.abi,
+		owner
+	  )
+  
+	  // check for ID
+	  if (isTemplateID) {
+		const id = await erc20Template.connect(owner).getId()
+		if (tokenTemplate.isActive && id.toString() === template.toString()) {
+		  return i
+		}
+	  } else if (
+		tokenTemplate.isActive &&
+		tokenTemplate.templateAddress === template.toString()
+	  ) {
+		return i
+	  }
+	}
+	// if nothing is found it returns -1
+	return -1
+  }
 
 export async function createAssetUtil(
 	name: string,

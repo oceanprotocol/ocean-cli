@@ -23,9 +23,7 @@ import {
 	ProviderFees,
 	ComputeAlgorithm,
 	LoggerInstance,
-	createAsset,
-	getSignerAccordingSdk,
-	SmartContract
+	createAsset
 } from "@oceanprotocol/lib";
 import { hexlify } from "ethers/lib/utils";
 import ERC20Template from '@oceanprotocol/contracts/artifacts/contracts/templates/ERC20Template.sol/ERC20Template.json';
@@ -146,9 +144,9 @@ export async function createAssetUtil(
 			await owner.getAddress(),
 			[await owner.getAddress(), ZERO_ADDRESS]
 		)
-		return await createAsset(name, symbol, signer, assetUrl, templateId, ddo, encryptDDO, providerUrl || macOsProviderUrl, providerFeeToken, aquariusInstance, accessListFactory, allowAccessList, denyAccessList);
+		return await createAsset(name, symbol, signer, assetUrl, templateIDorAddress, ddo, encryptDDO, providerUrl || macOsProviderUrl, providerFeeToken, aquariusInstance, accessListFactory, allowAccessList, denyAccessList);
 	}
-	return await createAsset(name, symbol, signer, assetUrl, templateId, ddo, encryptDDO, providerUrl || macOsProviderUrl, providerFeeToken, aquariusInstance);
+	return await createAsset(name, symbol, signer, assetUrl, templateIDorAddress, ddo, encryptDDO, providerUrl || macOsProviderUrl, providerFeeToken, aquariusInstance);
 }
 
 

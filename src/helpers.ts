@@ -23,7 +23,9 @@ import {
 	ProviderFees,
 	ComputeAlgorithm,
 	LoggerInstance,
-	createAsset
+	createAsset,
+	getSignerAccordingSdk,
+	SmartContract
 } from "@oceanprotocol/lib";
 import { hexlify } from "ethers/lib/utils";
 import ERC20Template from '@oceanprotocol/contracts/artifacts/contracts/templates/ERC20Template.sol/ERC20Template.json';
@@ -99,6 +101,12 @@ export async function calculateActiveTemplateIndex(
 	return -1
   }
 
+export function getSignerAccordingSdk(signer: Signer, config: Config) {
+    return config && 'sdk' in config && config.sdk === 'oasis'
+      ? sapphire.wrap(signer)
+      : signer
+  }
+
 export async function createAssetUtil(
 	name: string,
 	symbol: string,
@@ -109,7 +117,7 @@ export async function createAssetUtil(
 	config: Config,
 	aquariusInstance: Aquarius,
 	encryptDDO: boolean = true,
-	templateId: number = 1,
+	templateIDorAddress: string | number = 1, // If string, it's template address , otherwise, it's templateId,
 	providerFeeToken: string = ZERO_ADDRESS,
 	accessListFactory?: string,
 	allowAccessList?: string,
@@ -117,14 +125,17 @@ export async function createAssetUtil(
 	macOsProviderUrl?: string,
 	
 ) {
+	const isAddress = typeof templateIDorAddress === 'string'
+	const isTemplateIndex = typeof templateIDorAddress === 'number'
+	if (!isAddress && !isTemplateIndex) {
+		throw new Error('Invalid template! Must be a "number" or a "string"')
+	}
 	const { chainId } = await owner.provider.getNetwork();
-	const templateIndex = await calculateActiveTemplateIndex(owner, config.nftFactoryAddress, templateId);
-	if(templateId === 4 && config.sdk === 'oasis'){
-		// Wrap the signer for Sapphire
-		const wrappedSigner = sapphire.wrap(owner);
+	const signer = getSignerAccordingSdk(owner, config);
 
+	if(config.sdk === 'oasis'){
 		// Create Access List Factory
-		const accessListFactoryObj = new AccesslistFactory(config.accessListFactory, wrappedSigner, chainId);
+		const accessListFactoryObj = new AccesslistFactory(config.accessListFactory, signer, chainId);
 
 		// Create Allow List
 		await accessListFactoryObj.deployAccessListContract(
@@ -135,9 +146,9 @@ export async function createAssetUtil(
 			await owner.getAddress(),
 			[await owner.getAddress(), ZERO_ADDRESS]
 		)
-		return await createAsset(name, symbol, wrappedSigner, assetUrl, templateIndex, ddo, encryptDDO, providerUrl || macOsProviderUrl, providerFeeToken, aquariusInstance, accessListFactory, allowAccessList, denyAccessList);
+		return await createAsset(name, symbol, signer, assetUrl, templateId, ddo, encryptDDO, providerUrl || macOsProviderUrl, providerFeeToken, aquariusInstance, accessListFactory, allowAccessList, denyAccessList);
 	}
-	return await createAsset(name, symbol, owner, assetUrl, templateIndex, ddo, encryptDDO, providerUrl || macOsProviderUrl, providerFeeToken, aquariusInstance);
+	return await createAsset(name, symbol, signer, assetUrl, templateId, ddo, encryptDDO, providerUrl || macOsProviderUrl, providerFeeToken, aquariusInstance);
 }
 
 

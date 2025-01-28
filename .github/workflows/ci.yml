@@ -92,15 +92,15 @@ jobs:
       - run: docker image ls
       - name: Delete default runner images
         run: |
-          docker image rm node:20
-          docker image rm node:20-alpine
-          docker image rm node:18
-          docker image rm node:18-alpine
-          docker image rm debian:10
-          docker image rm debian:11
-          docker image rm ubuntu:22.04
-          docker image rm ubuntu:20.04
-          docker image rm moby/buildkit:latest
+          docker image rm -f node:20
+          docker image rm -f node:20-alpine
+          docker image rm -f node:18
+          docker image rm -f node:18-alpine
+          docker image rm -f debian:10
+          docker image rm -f debian:11
+          docker image rm -f ubuntu:22.04
+          docker image rm -f ubuntu:20.04
+          docker image rm -f moby/buildkit:latest
           rm -rf /usr/share/swift/
 
       - name: Wait for contracts deployment and C2D cluster to be ready

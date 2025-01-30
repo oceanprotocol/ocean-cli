@@ -1,0 +1,89 @@
+{
+  "@context": ["https://www.w3.org/ns/credentials/v2"],
+  "version": "5.0.0",
+  "id": "did:ope",
+  "credentialSubject": {
+    "id": "",
+    "metadata": {
+      "created": "2021-12-20T14:35:20Z",
+      "updated": "2021-12-20T14:35:20Z",
+      "type": "dataset",
+      "name": "CLi fixed asset",
+      "description": {
+        "@value": "New asset published using ocean CLI tool with version 5.0.0",
+        "@language": "en",
+        "@direction": "ltr"
+      },
+      "tags": ["test"],
+      "author": "oceanprotocol",
+      "providedBy": "oceanprotocol",
+      "copyrightHolder": "copirightHolder",
+      "license": {
+        "name": "https://market.oceanprotocol.com/terms"
+      },
+      "categories": ["data", "ocean-protocol"],
+      "additionalInformation": {
+        "termsAndConditions": true
+      }
+    },
+    "services": [
+      {
+        "id": "ccb398c50d6abd5b456e8d7242bd856a1767a890b537c2f8c10ba8b8a10e6025",
+        "type": "access",
+        "name": "service 1",
+        "description": {
+          "@value": "Service for accessing the dataset",
+          "@language": "en",
+          "@direction": "ltr"
+        },
+        "files": {
+          "datatokenAddress": "0x0",
+          "nftAddress": "0x0",
+          "files": [
+            {
+              "type": "url",
+              "url": "https://raw.githubusercontent.com/oceanprotocol/c2d-examples/main/branin_and_gpr/branin.arff",
+              "method": "GET"
+            }
+          ]
+        },
+        "datatokenAddress": "",
+        "serviceEndpoint": "http://10.84.128.6:8001",
+        "timeout": 86400,
+        "compute": {
+          "allowRawAlgorithm": false,
+          "allowNetworkAccess": true,
+          "publisherTrustedAlgorithmPublishers": [],
+          "publisherTrustedAlgorithms": []
+        },
+        "credentials": [],
+        "state": 0
+      }
+    ],
+    "datatokens": [],
+    "credentials": [],
+    "chainId": 8996,
+    "nftAddress": "",
+    "stats": {
+      "allocated": 0,
+      "orders": 0,
+      "price": {
+        "value": "0"
+      }
+    },
+    "nft": {
+      "address": "",
+      "name": "Ocean Data NFT",
+      "symbol": "OCEAN-NFT",
+      "state": 5,
+      "tokenURI": "",
+      "owner": "",
+      "created": ""
+    },
+    "purgatory": {
+      "state": false
+    }
+  },
+  "issuer": "did:op:issuer-did",
+  "type": ["VerifiableCredential"]
+}

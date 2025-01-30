@@ -6,16 +6,18 @@
     "allowSyntheticDefaultImports": true,
     "lib": ["ESNext", "dom"],
     "declaration": true,
-    "target": "es6",
-    "module": "commonjs",
-    "removeComments": true,
+    "module": "ESNext",
+    "target": "ES2020",
+    "removeComments": false,
     "experimentalDecorators": true,
     "preserveConstEnums": true,
-    "outDir": "./dist/node/",
-    "rootDir": "./src/",
+    "outDir": "./dist",
     "sourceMap": true,
-    "typeRoots": ["node_modules/@types"]
+    "skipLibCheck": true,
+    "baseUrl": "./src",
+    "allowImportingTsExtensions": true,
+    "emitDeclarationOnly": true,
   },
-  "include": ["src/**/*", "src/tests/**/*"],
-  "exclude": ["node_modules"]
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
 }

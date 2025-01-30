@@ -10,7 +10,7 @@ import {
 	getMetadataURI,
 	getIndexingWaitSettings,
 	IndexerWaitParams,
-} from "./helpers";
+} from "./helpers.js";
 import {
 	Aquarius,
 	Asset,
@@ -25,10 +25,11 @@ import {
 	getHash,
 	orderAsset,
 	sendTx,
-} from "@oceanprotocol/lib";
+} from "@oceanprotocol/lib"
 import { Signer, ethers } from "ethers";
-import { interactiveFlow } from "./interactiveFlow";
-import { publishAsset } from "./publishAsset";
+import { interactiveFlow } from "./interactiveFlow.js";
+import { publishAsset } from "./publishAsset.js";
+import { DDOManager } from 'ddo.js';
 
 export class Commands {
 	public signer: Signer;
@@ -96,12 +97,15 @@ export class Commands {
 		}
 		const encryptDDO = args[2] === "false" ? false : true;
 		try {
+			const ddoInstance = DDOManager.getDDOClass(asset);
+			const { nft } = ddoInstance.getAssetFields();
+			const { services } = ddoInstance.getDDOFields();
 			// add some more checks
 			const urlAssetId = await createAsset(
-				asset.nft.name,
-				asset.nft.symbol,
+				nft.name,
+				nft.symbol,
 				this.signer,
-				asset.services[0].files,
+				services[0].files,
 				asset,
 				this.providerUrl,
 				this.config,
@@ -201,11 +205,13 @@ export class Commands {
 			);
 			return;
 		}
+		const ddoInstance = DDOManager.getDDOClass(dataDdo);
+		const { services } = ddoInstance.getDDOFields();
 
 		const providerURI =
 			this.macOsProviderUrl && dataDdo.chainId === 8996
 				? this.macOsProviderUrl
-				: dataDdo.services[0].serviceEndpoint;
+				: services[0].serviceEndpoint;
 		console.log("Downloading asset using provider: ", providerURI);
 		const datatoken = new Datatoken(this.signer, this.config.chainId);
 
@@ -228,7 +234,7 @@ export class Commands {
 
 		const urlDownloadUrl = await ProviderInstance.getDownloadUrl(
 			dataDdo.id,
-			dataDdo.services[0].id,
+			services[0].id,
 			0,
 			orderTx.transactionHash,
 			providerURI,

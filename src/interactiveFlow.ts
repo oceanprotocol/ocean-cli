@@ -1,6 +1,7 @@
 // interactiveFlow.ts
-import { prompt } from 'enquirer';
-import { PublishAssetParams } from './publishAsset';
+import enquirer from 'enquirer';
+const { prompt } = enquirer;
+import { PublishAssetParams } from './publishAsset.js';
 import chalk from 'chalk';
 import figlet from 'figlet';
 

@@ -1,5 +1,5 @@
 import { ethers } from "ethers";
-import { Commands } from "./commands";
+import { Commands } from "./commands.ts";
 
 if (!process.env.MNEMONIC && !process.env.PRIVATE_KEY) {
 	console.error("Have you forgot to set MNEMONIC or PRIVATE_KEY?");
@@ -58,68 +58,68 @@ function help() {
 
 async function start() {
 	const provider = new ethers.providers.JsonRpcProvider(process.env.RPC);
-	console.log("Using RPC: " + process.env.RPC);
-	let signer;
+    console.log("Using RPC: " + process.env.RPC);
+    let signer;
 	if (process.env.PRIVATE_KEY)
 		signer = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
 	else {
 		signer = ethers.Wallet.fromMnemonic(process.env.MNEMONIC);
 		signer = await signer.connect(provider);
-	}
+    }
 	console.log("Using account: " + (await signer.getAddress()));
 
-	const { chainId } = await signer.provider.getNetwork();
-	const commands = new Commands(signer, chainId);
-	const myArgs = process.argv.slice(2);
-	switch (myArgs[0]) {
-		case "start":
+    const { chainId } = await signer.provider.getNetwork();
+    const commands = new Commands(signer, chainId);
+    const myArgs = process.argv.slice(2);
+    switch (myArgs[0]) {
+        case "start":
 			await commands.start()
 			break
-		case "getDDO":
-			await commands.getDDO(myArgs);
+        case "getDDO":
+            await commands.getDDO(myArgs);
+            break;
+        case "publish":
+            await commands.publish(myArgs);
+            break;
+        case "publishAlgo":
+            await commands.publishAlgo(myArgs);
+            break;
+        case "edit":
+            await commands.editAsset(myArgs);
+            break;
+        case "download":
+            await commands.download(myArgs);
+            break;
+        case "allowAlgo":
+            await commands.allowAlgo(myArgs);
+            break;
+        case "disallowAlgo":
+            await commands.disallowAlgo(myArgs);
+            break;
+        case "startCompute":
+            await commands.computeStart(myArgs);
+            break;
+        case "stopCompute":
+            await commands.computeStop(myArgs);
+            break;
+        case "getJobStatus":
+            await commands.getJobStatus(myArgs);
+            break;
 			break;
-		case "publish":
-			await commands.publish(myArgs);
-			break;
-		case "publishAlgo":
-			await commands.publishAlgo(myArgs);
-			break;
-		case "edit":
-			await commands.editAsset(myArgs);
-			break;
-		case "download":
-			await commands.download(myArgs);
-			break;
-		case "allowAlgo":
-			await commands.allowAlgo(myArgs);
-			break;
-		case "disallowAlgo":
-			await commands.disallowAlgo(myArgs);
-			break;
-		case "startCompute":
-			await commands.computeStart(myArgs);
-			break;
-		case "stopCompute":
-			await commands.computeStop(myArgs);
-			break;
-		case "getJobStatus":
-			await commands.getJobStatus(myArgs);
-			break;
-			break;
-		case "downloadJobResults":
-			await commands.downloadJobResults(myArgs);
-			break;
-		case "mintOcean":
-			await commands.mintOceanTokens();
-			break;
-		case "h":
-			help();
-			break;
-		default:
+        case "downloadJobResults":
+            await commands.downloadJobResults(myArgs);
+            break;
+        case "mintOcean":
+            await commands.mintOceanTokens();
+            break;
+        case "h":
+            help();
+            break;
+        default:
 			console.error("Not sure what command to use ? use h for help.");
-			break;
-	}
-	process.exit(0);
+            break;
+    }
+    process.exit(0);
 }
 
 start();

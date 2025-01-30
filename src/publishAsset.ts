@@ -5,7 +5,7 @@ import {
   Aquarius,
   Asset
 } from '@oceanprotocol/lib';
-import { createAsset, updateAssetMetadata } from './helpers';
+import { createAsset, updateAssetMetadata } from './helpers.js';
 
 export interface PublishAssetParams {
   title: string;

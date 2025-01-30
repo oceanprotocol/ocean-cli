@@ -205,10 +205,10 @@ export async function createAsset(
     templateIndex === 4
       ? ""
       : await ProviderInstance.encrypt(
-          assetUrl,
-          chainId,
-          macOsProviderUrl || providerUrl
-        );
+        assetUrl,
+        chainId,
+        macOsProviderUrl || providerUrl
+      );
   services[0].datatokenAddress = datatokenAddressAsset;
   services[0].serviceEndpoint = providerUrl;
 
@@ -249,7 +249,7 @@ export async function createAsset(
   const metadataIPFSHash =
     "0x" + createHash("sha256").update(stringDDO).digest("hex");
 
-  const x = await nft.setMetadata(
+  await nft.setMetadata(
     nftAddress,
     await owner.getAddress(),
     0,
@@ -259,9 +259,6 @@ export async function createAsset(
     metadataIPFS,
     metadataIPFSHash
   );
-
-  const res = await x.wait();
-  console.log("Data from transaction setMetadata... ", res);
 
   if (templateIndex === 4) {
     // Use Datatoken4 for file object

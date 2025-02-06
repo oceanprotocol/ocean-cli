@@ -28,9 +28,6 @@ async function initializeSigner() {
 }
 
 export async function createCLI() {
-  const { signer, chainId } = await initializeSigner();
-  const commands = new Commands(signer, chainId);
-
   const program = new Command();
 
   program
@@ -38,14 +35,25 @@ export async function createCLI() {
     .description('CLI tool to interact with Ocean Protocol')
     .version('2.0.0')
     .helpOption('-h, --help', 'Display help for command')
-    .helpCommand('help [command]', 'Display help for command');
+    .command('help')
+    .alias('h') 
+    .description('Display help for all commands')
+    .action(() => {
+      program.outputHelp();
+    })
+    .helpCommand('help [command]', 'Display help for specific command')
+    .configureOutput({
+      outputError: (str, write) => write(chalk.red(str))
+    });
 
-  // getDDO command
+  // Add commands before initializing signer
   program
     .command('getDDO')
     .description('Gets DDO for an asset using the asset did')
     .argument('<did>', 'The asset DID')
     .action(async (did) => {
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
       await commands.getDDO([null, did]);
     });
 
@@ -56,6 +64,8 @@ export async function createCLI() {
     .argument('<metadataFile>', 'Path to metadata file')
     .option('-e, --encrypt [boolean]', 'Encrypt DDO', true)
     .action(async (metadataFile, options) => {
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
       await commands.publish([null, metadataFile, options.encrypt.toString()]);
     });
 
@@ -66,6 +76,8 @@ export async function createCLI() {
     .argument('<metadataFile>', 'Path to metadata file')
     .option('-e, --encrypt [boolean]', 'Encrypt DDO', true)
     .action(async (metadataFile, options) => {
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
       await commands.publishAlgo([null, metadataFile, options.encrypt.toString()]);
     });
 
@@ -77,6 +89,8 @@ export async function createCLI() {
     .argument('<metadataFile>', 'Updated metadata file')
     .option('-e, --encrypt [boolean]', 'Encrypt DDO', true)
     .action(async (datasetDid, metadataFile, options) => {
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
       await commands.editAsset([null, datasetDid, metadataFile, options.encrypt.toString()]);
     });
 
@@ -87,6 +101,8 @@ export async function createCLI() {
     .argument('<did>', 'The asset DID')
     .argument('[destinationFolder]', 'Destination folder', '.')
     .action(async (did, destinationFolder) => {
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
       await commands.download([null, did, destinationFolder]);
     });
 
@@ -98,6 +114,8 @@ export async function createCLI() {
     .argument('<algoDid>', 'Algorithm DID')
     .option('-e, --encrypt [boolean]', 'Encrypt DDO', true)
     .action(async (datasetDid, algoDid, options) => {
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
       await commands.allowAlgo([null, datasetDid, algoDid, options.encrypt.toString()]);
     });
 
@@ -109,6 +127,8 @@ export async function createCLI() {
     .argument('<algoDid>', 'Algorithm DID')
     .argument('<computeEnvId>', 'Compute environment ID')
     .action(async (datasetDids, algoDid, computeEnvId) => {
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
       await commands.computeStart([null, datasetDids, algoDid, computeEnvId]);
     });
 
@@ -120,6 +140,8 @@ export async function createCLI() {
     .argument('<jobId>', 'Job ID')
     .argument('[agreementId]', 'Agreement ID')
     .action(async (datasetDid, jobId, agreementId) => {
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
       const args = [null, datasetDid, jobId];
       if (agreementId) args.push(agreementId);
       await commands.computeStop(args);
@@ -133,6 +155,8 @@ export async function createCLI() {
     .argument('<jobId>', 'Job ID')
     .argument('[agreementId]', 'Agreement ID')
     .action(async (datasetDid, jobId, agreementId) => {
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
       const args = [null, datasetDid, jobId];
       if (agreementId) args.push(agreementId);
       await commands.getJobStatus(args);
@@ -146,6 +170,8 @@ export async function createCLI() {
     .argument('<resultIndex>', 'Result index')
     .argument('[destinationFolder]', 'Destination folder', '.')
     .action(async (jobId, resultIndex, destinationFolder) => {
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
       await commands.downloadJobResults([null, jobId, resultIndex, destinationFolder]);
     });
 
@@ -154,6 +180,8 @@ export async function createCLI() {
     .command('mintOcean')
     .description('Mints Ocean tokens')
     .action(async () => {
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
       await commands.mintOceanTokens();
     });
 

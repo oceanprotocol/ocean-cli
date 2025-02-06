@@ -33,6 +33,7 @@ import {
 import { hexlify } from "ethers/lib/utils.js";
 import { DDOManager } from "ddo.js";
 import { uploadToIPFS } from "ipfs";
+import { signVC } from "sign";
 
 export async function downloadFile(
   url: string,
@@ -205,26 +206,43 @@ export async function createAsset(
     templateIndex === 4
       ? ""
       : await ProviderInstance.encrypt(
-        assetUrl,
-        chainId,
-        macOsProviderUrl || providerUrl
-      );
+          assetUrl,
+          chainId,
+          macOsProviderUrl || providerUrl
+        );
   services[0].datatokenAddress = datatokenAddressAsset;
   services[0].serviceEndpoint = providerUrl;
 
   ddoNftAddress = nftAddress;
   const id = ddoInstance.makeDid(ddoNftAddress, ddoChainId.toString());
-  ddo = ddoInstance.updateFields({ id, nftAddress: ddoNftAddress });
+  let issuer;
+  if (process.env.SSI === "true") {
+    issuer = process.env.ISSUER_ID;
+  } else {
+    const privateKeyHex = process.env.PRIVATE_KEY;
+    if (!privateKeyHex) {
+      console.log("No Private Key found");
+      return { jwt: null, method: null };
+    }
+    const wallet = new ethers.Wallet(privateKeyHex);
+    issuer = wallet._signingKey().publicKey;
+  }
+  ddo = ddoInstance.updateFields({ id, nftAddress: ddoNftAddress, issuer });
+  const proof = await signVC(ddo);
+  console.log("proof ", proof);
+  const validateResult = await aquariusInstance.validate(ddo);
+  if (!validateResult.valid) {
+    throw new Error("Invalid ddo");
+  }
+  let flags: number;
 
-  let flags;
-
-  let stringDDO = JSON.stringify(ddo);
+  let stringDDO = JSON.stringify(proof);
   const bytes = Buffer.from(stringDDO);
   const metadata = hexlify(bytes);
   flags = 0;
 
   const data = { encryptedData: metadata };
-  let metadataIPFS;
+  let metadataIPFS: string;
   const ipfsHash = await uploadToIPFS(data);
   const remoteDDO = {
     remote: {

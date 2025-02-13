@@ -5,7 +5,7 @@ import path from "path";
 describe("Ocean CLI Setup", function() {
     this.timeout(20000); // Set a longer timeout to allow the command to execute
 
-    it("should return a valid response for 'npm run cli h' with MNEMONIC and PRIVATE_KEY", function(done) {
+    it("should return a valid response for 'npm run cli h'", function(done) {
         // Ensure the command is run from the project root directory
         const projectRoot = path.resolve(__dirname, "..");
 
@@ -16,19 +16,34 @@ describe("Ocean CLI Setup", function() {
         exec("npm run cli h", { cwd: projectRoot }, (error, stdout) => {
             // Check the stdout for the expected response
             try {
-                expect(stdout).to.contain("Available options:");
-                expect(stdout).to.contain("getDDO DID");
-                expect(stdout).to.contain("publish METADATA_FILE ENCRYPT_DDO");
-                expect(stdout).to.contain("publishAlgo METADATA_FILE ENCRYPT_DDO");
-                expect(stdout).to.contain("editAsset DATASET_DID UPDATED_METADATA_FILE ENCRYPT_DDO");
-                expect(stdout).to.contain("download DID DESTINATION_FOLDER");
-                expect(stdout).to.contain("allowAlgo DATASET_DID ALGO_DID ENCRYPT_DDO");
-                expect(stdout).to.contain("disallowAlgo DATASET_DID ALGO_DID ENCRYPT_DDO");
-                expect(stdout).to.contain("startCompute [DATASET_DIDs] ALGO_DID COMPUTE_ENV_ID");
-                expect(stdout).to.contain("stopCompute DATASET_DID JOB_ID");
-                expect(stdout).to.contain("getJobStatus DATASET_DID JOB_ID");
-                expect(stdout).to.contain("getJobResults DATASET_DID JOB_ID");
-                expect(stdout).to.contain("downloadJobResults JOB_ID RESULT_INDEX DESTINATION_FOLDER");
+                expect(stdout).to.contain("-V, --version");
+                expect(stdout).to.contain("output the version number");
+                expect(stdout).to.contain("-h, --help");
+                expect(stdout).to.contain("Display help for command");
+                expect(stdout).to.contain("help|h");
+                expect(stdout).to.contain("Display help for all commands");
+                expect(stdout).to.contain("getDDO <did>");
+                expect(stdout).to.contain("Gets DDO for an asset using the asset did");
+                expect(stdout).to.contain("publish [options] <metadataFile>");
+                expect(stdout).to.contain("Publishes a new asset with access service or compute service");
+                expect(stdout).to.contain("publishAlgo [options] <metadataFile>");
+                expect(stdout).to.contain("Publishes a new algorithm");
+                expect(stdout).to.contain("editAsset [options] <datasetDid> <metadataFile>");
+                expect(stdout).to.contain("Updates DDO using the metadata items in the file");
+                expect(stdout).to.contain("download <did> [destinationFolder]");
+                expect(stdout).to.contain("Downloads an asset into specified folder");
+                expect(stdout).to.contain("allowAlgo [options] <datasetDid> <algoDid>");
+                expect(stdout).to.contain("Approves an algorithm to run on a dataset");
+                expect(stdout).to.contain("startCompute <datasetDids> <algoDid> <computeEnvId>");
+                expect(stdout).to.contain("Starts a compute job");
+                expect(stdout).to.contain("stopCompute <datasetDid> <jobId> [agreementId]");
+                expect(stdout).to.contain("Stops a compute job");
+                expect(stdout).to.contain("getJobStatus <datasetDid> <jobId> [agreementId]");
+                expect(stdout).to.contain("Displays the compute job status");
+                expect(stdout).to.contain("downloadJobResults <jobId> <resultIndex> [destinationFolder]");
+                expect(stdout).to.contain("Downloads compute job results");
+                expect(stdout).to.contain("mintOcean");
+                expect(stdout).to.contain("Mints Ocean tokens");
                 done();
             } catch (assertionError) {
                 done(assertionError);

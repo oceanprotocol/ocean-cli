@@ -167,7 +167,7 @@ export async function createCLI() {
     .command('downloadJobResults')
     .description('Downloads compute job results')
     .argument('<jobId>', 'Job ID')
-    .argument('<resultIndex>', 'Result index')
+    .argument('<resultIndex>', 'Result index', parseInt)
     .argument('[destinationFolder]', 'Destination folder', '.')
     .action(async (jobId, resultIndex, destinationFolder) => {
       const { signer, chainId } = await initializeSigner();

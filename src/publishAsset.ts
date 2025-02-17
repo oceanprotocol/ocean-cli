@@ -5,7 +5,7 @@ import {
   Aquarius,
   Asset
 } from '@oceanprotocol/lib';
-import { createAsset, updateAssetMetadata } from './helpers';
+import { createAssetUtil, updateAssetMetadata } from './helpers';
 
 export interface PublishAssetParams {
   title: string;
@@ -83,18 +83,17 @@ export async function publishAsset(params: PublishAssetParams, signer: Signer, c
       files: [{ type: params.storageType, url: params.assetLocation, method: 'GET' }],
     };
 
-      // Other networks
-      const did = await createAsset(
-        params.title,
-        'OCEAN-NFT',
-        signer,
-        assetUrl,
-        metadata,
-        params.providerUrl,
-        config,
-        aquarius,
-        params.template || 1
-      );
+    // Other networks
+    const did = await createAssetUtil(
+      params.title,
+      'OCEAN-NFT',
+      signer,
+      assetUrl,
+      metadata,
+      params.providerUrl,
+      config,
+      aquarius
+    );
 
 
     console.log(`Asset successfully published with DID: ${did}`);

@@ -63,7 +63,6 @@ describe("Ocean CLI Publishing", function() {
                 expect(stdout).to.contain("Asset published. ID:");
                 done()
             } catch (assertionError) {
-                console.log('assertionError', assertionError);
                 done(assertionError);
             }
         });
@@ -71,7 +70,6 @@ describe("Ocean CLI Publishing", function() {
 
     it("should publish a compute dataset using 'npm run cli publish'", function(done) {
         const metadataFile = path.resolve(projectRoot, "metadata/simpleComputeDataset.json");
-
         // Ensure the metadata file exists
         if (!fs.existsSync(metadataFile)) {
             done(new Error("Metadata file not found: " + metadataFile));

@@ -58,7 +58,7 @@ describe("Ocean CLI Setup", function() {
         delete process.env.PRIVATE_KEY;
         delete process.env.RPC;
 
-        exec("npm run cli h", { cwd: projectRoot }, (error, stdout, stderr) => {
+        exec("npm run cli getDDO did:op:123", { cwd: projectRoot }, (error, stdout, stderr) => {
             try {
                 expect(stderr).to.contain("Have you forgot to set env RPC?");
                 done();
@@ -74,7 +74,7 @@ describe("Ocean CLI Setup", function() {
         process.env.PRIVATE_KEY = "0x1d751ded5a32226054cd2e71261039b65afb9ee1c746d055dd699b1150a5befc";
         delete process.env.RPC;
 
-        exec("npm run cli h", { cwd: projectRoot }, (error, stdout, stderr) => {
+        exec("npm run cli getDDO did:op:123", { cwd: projectRoot }, (error, stdout, stderr) => {
             try {
                 expect(stderr).to.contain("Have you forgot to set env RPC?");
                 done();
@@ -90,7 +90,7 @@ describe("Ocean CLI Setup", function() {
         delete process.env.PRIVATE_KEY;
         process.env.RPC = "http://127.0.0.1:8545";
 
-        exec("npm run cli h", { cwd: projectRoot }, (error, stdout, stderr) => {
+        exec("npm run cli getDDO did:op:123", { cwd: projectRoot }, (error, stdout, stderr) => {
             try {
                 expect(stderr).to.contain("Have you forgot to set MNEMONIC or PRIVATE_KEY?");
                 done();

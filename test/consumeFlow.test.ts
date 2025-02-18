@@ -49,6 +49,7 @@ describe("Ocean CLI Publishing", function() {
         }
 
         process.env.PRIVATE_KEY = "0x1d751ded5a32226054cd2e71261039b65afb9ee1c746d055dd699b1150a5befc";
+        // 0x529043886F21D9bc1AE0feDb751e34265a246e47
         process.env.RPC = "http://127.0.0.1:8545";
         process.env.AQUARIUS_URL = "http://127.0.0.1:8001";
         process.env.PROVIDER_URL = "http://127.0.0.1:8001";

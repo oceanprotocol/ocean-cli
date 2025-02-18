@@ -34,23 +34,23 @@ export async function createCLI() {
     .name('ocean-cli')
     .description('CLI tool to interact with Ocean Protocol')
     .version('2.0.0')
-    .helpOption('-h, --help', 'Display help for command')
+    .helpOption('-h, --help', 'Display help for command');
+
+  // Custom help command to support legacy "h" invocation.
+  // Note: We use console.log(program.helpInformation()) to print the full help output.
+  program
     .command('help')
-    .alias('h') 
+    .alias('h')
     .description('Display help for all commands')
     .action(() => {
-      program.outputHelp();
-    })
-    .helpCommand('help [command]', 'Display help for specific command')
-    .configureOutput({
-      outputError: (str, write) => write(chalk.red(str))
+      console.log(program.helpInformation());
     });
 
   // getDDO command
   program
     .command('getDDO')
     .description('Gets DDO for an asset using the asset did')
-    .argument('[did]', 'The asset DID')
+    .argument('<did>', 'The asset DID')
     .option('-d, --did <did>', 'The asset DID')
     .action(async (did, options) => {
       const assetDid = options.did || did;
@@ -67,7 +67,7 @@ export async function createCLI() {
   program
     .command('publish')
     .description('Publishes a new asset with access service or compute service')
-    .argument('[metadataFile]', 'Path to metadata file')
+    .argument('<metadataFile>', 'Path to metadata file')
     .option('-f, --file <metadataFile>', 'Path to metadata file')
     .option('-e, --encrypt [boolean]', 'Encrypt DDO', true)
     .action(async (metadataFile, options) => {
@@ -85,7 +85,7 @@ export async function createCLI() {
   program
     .command('publishAlgo')
     .description('Publishes a new algorithm')
-    .argument('[metadataFile]', 'Path to metadata file')
+    .argument('<metadataFile>', 'Path to metadata file')
     .option('-f, --file <metadataFile>', 'Path to metadata file')
     .option('-e, --encrypt [boolean]', 'Encrypt DDO', true)
     .action(async (metadataFile, options) => {
@@ -99,13 +99,13 @@ export async function createCLI() {
       await commands.publishAlgo([null, file, options.encrypt.toString()]);
     });
 
-  // editAsset command (with alias "edit" for backwards compatibility)
+  // editAsset command (alias "edit" for backwards compatibility)
   program
     .command('editAsset')
     .alias('edit')
     .description('Updates DDO using the metadata items in the file')
-    .argument('[datasetDid]', 'Dataset DID')
-    .argument('[metadataFile]', 'Updated metadata file')
+    .argument('<datasetDid>', 'Dataset DID')
+    .argument('<metadataFile>', 'Updated metadata file')
     .option('-d, --did <datasetDid>', 'Dataset DID')
     .option('-f, --file <metadataFile>', 'Updated metadata file')
     .option('-e, --encrypt [boolean]', 'Encrypt DDO', true)
@@ -125,7 +125,7 @@ export async function createCLI() {
   program
     .command('download')
     .description('Downloads an asset into specified folder')
-    .argument('[did]', 'The asset DID')
+    .argument('<did>', 'The asset DID')
     .argument('[folder]', 'Destination folder', '.')
     .option('-d, --did <did>', 'The asset DID')
     .option('-f, --folder [folder]', 'Destination folder', '.')
@@ -145,8 +145,8 @@ export async function createCLI() {
   program
     .command('allowAlgo')
     .description('Approves an algorithm to run on a dataset')
-    .argument('[datasetDid]', 'Dataset DID')
-    .argument('[algoDid]', 'Algorithm DID')
+    .argument('<datasetDid>', 'Dataset DID')
+    .argument('<algoDid>', 'Algorithm DID')
     .option('-d, --dataset <datasetDid>', 'Dataset DID')
     .option('-a, --algo <algoDid>', 'Algorithm DID')
     .option('-e, --encrypt [boolean]', 'Encrypt DDO', true)
@@ -166,9 +166,9 @@ export async function createCLI() {
   program
     .command('startCompute')
     .description('Starts a compute job')
-    .argument('[datasetDids]', 'Dataset DIDs (comma-separated)')
-    .argument('[algoDid]', 'Algorithm DID')
-    .argument('[computeEnvId]', 'Compute environment ID')
+    .argument('<datasetDids>', 'Dataset DIDs (comma-separated)')
+    .argument('<algoDid>', 'Algorithm DID')
+    .argument('<computeEnvId>', 'Compute environment ID')
     .option('-d, --datasets <datasetDids>', 'Dataset DIDs (comma-separated)')
     .option('-a, --algo <algoDid>', 'Algorithm DID')
     .option('-e, --env <computeEnvId>', 'Compute environment ID')
@@ -189,8 +189,8 @@ export async function createCLI() {
   program
     .command('stopCompute')
     .description('Stops a compute job')
-    .argument('[datasetDid]', 'Dataset DID')
-    .argument('[jobId]', 'Job ID')
+    .argument('<datasetDid>', 'Dataset DID')
+    .argument('<jobId>', 'Job ID')
     .argument('[agreementId]', 'Agreement ID')
     .option('-d, --dataset <datasetDid>', 'Dataset DID')
     .option('-j, --job <jobId>', 'Job ID')
@@ -214,8 +214,8 @@ export async function createCLI() {
   program
     .command('getJobStatus')
     .description('Displays the compute job status')
-    .argument('[datasetDid]', 'Dataset DID')
-    .argument('[jobId]', 'Job ID')
+    .argument('<datasetDid>', 'Dataset DID')
+    .argument('<jobId>', 'Job ID')
     .argument('[agreementId]', 'Agreement ID')
     .option('-d, --dataset <datasetDid>', 'Dataset DID')
     .option('-j, --job <jobId>', 'Job ID')
@@ -235,7 +235,7 @@ export async function createCLI() {
       await commands.getJobStatus(args);
     });
 
-  // downloadJobResults command (positional-only for backwards compatibility)
+  // downloadJobResults command
   program
     .command('downloadJobResults')
     .description('Downloads compute job results')

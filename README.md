@@ -117,60 +117,187 @@ npm run cli publish metadata/simpleDownloadDataset.json
 
 ### Command Usage
 
-The CLI supports the following syntax:
+The Ocean CLI supports flexible argument ordering. You can supply arguments using:
+- **Positional Arguments** (traditional style): Must follow the defined order.
+- **Named Options**: Can be provided in any order. These options include flags like `--did`, `--file`, etc.
+
+#### General Format
 
 ```bash
-# Basic command format
 npm run cli <command> [options] <arguments>
-
-# Help commands
-npm run cli --help                # Show general help
-npm run cli -h                    # Short form for help
-npm run cli help                  # Alternative help command
-npm run cli help <command>        # Show command-specific help
-
-# Publishing Commands
-npm run cli publish metadata.json                    # Publish with default encryption
-npm run cli publish metadata.json --encrypt false    # Publish without encryption
-npm run cli publish --encrypt false metadata.json    # Same result, different order
-
-# Algorithm Commands
-npm run cli publishAlgo algo.json                    # Publish algorithm
-npm run cli publishAlgo --encrypt false algo.json    # Publish unencrypted algorithm
-
-# Asset Management
-npm run cli editAsset did:op:123 metadata.json                # Edit with default encryption
-npm run cli editAsset --encrypt false did:op:123 metadata.json # Edit without encryption
-
-# Download Commands
-npm run cli download did:op:123                     # Download to current directory
-npm run cli download did:op:123 ./custom-folder     # Download to specific folder
-
-# Compute Commands
-npm run cli startCompute did1,did2 algoDid env1     # Start compute job
-npm run cli stopCompute did:op:123 job-123          # Stop compute job
-npm run cli getJobStatus did:op:123 job-123         # Check job status
-
-# Results Download
-npm run cli downloadJobResults job-123 0             # Download to current directory
-npm run cli downloadJobResults job-123 0 ./results   # Download to specific folder
-
-# Token Management
-npm run cli mintOcean                               # Mint test OCEAN tokens
 ```
 
-### Available Options
+#### Help Commands
 
-Commands that support the `--encrypt` option:
-- `publish`
-- `publishAlgo`
-- `editAsset`
-- `allowAlgo`
+- **General help:**  
+  `npm run cli --help` or `npm run cli -h`
 
-**Note**: 
-- Options (like `--encrypt`) can be placed anywhere in the command
-- Required arguments must maintain their order
-- Optional arguments (in square brackets) can be omitted
+- **Command-specific help:**  
+  `npm run cli help <command>`
+
+#### Examples
+
+**Get DDO:**
+
+- **Positional:**  
+  `npm run cli getDDO did:op:123`
+
+- **Named Option:**  
+  `npm run cli getDDO --did did:op:123`
+
+---
+
+**Publish:**
+
+- **Positional:**  
+  `npm run cli publish metadata.json`
+
+- **Named Options:**  
+  `npm run cli publish --file metadata.json`  
+  With encryption disabled:  
+  `npm run cli publish --file metadata.json --encrypt false`  
+  (Note: `--file` and `--encrypt` can be in any order.)
+
+---
+
+**Publish Algorithm:**
+
+- **Positional:**  
+  `npm run cli publishAlgo algorithm.json`
+
+- **Named Options:**  
+  `npm run cli publishAlgo --file algorithm.json`  
+  With encryption disabled:  
+  `npm run cli publishAlgo --encrypt false --file algorithm.json`
+
+---
+
+**Edit Asset:**
+
+- **Positional:**  
+  `npm run cli editAsset did:op:123 metadata.json`
+
+- **Named Options:**  
+  `npm run cli editAsset --did did:op:123 --file metadata.json`  
+  (The flags can be provided in any order, for example:  
+  `npm run cli editAsset --file metadata.json --did did:op:123`)
+
+---
+
+**Download:**
+
+- **Positional:**  
+  `npm run cli download did:op:123 ./custom-folder`
+
+- **Named Options:**  
+  `npm run cli download --did did:op:123 --folder ./custom-folder`  
+  (Order of `--did` and `--folder` does not matter.)
+
+---
+
+**Start Compute:**
+
+- **Positional:**  
+  `npm run cli startCompute did1,did2 algoDid env1`
+
+- **Named Options:**  
+  `npm run cli startCompute --datasets did1,did2 --algo algoDid --env env1`  
+  (Options can be provided in any order.)
+
+---
+
+**Stop Compute:**
+
+- **Positional:**  
+  `npm run cli stopCompute did:op:123 job-123`
+
+- **Named Options:**  
+  `npm run cli stopCompute --dataset did:op:123 --job job-123`  
+  (Optionally, you can also provide an agreement ID using `--agreement`.)
+
+---
+
+**Get Job Status:**
+
+- **Positional:**  
+  `npm run cli getJobStatus did:op:123 job-123`
+
+- **Named Options:**  
+  `npm run cli getJobStatus --dataset did:op:123 --job job-123`  
+  (Optionally, an agreement ID may be provided.)
+
+---
+
+**Download Job Results:**
+
+- **Positional:**  
+  `npm run cli downloadJobResults job-123 0 ./results`
+
+- **Named Options:**  
+  `npm run cli downloadJobResults --job job-123 --index 0 --folder ./results`
+
+---
+
+**Mint Ocean:**
+
+- **Positional:**  
+  `npm run cli mintOcean`  
+  (No arguments are required for this command.)
+
+---
+
+#### Available Named Options Per Command
+
+- **getDDO:**  
+  `-d, --did <did>`
+
+- **publish:**  
+  `-f, --file <metadataFile>`  
+  `-e, --encrypt [boolean]` (Default: `true`)
+
+- **publishAlgo:**  
+  `-f, --file <metadataFile>`  
+  `-e, --encrypt [boolean]` (Default: `true`)
+
+- **editAsset:**  
+  `-d, --did <datasetDid>`  
+  `-f, --file <metadataFile>`  
+  `-e, --encrypt [boolean]` (Default: `true`)
+
+- **download:**  
+  `-d, --did <did>`  
+  `-f, --folder [destinationFolder]` (Default: `.`)
+
+- **startCompute:**  
+  `-d, --datasets <datasetDids>`  
+  `-a, --algo <algoDid>`  
+  `-e, --env <computeEnvId>`
+
+- **stopCompute:**  
+  `-d, --dataset <datasetDid>`  
+  `-j, --job <jobId>`  
+  `-a, --agreement [agreementId]`
+
+- **getJobStatus:**  
+  `-d, --dataset <datasetDid>`  
+  `-j, --job <jobId>`  
+  `-a, --agreement [agreementId]`
+
+- **downloadJobResults:**  
+  `-j, --job <jobId>`  
+  `-i, --index <index>`  
+  `-f, --folder [destinationFolder]`
+
+- **mintOcean:**  
+  No options/arguments required.
+
+---
+
+**Note:**  
+- When using **named options**, you can write them in any order.  
+- When relying on **positional arguments**, ensure they follow the exact order as defined by the command.
+
+This flexible approach lets you use the style that best suits your workflow while remaining fully backwards compatible.
 
 ## 🏛 License
 

@@ -50,8 +50,15 @@ export async function createCLI() {
   program
     .command('getDDO')
     .description('Gets DDO for an asset using the asset did')
-    .argument('<did>', 'The asset DID')
-    .action(async (did) => {
+    .option('-d, --did <did>', 'The asset DID')
+    .action(async (options) => {
+      const did = options.did || program.args[0];
+      
+      if (!did) {
+        console.error(chalk.red('DID is required'));
+        process.exit(1);
+      }
+
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
       await commands.getDDO([null, did]);
@@ -61,9 +68,16 @@ export async function createCLI() {
   program
     .command('publish')
     .description('Publishes a new asset with access service or compute service')
-    .argument('<metadataFile>', 'Path to metadata file')
+    .option('-f, --file <metadataFile>', 'Path to metadata file')
     .option('-e, --encrypt [boolean]', 'Encrypt DDO', true)
-    .action(async (metadataFile, options) => {
+    .action(async (options) => {
+      const metadataFile = options.file || program.args[0];
+      
+      if (!metadataFile) {
+        console.error(chalk.red('Metadata file is required'));
+        process.exit(1);
+      }
+
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
       await commands.publish([null, metadataFile, options.encrypt.toString()]);
@@ -73,9 +87,16 @@ export async function createCLI() {
   program
     .command('publishAlgo')
     .description('Publishes a new algorithm')
-    .argument('<metadataFile>', 'Path to metadata file')
+    .option('-f, --file <metadataFile>', 'Path to metadata file')
     .option('-e, --encrypt [boolean]', 'Encrypt DDO', true)
-    .action(async (metadataFile, options) => {
+    .action(async (options) => {
+      const metadataFile = options.file || program.args[0];
+      
+      if (!metadataFile) {
+        console.error(chalk.red('Metadata file is required'));
+        process.exit(1);
+      }
+
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
       await commands.publishAlgo([null, metadataFile, options.encrypt.toString()]);
@@ -85,10 +106,18 @@ export async function createCLI() {
   program
     .command('editAsset')
     .description('Updates DDO using the metadata items in the file')
-    .argument('<datasetDid>', 'Dataset DID')
-    .argument('<metadataFile>', 'Updated metadata file')
+    .option('-d, --did <datasetDid>', 'Dataset DID')
+    .option('-f, --file <metadataFile>', 'Updated metadata file')
     .option('-e, --encrypt [boolean]', 'Encrypt DDO', true)
-    .action(async (datasetDid, metadataFile, options) => {
+    .action(async (options) => {
+      const datasetDid = options.did || program.args[0];
+      const metadataFile = options.file || program.args[1];
+      
+      if (!datasetDid || !metadataFile) {
+        console.error(chalk.red('Dataset DID and metadata file are required'));
+        process.exit(1);
+      }
+
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
       await commands.editAsset([null, datasetDid, metadataFile, options.encrypt.toString()]);
@@ -98,22 +127,39 @@ export async function createCLI() {
   program
     .command('download')
     .description('Downloads an asset into specified folder')
-    .argument('<did>', 'The asset DID')
-    .argument('[destinationFolder]', 'Destination folder', '.')
-    .action(async (did, destinationFolder) => {
+    .option('-d, --did <did>', 'The asset DID')
+    .option('-f, --folder [folder]', 'Destination folder', '.')
+    .action(async (options) => {
+      // Support both option and argument formats
+      const did = options.did || program.args[0];
+      const folder = options.folder || program.args[1] || '.';
+      
+      if (!did) {
+        console.error(chalk.red('DID is required'));
+        process.exit(1);
+      }
+
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
-      await commands.download([null, did, destinationFolder]);
+      await commands.download([null, did, folder]);
     });
 
   // allowAlgo command
   program
     .command('allowAlgo')
     .description('Approves an algorithm to run on a dataset')
-    .argument('<datasetDid>', 'Dataset DID')
-    .argument('<algoDid>', 'Algorithm DID')
+    .option('-d, --dataset <datasetDid>', 'Dataset DID')
+    .option('-a, --algo <algoDid>', 'Algorithm DID')
     .option('-e, --encrypt [boolean]', 'Encrypt DDO', true)
-    .action(async (datasetDid, algoDid, options) => {
+    .action(async (options) => {
+      const datasetDid = options.dataset || program.args[0];
+      const algoDid = options.algo || program.args[1];
+      
+      if (!datasetDid || !algoDid) {
+        console.error(chalk.red('Dataset DID and Algorithm DID are required'));
+        process.exit(1);
+      }
+
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
       await commands.allowAlgo([null, datasetDid, algoDid, options.encrypt.toString()]);
@@ -123,10 +169,19 @@ export async function createCLI() {
   program
     .command('startCompute')
     .description('Starts a compute job')
-    .argument('<datasetDids>', 'Dataset DIDs (comma-separated)')
-    .argument('<algoDid>', 'Algorithm DID')
-    .argument('<computeEnvId>', 'Compute environment ID')
-    .action(async (datasetDids, algoDid, computeEnvId) => {
+    .option('-d, --datasets <datasetDids>', 'Dataset DIDs (comma-separated)')
+    .option('-a, --algo <algoDid>', 'Algorithm DID')
+    .option('-e, --env <computeEnvId>', 'Compute environment ID')
+    .action(async (options) => {
+      const datasetDids = options.datasets || program.args[0];
+      const algoDid = options.algo || program.args[1];
+      const computeEnvId = options.env || program.args[2];
+
+      if (!datasetDids || !algoDid || !computeEnvId) {
+        console.error(chalk.red('Missing required arguments'));
+        process.exit(1);
+      }
+
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
       await commands.computeStart([null, datasetDids, algoDid, computeEnvId]);
@@ -136,10 +191,19 @@ export async function createCLI() {
   program
     .command('stopCompute')
     .description('Stops a compute job')
-    .argument('<datasetDid>', 'Dataset DID')
-    .argument('<jobId>', 'Job ID')
-    .argument('[agreementId]', 'Agreement ID')
-    .action(async (datasetDid, jobId, agreementId) => {
+    .option('-d, --dataset <datasetDid>', 'Dataset DID')
+    .option('-j, --job <jobId>', 'Job ID')
+    .option('-a, --agreement [agreementId]', 'Agreement ID')
+    .action(async (options) => {
+      const datasetDid = options.dataset || program.args[0];
+      const jobId = options.job || program.args[1];
+      const agreementId = options.agreement || program.args[2];
+      
+      if (!datasetDid || !jobId) {
+        console.error(chalk.red('Dataset DID and Job ID are required'));
+        process.exit(1);
+      }
+
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
       const args = [null, datasetDid, jobId];
@@ -151,10 +215,19 @@ export async function createCLI() {
   program
     .command('getJobStatus')
     .description('Displays the compute job status')
-    .argument('<datasetDid>', 'Dataset DID')
-    .argument('<jobId>', 'Job ID')
-    .argument('[agreementId]', 'Agreement ID')
-    .action(async (datasetDid, jobId, agreementId) => {
+    .option('-d, --dataset <datasetDid>', 'Dataset DID')
+    .option('-j, --job <jobId>', 'Job ID')
+    .option('-a, --agreement [agreementId]', 'Agreement ID')
+    .action(async (options) => {
+      const datasetDid = options.dataset || program.args[0];
+      const jobId = options.job || program.args[1];
+      const agreementId = options.agreement || program.args[2];
+      
+      if (!datasetDid || !jobId) {
+        console.error(chalk.red('Dataset DID and Job ID are required'));
+        process.exit(1);
+      }
+
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
       const args = [null, datasetDid, jobId];

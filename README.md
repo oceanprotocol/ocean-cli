@@ -115,6 +115,44 @@ Make sure to update chainId from the assets from `metadata` folder.
 npm run cli publish metadata/simpleDownloadDataset.json
 ```
 
+### Command Usage
+
+The CLI supports multiple ways to run commands:
+
+```bash
+# Basic command format
+npm run cli <command> [options] <arguments>
+
+# Show help
+npm run cli --help              # Show general help
+npm run cli help               # Alternative way to show help
+npm run cli h                  # Shorthand for help
+npm run cli help <command>     # Show help for specific command
+npm run cli <command> --help   # Alternative way to show command help
+
+# Examples of command usage
+# Publishing assets
+npm run cli publish metadata.json                  # Publish with default encryption
+npm run cli publish metadata.json --no-encrypt     # Publish without encryption
+npm run cli publish --help                        # Show publish command help
+
+# Starting compute jobs
+npm run cli startCompute did1,did2 algoDid env1           # Basic compute job
+npm run cli startCompute did1,did2 algoDid env1 -t 120    # With 120 minute timeout
+
+# Downloading results
+npm run cli downloadJobResults job-123 0                   # Download to current directory
+npm run cli downloadJobResults job-123 0 ./results        # Download to specific directory
+
+# Getting DDO information
+npm run cli getDDO did:op:123                             # Get DDO for an asset
+```
+
+Each command supports the `--help` flag to show specific options and examples:
+- Required arguments are shown in angle brackets `<arg>`
+- Optional arguments are shown in square brackets `[arg]`
+- Options are prefixed with `--` (or `-` for short versions)
+
 ## 🏛 License
 
 ```

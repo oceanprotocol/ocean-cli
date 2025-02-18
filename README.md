@@ -117,41 +117,60 @@ npm run cli publish metadata/simpleDownloadDataset.json
 
 ### Command Usage
 
-The CLI supports multiple ways to run commands:
+The CLI supports the following syntax:
 
 ```bash
 # Basic command format
 npm run cli <command> [options] <arguments>
 
-# Show help
-npm run cli --help              # Show general help
-npm run cli help               # Alternative way to show help
-npm run cli h                  # Shorthand for help
-npm run cli help <command>     # Show help for specific command
-npm run cli <command> --help   # Alternative way to show command help
+# Help commands
+npm run cli --help                # Show general help
+npm run cli -h                    # Short form for help
+npm run cli help                  # Alternative help command
+npm run cli help <command>        # Show command-specific help
 
-# Examples of command usage
-# Publishing assets
-npm run cli publish metadata.json                  # Publish with default encryption
-npm run cli publish metadata.json --no-encrypt     # Publish without encryption
-npm run cli publish --help                        # Show publish command help
+# Publishing Commands
+npm run cli publish metadata.json                    # Publish with default encryption
+npm run cli publish metadata.json --encrypt false    # Publish without encryption
+npm run cli publish --encrypt false metadata.json    # Same result, different order
 
-# Starting compute jobs
-npm run cli startCompute did1,did2 algoDid env1           # Basic compute job
-npm run cli startCompute did1,did2 algoDid env1 -t 120    # With 120 minute timeout
+# Algorithm Commands
+npm run cli publishAlgo algo.json                    # Publish algorithm
+npm run cli publishAlgo --encrypt false algo.json    # Publish unencrypted algorithm
 
-# Downloading results
-npm run cli downloadJobResults job-123 0                   # Download to current directory
-npm run cli downloadJobResults job-123 0 ./results        # Download to specific directory
+# Asset Management
+npm run cli editAsset did:op:123 metadata.json                # Edit with default encryption
+npm run cli editAsset --encrypt false did:op:123 metadata.json # Edit without encryption
 
-# Getting DDO information
-npm run cli getDDO did:op:123                             # Get DDO for an asset
+# Download Commands
+npm run cli download did:op:123                     # Download to current directory
+npm run cli download did:op:123 ./custom-folder     # Download to specific folder
+
+# Compute Commands
+npm run cli startCompute did1,did2 algoDid env1     # Start compute job
+npm run cli stopCompute did:op:123 job-123          # Stop compute job
+npm run cli getJobStatus did:op:123 job-123         # Check job status
+
+# Results Download
+npm run cli downloadJobResults job-123 0             # Download to current directory
+npm run cli downloadJobResults job-123 0 ./results   # Download to specific folder
+
+# Token Management
+npm run cli mintOcean                               # Mint test OCEAN tokens
 ```
 
-Each command supports the `--help` flag to show specific options and examples:
-- Required arguments are shown in angle brackets `<arg>`
-- Optional arguments are shown in square brackets `[arg]`
-- Options are prefixed with `--` (or `-` for short versions)
+### Available Options
+
+Commands that support the `--encrypt` option:
+- `publish`
+- `publishAlgo`
+- `editAsset`
+- `allowAlgo`
+
+**Note**: 
+- Options (like `--encrypt`) can be placed anywhere in the command
+- Required arguments must maintain their order
+- Optional arguments (in square brackets) can be omitted
 
 ## 🏛 License
 

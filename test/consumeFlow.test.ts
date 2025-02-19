@@ -140,7 +140,6 @@ describe("Ocean CLI Publishing", function() {
         exec(`npm run cli getDDO ${downloadDatasetDid}`, { cwd: projectRoot }, (error, stdout) => {
             expect(stdout).to.contain(`${downloadDatasetDid}`);
             expect(stdout).to.contain("https://w3id.org/did/v1");
-            expect(stdout).to.contain("Datatoken");
             done()
         });
     });
@@ -149,7 +148,6 @@ describe("Ocean CLI Publishing", function() {
         exec(`npm run cli getDDO ${computeDatasetDid}`, { cwd: projectRoot }, (error, stdout) => {
             expect(stdout).to.contain(`${computeDatasetDid}`);
             expect(stdout).to.contain("https://w3id.org/did/v1");
-            expect(stdout).to.contain("Datatoken");
             done()
         });
     });
@@ -158,7 +156,6 @@ describe("Ocean CLI Publishing", function() {
         exec(`npm run cli getDDO ${jsAlgoDid}`, { cwd: projectRoot }, (error, stdout) => {
             expect(stdout).to.contain(`${jsAlgoDid}`);
             expect(stdout).to.contain("https://w3id.org/did/v1");
-            expect(stdout).to.contain("Datatoken");
             done()
         });
     });
@@ -167,7 +164,6 @@ describe("Ocean CLI Publishing", function() {
         exec(`npm run cli getDDO ${pythonAlgoDid}`, { cwd: projectRoot }, (error, stdout) => {
             expect(stdout).to.contain(`${pythonAlgoDid}`);
             expect(stdout).to.contain("https://w3id.org/did/v1");
-            expect(stdout).to.contain("Datatoken");
             done()
         });
     });

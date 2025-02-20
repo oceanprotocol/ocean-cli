@@ -297,6 +297,13 @@ export class Commands {
 			this.macOsProviderUrl || this.providerUrl
 		);
 
+		if(!computeEnvs || computeEnvs.length  < 1) {
+			console.error(
+				"Error fetching compute environments. No compute environments available."
+			);
+			return;
+		}
+
 		const datatoken = new Datatoken(
 			this.signer,
 			(await this.signer.provider.getNetwork()).chainId,
@@ -309,16 +316,21 @@ export class Commands {
 		const computeValidUntil = Math.floor(mytime.getTime() / 1000);
 
 		const computeEnvID = args[3];
-		const chainComputeEnvs = computeEnvs[algoDdo.chainId];
-		let computeEnv = chainComputeEnvs[0];
+		// NO chainId needed anymore (is not part of ComputeEnvironment spec anymore)
+		// const chainComputeEnvs = computeEnvs[computeEnvID]; // was algoDdo.chainId
+		let computeEnv = null;// chainComputeEnvs[0];
 
 		if (computeEnvID && computeEnvID.length > 1) {
-			for (const index in chainComputeEnvs) {
-				if (computeEnvID == chainComputeEnvs[index].id) {
-					computeEnv = chainComputeEnvs[index];
-					continue;
+			for (const index in computeEnvs) {
+				if (computeEnvID == computeEnvs[index].id) {
+					computeEnv = computeEnvs[index];
+					break;
 				}
 			}
+		}
+		if(!computeEnv || !computeEnvID) {
+			console.error("Error fetching compute environment. No compute environment matches id: ", computeEnvID);
+			return;
 		}
 		
 		const algo: ComputeAlgorithm = {
@@ -430,6 +442,8 @@ export class Commands {
 			metadataUri: await getMetadataURI()
 		}
 
+		const isFreeJob = computeEnv.free ? true : false
+
 		const computeJobs = await ProviderInstance.computeStart(
 			providerURI,
 			this.signer,
@@ -437,15 +451,21 @@ export class Commands {
 			assets, // assets[0] // only c2d v1,
 			algo,
 			null,
+			null,
 			// additionalDatasets, only c2d v1
 			output,
-			computeEnv.free ? true : false //
+			isFreeJob
 		);
+
+		console.log('compute jobs: ', computeJobs)
 
 		if (computeJobs && computeJobs[0]) {
 			const { jobId, agreementId } = computeJobs[0];
 			console.log("Compute started.  JobID: " + jobId);
-			console.log("Agreement ID: " + agreementId);
+			if(!isFreeJob) {
+				console.log("Agreement ID: " + agreementId);
+			}
+			
 		} else {
 			console.log("Error while starting the compute job: ", computeJobs);
 		}

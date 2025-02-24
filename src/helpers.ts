@@ -162,7 +162,7 @@ export async function updateAssetMetadata(
 	const nft = new Nft(owner, (await owner.provider.getNetwork()).chainId);
 	let flags;
 	let metadata;
-	const validateResult = await aquariusInstance.validate(updatedDdo);
+	const validateResult = await aquariusInstance.validate(updatedDdo, owner, macOsProviderUrl || providerUrl);
 	if (encryptDDO) {
 		const providerResponse = await ProviderInstance.encrypt(
 			updatedDdo,

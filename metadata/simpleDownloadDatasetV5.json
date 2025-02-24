@@ -61,7 +61,25 @@
       }
     ],
     "datatokens": [],
-    "credentials": [],
+    "credentials": { "allow": [
+      {
+        "type": "SSIpolicy",
+        "values": [
+          {
+            "request_credentials": [],
+            "vc_policies": [
+              "signature",
+              "expired",
+              "not-before",
+              "revoked-status-list"
+            ],
+            "vp_policies": []
+          }
+        ]
+      }
+    ]},
+    "deny": [],
+    "match_deny": "any",
     "chainId": 8996,
     "nftAddress": "",
     "stats": {

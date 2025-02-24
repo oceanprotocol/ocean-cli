@@ -31,7 +31,7 @@ import {
   Datatoken4,
 } from "@oceanprotocol/lib";
 import { hexlify } from "ethers/lib/utils.js";
-import { DDOManager } from "ddo.js";
+import { DDOManager } from "@oceanprotocol/ddo-js";
 import { uploadToIPFS } from "ipfs";
 import { signVC } from "sign";
 

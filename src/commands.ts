@@ -29,7 +29,7 @@ import {
 import { Signer, ethers } from "ethers";
 import { interactiveFlow } from "./interactiveFlow.js";
 import { publishAsset } from "./publishAsset.js";
-import { DDOManager } from 'ddo.js';
+import { DDOManager } from '@oceanprotocol/ddo-js';
 
 export class Commands {
 	public signer: Signer;

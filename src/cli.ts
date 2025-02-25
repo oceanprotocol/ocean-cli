@@ -185,6 +185,29 @@ export async function createCLI() {
       await commands.computeStart([null, dsDids, aDid, envId]);
     });
 
+  // startFreeCompute command
+  program
+    .command('startFreeCompute')
+    .description('Starts a compute job')
+    .argument('<datasetDids>', 'Dataset DIDs (comma-separated)')
+    .argument('<algoDid>', 'Algorithm DID')
+    .argument('<computeEnvId>', 'Compute environment ID')
+    .option('-d, --datasets <datasetDids>', 'Dataset DIDs (comma-separated)')
+    .option('-a, --algo <algoDid>', 'Algorithm DID')
+    .option('-e, --env <computeEnvId>', 'Compute environment ID')
+    .action(async (datasetDids, algoDid, computeEnvId, options) => {
+      const dsDids = options.datasets || datasetDids;
+      const aDid = options.algo || algoDid;
+      const envId = options.env || computeEnvId;
+      if (!dsDids || !aDid || !envId) {
+        console.error(chalk.red('Missing required arguments'));
+        process.exit(1);
+      }
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
+      await commands.freeComputeStart([null, dsDids, aDid, envId]);
+    });
+
   // stopCompute command
   program
     .command('stopCompute')

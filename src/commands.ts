@@ -442,8 +442,6 @@ export class Commands {
 			metadataUri: await getMetadataURI()
 		}
 
-		const isFreeJob = computeEnv.free ? true : false
-
 		const computeJobs = await ProviderInstance.computeStart(
 			providerURI,
 			this.signer,
@@ -453,8 +451,7 @@ export class Commands {
 			null,
 			null,
 			// additionalDatasets, only c2d v1
-			output,
-			isFreeJob
+			output
 		);
 
 		console.log('compute jobs: ', computeJobs)
@@ -462,10 +459,151 @@ export class Commands {
 		if (computeJobs && computeJobs[0]) {
 			const { jobId, agreementId } = computeJobs[0];
 			console.log("Compute started.  JobID: " + jobId);
-			if(!isFreeJob) {
-				console.log("Agreement ID: " + agreementId);
+			console.log("Agreement ID: " + agreementId);
+		} else {
+			console.log("Error while starting the compute job: ", computeJobs);
+		}
+	}
+
+	public async freeComputeStart(args: string[]) {
+
+		const inputDatasetsString = args[1];
+		let inputDatasets = [];
+
+		if (
+			inputDatasetsString.includes("[") ||
+			inputDatasetsString.includes("]")
+		) {
+			const processedInput = inputDatasetsString
+				.replaceAll("]", "")
+				.replaceAll("[", "");
+			inputDatasets = processedInput.split(",");
+		} else {
+			inputDatasets.push(inputDatasetsString);
+		}
+
+		const ddos = [];
+
+		for (const dataset in inputDatasets) {
+			const dataDdo = await this.aquarius.waitForIndexer(inputDatasets[dataset],null,null, this.indexingParams.retryInterval, this.indexingParams.maxRetries);
+			if (!dataDdo) {
+				console.error(
+					"Error fetching DDO " + dataset[1] + ".  Does this asset exists?"
+				);
+				return;
+			} else {
+				ddos.push(dataDdo);
 			}
-			
+		}
+		if (ddos.length <= 0 || ddos.length != inputDatasets.length) {
+			console.error("Not all the data ddos are available.");
+			return;
+		}
+		const providerURI =
+			this.macOsProviderUrl && ddos[0].chainId === 8996
+				? this.macOsProviderUrl
+				: ddos[0].services[0].serviceEndpoint;
+
+		const algoDdo = await this.aquarius.waitForIndexer(args[2],null,null, this.indexingParams.retryInterval, this.indexingParams.maxRetries);
+		if (!algoDdo) {
+			console.error(
+				"Error fetching DDO " + args[1] + ".  Does this asset exists?"
+			);
+			return;
+		}
+
+		const computeEnvs = await ProviderInstance.getComputeEnvironments(
+			this.macOsProviderUrl || this.providerUrl
+		);
+
+		if(!computeEnvs || computeEnvs.length  < 1) {
+			console.error(
+				"Error fetching compute environments. No compute environments available."
+			);
+			return;
+		}
+
+		const mytime = new Date();
+		const computeMinutes = 5;
+		mytime.setMinutes(mytime.getMinutes() + computeMinutes);
+
+		const computeEnvID = args[3];
+		// NO chainId needed anymore (is not part of ComputeEnvironment spec anymore)
+		// const chainComputeEnvs = computeEnvs[computeEnvID]; // was algoDdo.chainId
+		let computeEnv = null;// chainComputeEnvs[0];
+
+		if (computeEnvID && computeEnvID.length > 1) {
+			for (const index in computeEnvs) {
+				if (computeEnvID == computeEnvs[index].id && computeEnvs[index].free) {
+					computeEnv = computeEnvs[index];
+					break;
+				}
+			}
+		}
+		if(!computeEnv || !computeEnvID) {
+			console.error("Error fetching free compute environment. No free compute environment matches id: ", computeEnvID);
+			return;
+		}
+		
+		const algo: ComputeAlgorithm = {
+			documentId: algoDdo.id,
+			serviceId: algoDdo.services[0].id,
+			meta: algoDdo.metadata.algorithm
+		};
+	
+		const assets = [];
+		for (const dataDdo in ddos) {
+			const canStartCompute = isOrderable(
+				ddos[dataDdo],
+				ddos[dataDdo].services[0].id,
+				algo,
+				algoDdo
+			);
+			if (!canStartCompute) {
+				console.error(
+					"Error Cannot start compute job using the datasets DIDs & algorithm DID provided"
+				);
+				return;
+			}
+			assets.push({
+				documentId: ddos[dataDdo].id,
+				serviceId: ddos[dataDdo].services[0].id
+			});
+
+		}
+
+		console.log("Starting compute job using provider: ", providerURI);
+		const additionalDatasets = assets.length > 1 ? assets.slice(1) : null;
+		console.log(
+			"Starting compute job on " +
+				assets[0].documentId +
+				" with additional datasets:" +
+				(!additionalDatasets ? "none" : additionalDatasets[0].documentId)
+		);
+		if(additionalDatasets!==null) {
+			console.log('Adding additional datasets to dataset, according to C2D V2 specs')
+			assets.push(additionalDatasets)
+		}
+
+		const output: ComputeOutput =  {
+			metadataUri: await getMetadataURI()
+		}
+
+		const computeJobs = await ProviderInstance.freeComputeStart(
+			providerURI,
+			this.signer,
+			computeEnv.id,
+			assets, // assets[0] // only c2d v1,
+			algo,
+			null,
+			output
+		);
+
+		console.log('compute jobs: ', computeJobs)
+
+		if (computeJobs && computeJobs[0]) {
+			const { jobId } = computeJobs[0];
+			console.log("Compute started.  JobID: " + jobId);	
 		} else {
 			console.log("Error while starting the compute job: ", computeJobs);
 		}

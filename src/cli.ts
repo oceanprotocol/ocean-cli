@@ -208,6 +208,16 @@ export async function createCLI() {
       await commands.freeComputeStart([null, dsDids, aDid, envId]);
     });
 
+  // startFreeCompute command
+  program
+    .command('getComputeEnvironments')
+    .description('Gets the existing compute environments')
+    .action(async () => {
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
+      await commands.getComputeEnvironments();
+    });
+
   // stopCompute command
   program
     .command('stopCompute')

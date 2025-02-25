@@ -641,6 +641,20 @@ export class Commands {
 		console.log(jobStatus);
 	}
 
+	public async getComputeEnvironments() {
+		const computeEnvs = await ProviderInstance.getComputeEnvironments(
+			this.macOsProviderUrl || this.providerUrl
+		);
+
+		if(!computeEnvs || computeEnvs.length  < 1) {
+			console.error(
+				"Error fetching compute environments. No compute environments available."
+			);
+			return;
+		}
+		console.log('Exiting compute environments: ', computeEnvs)
+	}
+
 	public async allowAlgo(args: string[]) {
 		const asset = await this.aquarius.waitForIndexer(args[1],null,null, this.indexingParams.retryInterval, this.indexingParams.maxRetries);
 		if (!asset) {

@@ -211,6 +211,7 @@ export async function createCLI() {
   // startFreeCompute command
   program
     .command('getComputeEnvironments')
+    .alias('getC2DEnvs')
     .description('Gets the existing compute environments')
     .action(async () => {
       const { signer, chainId } = await initializeSigner();

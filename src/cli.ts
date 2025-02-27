@@ -208,7 +208,7 @@ export async function createCLI() {
       await commands.freeComputeStart([null, dsDids, aDid, envId]);
     });
 
-  // startFreeCompute command
+  // getComputeEnvironments command
   program
     .command('getComputeEnvironments')
     .alias('getC2DEnvs')
@@ -217,6 +217,19 @@ export async function createCLI() {
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
       await commands.getComputeEnvironments();
+    });
+
+  // startFreeCompute command
+  program
+    .command('computeStreamableLogs')
+    .description('Gets the existing compute streamable logs')
+    .argument('<jobId>', 'Job ID')
+    .option('-j, --job <jobId>', 'Job ID')
+    .action(async (jobId, options) => {
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
+      const args = jobId || options.job
+      await commands.computeStreamableLogs([args]);
     });
 
   // stopCompute command

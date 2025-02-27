@@ -533,13 +533,14 @@ export class Commands {
 		let computeEnv = null;// chainComputeEnvs[0];
 
 		if (computeEnvID && computeEnvID.length > 1) {
-			for (const index in computeEnvs) {
-				if (computeEnvID == computeEnvs[index].id && computeEnvs[index].free) {
-					computeEnv = computeEnvs[index];
+			for (const env of computeEnvs) {
+				if (computeEnvID == env.id && env.free) {
+					computeEnv = env;
 					break;
 				}
 			}
 		}
+
 		if(!computeEnv || !computeEnvID) {
 			console.error("Error fetching free compute environment. No free compute environment matches id: ", computeEnvID);
 			return;
@@ -653,6 +654,34 @@ export class Commands {
 			return;
 		}
 		console.log('Exiting compute environments: ', computeEnvs)
+	}
+
+	public async computeStreamableLogs(args: string[]) {
+		const jobId = args[0]
+		const logsResponse = await ProviderInstance.computeStreamableLogs(
+			this.macOsProviderUrl || this.providerUrl,
+			this.signer,
+			jobId,
+		);
+		console.log('response: ' , logsResponse)
+
+		if(!logsResponse) {
+			console.error(
+				"Error fetching streamable logs. No logs available."
+			);
+			return;
+		} else {
+			const stream = logsResponse as ReadableStream
+			console.log('stream: ', stream)
+			const text = await new Response(stream).text();
+			console.log('Streamable Logs: ')
+			console.log(text);
+			// for await (const value of stream) {
+			// 	// just print it to the console
+			// 	console.log(value);
+			// }
+		}
+		console.log('Exiting computeStreamableLogs: ', logsResponse)
 	}
 
 	public async allowAlgo(args: string[]) {

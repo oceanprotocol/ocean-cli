@@ -5,7 +5,7 @@
   "id": "",
   "nftAddress": "",
   "version": "4.1.0",
-  "chainId": 80001,
+  "chainId": null,
   "metadata": {
     "created": "2021-12-20T14:35:20Z",
     "updated": "2021-12-20T14:35:20Z",
@@ -31,7 +31,7 @@
         "files": [
           {
             "type": "url",
-            "url": "https://dumps.wikimedia.org/enwiki/latest/enwiki-latest-abstract10.xml.gz-rss.xml",
+            "url": "https://raw.githubusercontent.com/oceanprotocol/ocean-node/refs/heads/main/LICENSE",
             "method": "GET"
           }
         ]

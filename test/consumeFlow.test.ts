@@ -63,7 +63,6 @@ describe("Ocean CLI Publishing", function() {
                 expect(stdout).to.contain("Asset published. ID:");
                 done()
             } catch (assertionError) {
-                console.log('assertionError', assertionError);
                 done(assertionError);
             }
         });
@@ -71,7 +70,6 @@ describe("Ocean CLI Publishing", function() {
 
     it("should publish a compute dataset using 'npm run cli publish'", function(done) {
         const metadataFile = path.resolve(projectRoot, "metadata/simpleComputeDataset.json");
-
         // Ensure the metadata file exists
         if (!fs.existsSync(metadataFile)) {
             done(new Error("Metadata file not found: " + metadataFile));
@@ -188,13 +186,13 @@ describe("Ocean CLI Publishing", function() {
                 expect(stdout).to.contain("File downloaded successfully");
     
                 // Path to the downloaded file
-                const downloadedFilePath = './enwiki-latest-abstract10.xml.gz-rss.xml';
+                const downloadedFilePath = './LICENSE';
     
                 // Verify the downloaded file content hash matches the original file hash
                 const downloadedFileHash = computeFileHash(downloadedFilePath);
-                const originalFilePath = './metadata/enwiki-latest-abstract10.xml.gz-rss.xml';
+                const originalFilePath = './metadata/LICENSE';
     
-                await downloadFile("https://dumps.wikimedia.org/enwiki/latest/enwiki-latest-abstract10.xml.gz-rss.xml", originalFilePath);
+                await downloadFile("https://raw.githubusercontent.com/oceanprotocol/ocean-node/refs/heads/main/LICENSE", originalFilePath);
                 const originalFileHash = computeFileHash(originalFilePath);
     
                 expect(downloadedFileHash).to.equal(originalFileHash);

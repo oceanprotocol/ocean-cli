@@ -196,7 +196,7 @@ describe("Ocean CLI Publishing", function() {
                 const downloadedFileHash = computeFileHash(downloadedFilePath);
                 const originalFilePath = './metadata/LICENSE';
     
-                await downloadFile("https://github.com/oceanprotocol/ocean-node/blob/main/LICENSE", originalFilePath);
+                await downloadFile("https://raw.githubusercontent.com/oceanprotocol/ocean-node/refs/heads/main/LICENSE", originalFilePath);
                 const originalFileHash = computeFileHash(originalFilePath);
     
                 expect(downloadedFileHash).to.equal(originalFileHash);

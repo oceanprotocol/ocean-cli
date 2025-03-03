@@ -31,7 +31,7 @@
         "files": [
           {
             "type": "url",
-            "url": "https://dumps.wikimedia.org/enwiki/latest/enwiki-latest-abstract10.xml.gz-rss.xml",
+            "url": "https://github.com/oceanprotocol/ocean-node/blob/main/LICENSE",
             "method": "GET"
           }
         ]

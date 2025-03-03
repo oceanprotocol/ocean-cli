@@ -55,7 +55,7 @@ jobs:
           node-version: '18.19.0'
 
       - name: Cache node_modules
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         env:
           cache-name: cache-node-modules
         with:

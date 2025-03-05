@@ -217,6 +217,12 @@ npm run cli <command> [options] <arguments>
 
 ---
 
+**Get Compute Environments:**
+
+  `npm run cli getComputeEnvironments`
+
+---
+
 **Get Job Status:**
 
 - **Positional:**  

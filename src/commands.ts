@@ -30,6 +30,8 @@ import { Signer, ethers } from "ethers";
 import { interactiveFlow } from "./interactiveFlow.js";
 import { publishAsset } from "./publishAsset.js";
 import { DDOManager } from '@oceanprotocol/ddo-js';
+import axios from 'axios'
+import { SsiWalletSession } from "ssi.js";
 
 export class Commands {
 	public signer: Signer;
@@ -75,7 +77,7 @@ export class Commands {
 		console.log('Starting the interactive CLI flow...\n\n');
 		const data = await interactiveFlow(this.providerUrl); // Collect data via CLI
 		await publishAsset(data, this.signer, this.config); // Publish asset with collected data
-	  }
+	}
 
 	// utils
 	public async sleep(ms: number) {
@@ -151,7 +153,7 @@ export class Commands {
 	}
 
 	public async editAsset(args: string[]) {
-		const asset = await this.aquarius.waitForIndexer(args[1],null,null, this.indexingParams.retryInterval, this.indexingParams.maxRetries);
+		const asset = await this.aquarius.waitForIndexer(args[1], null, null, this.indexingParams.retryInterval, this.indexingParams.maxRetries);
 		if (!asset) {
 			console.error(
 				"Error fetching DDO " + args[1] + ".  Does this asset exists?"
@@ -187,18 +189,18 @@ export class Commands {
 
 	public async getDDO(args: string[]) {
 		console.log("Resolving Asset with DID: " + args[1]);
-		const resolvedDDO = await this.aquarius.waitForIndexer(args[1],null,null, this.indexingParams.retryInterval, this.indexingParams.maxRetries);
+		const resolvedDDO = await this.aquarius.waitForIndexer(args[1], null, null, this.indexingParams.retryInterval, this.indexingParams.maxRetries);
 		if (!resolvedDDO) {
 			console.error(
 				"Error fetching Asset with DID: " +
-					args[1] +
-					".  Does this asset exists?"
+				args[1] +
+				".  Does this asset exists?"
 			);
 		} else console.log(util.inspect(resolvedDDO, false, null, true));
 	}
 
 	public async download(args: string[]) {
-		const dataDdo = await this.aquarius.waitForIndexer(args[1],null,null, this.indexingParams.retryInterval, this.indexingParams.maxRetries);
+		const dataDdo = await this.aquarius.waitForIndexer(args[1], null, null, this.indexingParams.retryInterval, this.indexingParams.maxRetries);
 		if (!dataDdo) {
 			console.error(
 				"Error fetching DDO " + args[1] + ".  Does this asset exists?"
@@ -214,13 +216,13 @@ export class Commands {
 				: services[0].serviceEndpoint;
 		console.log("Downloading asset using provider: ", providerURI);
 		const datatoken = new Datatoken(this.signer, this.config.chainId);
-
+		//TODO throw passtorw to get sessionId
 		const tx = await orderAsset(
 			dataDdo,
 			this.signer,
 			this.config,
 			datatoken,
-			providerURI
+			providerURI,
 		);
 
 		if (!tx) {
@@ -238,7 +240,8 @@ export class Commands {
 			0,
 			orderTx.transactionHash,
 			providerURI,
-			this.signer
+			this.signer,
+			//ssessionId
 		);
 		try {
 			const path = args[2] ? args[2] : '.';
@@ -269,7 +272,7 @@ export class Commands {
 		const ddos = [];
 
 		for (const dataset in inputDatasets) {
-			const dataDdo = await this.aquarius.waitForIndexer(inputDatasets[dataset],null,null, this.indexingParams.retryInterval, this.indexingParams.maxRetries);
+			const dataDdo = await this.aquarius.waitForIndexer(inputDatasets[dataset], null, null, this.indexingParams.retryInterval, this.indexingParams.maxRetries);
 			if (!dataDdo) {
 				console.error(
 					"Error fetching DDO " + dataset[1] + ".  Does this asset exists?"
@@ -288,7 +291,7 @@ export class Commands {
 				? this.macOsProviderUrl
 				: ddos[0].services[0].serviceEndpoint;
 
-		const algoDdo = await this.aquarius.waitForIndexer(args[2],null,null, this.indexingParams.retryInterval, this.indexingParams.maxRetries);
+		const algoDdo = await this.aquarius.waitForIndexer(args[2], null, null, this.indexingParams.retryInterval, this.indexingParams.maxRetries);
 		if (!algoDdo) {
 			console.error(
 				"Error fetching DDO " + args[1] + ".  Does this asset exists?"
@@ -322,13 +325,13 @@ export class Commands {
 				}
 			}
 		}
-		
+
 		const algo: ComputeAlgorithm = {
 			documentId: algoDdo.id,
 			serviceId: algoDdo.services[0].id,
 			meta: algoDdo.metadata.algorithm
 		};
-	
+
 		const assets = [];
 		for (const dataDdo in ddos) {
 			const canStartCompute = isOrderable(
@@ -365,9 +368,9 @@ export class Commands {
 		) {
 			console.error(
 				"Error initializing Provider for the compute job using dataset DID " +
-					args[1] +
-					" and algorithm DID " +
-					args[2]
+				args[1] +
+				" and algorithm DID " +
+				args[2]
 			);
 			return;
 		}
@@ -387,8 +390,8 @@ export class Commands {
 		if (!algo.transferTxId) {
 			console.error(
 				"Error ordering compute for algorithm with DID: " +
-					args[2] +
-					".  Do you have enough tokens?"
+				args[2] +
+				".  Do you have enough tokens?"
 			);
 			return;
 		}
@@ -408,8 +411,8 @@ export class Commands {
 			if (!assets[i].transferTxId) {
 				console.error(
 					"Error ordering dataset with DID: " +
-						assets[i] +
-						".  Do you have enough tokens?"
+					assets[i] +
+					".  Do you have enough tokens?"
 				);
 				return;
 			}
@@ -418,12 +421,12 @@ export class Commands {
 		const additionalDatasets = assets.length > 1 ? assets.slice(1) : null;
 		console.log(
 			"Starting compute job on " +
-				assets[0].documentId +
-				" with additional datasets:" +
-				(!additionalDatasets ? "none" : additionalDatasets[0].documentId)
+			assets[0].documentId +
+			" with additional datasets:" +
+			(!additionalDatasets ? "none" : additionalDatasets[0].documentId)
 		);
 
-		const output: ComputeOutput =  {
+		const output: ComputeOutput = {
 			metadataUri: await getMetadataURI()
 		}
 
@@ -447,7 +450,7 @@ export class Commands {
 	}
 
 	public async computeStop(args: string[]) {
-		const dataDdo = await this.aquarius.waitForIndexer(args[1],null,null, this.indexingParams.retryInterval, this.indexingParams.maxRetries);
+		const dataDdo = await this.aquarius.waitForIndexer(args[1], null, null, this.indexingParams.retryInterval, this.indexingParams.maxRetries);
 		if (!dataDdo) {
 			console.error(
 				"Error fetching DDO " + args[1] + ".  Does this asset exists?"
@@ -458,7 +461,7 @@ export class Commands {
 
 		const jobId = args[2]
 		let agreementId = null;
-		if(hasAgreementId) {
+		if (hasAgreementId) {
 			agreementId = args[3];
 		}
 
@@ -479,7 +482,7 @@ export class Commands {
 	}
 
 	public async allowAlgo(args: string[]) {
-		const asset = await this.aquarius.waitForIndexer(args[1],null,null, this.indexingParams.retryInterval, this.indexingParams.maxRetries);
+		const asset = await this.aquarius.waitForIndexer(args[1], null, null, this.indexingParams.retryInterval, this.indexingParams.maxRetries);
 		if (!asset) {
 			console.error(
 				"Error fetching DDO " + args[1] + ".  Does this asset exists?"
@@ -497,12 +500,12 @@ export class Commands {
 		if (asset.services[0].type !== "compute") {
 			console.error(
 				"Error getting computeService for " +
-					args[1] +
-					".  Does this asset has an computeService?"
+				args[1] +
+				".  Does this asset has an computeService?"
 			);
 			return;
 		}
-		const algoAsset = await this.aquarius.waitForIndexer(args[2],null,null, this.indexingParams.retryInterval, this.indexingParams.maxRetries);
+		const algoAsset = await this.aquarius.waitForIndexer(args[2], null, null, this.indexingParams.retryInterval, this.indexingParams.maxRetries);
 		if (!algoAsset) {
 			console.error(
 				"Error fetching DDO " + args[2] + ".  Does this asset exists?"
@@ -549,7 +552,7 @@ export class Commands {
 	}
 
 	public async disallowAlgo(args: string[]) {
-		const asset = await this.aquarius.waitForIndexer(args[1],null,null, this.indexingParams.retryInterval, this.indexingParams.maxRetries);
+		const asset = await this.aquarius.waitForIndexer(args[1], null, null, this.indexingParams.retryInterval, this.indexingParams.maxRetries);
 		if (!asset) {
 			console.error(
 				"Error fetching DDO " + args[1] + ".  Does this asset exists?"
@@ -565,8 +568,8 @@ export class Commands {
 		if (asset.services[0].type !== "compute") {
 			console.error(
 				"Error getting computeService for " +
-					args[1] +
-					".  Does this asset has an computeService?"
+				args[1] +
+				".  Does this asset has an computeService?"
 			);
 			return;
 		}
@@ -590,9 +593,9 @@ export class Commands {
 		} else {
 			console.error(
 				" " +
-					args[2] +
-					".  is not allowed by the publisher to run on " +
-					args[1]
+				args[2] +
+				".  is not allowed by the publisher to run on " +
+				args[1]
 			);
 			return;
 		}
@@ -613,8 +616,8 @@ export class Commands {
 		// args[2] - jobId
 		// args[3] - agreementId
 		const hasAgreementId = args.length === 4;
-		
-		const dataDdo = await this.aquarius.waitForIndexer(args[1],null,null, this.indexingParams.retryInterval, this.indexingParams.maxRetries);
+
+		const dataDdo = await this.aquarius.waitForIndexer(args[1], null, null, this.indexingParams.retryInterval, this.indexingParams.maxRetries);
 		if (!dataDdo) {
 			console.error(
 				"Error fetching DDO " + args[1] + ".  Does this asset exists?"
@@ -623,7 +626,7 @@ export class Commands {
 		}
 		const jobId = args[2]
 		let agreementId = null;
-		if(hasAgreementId) {
+		if (hasAgreementId) {
 			agreementId = args[3];
 		}
 		const providerURI =
@@ -641,7 +644,7 @@ export class Commands {
 	}
 
 	public async downloadJobResults(args: string[]) {
-	
+
 		const jobResult = await ProviderInstance.getComputeResultUrl(
 			this.providerUrl,
 			this.signer,
@@ -693,4 +696,35 @@ export class Commands {
 			amountToUnits(null, null, "1000", 18)
 		);
 	}
+
+	public async connectToSSIWallet(
+	): Promise<SsiWalletSession> {
+		try {
+			const waltIdWalletApi =
+				process.env.WALT_ID_WALLET_API || "http://ocean-node-vm3.oceanenterprise.io:7001";
+			let response = await axios.get(`${waltIdWalletApi}/wallet-api/auth/account/web3/nonce`)
+			console.log('response nonce status:', response.status)
+			console.log('nonce:', response.data)
+			const nonce = response.data
+			const payload = {
+				challenge: nonce,
+				signed: await this.signer.signMessage(nonce),
+				publicKey: await this.signer.getAddress()
+			}
+
+			response = await axios.post(
+				`${waltIdWalletApi}/wallet-api/auth/account/web3/signed`,
+				payload
+			)
+			console.log('response:', response)
+			console.log('token:', response.data?.token)
+			return response.data?.token
+		} catch (error) {
+			console.log('error message:', error.response.statusText)
+			console.log('error code:', error.response.status)
+			console.log('error data:', error.response.data)
+			// throw error
+		}
+	}
+
 }

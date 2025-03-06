@@ -112,6 +112,9 @@ async function start() {
         case "mintOcean":
             await commands.mintOceanTokens();
             break;
+        case "connectToSSIWallet":
+            await commands.connectToSSIWallet()
+            break;
         case "h":
             help();
             break;

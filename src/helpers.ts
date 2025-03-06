@@ -206,10 +206,10 @@ export async function createAsset(
     templateIndex === 4
       ? ""
       : await ProviderInstance.encrypt(
-          assetUrl,
-          chainId,
-          macOsProviderUrl || providerUrl
-        );
+        assetUrl,
+        chainId,
+        macOsProviderUrl || providerUrl
+      );
   services[0].datatokenAddress = datatokenAddressAsset;
   services[0].serviceEndpoint = providerUrl;
 
@@ -229,7 +229,6 @@ export async function createAsset(
   }
   ddo = ddoInstance.updateFields({ id, nftAddress: ddoNftAddress, issuer });
   const proof = await signVC(ddo);
-  console.log("proof ", proof);
   const validateResult = await aquariusInstance.validate(ddo);
   if (!validateResult.valid) {
     throw new Error("Invalid ddo");

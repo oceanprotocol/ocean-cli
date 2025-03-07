@@ -31,13 +31,14 @@ import { interactiveFlow } from "./interactiveFlow.js";
 import { publishAsset } from "./publishAsset.js";
 import { DDOManager } from '@oceanprotocol/ddo-js';
 import axios from 'axios'
-import { SsiWalletSession } from "ssi.js";
+import { SsiKeyDesc, SsiWalletDesc, SsiWalletSession } from "ssi.js";
 
 export class Commands {
 	public signer: Signer;
 	public config: Config;
 	public aquarius: Aquarius;
 	public providerUrl: string;
+	public waltIdWalletApi: string;
 	public macOsProviderUrl: string;
 	// optional settings for indexing wait time
 	private indexingParams: IndexerWaitParams;
@@ -46,6 +47,8 @@ export class Commands {
 		this.signer = signer;
 		this.config = config || new ConfigHelper().getConfig(network);
 		this.providerUrl = process.env.NODE_URL || process.env.PROVIDER_URL || this.config.providerUri;
+		this.waltIdWalletApi =
+			process.env.WALT_ID_WALLET_API || "http://ocean-node-vm3.oceanenterprise.io:7001";
 		this.indexingParams = getIndexingWaitSettings();
 		if (
 			!process.env.PROVIDER_URL && !process.env.NODE_URL &&
@@ -200,7 +203,9 @@ export class Commands {
 	}
 
 	public async download(args: string[]) {
+		console.log('dataDDO')
 		const dataDdo = await this.aquarius.waitForIndexer(args[1], null, null, this.indexingParams.retryInterval, this.indexingParams.maxRetries);
+		console.log('dataDDO', dataDdo)
 		if (!dataDdo) {
 			console.error(
 				"Error fetching DDO " + args[1] + ".  Does this asset exists?"
@@ -700,30 +705,75 @@ export class Commands {
 	public async connectToSSIWallet(
 	): Promise<SsiWalletSession> {
 		try {
-			const waltIdWalletApi =
-				process.env.WALT_ID_WALLET_API || "http://ocean-node-vm3.oceanenterprise.io:7001";
-			let response = await axios.get(`${waltIdWalletApi}/wallet-api/auth/account/web3/nonce`)
-			console.log('response nonce status:', response.status)
-			console.log('nonce:', response.data)
-			const nonce = response.data
+			const responseNonce = await axios.get(`${this.waltIdWalletApi}/wallet-api/auth/account/web3/nonce`)
+			console.log('response nonce status:', responseNonce.status)
+			console.log('nonce:', responseNonce.data)
+			const nonce = responseNonce.data
 			const payload = {
 				challenge: nonce,
 				signed: await this.signer.signMessage(nonce),
 				publicKey: await this.signer.getAddress()
 			}
 
-			response = await axios.post(
-				`${waltIdWalletApi}/wallet-api/auth/account/web3/signed`,
+			const responseSigned = await axios.post(
+				`${this.waltIdWalletApi}/wallet-api/auth/account/web3/signed`,
 				payload
 			)
-			console.log('response:', response)
-			console.log('token:', response.data?.token)
-			return response.data?.token
+			console.log('token:', responseSigned.data?.token)
+			const token = responseSigned.data?.token
+			const ssiWallets = await this.getSSIWallets(token)
+			console.log('ssiWallets:', ssiWallets)
+			if (ssiWallets.length > 0) {
+				const ssiWalletKeys = await this.getSSIWalletKeys(ssiWallets[0], token)
+				console.log('ssiWalletKeys:', ssiWalletKeys)
+			}
+
+			return token
 		} catch (error) {
-			console.log('error message:', error.response.statusText)
-			console.log('error code:', error.response.status)
-			console.log('error data:', error.response.data)
+			console.log('error:', error)
+			// console.log('error message:', error.response.statusText)
+			// console.log('error code:', error.response.status)
+			// console.log('error data:', error.response.data)
 			// throw error
+		}
+	}
+
+	public async getSSIWallets(token: string): Promise<SsiWalletDesc[]> {
+		try {
+			const response = await axios.get(
+				`${this.waltIdWalletApi}/wallet-api/wallet/accounts/wallets`,
+				{
+					headers: {
+						Authorization: `Bearer ${token}`,
+					},
+					withCredentials: true,
+				}
+			)
+
+			const result: { wallets: SsiWalletDesc[] } = response.data
+			return result.wallets
+		} catch (error) {
+			throw error.response
+		}
+	}
+
+	public async getSSIWalletKeys(
+		wallet: SsiWalletDesc,
+		token: string
+	): Promise<SsiKeyDesc[]> {
+		try {
+			const response = await axios.get(
+				`${this.waltIdWalletApi}/wallet-api/wallet/${wallet?.id}/keys`,
+				{
+					headers: {
+						Authorization: `Bearer ${token}`,
+					},
+					withCredentials: true,
+				}
+			)
+			return response.data
+		} catch (error) {
+			throw error.response
 		}
 	}
 

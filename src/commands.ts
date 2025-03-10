@@ -10,6 +10,7 @@ import {
 	getMetadataURI,
 	getIndexingWaitSettings,
 	IndexerWaitParams,
+	checkCredentialSSI,
 } from "./helpers.js";
 import {
 	Aquarius,
@@ -257,6 +258,74 @@ export class Commands {
 		}
 	}
 
+	public async downloadSSI(args: string[]) {
+		const dataDdo = await this.aquarius.waitForIndexer(args[1], null, null, this.indexingParams.retryInterval, this.indexingParams.maxRetries);
+		if (!dataDdo) {
+			console.error(
+				"Error fetching DDO " + args[1] + ".  Does this asset exists?"
+			);
+			return;
+		}
+		const ddoInstance = DDOManager.getDDOClass(dataDdo);
+		const { services } = ddoInstance.getDDOFields();
+
+		const providerURI =
+			this.macOsProviderUrl && dataDdo.chainId === 8996
+				? this.macOsProviderUrl
+				: services[0].serviceEndpoint;
+		console.log("Downloading asset using provider: ", providerURI);
+		const datatoken = new Datatoken(this.signer, this.config.chainId);
+
+		//HERE PolicyServerPasstrow
+		const downloadEnabled = false
+		try {
+			const result = await checkCredentialSSI(dataDdo, this.providerUrl)
+			console.log('result:', result)
+		} catch (error) {
+			console.log('policity server initiate error', error)
+		}
+		if (downloadEnabled) {
+			//TODO throw passtorw to get sessionId
+			const tx = await orderAsset(
+				dataDdo,
+				this.signer,
+				this.config,
+				datatoken,
+				providerURI,
+			);
+			if (!tx) {
+				console.error(
+					"Error ordering access for " + args[1] + ".  Do you have enough tokens?"
+				);
+				return;
+			}
+
+			const orderTx = await tx.wait();
+			const urlDownloadUrl = await ProviderInstance.getDownloadUrl(
+				dataDdo.id,
+				services[0].id,
+				0,
+				orderTx.transactionHash,
+				providerURI,
+				this.signer,
+				//ssessionId
+			);
+			console.log('urlDownloadUrl', urlDownloadUrl)
+
+			try {
+				const path = args[2] ? args[2] : '.';
+				const { filename } = await downloadFile(urlDownloadUrl, path);
+				console.log("File downloaded successfully:", path + "/" + filename);
+			} catch (e) {
+				console.log(`Download url dataset failed: ${e}`);
+			}
+		} else {
+			console.log('download not enabled, ssi error')
+		}
+
+
+	}
+
 	public async computeStart(args: string[]) {
 
 		const inputDatasetsString = args[1];
@@ -453,6 +522,8 @@ export class Commands {
 			console.log("Error while starting the compute job: ", computeJobs);
 		}
 	}
+
+
 
 	public async computeStop(args: string[]) {
 		const dataDdo = await this.aquarius.waitForIndexer(args[1], null, null, this.indexingParams.retryInterval, this.indexingParams.maxRetries);

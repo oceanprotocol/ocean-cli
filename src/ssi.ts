@@ -20,3 +20,17 @@ export interface SsiKeyDesc {
     id: string
   }
 }
+
+export interface PolicyServerInitiateActionData {
+  successRedirectUri: string
+  errorRedirectUri: string
+  responseRedirectUri: string
+  presentationDefinitionUri: string
+}
+
+export interface PolicyServerInitiateAction {
+  action: 'initiate'
+  sessionId?: string
+  ddo: any
+  policyServer: PolicyServerInitiateActionData
+}

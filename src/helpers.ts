@@ -1,7 +1,7 @@
 import { ethers, Signer } from "ethers";
 import fetch from "cross-fetch";
 import { promises as fs } from "fs";
-import { createHash } from "crypto";
+import { createHash, randomUUID } from "crypto";
 import * as path from "path";
 import * as sapphire from "@oasisprotocol/sapphire-paratime";
 import {
@@ -34,6 +34,8 @@ import { hexlify } from "ethers/lib/utils.js";
 import { DDOManager } from "@oceanprotocol/ddo-js";
 import { uploadToIPFS } from "ipfs";
 import { signVC } from "sign";
+import { PolicyServerInitiateAction, PolicyServerInitiateActionData } from "ssi";
+import axios from 'axios'
 
 export async function downloadFile(
   url: string,
@@ -527,4 +529,48 @@ export function getIndexingWaitSettings(): IndexerWaitParams {
   }
 
   return indexingParams;
+}
+
+export async function checkCredentialSSI(ddo: any, providerUrl: string): Promise<{
+  success: boolean
+  openid4vc: string
+  policyServerData: PolicyServerInitiateActionData
+}> {
+  const sessionId = randomUUID()
+
+  const policyServer: PolicyServerInitiateActionData = {
+    successRedirectUri: `${providerUrl}/api/policy/success`,
+    errorRedirectUri: `${providerUrl}/api/policy/error`,
+    responseRedirectUri: `${providerUrl}/policy/verify/${sessionId}`,
+    presentationDefinitionUri: `${providerUrl}/policy/pd/${sessionId}`
+  }
+
+  const action: PolicyServerInitiateAction = {
+    action: 'initiate',
+    sessionId,
+    ddo,
+    policyServer
+  }
+  try {
+    const response = await axios.post(
+      `${providerUrl}/api/services/PolicyServerPassthrough`,
+      {
+        policyServerPassthrough: action
+      }
+    )
+
+    if (response.data.length === 0) {
+      throw { success: false, message: 'No openid4vc url found' }
+    }
+    return {
+      success: response.data?.success,
+      openid4vc: response.data?.message,
+      policyServerData: policyServer
+    }
+  } catch (error) {
+    if (error.response?.data) {
+      throw error.response?.data
+    }
+    throw error
+  }
 }

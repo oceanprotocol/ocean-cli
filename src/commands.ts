@@ -10,7 +10,7 @@ import {
 	getMetadataURI,
 	getIndexingWaitSettings,
 	IndexerWaitParams,
-	checkCredentialSSI,
+	requestCredentialPresentation,
 } from "./helpers.js";
 import {
 	Aquarius,
@@ -279,7 +279,7 @@ export class Commands {
 		//HERE PolicyServerPasstrow
 		const downloadEnabled = false
 		try {
-			const result = await checkCredentialSSI(dataDdo, this.providerUrl)
+			const result = await requestCredentialPresentation(dataDdo, this.providerUrl)
 			console.log('result:', result)
 		} catch (error) {
 			console.log('policity server initiate error', error)

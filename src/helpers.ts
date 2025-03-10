@@ -531,7 +531,7 @@ export function getIndexingWaitSettings(): IndexerWaitParams {
   return indexingParams;
 }
 
-export async function checkCredentialSSI(ddo: any, providerUrl: string): Promise<{
+export async function requestCredentialPresentation(ddo: any, providerUrl: string): Promise<{
   success: boolean
   openid4vc: string
   policyServerData: PolicyServerInitiateActionData

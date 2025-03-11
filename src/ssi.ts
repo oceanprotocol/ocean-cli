@@ -1,36 +1,260 @@
-export interface SsiWalletSession {
-  session_id: string
-  status: string
-  token: string
-  expiration: Date
+import { ConfigRules, PolicyServerCheckSessionIdAction, PolicyServerDownloadAction, PolicyServerGetPdAction, PolicyServerInitiateAction, PolicyServerInitiateActionData, PolicyServerVerifyAction, SSI_ACTIONS, SsiKeyDesc, SsiWalletDesc } from "types/ssiType";
+import axios from 'axios'
+import { randomUUID } from "crypto";
+
+export async function getSSIToken(waltIdWalletApi: string): Promise<string> {
+  const responseNonce = await axios.get(`${this.waltIdWalletApi}/wallet-api/auth/account/web3/nonce`)
+  console.log('response nonce status:', responseNonce.status)
+  console.log('nonce:', responseNonce.data)
+  const nonce = responseNonce.data
+  const payload = {
+    challenge: nonce,
+    signed: await this.signer.signMessage(nonce),
+    publicKey: await this.signer.getAddress()
+  }
+
+  const responseSigned = await axios.post(
+    `${waltIdWalletApi}/wallet-api/auth/account/web3/signed`,
+    payload
+  )
+  console.log('token:', responseSigned.data?.token)
+  return responseSigned.data?.token
 }
 
-export interface SsiWalletDesc {
-  id: string
-  name: string
-  createdOn: Date
-  addedOn: Date
-  permission: string
-}
+export async function getSSIWallets(token: string, waltIdWalletApi: string): Promise<SsiWalletDesc[]> {
+  try {
+    const response = await axios.get(
+      `${waltIdWalletApi}/wallet-api/wallet/accounts/wallets`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        withCredentials: true,
+      }
+    )
 
-export interface SsiKeyDesc {
-  algorithm: string
-  cryptoProvider: string
-  keyId: {
-    id: string
+    const result: { wallets: SsiWalletDesc[] } = response.data
+    return result.wallets
+  } catch (error) {
+    throw error.response
   }
 }
 
-export interface PolicyServerInitiateActionData {
-  successRedirectUri: string
-  errorRedirectUri: string
-  responseRedirectUri: string
-  presentationDefinitionUri: string
+export async function getSSIWalletKeys(
+  wallet: SsiWalletDesc,
+  token: string,
+  waltIdWalletApi: string
+): Promise<SsiKeyDesc[]> {
+  try {
+    const response = await axios.get(
+      `${waltIdWalletApi}/wallet-api/wallet/${wallet?.id}/keys`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        withCredentials: true,
+      }
+    )
+    return response.data
+  } catch (error) {
+    throw error.response
+  }
 }
 
-export interface PolicyServerInitiateAction {
-  action: 'initiate'
-  sessionId?: string
-  ddo: any
-  policyServer: PolicyServerInitiateActionData
+export async function requestCredentialPresentation(ddo: any, providerUrl: string): Promise<{
+  success: boolean
+  openid4vc: string
+  policyServerData: PolicyServerInitiateActionData
+}> {
+  const sessionId = randomUUID()
+
+  const policyServer: PolicyServerInitiateActionData = {
+    successRedirectUri: `${providerUrl}/api/policy/success`,
+    errorRedirectUri: `${providerUrl}/api/policy/error`,
+    responseRedirectUri: `${providerUrl}/policy/verify/${sessionId}`,
+    presentationDefinitionUri: `${providerUrl}/policy/pd/${sessionId}`
+  }
+
+  const action: PolicyServerInitiateAction = {
+    action: SSI_ACTIONS.INITIATE,
+    sessionId,
+    ddo,
+    policyServer
+  }
+  try {
+    const response = await axios.post(
+      `${providerUrl}/api/services/PolicyServerPassthrough`,
+      {
+        policyServerPassthrough: action
+      }
+    )
+
+    if (response.data.length === 0) {
+      throw { success: false, message: 'No openid4vc url found' }
+    }
+    return {
+      success: response.data?.success,
+      openid4vc: response.data?.message,
+      policyServerData: policyServer
+    }
+  } catch (error) {
+    if (error.response?.data) {
+      throw error.response?.data
+    }
+    throw error
+  }
+}
+
+export async function getPd(sessionId: string, providerUrl: string): Promise<{
+  success: boolean
+  message: string
+}> {
+  const action: PolicyServerGetPdAction = {
+    action: SSI_ACTIONS.GET_PD,
+    sessionId
+  }
+  try {
+    const response = await axios.post(
+      `${providerUrl}/api/services/PolicyServerPassthrough`,
+      {
+        policyServerPassthrough: action
+      }
+    )
+
+    if (response.data.length === 0) {
+      throw { success: false, message: 'Error Pd' }
+    }
+    return {
+      success: response.data?.success,
+      message: response.data?.message,
+    }
+  } catch (error) {
+    if (error.response?.data) {
+      throw error.response?.data
+    }
+    throw error
+  }
+}
+
+export async function verify(vpToken: string, providerUrl: string): Promise<{
+  success: boolean
+  message: string
+}> {
+  const action: PolicyServerVerifyAction = {
+    action: SSI_ACTIONS.VERIFY,
+    vpToken
+  }
+  try {
+    const response = await axios.post(
+      `${providerUrl}/api/services/PolicyServerPassthrough`,
+      {
+        policyServerPassthrough: action
+      }
+    )
+
+    if (response.data.length === 0) {
+      throw { success: false, message: 'Error verify' }
+    }
+    return {
+      success: response.data?.success,
+      message: response.data?.message,
+    }
+  } catch (error) {
+    if (error.response?.data) {
+      throw error.response?.data
+    }
+    throw error
+  }
+}
+
+export async function checkSessionId(sessionId: string, providerUrl: string): Promise<{
+  success: boolean
+  message: string
+}> {
+  const action: PolicyServerCheckSessionIdAction = {
+    action: SSI_ACTIONS.CHECK_SESSION_ID,
+    sessionId
+  }
+  try {
+    const response = await axios.post(
+      `${providerUrl}/api/services/PolicyServerPassthrough`,
+      {
+        policyServerPassthrough: action
+      }
+    )
+
+    if (response.data.length === 0) {
+      throw { success: false, message: 'Error check session id' }
+    }
+    return {
+      success: response.data?.success,
+      message: response.data?.message,
+    }
+  } catch (error) {
+    if (error.response?.data) {
+      throw error.response?.data
+    }
+    throw error
+  }
+}
+
+export async function download(sessionId: string, providerUrl: string): Promise<{
+  success: boolean
+  message: string
+}> {
+  const policyServer = {
+    sessionId
+  }
+  const action: PolicyServerDownloadAction = {
+    action: SSI_ACTIONS.DOWNLOAD,
+    policyServer
+  }
+  try {
+    const response = await axios.post(
+      `${providerUrl}/api/services/PolicyServerPassthrough`,
+      {
+        policyServerPassthrough: action
+      }
+    )
+
+    if (response.data.length === 0) {
+      throw { success: false, message: 'Error download' }
+    }
+    return {
+      success: response.data?.success,
+      message: response.data?.message,
+    }
+  } catch (error) {
+    if (error.response?.data) {
+      throw error.response?.data
+    }
+    throw error
+  }
+}
+
+//TODO define type credential
+export function filterCredentials(credentials: any[]): any[] {
+  const result = [];
+
+  for (const rule of ConfigRules) {
+    const key = Object.keys(rule)[0];
+    const condition = rule[key];
+
+    const matchingCredentials = credentials.filter(c => c.type === key);
+
+    if (condition === "*all") {
+      result.push(...matchingCredentials);
+    } else if (condition === "first") {
+      if (matchingCredentials.length > 0) {
+        result.push(matchingCredentials[0]);
+      }
+    } else {
+      const specificMatch = matchingCredentials.find(c => c.value === condition);
+      if (specificMatch) {
+        result.push(specificMatch);
+      }
+    }
+  }
+
+  return result;
 }

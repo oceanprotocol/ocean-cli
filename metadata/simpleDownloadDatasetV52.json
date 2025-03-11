@@ -105,39 +105,54 @@
         }
       }
     ],
-    "credentials": {"allow":[{"type":"SSIpolicy","values":[{
-      "request_credentials": [
-                  {
-                    "format": "jwt_vc_json",
-                    "policies": [
-                      {
-                        "policy": "dynamic",                                    
-                        "args": {
-                          "policy_name": "signature",
-                          "policy_query": "data",
-                          "rules": {
-                            "policy_url": "https://raw.githubusercontent.com/OceanProtocolEnterprise/policy-server/refs/heads/main/default-verification-policies"
-                          },
-                          "argument": {}
-                        }
-                      }                                              
-                    ],
-                    "type": "VerifiableId"
-                  }
-  ],
-      "vc_policies":["signature","expired","not-before","revoked-status-list"],"vp_policies":[]}]}],"deny":[],"match_deny":"any"},
-      "datatokens": [
+    "credentials": {
+      "allow": [
+        {
+          "type": "SSIpolicy",
+          "values": [
+            {
+                "vp_policies": [
+                    "signature",
+                    "expired"
+                ],
+                "vc_policies": [
+                    "signature",
+                    "expired"
+                ],
+                "request_credentials": [
+                    {
+                        "type": "UniversityDegree",
+                        "format": "jwt_vc_json",
+                        "policies": [
+                            {
+                                "policy": "allowed-issuer",
+                                "args": 
+                                    {
+                                      "did": "did:key:z6MksY1pXwmVSBW8iLBRB1faGArjuWg46a8c7bwN952iksqM"
+                                    }
+                                
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+        }
       ],
-      "nft": {
-        "name": "Data NFT",
-        "symbol": "OEC-NFT",
-        "templateIndex": 1,
-        "tokenURI": "",
-        "transferable": true,
-        "owner": "0xe2DD09d719Da89e5a3D0F2549c7E24566e947260",
-        "address": "",
-        "state": 0,
-        "created": ""
+      "deny": [],
+      "match_deny": "any"
+    },
+    "datatokens": [],
+    "nft": {
+      "name": "Data NFT",
+      "symbol": "OEC-NFT",
+      "templateIndex": 1,
+      "tokenURI": "",
+      "transferable": true,
+      "owner": "0xe2DD09d719Da89e5a3D0F2549c7E24566e947260",
+      "address": "",
+      "state": 0,
+      "created": ""
     },
     "stats": {
       "allocated": 0,
@@ -148,5 +163,7 @@
     }
   },
   "additionalDdos": [],
-  "type": ["VerifiableCredential"]
+  "type": [
+    "VerifiableCredential"
+  ]
 }

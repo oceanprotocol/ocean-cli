@@ -10,7 +10,6 @@ import {
 	getMetadataURI,
 	getIndexingWaitSettings,
 	IndexerWaitParams,
-	requestCredentialPresentation,
 } from "./helpers.js";
 import {
 	Aquarius,
@@ -31,8 +30,7 @@ import { Signer, ethers } from "ethers";
 import { interactiveFlow } from "./interactiveFlow.js";
 import { publishAsset } from "./publishAsset.js";
 import { DDOManager } from '@oceanprotocol/ddo-js';
-import axios from 'axios'
-import { SsiKeyDesc, SsiWalletDesc, SsiWalletSession } from "ssi.js";
+import { getSSIToken, getSSIWalletKeys, getSSIWallets, requestCredentialPresentation } from "ssi.js";
 
 export class Commands {
 	public signer: Signer;
@@ -280,6 +278,7 @@ export class Commands {
 		const downloadEnabled = false
 		try {
 			const result = await requestCredentialPresentation(dataDdo, this.providerUrl)
+
 			console.log('result:', result)
 		} catch (error) {
 			console.log('policity server initiate error', error)
@@ -774,28 +773,13 @@ export class Commands {
 	}
 
 	public async connectToSSIWallet(
-	): Promise<SsiWalletSession> {
+	) {
 		try {
-			const responseNonce = await axios.get(`${this.waltIdWalletApi}/wallet-api/auth/account/web3/nonce`)
-			console.log('response nonce status:', responseNonce.status)
-			console.log('nonce:', responseNonce.data)
-			const nonce = responseNonce.data
-			const payload = {
-				challenge: nonce,
-				signed: await this.signer.signMessage(nonce),
-				publicKey: await this.signer.getAddress()
-			}
-
-			const responseSigned = await axios.post(
-				`${this.waltIdWalletApi}/wallet-api/auth/account/web3/signed`,
-				payload
-			)
-			console.log('token:', responseSigned.data?.token)
-			const token = responseSigned.data?.token
-			const ssiWallets = await this.getSSIWallets(token)
+			const token = await getSSIToken(this.waltIdWalletApi)
+			const ssiWallets = await getSSIWallets(token, this.waltIdWalletApi)
 			console.log('ssiWallets:', ssiWallets)
 			if (ssiWallets.length > 0) {
-				const ssiWalletKeys = await this.getSSIWalletKeys(ssiWallets[0], token)
+				const ssiWalletKeys = await getSSIWalletKeys(ssiWallets[0], token, this.waltIdWalletApi)
 				console.log('ssiWalletKeys:', ssiWalletKeys)
 			}
 
@@ -806,45 +790,6 @@ export class Commands {
 			// console.log('error code:', error.response.status)
 			// console.log('error data:', error.response.data)
 			// throw error
-		}
-	}
-
-	public async getSSIWallets(token: string): Promise<SsiWalletDesc[]> {
-		try {
-			const response = await axios.get(
-				`${this.waltIdWalletApi}/wallet-api/wallet/accounts/wallets`,
-				{
-					headers: {
-						Authorization: `Bearer ${token}`,
-					},
-					withCredentials: true,
-				}
-			)
-
-			const result: { wallets: SsiWalletDesc[] } = response.data
-			return result.wallets
-		} catch (error) {
-			throw error.response
-		}
-	}
-
-	public async getSSIWalletKeys(
-		wallet: SsiWalletDesc,
-		token: string
-	): Promise<SsiKeyDesc[]> {
-		try {
-			const response = await axios.get(
-				`${this.waltIdWalletApi}/wallet-api/wallet/${wallet?.id}/keys`,
-				{
-					headers: {
-						Authorization: `Bearer ${token}`,
-					},
-					withCredentials: true,
-				}
-			)
-			return response.data
-		} catch (error) {
-			throw error.response
 		}
 	}
 

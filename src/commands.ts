@@ -283,6 +283,7 @@ export class Commands {
 		} catch (error) {
 			console.log('policity server initiate error', error)
 		}
+		// more ssi functions
 		if (downloadEnabled) {
 			//TODO throw passtorw to get sessionId
 			const tx = await orderAsset(
@@ -307,7 +308,7 @@ export class Commands {
 				orderTx.transactionHash,
 				providerURI,
 				this.signer,
-				//ssessionId
+				//policySever that came from one ssi function, to use this need new ocean js version or main with npm link
 			);
 			console.log('urlDownloadUrl', urlDownloadUrl)
 

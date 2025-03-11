@@ -29,8 +29,8 @@ export interface PolicyServerInitiateActionData {
 }
 
 export enum SSI_ACTIONS {
-  INITIATE = "INITIATE",
-  GET_PD = "GET_PD",
+  INITIATE = "initiate",
+  GET_PD = "getPD",
   CHECK_SESSION_ID = "checkSessionId",
   PRESENTATION_REQUEST = "presentationRequest",
   VERIFY = "verify",

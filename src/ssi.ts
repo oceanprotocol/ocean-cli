@@ -1,16 +1,47 @@
-import { ConfigRules, PolicyServerCheckSessionIdAction, PolicyServerDownloadAction, PolicyServerGetPdAction, PolicyServerInitiateAction, PolicyServerInitiateActionData, PolicyServerVerifyAction, SSI_ACTIONS, SsiKeyDesc, SsiWalletDesc } from "types/ssiType";
+import { ConfigRules, PolicyServerCheckSessionIdAction, PolicyServerDownalodAction, PolicyServerDownloadAction, PolicyServerGetPdAction, PolicyServerInitiateAction, PolicyServerInitiateActionData, PolicyServerVerifyAction, SSI_ACTIONS, SsiKeyDesc, SsiWalletDesc } from "types/ssiType";
 import axios from 'axios'
 import { randomUUID } from "crypto";
+import { Signer } from "ethers";
 
-export async function getSSIToken(waltIdWalletApi: string): Promise<string> {
-  const responseNonce = await axios.get(`${this.waltIdWalletApi}/wallet-api/auth/account/web3/nonce`)
+function extractSessionId(url: string): string | null {
+  const match = url.match(/[?&]state=([^&]+)/);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+export async function checkCredentials(ddo: any, providerUrl: string): Promise<{ downloadEnabled: boolean; policyServer: PolicyServerDownalodAction }> {
+  try {
+    const credentialPresentation = await requestCredentialPresentation(ddo, providerUrl);
+    console.log('credentialPresentation:', credentialPresentation)
+    const sessionId = extractSessionId(credentialPresentation.openid4vc)
+    console.log('sessionId:', sessionId)
+    const pd = await getPd(sessionId, providerUrl)
+    console.log('pd:', pd)
+    //TODO get from pd.input_descriptors and match with ours from wallet and fileter only that with config
+    const checkSessionIdResult = await checkSessionId(sessionId, providerUrl)
+    console.log("checkSessionIdResult", checkSessionIdResult)
+    const downloadResult = await download(sessionId, providerUrl)
+    console.log('downloadResult', downloadResult)
+    // Ensure result structure has downloadEnabled or default to false
+    return {
+      downloadEnabled: false,
+      policyServer: { sessionId }
+    };
+  } catch (error) {
+    console.log('Error verifying credentials:', error);
+    return { downloadEnabled: false, policyServer: { sessionId: null } };
+  }
+}
+
+export async function getSSIToken(waltIdWalletApi: string, signer: Signer): Promise<string> {
+  console.log("this.waltIdWalletApi", waltIdWalletApi)
+  const responseNonce = await axios.get(`${waltIdWalletApi}/wallet-api/auth/account/web3/nonce`)
   console.log('response nonce status:', responseNonce.status)
   console.log('nonce:', responseNonce.data)
   const nonce = responseNonce.data
   const payload = {
     challenge: nonce,
-    signed: await this.signer.signMessage(nonce),
-    publicKey: await this.signer.getAddress()
+    signed: await signer.signMessage(nonce),
+    publicKey: await signer.getAddress()
   }
 
   const responseSigned = await axios.post(
@@ -81,6 +112,7 @@ export async function requestCredentialPresentation(ddo: any, providerUrl: strin
     ddo,
     policyServer
   }
+
   try {
     const response = await axios.post(
       `${providerUrl}/api/services/PolicyServerPassthrough`,
@@ -88,10 +120,10 @@ export async function requestCredentialPresentation(ddo: any, providerUrl: strin
         policyServerPassthrough: action
       }
     )
-
     if (response.data.length === 0) {
       throw { success: false, message: 'No openid4vc url found' }
     }
+
     return {
       success: response.data?.success,
       openid4vc: response.data?.message,
@@ -173,7 +205,8 @@ export async function checkSessionId(sessionId: string, providerUrl: string): Pr
 }> {
   const action: PolicyServerCheckSessionIdAction = {
     action: SSI_ACTIONS.CHECK_SESSION_ID,
-    sessionId
+    sessionId,
+    policyServer: {}
   }
   try {
     const response = await axios.post(
@@ -182,12 +215,11 @@ export async function checkSessionId(sessionId: string, providerUrl: string): Pr
         policyServerPassthrough: action
       }
     )
-
     if (response.data.length === 0) {
       throw { success: false, message: 'Error check session id' }
     }
     return {
-      success: response.data?.success,
+      success: true,
       message: response.data?.message,
     }
   } catch (error) {
@@ -221,7 +253,7 @@ export async function download(sessionId: string, providerUrl: string): Promise<
       throw { success: false, message: 'Error download' }
     }
     return {
-      success: response.data?.success,
+      success: true,
       message: response.data?.message,
     }
   } catch (error) {

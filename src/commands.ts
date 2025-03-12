@@ -30,7 +30,7 @@ import { Signer, ethers } from "ethers";
 import { interactiveFlow } from "./interactiveFlow.js";
 import { publishAsset } from "./publishAsset.js";
 import { DDOManager } from '@oceanprotocol/ddo-js';
-import { getSSIToken, getSSIWalletKeys, getSSIWallets, requestCredentialPresentation } from "ssi.js";
+import { checkCredentials, getSSIToken, getSSIWalletKeys, getSSIWallets } from "ssi.js";
 
 export class Commands {
 	public signer: Signer;
@@ -275,17 +275,17 @@ export class Commands {
 		const datatoken = new Datatoken(this.signer, this.config.chainId);
 
 		//HERE PolicyServerPasstrow
-		const downloadEnabled = false
+		let downloadEnabled = false
+		let policyServer = null
 		try {
-			const result = await requestCredentialPresentation(dataDdo, this.providerUrl)
-
-			console.log('result:', result)
+			const result = await checkCredentials(dataDdo, this.providerUrl)
+			downloadEnabled = result.downloadEnabled
+			policyServer = result.policyServer
 		} catch (error) {
-			console.log('policity server initiate error', error)
+			console.log('policity server error', error)
 		}
-		// more ssi functions
-		if (downloadEnabled) {
-			//TODO throw passtorw to get sessionId
+
+		if (downloadEnabled && policyServer) {
 			const tx = await orderAsset(
 				dataDdo,
 				this.signer,
@@ -308,7 +308,7 @@ export class Commands {
 				orderTx.transactionHash,
 				providerURI,
 				this.signer,
-				//policySever that came from one ssi function, to use this need new ocean js version or main with npm link
+				policyServer
 			);
 			console.log('urlDownloadUrl', urlDownloadUrl)
 
@@ -776,7 +776,7 @@ export class Commands {
 	public async connectToSSIWallet(
 	) {
 		try {
-			const token = await getSSIToken(this.waltIdWalletApi)
+			const token = await getSSIToken(this.waltIdWalletApi, this.signer)
 			const ssiWallets = await getSSIWallets(token, this.waltIdWalletApi)
 			console.log('ssiWallets:', ssiWallets)
 			if (ssiWallets.length > 0) {

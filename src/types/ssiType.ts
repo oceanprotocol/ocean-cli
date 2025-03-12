@@ -52,6 +52,7 @@ export interface PolicyServerGetPdAction {
 export interface PolicyServerCheckSessionIdAction {
   action: SSI_ACTIONS.CHECK_SESSION_ID;
   sessionId: string;
+  policyServer: any;
 }
 
 export interface PolicyServerVerifyAction {

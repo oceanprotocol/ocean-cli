@@ -61,48 +61,7 @@
         "datatokenAddress": "",
         "serviceEndpoint": "http://localhost:8000",
         "timeout": 0,
-        "name": "",
-        "credentials": {
-          "allow": [
-            {
-              "type": "SSIpolicy",
-              "values": [
-                {
-                  "request_credentials": [
-                    {
-                      "format": "dsfsdf",
-                      "policies": [
-                        {
-                          "policy": "dynamic",
-                          "args": {
-                            "policy_name": "dsfdsf",
-                            "policy_query": "data",
-                            "rules": {
-                              "policy_url": "ffsdfdsfsdfdsfsdfdsfsdfdsfdsf"
-                            },
-                            "argument": {
-                              "sfd": "234"
-                            }
-                          }
-                        }
-                      ],
-                      "type": "esfsdf"
-                    }
-                  ],
-                  "vc_policies": [
-                    "signature",
-                    "expired",
-                    "not-before",
-                    "revoked-status-list"
-                  ],
-                  "vp_policies": []
-                }
-              ]
-            }
-          ],
-          "deny": [],
-          "match_deny": "any"
-        }
+        "name": ""
       }
     ],
     "credentials": {
@@ -111,37 +70,34 @@
           "type": "SSIpolicy",
           "values": [
             {
-                "vp_policies": [
-                    "signature",
-                    "expired"
-                ],
-                "vc_policies": [
-                    "signature",
-                    "expired"
-                ],
-                "request_credentials": [
-                    {
-                        "type": "UniversityDegree",
-                        "format": "jwt_vc_json",
-                        "policies": [
-                            {
-                                "policy": "allowed-issuer",
-                                "args": 
-                                    {
-                                      "did": "did:key:z6MksY1pXwmVSBW8iLBRB1faGArjuWg46a8c7bwN952iksqM"
-                                    }
-                                
-                            }
-                        ]
-                    }
-                ]
+              "request_credentials": [
+                {
+                  "format": "jwt_vc_json",
+                  "policies": [],
+                  "type": "VerifiableId"
+                }
+              ],
+              "vc_policies": [
+                "signature",
+                "expired",
+                "not-before",
+                "revoked-status-list"
+              ],
+              "vp_policies": []
             }
-        ]
+          ]
+        },
+        {
+          "type": "address",
+          "values": [{
+            "address": "0x274124963777ece67d082616765f5b035c1f4333"
+          }]
         }
       ],
       "deny": [],
       "match_deny": "any"
     },
+
     "datatokens": [],
     "nft": {
       "name": "Data NFT",

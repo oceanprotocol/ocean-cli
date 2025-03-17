@@ -88,3 +88,7 @@ export const ConfigRules: ConfigRule[] = [
 ];
 
 
+export type PolicyServerResponse ={
+  success: boolean
+  message: string
+}

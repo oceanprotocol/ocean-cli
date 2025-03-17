@@ -1,4 +1,4 @@
-import { ConfigRules, PolicyServerCheckSessionIdAction, PolicyServerDownalodAction, PolicyServerDownloadAction, PolicyServerGetPdAction, PolicyServerInitiateAction, PolicyServerInitiateActionData, PolicyServerVerifyAction, SSI_ACTIONS, SsiKeyDesc, SsiWalletDesc } from "types/ssiType";
+import { ConfigRules, PolicyServerCheckSessionIdAction, PolicyServerDownalodAction, PolicyServerDownloadAction, PolicyServerGetPdAction, PolicyServerInitiateAction, PolicyServerInitiateActionData, PolicyServerResponse, PolicyServerVerifyAction, SSI_ACTIONS, SsiKeyDesc, SsiWalletDesc } from "types/ssiType";
 import axios from 'axios'
 import { randomUUID } from "crypto";
 import { Signer } from "ethers";
@@ -8,35 +8,43 @@ function extractSessionId(url: string): string | null {
   return match ? decodeURIComponent(match[1]) : null;
 }
 
-export async function checkCredentials(ddo: any, providerUrl: string): Promise<{ downloadEnabled: boolean; policyServer: PolicyServerDownalodAction }> {
+export async function checkCredentials(ddo: any, providerUrl: string, waltIdWalletApi: string, signer: Signer): Promise<{ downloadEnabled: boolean; policyServer: PolicyServerDownalodAction }> {
   try {
     const credentialPresentation = await requestCredentialPresentation(ddo, providerUrl);
-    console.log('credentialPresentation:', credentialPresentation)
     const sessionId = extractSessionId(credentialPresentation.openid4vc)
-    console.log('sessionId:', sessionId)
     const pd = await getPd(sessionId, providerUrl)
-    console.log('pd:', pd)
-    //TODO get from pd.input_descriptors and match with ours from wallet and fileter only that with config
-    const checkSessionIdResult = await checkSessionId(sessionId, providerUrl)
-    console.log("checkSessionIdResult", checkSessionIdResult)
-    const downloadResult = await download(sessionId, providerUrl)
-    console.log('downloadResult', downloadResult)
-    // Ensure result structure has downloadEnabled or default to false
+    await checkSessionId(sessionId, providerUrl)
+    const token = await getSSIToken(waltIdWalletApi, signer);
+    const wallets = await getSSIWallets(token, waltIdWalletApi);
+    const walletId = wallets[0].id;
+    const credentials = await getVerifiableCredentials(waltIdWalletApi, walletId, token, pd);
+    const filteredCredentials = filterCredentials(credentials, ConfigRules);
+    const dids = await getDIDs(waltIdWalletApi, walletId, token);
+    const selectedDid = dids[0];
+    const presentationRequest = credentialPresentation.openid4vc
+    const consumer = selectedDid.did
+    const selectedCredentials = filteredCredentials.map(cred => cred.parsedDocument.id);    
+
+    const resolvedPr = await resolvePresentationRequest(waltIdWalletApi, walletId, presentationRequest, token);
+    const userPrResponse = await usePresentationRequest(waltIdWalletApi, walletId, resolvedPr, consumer, selectedCredentials, token);
+
+    if (userPrResponse.redirectUri.includes('success')) {
+      return {
+        downloadEnabled: true,
+        policyServer: { sessionId }
+      };
+    }
     return {
       downloadEnabled: false,
       policyServer: { sessionId }
     };
   } catch (error) {
-    console.log('Error verifying credentials:', error);
     return { downloadEnabled: false, policyServer: { sessionId: null } };
   }
 }
 
 export async function getSSIToken(waltIdWalletApi: string, signer: Signer): Promise<string> {
-  console.log("this.waltIdWalletApi", waltIdWalletApi)
   const responseNonce = await axios.get(`${waltIdWalletApi}/wallet-api/auth/account/web3/nonce`)
-  console.log('response nonce status:', responseNonce.status)
-  console.log('nonce:', responseNonce.data)
   const nonce = responseNonce.data
   const payload = {
     challenge: nonce,
@@ -48,7 +56,6 @@ export async function getSSIToken(waltIdWalletApi: string, signer: Signer): Prom
     `${waltIdWalletApi}/wallet-api/auth/account/web3/signed`,
     payload
   )
-  console.log('token:', responseSigned.data?.token)
   return responseSigned.data?.token
 }
 
@@ -100,10 +107,10 @@ export async function requestCredentialPresentation(ddo: any, providerUrl: strin
   const sessionId = randomUUID()
 
   const policyServer: PolicyServerInitiateActionData = {
-    successRedirectUri: `${providerUrl}/api/policy/success`,
-    errorRedirectUri: `${providerUrl}/api/policy/error`,
-    responseRedirectUri: `${providerUrl}/policy/verify/${sessionId}`,
-    presentationDefinitionUri: `${providerUrl}/policy/pd/${sessionId}`
+    successRedirectUri: ``,
+    errorRedirectUri: ``,
+    responseRedirectUri: ``,
+    presentationDefinitionUri: ``
   }
 
   const action: PolicyServerInitiateAction = {
@@ -137,10 +144,7 @@ export async function requestCredentialPresentation(ddo: any, providerUrl: strin
   }
 }
 
-export async function getPd(sessionId: string, providerUrl: string): Promise<{
-  success: boolean
-  message: string
-}> {
+export async function getPd(sessionId: string, providerUrl: string): Promise<PolicyServerResponse> {
   const action: PolicyServerGetPdAction = {
     action: SSI_ACTIONS.GET_PD,
     sessionId
@@ -168,10 +172,7 @@ export async function getPd(sessionId: string, providerUrl: string): Promise<{
   }
 }
 
-export async function verify(vpToken: string, providerUrl: string): Promise<{
-  success: boolean
-  message: string
-}> {
+export async function verify(vpToken: string, providerUrl: string): Promise<PolicyServerResponse> {
   const action: PolicyServerVerifyAction = {
     action: SSI_ACTIONS.VERIFY,
     vpToken
@@ -199,10 +200,7 @@ export async function verify(vpToken: string, providerUrl: string): Promise<{
   }
 }
 
-export async function checkSessionId(sessionId: string, providerUrl: string): Promise<{
-  success: boolean
-  message: string
-}> {
+export async function checkSessionId(sessionId: string, providerUrl: string): Promise<PolicyServerResponse> {
   const action: PolicyServerCheckSessionIdAction = {
     action: SSI_ACTIONS.CHECK_SESSION_ID,
     sessionId,
@@ -230,10 +228,7 @@ export async function checkSessionId(sessionId: string, providerUrl: string): Pr
   }
 }
 
-export async function download(sessionId: string, providerUrl: string): Promise<{
-  success: boolean
-  message: string
-}> {
+export async function download(sessionId: string, providerUrl: string): Promise<PolicyServerResponse> {
   const policyServer = {
     sessionId
   }
@@ -264,15 +259,20 @@ export async function download(sessionId: string, providerUrl: string): Promise<
   }
 }
 
-//TODO define type credential
-export function filterCredentials(credentials: any[]): any[] {
+export function filterCredentials(credentials, configRules) {
   const result = [];
 
-  for (const rule of ConfigRules) {
+  for (const rule of configRules) {
     const key = Object.keys(rule)[0];
     const condition = rule[key];
 
-    const matchingCredentials = credentials.filter(c => c.type === key);
+    const matchingCredentials = credentials.filter(c => {
+      return (
+        c.parsedDocument?.type &&
+        Array.isArray(c.parsedDocument.type) &&
+        c.parsedDocument.type.includes(key)
+      );
+    });
 
     if (condition === "*all") {
       result.push(...matchingCredentials);
@@ -281,7 +281,11 @@ export function filterCredentials(credentials: any[]): any[] {
         result.push(matchingCredentials[0]);
       }
     } else {
-      const specificMatch = matchingCredentials.find(c => c.value === condition);
+      const specificMatch = matchingCredentials.find(c => {
+        return (
+          c.parsedDocument?.credentialSubject?.degree?.type === condition
+        );
+      });
       if (specificMatch) {
         result.push(specificMatch);
       }
@@ -290,3 +294,103 @@ export function filterCredentials(credentials: any[]): any[] {
 
   return result;
 }
+
+
+async function getVerifiableCredentials(
+  waltIdWalletApi: string,
+  walletId: string,
+  token: string,
+  pd: PolicyServerResponse 
+): Promise<any[]> {
+  try {
+    const url = `${waltIdWalletApi.replace(/\/+$/, '')}/wallet-api/wallet/${walletId}/exchange/matchCredentialsForPresentationDefinition`;
+    const presentationDefinition = pd.message;
+    const response = await axios.post(
+      url,
+      presentationDefinition,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        withCredentials: true,
+      }
+    );
+
+    if (response.data && Array.isArray(response.data)) {
+      return response.data;
+    } else {
+      throw new Error('No Verifiable Credentials found');
+    }
+  } catch (error) {
+    console.error('Error fetching Verifiable Credentials:', error);
+    throw error;
+  }
+}
+
+async function resolvePresentationRequest(waltIdWalletApi: string, walletId: string, presentationRequest: string, token: string): Promise<string> {
+  try {
+    const response = await axios.post(
+      `${waltIdWalletApi}/wallet-api/wallet/${walletId}/exchange/resolvePresentationRequest`,
+       presentationRequest,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        withCredentials: true,
+      }
+    );
+
+    return response.data;
+  } catch (error) {
+    console.error('Error resolving Presentation Request:', error);
+    throw error;
+  }
+}
+async function usePresentationRequest(waltIdWalletApi: string, walletId: string, presentationRequest: string, did: string, selectedCredentials: string[], token: string): Promise<any> {
+  try {
+    const response = await axios.post(
+      `${waltIdWalletApi}/wallet-api/wallet/${walletId}/exchange/usePresentationRequest`,
+      {did, presentationRequest, selectedCredentials},
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        withCredentials: true,
+      }
+    );
+
+    return response.data;
+  } catch (error) {
+    console.error('Error resolving Presentation Request:', error);
+    throw error;
+  }
+}
+
+async function getDIDs(
+  waltIdWalletApi: string,
+  walletId: string,
+  token: string 
+): Promise<any[]> {
+  try {
+    const response = await axios.get(
+      `${waltIdWalletApi}/wallet-api/wallet/${walletId}/dids`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        withCredentials: true,
+      }
+    );
+    if (response.data && Array.isArray(response.data)) {
+      return response.data;
+    } else {
+      throw new Error('No DIDs found');
+    }
+  } catch (error) {
+    console.error('Error fetching DIDs:', error);
+    throw error;
+  }
+}
+

@@ -1,40 +1,76 @@
 {
   "@context": ["https://www.w3.org/ns/credentials/v2"],
-  "version": "5.0.0",
   "id": "did:ope",
+  "version": "5.0.0",
   "credentialSubject": {
     "id": "",
+    "chainId": 8996,
     "metadata": {
-      "created": "2021-12-20T14:35:20Z",
-      "updated": "2021-12-20T14:35:20Z",
+      "created": "2025-02-19T10:23:59Z",
+      "updated": "2025-02-19T10:23:59Z",
       "type": "dataset",
-      "name": "CLi fixed asset",
+      "name": "The Digital Project Management Office (DigitalPMO)",
       "description": {
-        "@value": "New asset published using ocean CLI tool with version 5.0.0",
-        "@language": "en",
-        "@direction": "ltr"
+        "@value": "fdsfsdfsdfsdfsdfsd",
+        "@direction": "",
+        "@language": ""
       },
-      "tags": ["test"],
-      "author": "oceanprotocol",
-      "providedBy": "oceanprotocol",
-      "copyrightHolder": "copirightHolder",
+      "tags": [],
+      "author": "",
       "license": {
-        "name": "https://market.oceanprotocol.com/terms"
+        "name": "https://www.google.de",
+        "licenseDocuments": [
+          {
+            "name": "https://www.google.de",
+            "fileType": "text/html; charset=ISO-8859-1",
+            "sha256": "5a051e8e73057a521eadf3f80219495c4ed04d63397e5817a72ec2c335025b44",
+            "mirrors": [
+              {
+                "type": "url",
+                "method": "get",
+                "url": "https://www.google.de"
+              }
+            ]
+          }
+        ]
       },
-      "categories": ["data", "ocean-protocol"],
+      "links": {},
       "additionalInformation": {
         "termsAndConditions": true
-      }
+      },
+      "copyrightHolder": "",
+      "providedBy": ""
     },
     "services": [
       {
-        "id": "ccb398c50d6abd5b456e8d7242bd856a1767a890b537c2f8c10ba8b8a10e6025",
+        "id": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
         "type": "access",
-        "name": "service 1",
-        "description": {
-          "@value": "Service for accessing the dataset",
-          "@language": "en",
-          "@direction": "ltr"
+        "credentials": {
+          "allow": [
+            {
+              "type": "SSIpolicy",
+              "values": [
+                {
+                  "vp_policies": ["signature", "expired"],
+                  "vc_policies": ["signature", "expired"],
+                  "request_credentials": [
+                    {
+                      "type": "VerifiableId",
+                      "format": "jwt_vc_json"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "address",
+              "values": [
+                {
+                  "address": "0xe2DD09d719Da89e5a3D0F2549c7E24566e947260"
+                }
+              ]
+            }
+          ]
         },
         "files": {
           "datatokenAddress": "0x0",
@@ -48,60 +84,43 @@
           ]
         },
         "datatokenAddress": "",
-        "serviceEndpoint": "http://10.84.128.6:8001",
-        "timeout": 86400,
-        "compute": {
-          "allowRawAlgorithm": false,
-          "allowNetworkAccess": true,
-          "publisherTrustedAlgorithmPublishers": [],
-          "publisherTrustedAlgorithms": []
-        },
-        "credentials": [],
-        "state": 0
+        "serviceEndpoint": "http://localhost:8000",
+        "timeout": 0,
+        "name": ""
       }
     ],
+    "credentials": {
+      "allow": [
+        {
+          "type": "address",
+          "values": [
+            {
+              "address": "0xe2DD09d719Da89e5a3D0F2549c7E24566e947260"
+            }
+          ]
+        }
+      ]
+    },
     "datatokens": [],
-    "credentials": { "allow": [
-      {
-        "type": "SSIpolicy",
-        "values": [
-          {
-            "request_credentials": [],
-            "vc_policies": [
-              "signature",
-              "expired",
-              "not-before",
-              "revoked-status-list"
-            ],
-            "vp_policies": []
-          }
-        ]
-      }
-    ]},
-    "deny": [],
-    "match_deny": "any",
-    "chainId": 8996,
-    "nftAddress": "",
+    "nft": {
+      "name": "Data NFT",
+      "symbol": "OEC-NFT",
+      "templateIndex": 1,
+      "tokenURI": "",
+      "transferable": true,
+      "owner": "0xe2DD09d719Da89e5a3D0F2549c7E24566e947260",
+      "address": "",
+      "state": 0,
+      "created": ""
+    },
     "stats": {
       "allocated": 0,
       "orders": 0,
       "price": {
         "value": "0"
       }
-    },
-    "nft": {
-      "address": "",
-      "name": "Ocean Data NFT",
-      "symbol": "OCEAN-NFT",
-      "state": 5,
-      "tokenURI": "",
-      "owner": "",
-      "created": ""
-    },
-    "purgatory": {
-      "state": false
     }
   },
-  "issuer": "did:op:issuer-did",
+  "additionalDdos": [],
   "type": ["VerifiableCredential"]
 }

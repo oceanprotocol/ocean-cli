@@ -77,8 +77,8 @@ export class Commands {
 
 	public async start() {
 		console.log('Starting the interactive CLI flow...\n\n');
-		const data = await interactiveFlow(this.providerUrl); // Collect data via CLI
-		await publishAsset(data, this.signer, this.config); // Publish asset with collected data
+		const data = await interactiveFlow(this.providerUrl);
+		await publishAsset(data, this.signer, this.config);
 	}
 
 	// utils
@@ -136,8 +136,7 @@ export class Commands {
 			return;
 		}
 		const encryptDDO = args[2] === "false" ? false : true;
-		// add some more checks
-		const algoDid = await createAsset(
+		await createAsset(
 			algoAsset.nft.name,
 			algoAsset.nft.symbol,
 			this.signer,
@@ -150,8 +149,7 @@ export class Commands {
 			this.macOsProviderUrl,
 			encryptDDO
 		);
-		// add some more checks
-		console.log("Algorithm published. DID:  " + algoDid);
+
 	}
 
 	public async editAsset(args: string[]) {
@@ -171,7 +169,6 @@ export class Commands {
 			console.error(e);
 			return;
 		}
-		// Get keys and values
 		const keys = Object.keys(updateJson);
 
 		for (const key of keys) {
@@ -220,7 +217,6 @@ export class Commands {
 				: services[0].serviceEndpoint;
 		console.log("Downloading asset using provider: ", providerURI);
 		const datatoken = new Datatoken(this.signer, this.config.chainId);
-		//TODO throw passtorw to get sessionId
 		const tx = await orderAsset(
 			dataDdo,
 			this.signer,
@@ -274,11 +270,10 @@ export class Commands {
 		console.log("Downloading asset using provider: ", providerURI);
 		const datatoken = new Datatoken(this.signer, this.config.chainId);
 
-		//HERE PolicyServerPasstrow
 		let downloadEnabled = false
 		let policyServer = null
 		try {
-			const result = await checkCredentials(dataDdo, this.providerUrl)
+			const result = await checkCredentials(dataDdo, this.providerUrl, this.waltIdWalletApi, this.signer)
 			downloadEnabled = result.downloadEnabled
 			policyServer = result.policyServer
 		} catch (error) {
@@ -310,7 +305,6 @@ export class Commands {
 				this.signer,
 				policyServer
 			);
-			console.log('urlDownloadUrl', urlDownloadUrl)
 
 			try {
 				const path = args[2] ? args[2] : '.';

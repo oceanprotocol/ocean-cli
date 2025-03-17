@@ -8,7 +8,7 @@
     "build": "npm run clean && npm run build:tsc",
     "build:tsc": "tsc --sourceMap",
     "publish:v4": "npx tsx src/index.ts publish metadata/simpleDownloadDataset.json",
-    "publish:v5": "npx tsx src/index.ts publish metadata/simpleDownloadDatasetV52.json",
+    "publish:v5": "npx tsx src/index.ts publish metadata/simpleDownloadDatasetV5.json",
     "download": "npx tsx src/index.ts download",
     "downloadSSI": "npx tsx src/index.ts downloadSSI",
     "ssiconnect": "npx tsx src/index.ts connectToSSIWallet",

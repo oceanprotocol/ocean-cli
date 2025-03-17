@@ -30,7 +30,7 @@ import { Signer, ethers } from "ethers";
 import { interactiveFlow } from "./interactiveFlow.js";
 import { publishAsset } from "./publishAsset.js";
 import { DDOManager } from '@oceanprotocol/ddo-js';
-import { checkCredentials, getSSIToken, getSSIWalletKeys, getSSIWallets } from "ssi.js";
+import { checkCredentials } from "ssi.js";
 
 export class Commands {
 	public signer: Signer;
@@ -766,26 +766,4 @@ export class Commands {
 			amountToUnits(null, null, "1000", 18)
 		);
 	}
-
-	public async connectToSSIWallet(
-	) {
-		try {
-			const token = await getSSIToken(this.waltIdWalletApi, this.signer)
-			const ssiWallets = await getSSIWallets(token, this.waltIdWalletApi)
-			console.log('ssiWallets:', ssiWallets)
-			if (ssiWallets.length > 0) {
-				const ssiWalletKeys = await getSSIWalletKeys(ssiWallets[0], token, this.waltIdWalletApi)
-				console.log('ssiWalletKeys:', ssiWalletKeys)
-			}
-
-			return token
-		} catch (error) {
-			console.log('error:', error)
-			// console.log('error message:', error.response.statusText)
-			// console.log('error code:', error.response.status)
-			// console.log('error data:', error.response.data)
-			// throw error
-		}
-	}
-
 }

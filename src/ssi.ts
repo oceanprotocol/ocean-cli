@@ -23,7 +23,7 @@ export async function checkCredentials(ddo: any, providerUrl: string, waltIdWall
     const selectedDid = dids[0];
     const presentationRequest = credentialPresentation.openid4vc
     const consumer = selectedDid.did
-    const selectedCredentials = filteredCredentials.map(cred => cred.parsedDocument.id);    
+    const selectedCredentials = filteredCredentials.map(cred => cred.parsedDocument.id);
 
     const resolvedPr = await resolvePresentationRequest(waltIdWalletApi, walletId, presentationRequest, token);
     const userPrResponse = await usePresentationRequest(waltIdWalletApi, walletId, resolvedPr, consumer, selectedCredentials, token);
@@ -300,7 +300,7 @@ async function getVerifiableCredentials(
   waltIdWalletApi: string,
   walletId: string,
   token: string,
-  pd: PolicyServerResponse 
+  pd: PolicyServerResponse
 ): Promise<any[]> {
   try {
     const url = `${waltIdWalletApi.replace(/\/+$/, '')}/wallet-api/wallet/${walletId}/exchange/matchCredentialsForPresentationDefinition`;
@@ -323,7 +323,7 @@ async function getVerifiableCredentials(
       throw new Error('No Verifiable Credentials found');
     }
   } catch (error) {
-    console.error('Error fetching Verifiable Credentials:', error);
+    console.error('Error fetching Verifiable Credentials:');
     throw error;
   }
 }
@@ -332,7 +332,7 @@ async function resolvePresentationRequest(waltIdWalletApi: string, walletId: str
   try {
     const response = await axios.post(
       `${waltIdWalletApi}/wallet-api/wallet/${walletId}/exchange/resolvePresentationRequest`,
-       presentationRequest,
+      presentationRequest,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -343,7 +343,7 @@ async function resolvePresentationRequest(waltIdWalletApi: string, walletId: str
 
     return response.data;
   } catch (error) {
-    console.error('Error resolving Presentation Request:', error);
+    console.error('Error resolving Presentation Request');
     throw error;
   }
 }
@@ -351,7 +351,7 @@ async function usePresentationRequest(waltIdWalletApi: string, walletId: string,
   try {
     const response = await axios.post(
       `${waltIdWalletApi}/wallet-api/wallet/${walletId}/exchange/usePresentationRequest`,
-      {did, presentationRequest, selectedCredentials},
+      { did, presentationRequest, selectedCredentials },
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -363,7 +363,7 @@ async function usePresentationRequest(waltIdWalletApi: string, walletId: string,
 
     return response.data;
   } catch (error) {
-    console.error('Error resolving Presentation Request:', error);
+    console.error('Error resolving Presentation Request');
     throw error;
   }
 }
@@ -371,7 +371,7 @@ async function usePresentationRequest(waltIdWalletApi: string, walletId: string,
 async function getDIDs(
   waltIdWalletApi: string,
   walletId: string,
-  token: string 
+  token: string
 ): Promise<any[]> {
   try {
     const response = await axios.get(
@@ -389,7 +389,7 @@ async function getDIDs(
       throw new Error('No DIDs found');
     }
   } catch (error) {
-    console.error('Error fetching DIDs:', error);
+    console.error('Error fetching DIDs');
     throw error;
   }
 }

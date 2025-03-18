@@ -277,7 +277,7 @@ export class Commands {
 			downloadEnabled = result.downloadEnabled
 			policyServer = result.policyServer
 		} catch (error) {
-			console.log('policity server error', error)
+			console.log('policity server error')
 		}
 
 		if (downloadEnabled && policyServer) {

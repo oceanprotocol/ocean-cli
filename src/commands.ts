@@ -355,7 +355,7 @@ export class Commands {
 				computeEnv.id,
 				computeValidUntil,
 				providerURI,
-				await this.signer.getAddress()
+				this.signer
 			);
 		if (
 			!providerInitializeComputeJob ||
@@ -432,7 +432,7 @@ export class Commands {
 			assets[0],
 			algo,
 			null,
-			additionalDatasets,
+			null,
 			output
 		);
 		if (computeJobs && computeJobs[0]) {

@@ -1,5 +1,5 @@
 import { Command } from 'commander';
-import { Commands } from './commands';
+import { Commands } from './commands.js';
 import { ethers } from 'ethers';
 import chalk from 'chalk';
 

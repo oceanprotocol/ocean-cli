@@ -2,7 +2,7 @@
   "name": "ocean-cli",
   "version": "2.0.0",
   "description": "CLI tool to interact with the oceanprotocol's JavaScript library to privately & securely publish, consume and run compute on data.",
-  "main": "index.js",
+  "type": "module",
   "scripts": {
     "build": "npm run clean && npm run build:tsc",
     "build:tsc": "tsc --sourceMap",
@@ -10,7 +10,7 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --parser typescript --ignore-path .gitignore --write '**/*.{js,jsx,ts,tsx}'",
-    "cli": "TS_NODE_PROJECT='./tsconfig.json' ./node_modules/ts-node/dist/bin.js src/index.ts",
+    "cli": "npx tsx src/index.ts",
     "test:system": "npm run mocha 'test/**/*.test.ts'",
     "test": "npm run lint && npm run test:system",
     "mocha": "TS_NODE_PROJECT='./test/tsconfig.json' mocha --config=test/.mocharc.json --node-env=test --exit"
@@ -35,9 +35,11 @@
     "eslint-config-prettier": "^8.8.0",
     "eslint-plugin-prettier": "^4.2.1",
     "globals": "^15.3.0",
+    "microbundle": "^0.15.1",
     "mocha": "^10.2.0",
     "prettier": "^2.8.8",
     "pretty-quick": "^3.1.3",
+    "tsx": "^4.19.2",
     "typescript": "^5.0.4",
     "typescript-eslint": "^7.12.0"
   },
@@ -50,8 +52,10 @@
     "crypto-js": "^4.1.1",
     "decimal.js": "^10.4.1",
     "enquirer": "^2.4.1",
+    "esm": "^3.2.25",
     "ethers": "^5.7.2",
     "figlet": "^1.7.0",
-    "ts-node": "^10.9.1"
+    "ts-node": "^10.9.1",
+    "tsx": "^4.19.3"
   }
 }

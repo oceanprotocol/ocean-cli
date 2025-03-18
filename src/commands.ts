@@ -10,7 +10,7 @@ import {
 	getMetadataURI,
 	getIndexingWaitSettings,
 	IndexerWaitParams,
-} from "./helpers";
+} from "./helpers.js";
 import {
 	Aquarius,
 	Asset,
@@ -27,8 +27,8 @@ import {
 	sendTx,
 } from "@oceanprotocol/lib";
 import { Signer, ethers } from "ethers";
-import { interactiveFlow } from "./interactiveFlow";
-import { publishAsset } from "./publishAsset";
+import { interactiveFlow } from "./interactiveFlow.js";
+import { publishAsset } from "./publishAsset.js";
 
 export class Commands {
 	public signer: Signer;

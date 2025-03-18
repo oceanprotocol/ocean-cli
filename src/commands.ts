@@ -421,6 +421,7 @@ export class Commands {
 		}
 
 		console.log("Starting compute job using provider: ", providerURI);
+		const address = await this.signer.getAddress() as any
 		const providerInitializeComputeJob =
 			await ProviderInstance.initializeCompute(
 				assets,
@@ -428,7 +429,7 @@ export class Commands {
 				computeEnv.id,
 				computeValidUntil,
 				providerURI,
-				await this.signer.getAddress()
+				address
 			);
 		if (
 			!providerInitializeComputeJob ||
@@ -486,7 +487,7 @@ export class Commands {
 			}
 		}
 
-		const additionalDatasets = assets.length > 1 ? assets.slice(1) : null;
+		const additionalDatasets = assets.length > 1 ? assets.slice(1) : null as any
 		console.log(
 			"Starting compute job on " +
 			assets[0].documentId +

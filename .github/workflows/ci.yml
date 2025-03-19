@@ -11,12 +11,12 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Set up Node.js
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: 'v20.16.0'
 
       - name: Install dependencies
         run: npm install
@@ -29,12 +29,12 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Set up Node.js
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: 'v20.16.0'
 
       - name: Install dependencies
         run: npm install
@@ -47,12 +47,12 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Node.js
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v4
         with:
-          node-version: '18.19.0'
+          node-version: 'v20.16.0'
 
       - name: Cache node_modules
         uses: actions/cache@v3
@@ -67,7 +67,7 @@ jobs:
         run: echo "ADDRESS_FILE=${HOME}/.ocean/ocean-contracts/artifacts/address.json" >> $GITHUB_ENV
 
       - name: Checkout Barge
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: 'oceanprotocol/barge'
           path: 'barge'
@@ -116,7 +116,7 @@ jobs:
         if: ${{ failure() }}
 
       - name: Checkout Ocean Node
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: 'oceanprotocol/ocean-node'
           path: 'ocean-node'

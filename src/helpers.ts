@@ -158,7 +158,7 @@ export async function updateAssetMetadata(
 	aquariusInstance: Aquarius,
 	macOsProviderUrl?: string,
 	encryptDDO: boolean = true
-) {
+): Promise<any> {
 	const nft = new Nft(owner, (await owner.provider.getNetwork()).chainId);
 	let flags;
 	let metadata;

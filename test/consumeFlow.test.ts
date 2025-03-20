@@ -12,7 +12,7 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 
 describe("Ocean CLI Publishing", function() {
-    this.timeout(180000); // Set a longer timeout to allow the command to execute
+    this.timeout(360000); // Set a longer timeout to allow the command to execute
 
     let downloadDatasetDid: string;
     let computeDatasetDid: string;

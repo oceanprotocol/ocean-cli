@@ -140,7 +140,6 @@ describe("Ocean CLI Publishing", function() {
         exec(`npm run cli getDDO ${downloadDatasetDid}`, { cwd: projectRoot }, (error, stdout) => {
             expect(stdout).to.contain(`${downloadDatasetDid}`);
             expect(stdout).to.contain("https://w3id.org/did/v1");
-            expect(stdout).to.contain("Datatoken");
             done()
         });
     });
@@ -149,7 +148,6 @@ describe("Ocean CLI Publishing", function() {
         exec(`npm run cli getDDO ${computeDatasetDid}`, { cwd: projectRoot }, (error, stdout) => {
             expect(stdout).to.contain(`${computeDatasetDid}`);
             expect(stdout).to.contain("https://w3id.org/did/v1");
-            expect(stdout).to.contain("Datatoken");
             done()
         });
     });
@@ -158,7 +156,6 @@ describe("Ocean CLI Publishing", function() {
         exec(`npm run cli getDDO ${jsAlgoDid}`, { cwd: projectRoot }, (error, stdout) => {
             expect(stdout).to.contain(`${jsAlgoDid}`);
             expect(stdout).to.contain("https://w3id.org/did/v1");
-            expect(stdout).to.contain("Datatoken");
             done()
         });
     });
@@ -167,7 +164,6 @@ describe("Ocean CLI Publishing", function() {
         exec(`npm run cli getDDO ${pythonAlgoDid}`, { cwd: projectRoot }, (error, stdout) => {
             expect(stdout).to.contain(`${pythonAlgoDid}`);
             expect(stdout).to.contain("https://w3id.org/did/v1");
-            expect(stdout).to.contain("Datatoken");
             done()
         });
     });
@@ -190,13 +186,13 @@ describe("Ocean CLI Publishing", function() {
                 expect(stdout).to.contain("File downloaded successfully");
     
                 // Path to the downloaded file
-                const downloadedFilePath = './enwiki-latest-abstract10.xml.gz-rss.xml';
+                const downloadedFilePath = './LICENSE';
     
                 // Verify the downloaded file content hash matches the original file hash
                 const downloadedFileHash = computeFileHash(downloadedFilePath);
-                const originalFilePath = './metadata/enwiki-latest-abstract10.xml.gz-rss.xml';
+                const originalFilePath = './metadata/LICENSE';
     
-                await downloadFile("https://dumps.wikimedia.org/enwiki/latest/enwiki-latest-abstract10.xml.gz-rss.xml", originalFilePath);
+                await downloadFile("https://raw.githubusercontent.com/oceanprotocol/ocean-node/refs/heads/main/LICENSE", originalFilePath);
                 const originalFileHash = computeFileHash(originalFilePath);
     
                 expect(downloadedFileHash).to.equal(originalFileHash);

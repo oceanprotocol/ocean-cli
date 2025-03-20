@@ -55,7 +55,7 @@ jobs:
           node-version: '18.19.0'
 
       - name: Cache node_modules
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         env:
           cache-name: cache-node-modules
         with:
@@ -120,7 +120,7 @@ jobs:
         with:
           repository: 'oceanprotocol/ocean-node'
           path: 'ocean-node'
-          ref: 'develop'
+          ref: 'main'
 
       - name: Start Ocean Node
         working-directory: ${{ github.workspace }}/ocean-node

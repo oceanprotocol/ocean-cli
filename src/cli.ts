@@ -1,5 +1,5 @@
 import { Command } from 'commander';
-import { Commands } from './commands';
+import { Commands } from './commands.js';
 import { ethers } from 'ethers';
 import chalk from 'chalk';
 
@@ -183,6 +183,53 @@ export async function createCLI() {
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
       await commands.computeStart([null, dsDids, aDid, envId]);
+    });
+
+  // startFreeCompute command
+  program
+    .command('startFreeCompute')
+    .description('Starts a compute job')
+    .argument('<datasetDids>', 'Dataset DIDs (comma-separated)')
+    .argument('<algoDid>', 'Algorithm DID')
+    .argument('<computeEnvId>', 'Compute environment ID')
+    .option('-d, --datasets <datasetDids>', 'Dataset DIDs (comma-separated)')
+    .option('-a, --algo <algoDid>', 'Algorithm DID')
+    .option('-e, --env <computeEnvId>', 'Compute environment ID')
+    .action(async (datasetDids, algoDid, computeEnvId, options) => {
+      const dsDids = options.datasets || datasetDids;
+      const aDid = options.algo || algoDid;
+      const envId = options.env || computeEnvId;
+      if (!dsDids || !aDid || !envId) {
+        console.error(chalk.red('Missing required arguments'));
+        process.exit(1);
+      }
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
+      await commands.freeComputeStart([null, dsDids, aDid, envId]);
+    });
+
+  // getComputeEnvironments command
+  program
+    .command('getComputeEnvironments')
+    .alias('getC2DEnvs')
+    .description('Gets the existing compute environments')
+    .action(async () => {
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
+      await commands.getComputeEnvironments();
+    });
+
+  // startFreeCompute command
+  program
+    .command('computeStreamableLogs')
+    .description('Gets the existing compute streamable logs')
+    .argument('<jobId>', 'Job ID')
+    .option('-j, --job <jobId>', 'Job ID')
+    .action(async (jobId, options) => {
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
+      const args = jobId || options.job
+      await commands.computeStreamableLogs([args]);
     });
 
   // stopCompute command

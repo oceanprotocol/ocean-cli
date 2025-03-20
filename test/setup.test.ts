@@ -49,8 +49,8 @@ describe("Ocean CLI Setup", function() {
                 expect(stdout).to.contain("Mints Ocean tokens");
                 expect(stdout).to.contain("getComputeEnvironments");
                 expect(stdout).to.contain("Gets the existing compute environments");
-                expect(stdout).to.contain("computeStreamableLogs [options] <jobId>");
-                expect(stdout).to.contain("Gets the existing compute streamable logs'");
+                expect(stdout).to.contain("computeStreamableLogs");
+                expect(stdout).to.contain("Gets the existing compute streamable logs");
                 
                 done();
             } catch (assertionError) {

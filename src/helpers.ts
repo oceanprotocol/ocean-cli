@@ -356,8 +356,8 @@ export function isPrivateIP(ip): boolean {
  // defines how much time we wait for an asset to index + the interval for retries
  export function getIndexingWaitSettings(): IndexerWaitParams {
 	const indexingParams: IndexerWaitParams = {
-		maxRetries: 100, // 100 retries
-		retryInterval: 3000 // retries every 3 seconds
+		maxRetries: 120, // 120 retries
+		retryInterval: 4000 // retries every 4 seconds
 	}
 	try {
 
@@ -365,7 +365,7 @@ export function isPrivateIP(ip): boolean {
 			
 			indexingParams.retryInterval = Number(process.env.INDEXING_RETRY_INTERVAL)
 			if(indexingParams.retryInterval < 0) {
-				indexingParams.retryInterval = 3000
+				indexingParams.retryInterval = 4000
 			}
 
 		}
@@ -373,7 +373,7 @@ export function isPrivateIP(ip): boolean {
 			
 			indexingParams.maxRetries = Number(process.env.INDEXING_MAX_RETRIES)
 			if(indexingParams.maxRetries < 0) {
-				indexingParams.maxRetries = 100
+				indexingParams.maxRetries = 120
 			}
 		}
 	}catch(err) {

@@ -12,7 +12,7 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 
 describe("Ocean CLI Publishing", function() {
-    this.timeout(360000); // Set a longer timeout to allow the command to execute
+    this.timeout(180000); // Set a longer timeout to allow the command to execute
 
     let downloadDatasetDid: string;
     let computeDatasetDid: string;
@@ -63,6 +63,8 @@ describe("Ocean CLI Publishing", function() {
         process.env.INDEXING_RETRY_INTERVAL = process.env.INDEXING_RETRY_INTERVAL || '3000'
         process.env.INDEXING_MAX_RETRIES = process.env.INDEXING_MAX_RETRIES || '100'
 
+        console.log('process.env.INDEXING_RETRY_INTERVAL: ', process.env.INDEXING_RETRY_INTERVAL)
+        console.log('process.env.INDEXING_MAX_RETRIES: ', process.env.INDEXING_MAX_RETRIES)
         exec(`npm run cli publish ${metadataFile}`, { cwd: projectRoot }, (error, stdout) => {
             try {
                 const match = stdout.match(/did:op:[a-f0-9]{64}/);

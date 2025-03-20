@@ -141,6 +141,7 @@ jobs:
           AUTHORIZED_DECRYPTERS: '["0xe2DD09d719Da89e5a3D0F2549c7E24566e947260","0x529043886F21D9bc1AE0feDb751e34265a246e47"]'
           ALLOWED_ADMINS: '["0xe2DD09d719Da89e5a3D0F2549c7E24566e947260"]'
           MAX_REQ_PER_MINUTE: 320
+          MAX_CONNECTIONS_PER_MINUTE: 500
       - name: Check Ocean Node is running
         run: |
           for i in $(seq 1 30); do

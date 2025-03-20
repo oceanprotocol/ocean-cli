@@ -2,6 +2,11 @@ import { expect } from "chai";
 import { exec } from "child_process";
 import path from "path";
 
+import { dirname } from 'path'
+import { fileURLToPath } from 'url'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
 describe("Ocean CLI Setup", function() {
     this.timeout(20000); // Set a longer timeout to allow the command to execute
 

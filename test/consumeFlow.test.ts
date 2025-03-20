@@ -60,6 +60,9 @@ describe("Ocean CLI Publishing", function() {
         process.env.PROVIDER_URL = "http://127.0.0.1:8001";
         process.env.ADDRESS_FILE = path.join(process.env.HOME || "", ".ocean/ocean-contracts/artifacts/address.json");
 
+        process.env.INDEXING_RETRY_INTERVAL = process.env.INDEXING_RETRY_INTERVAL || '3000'
+        process.env.INDEXING_MAX_RETRIES = process.env.INDEXING_MAX_RETRIES || '100'
+
         exec(`npm run cli publish ${metadataFile}`, { cwd: projectRoot }, (error, stdout) => {
             try {
                 const match = stdout.match(/did:op:[a-f0-9]{64}/);

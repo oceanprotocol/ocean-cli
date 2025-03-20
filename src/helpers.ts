@@ -379,6 +379,8 @@ export function isPrivateIP(ip): boolean {
 	}catch(err) {
 		console.error('Error getting indexing wait arguments:' , err)
 	}
+
+	console.log('params: ', indexingParams)
 	
 	return indexingParams
  }

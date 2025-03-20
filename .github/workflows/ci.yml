@@ -155,4 +155,7 @@ jobs:
           exit 1
       - name: Run system tests 
         run: npm run test:system
+        env:
+          INDEXING_RETRY_INTERVAL: 3000
+          INDEXING_MAX_RETRIES: 100
 

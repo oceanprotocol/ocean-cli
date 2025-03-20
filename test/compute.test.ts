@@ -29,7 +29,8 @@ describe("Ocean CLI Free Compute Flow", function () {
 	};
 
 	before(async () => {
-		process.env.PRIVATE_KEY = "0xYOUR_PRIVATE_KEY";
+		process.env.PRIVATE_KEY =
+			"0x1d751ded5a32226054cd2e71261039b65afb9ee1c746d055dd699b1150a5befc";
 		process.env.RPC = "http://127.0.0.1:8545";
 		process.env.AQUARIUS_URL = "http://127.0.0.1:5000";
 		process.env.PROVIDER_URL = "http://127.0.0.1:8030";

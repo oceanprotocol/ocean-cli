@@ -6,14 +6,14 @@ import util from "util";
 
 const execPromise = util.promisify(exec);
 
-describe("Ocean CLI Compute Flow", function () {
-	this.timeout(300000); // 5 min timeout
+describe("Ocean CLI Free Compute Flow", function () {
+	this.timeout(300000);
 
 	const projectRoot = path.resolve(__dirname, "..");
 
 	let computeDatasetDid: string;
 	let algoDid: string;
-	const computeEnvId: string = "1";
+	let computeEnvId: string;
 	let jobId: string;
 
 	const runCommand = async (command: string): Promise<string> => {
@@ -70,9 +70,22 @@ describe("Ocean CLI Compute Flow", function () {
 		console.log(`Published Algorithm DID: ${algoDid}`);
 	});
 
-	it("should start a compute job", async () => {
+	it("should get compute environments", async () => {
+		const output = await runCommand(`npm run cli getComputeEnvironments`);
+
+		expect(output).to.contain("id");
+
+		const envMatch = output.match(/id: (0x[a-fA-F0-9]+)/);
+		if (!envMatch)
+			throw new Error("No environment ID found in environments output");
+
+		computeEnvId = envMatch[1];
+		console.log(`Fetched Compute Env ID: ${computeEnvId}`);
+	});
+
+	it("should start a free compute job", async () => {
 		const output = await runCommand(
-			`npm run cli startCompute -- --datasets ${computeDatasetDid} --algo ${algoDid} --env ${computeEnvId}`
+			`npm run cli startFreeCompute -- --datasets ${computeDatasetDid} --algo ${algoDid} --env ${computeEnvId}`
 		);
 
 		const jobIdMatch = output.match(
@@ -81,17 +94,26 @@ describe("Ocean CLI Compute Flow", function () {
 		expect(jobIdMatch, "No Job ID found in output").to.not.be.null;
 
 		jobId = jobIdMatch![1];
-		console.log(`Started Compute Job ID: ${jobId}`);
+		console.log(`Started Free Compute Job ID: ${jobId}`);
 	});
 
-	it("should get the job status", async () => {
+	it("should get job status", async () => {
 		const output = await runCommand(
 			`npm run cli getJobStatus -- --dataset ${computeDatasetDid} --job ${jobId}`
 		);
 
 		expect(output).to.contain(jobId);
-		expect(output).to.match(/status/i);
-		console.log(`Job status output received for jobId: ${jobId}`);
+		expect(output.toLowerCase()).to.match(/status/);
+		console.log(`Job status retrieved for jobId: ${jobId}`);
+	});
+
+	it("should fetch streamable logs", async () => {
+		const output = await runCommand(
+			`npm run cli computeStreamableLogs -- --job ${jobId}`
+		);
+
+		expect(output).to.contain(jobId);
+		console.log(`Streamable logs retrieved for jobId: ${jobId}`);
 	});
 
 	it("should stop the compute job", async () => {
@@ -100,6 +122,6 @@ describe("Ocean CLI Compute Flow", function () {
 		);
 
 		expect(output).to.contain("Compute job stopped successfully");
-		console.log(`Stopped Compute Job ID: ${jobId}`);
+		console.log(`Stopped compute job with ID: ${jobId}`);
 	});
 });

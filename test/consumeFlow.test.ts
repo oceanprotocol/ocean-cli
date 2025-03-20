@@ -145,10 +145,6 @@ describe("Ocean CLI Publishing", function() {
 
     it("should get DDO using 'npm run cli getDDO' for download dataset", function(done) {
 
-        console.log('NODE_URL ', process.env.NODE_URL)
-        console.log('INDEXING_RETRY_INTERVAL: ', process.env.INDEXING_RETRY_INTERVAL)
-        console.log('INDEXING_MAX_RETRIES: ', process.env.INDEXING_MAX_RETRIES)
-        console.log('download asset: ', downloadDatasetDid)
         exec(`npm run cli getDDO ${downloadDatasetDid}`, { cwd: projectRoot }, (error, stdout) => {
             expect(stdout).to.contain(`${downloadDatasetDid}`);
             expect(stdout).to.contain("https://w3id.org/did/v1");

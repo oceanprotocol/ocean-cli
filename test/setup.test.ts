@@ -37,6 +37,8 @@ describe("Ocean CLI Setup", function() {
                 expect(stdout).to.contain("Approves an algorithm to run on a dataset");
                 expect(stdout).to.contain("startCompute [options] <datasetDids> <algoDid> <computeEnvId>");
                 expect(stdout).to.contain("Starts a compute job");
+                expect(stdout).to.contain("startFreeCompute [options] <datasetDids> <algoDid> <computeEnvId>");
+                expect(stdout).to.contain("Starts a FREE compute job");
                 expect(stdout).to.contain("stopCompute [options] <datasetDid> <jobId> [agreementId]");
                 expect(stdout).to.contain("Stops a compute job");
                 expect(stdout).to.contain("getJobStatus [options] <datasetDid> <jobId> [agreementId]");
@@ -45,6 +47,11 @@ describe("Ocean CLI Setup", function() {
                 expect(stdout).to.contain("Downloads compute job results");
                 expect(stdout).to.contain("mintOcean");
                 expect(stdout).to.contain("Mints Ocean tokens");
+                expect(stdout).to.contain("getComputeEnvironments");
+                expect(stdout).to.contain("Gets the existing compute environments");
+                expect(stdout).to.contain("computeStreamableLogs [options] <jobId>");
+                expect(stdout).to.contain("Gets the existing compute streamable logs'");
+                
                 done();
             } catch (assertionError) {
                 done(assertionError);

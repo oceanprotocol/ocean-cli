@@ -5,6 +5,11 @@ import fs from "fs";
 import crypto from "crypto";
 import https from "https";
 
+import { dirname } from 'path'
+import { fileURLToPath } from 'url'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
 describe("Ocean CLI Publishing", function() {
     this.timeout(180000); // Set a longer timeout to allow the command to execute
 
@@ -49,6 +54,7 @@ describe("Ocean CLI Publishing", function() {
         }
 
         process.env.PRIVATE_KEY = "0x1d751ded5a32226054cd2e71261039b65afb9ee1c746d055dd699b1150a5befc";
+        // Using this account: 0x529043886F21D9bc1AE0feDb751e34265a246e47
         process.env.RPC = "http://127.0.0.1:8545";
         process.env.AQUARIUS_URL = "http://127.0.0.1:8001";
         process.env.PROVIDER_URL = "http://127.0.0.1:8001";

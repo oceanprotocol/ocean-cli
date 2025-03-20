@@ -10,7 +10,7 @@ import {
 	getMetadataURI,
 	getIndexingWaitSettings,
 	IndexerWaitParams,
-} from "./helpers";
+} from "./helpers.js";
 import {
 	Aquarius,
 	Asset,
@@ -27,8 +27,8 @@ import {
 	sendTx,
 } from "@oceanprotocol/lib";
 import { Signer, ethers } from "ethers";
-import { interactiveFlow } from "./interactiveFlow";
-import { publishAsset } from "./publishAsset";
+import { interactiveFlow } from "./interactiveFlow.js";
+import { publishAsset } from "./publishAsset.js";
 
 export class Commands {
 	public signer: Signer;
@@ -355,7 +355,7 @@ export class Commands {
 				computeEnv.id,
 				computeValidUntil,
 				providerURI,
-				await this.signer.getAddress()
+				this.signer
 			);
 		if (
 			!providerInitializeComputeJob ||
@@ -432,7 +432,7 @@ export class Commands {
 			assets[0],
 			algo,
 			null,
-			additionalDatasets,
+			null,
 			output
 		);
 		if (computeJobs && computeJobs[0]) {

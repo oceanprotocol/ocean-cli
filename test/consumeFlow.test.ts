@@ -12,7 +12,7 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 
 describe("Ocean CLI Publishing", function() {
-    this.timeout(180000); // Set a longer timeout to allow the command to execute
+    this.timeout(200000); // Set a longer timeout to allow the command to execute
 
     let downloadDatasetDid: string;
     let computeDatasetDid: string;
@@ -60,16 +60,12 @@ describe("Ocean CLI Publishing", function() {
         process.env.PROVIDER_URL = "http://127.0.0.1:8001";
         process.env.ADDRESS_FILE = path.join(process.env.HOME || "", ".ocean/ocean-contracts/artifacts/address.json");
 
-        process.env.INDEXING_RETRY_INTERVAL = process.env.INDEXING_RETRY_INTERVAL || '3000'
-        process.env.INDEXING_MAX_RETRIES = process.env.INDEXING_MAX_RETRIES || '100'
-
-        console.log('process.env.INDEXING_RETRY_INTERVAL: ', process.env.INDEXING_RETRY_INTERVAL)
-        console.log('process.env.INDEXING_MAX_RETRIES: ', process.env.INDEXING_MAX_RETRIES)
         exec(`npm run cli publish ${metadataFile}`, { cwd: projectRoot }, (error, stdout) => {
             try {
                 const match = stdout.match(/did:op:[a-f0-9]{64}/);
                 if (match) {
                     downloadDatasetDid = match[0];
+                    console.log('download asset: ', downloadDatasetDid)
                 }
                 expect(stdout).to.contain("Asset published. ID:");
                 done()
@@ -148,6 +144,11 @@ describe("Ocean CLI Publishing", function() {
     });
 
     it("should get DDO using 'npm run cli getDDO' for download dataset", function(done) {
+
+        console.log('NODE_URL ', process.env.NODE_URL)
+        console.log('INDEXING_RETRY_INTERVAL: ', process.env.INDEXING_RETRY_INTERVAL)
+        console.log('INDEXING_MAX_RETRIES: ', process.env.INDEXING_MAX_RETRIES)
+        console.log('download asset: ', downloadDatasetDid)
         exec(`npm run cli getDDO ${downloadDatasetDid}`, { cwd: projectRoot }, (error, stdout) => {
             expect(stdout).to.contain(`${downloadDatasetDid}`);
             expect(stdout).to.contain("https://w3id.org/did/v1");

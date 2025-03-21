@@ -473,7 +473,7 @@ export class Commands {
 
 		if (computeJobs && computeJobs[0]) {
 			const { jobId, agreementId } = computeJobs[0];
-			console.log("Compute started.  JobID: " + jobId);
+			console.log("Compute started. JobID: " + jobId);
 			console.log("Agreement ID: " + agreementId);
 		} else {
 			console.log("Error while starting the compute job: ", computeJobs);
@@ -635,7 +635,7 @@ export class Commands {
 
 		if (computeJobs && computeJobs[0]) {
 			const { jobId } = computeJobs[0];
-			console.log("Compute started.  JobID: " + jobId);	
+			console.log("Compute started. JobID: " + jobId);	
 		} else {
 			console.log("Error while starting the compute job: ", computeJobs);
 		}
@@ -684,7 +684,7 @@ export class Commands {
 			);
 			return;
 		}
-		console.log('Exiting compute environments: ', computeEnvs)
+		console.log('Existing compute environments:', computeEnvs)
 	}
 
 	public async computeStreamableLogs(args: string[]) {

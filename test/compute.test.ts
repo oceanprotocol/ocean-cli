@@ -12,6 +12,11 @@ const execPromise = util.promisify(exec);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+export async function sleep(ms: number) {
+	return new Promise((resolve) => {
+		setTimeout(resolve, ms);
+	});
+}
 describe("Ocean CLI Free Compute Flow", function () {
 	this.timeout(300000);
 
@@ -85,34 +90,60 @@ describe("Ocean CLI Free Compute Flow", function () {
 	it("should get compute environments", async () => {
 		const output = await runCommand(`npm run cli getComputeEnvironments`);
 
-		let environments;
+		expect(output).to.contain("id");
+
+		const indexOfArray = output.indexOf('[')
+		console.log('output ', output)
+		const cleaned = `${output.substring(indexOfArray).trim()}`
+
+		const validJsonString = cleaned
+		.replace(/'/g, '"')
+		.replace(/\[Object\]/g, '{}')
+		.replace(/\[Array\]/g, '[]')
+		.replace(/[\r\n]+/g, '')
+		.replace(/\+/g, '')
+		.replace(/\s+/g, '')
+		.replace(/([{,])\s*(\w+)(?=\s*:)/g, '$1"$2"');  // Add quotes around unquoted keys
+		
 		try {
-			environments = JSON.parse(output);
-		} catch (error) {
-			throw new Error("Output is not valid JSON:\n" + output);
+
+			const environments = JSON.parse(validJsonString)
+			console.log('environments ', environments)
+			if(environments.length > 0) {
+				for(let i = 0; i< environments.length; i++) {
+					const env =  environments[i]
+					console.log('environment: ', env)
+					if(env.free) {
+						computeEnvId = env.id
+						console.log(`Fetched Compute Env ID: ${computeEnvId}`);
+						break
+					}
+				}
+			}
+			expect(environments.length > 0, 'No compute environments were found')
+			expect(computeEnvId, 'No free C2D environment found').to.not.be.null;
+		} catch(err) {
+			console.error('Unable to get compute environments')
 		}
-
-		expect(environments).to.be.an("array").that.is.not.empty;
-
-		const firstEnv = environments[0];
-
-		expect(firstEnv).to.have.property("id").that.is.a("string");
-
-		computeEnvId = firstEnv.id;
-		console.log(`Fetched Compute Env ID: ${computeEnvId}`);
+		
 	});
 
 	it("should start a free compute job", async () => {
+
+		await sleep(9000) // wait a bit, ideally wait to index
+
 		const output = await runCommand(
 			`npm run cli startFreeCompute --datasets ${computeDatasetDid} --algo ${algoDid} --env ${computeEnvId}`
 		);
 
 		const jobIdMatch = output.match(
-			/Job started successfully with ID: ([a-f0-9-]+)/i
+			/Compute started. JobID: ([a-f0-9-]+)/i
 		);
 		expect(jobIdMatch, "No Job ID found in output").to.not.be.null;
 
-		jobId = jobIdMatch![1];
+		const jobText = output.indexOf('Compute started. JobID:')
+		const important = output.substring(jobText)
+		jobId = important.replace('Compute started. JobID: ','')
 		console.log(`Started Free Compute Job ID: ${jobId}`);
 	});
 

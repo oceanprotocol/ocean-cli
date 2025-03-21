@@ -123,7 +123,10 @@ jobs:
       - name: Start Ocean Node
         working-directory: ${{ github.workspace }}/ocean-node
         run: |
+          npm run clean
+          rm -rf ./node_modules
           npm ci
+          npm ci esbuild
           npm run build
           npm run start &
         env:

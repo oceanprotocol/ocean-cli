@@ -4,7 +4,13 @@ import path from "path";
 import fs from "fs";
 import util from "util";
 
+import { dirname } from "path";
+import { fileURLToPath } from "url";
+
 const execPromise = util.promisify(exec);
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 describe("Ocean CLI Free Compute Flow", function () {
 	this.timeout(300000);
@@ -32,8 +38,12 @@ describe("Ocean CLI Free Compute Flow", function () {
 		process.env.PRIVATE_KEY =
 			"0x1d751ded5a32226054cd2e71261039b65afb9ee1c746d055dd699b1150a5befc";
 		process.env.RPC = "http://127.0.0.1:8545";
-		process.env.AQUARIUS_URL = "http://127.0.0.1:5000";
-		process.env.PROVIDER_URL = "http://127.0.0.1:8030";
+		// process.env.AQUARIUS_URL = "http://127.0.0.1:5000";
+		// process.env.PROVIDER_URL = "http://127.0.0.1:8030";
+		process.env.ADDRESS_FILE = path.join(
+			process.env.HOME || "",
+			".ocean/ocean-contracts/artifacts/address.json"
+		);
 	});
 
 	it("should publish a compute dataset", async () => {

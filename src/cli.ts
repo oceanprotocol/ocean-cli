@@ -188,7 +188,7 @@ export async function createCLI() {
   // startFreeCompute command
   program
     .command('startFreeCompute')
-    .description('Starts a compute job')
+    .description('Starts a FREE compute job')
     .argument('<datasetDids>', 'Dataset DIDs (comma-separated)')
     .argument('<algoDid>', 'Algorithm DID')
     .argument('<computeEnvId>', 'Compute environment ID')

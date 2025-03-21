@@ -124,7 +124,6 @@ jobs:
         working-directory: ${{ github.workspace }}/ocean-node
         run: |
           npm run clean
-          rm -rf ./node_modules
           npm ci esbuild@0.18.20
           npm ci
           npm run build

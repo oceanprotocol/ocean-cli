@@ -10,7 +10,7 @@ import {
 	getMetadataURI,
 	getIndexingWaitSettings,
 	IndexerWaitParams,
-} from "./helpers";
+} from "./helpers.js";
 import {
 	Aquarius,
 	Asset,
@@ -27,8 +27,8 @@ import {
 	sendTx,
 } from "@oceanprotocol/lib";
 import { Signer, ethers } from "ethers";
-import { interactiveFlow } from "./interactiveFlow";
-import { publishAsset } from "./publishAsset";
+import { interactiveFlow } from "./interactiveFlow.js";
+import { publishAsset } from "./publishAsset.js";
 
 export class Commands {
 	public signer: Signer;
@@ -252,13 +252,16 @@ export class Commands {
 		let inputDatasets = [];
 
 		if (
-			inputDatasetsString.includes("[") ||
+			inputDatasetsString.includes("[") &&
 			inputDatasetsString.includes("]")
 		) {
 			const processedInput = inputDatasetsString
 				.replaceAll("]", "")
 				.replaceAll("[", "");
-			inputDatasets = processedInput.split(",");
+				if(processedInput.indexOf(',') > -1) {
+					inputDatasets = processedInput.split(",");
+				}
+			
 		} else {
 			inputDatasets.push(inputDatasetsString);
 		}
@@ -276,14 +279,17 @@ export class Commands {
 				ddos.push(dataDdo);
 			}
 		}
-		if (ddos.length <= 0 || ddos.length != inputDatasets.length) {
+		if (inputDatasets.length > 0 && (ddos.length <= 0 || ddos.length != inputDatasets.length)) {
 			console.error("Not all the data ddos are available.");
 			return;
 		}
-		const providerURI =
-			this.macOsProviderUrl && ddos[0].chainId === 8996
-				? this.macOsProviderUrl
-				: ddos[0].services[0].serviceEndpoint;
+		let providerURI = this.macOsProviderUrl || this.providerUrl
+		if(ddos.length > 0) {
+			providerURI = this.macOsProviderUrl && ddos[0].chainId === 8996
+			? this.macOsProviderUrl
+			: ddos[0].services[0].serviceEndpoint;
+		}
+			
 
 		const algoDdo = await this.aquarius.waitForIndexer(args[2],null,null, this.indexingParams.retryInterval, this.indexingParams.maxRetries);
 		if (!algoDdo) {
@@ -297,6 +303,13 @@ export class Commands {
 			this.macOsProviderUrl || this.providerUrl
 		);
 
+		if(!computeEnvs || computeEnvs.length  < 1) {
+			console.error(
+				"Error fetching compute environments. No compute environments available."
+			);
+			return;
+		}
+
 		const datatoken = new Datatoken(
 			this.signer,
 			(await this.signer.provider.getNetwork()).chainId,
@@ -309,16 +322,21 @@ export class Commands {
 		const computeValidUntil = Math.floor(mytime.getTime() / 1000);
 
 		const computeEnvID = args[3];
-		const chainComputeEnvs = computeEnvs[algoDdo.chainId];
-		let computeEnv = chainComputeEnvs[0];
+		// NO chainId needed anymore (is not part of ComputeEnvironment spec anymore)
+		// const chainComputeEnvs = computeEnvs[computeEnvID]; // was algoDdo.chainId
+		let computeEnv = null;// chainComputeEnvs[0];
 
 		if (computeEnvID && computeEnvID.length > 1) {
-			for (const index in chainComputeEnvs) {
-				if (computeEnvID == chainComputeEnvs[index].id) {
-					computeEnv = chainComputeEnvs[index];
-					continue;
+			for (const index in computeEnvs) {
+				if (computeEnvID == computeEnvs[index].id) {
+					computeEnv = computeEnvs[index];
+					break;
 				}
 			}
+		}
+		if(!computeEnv || !computeEnvID) {
+			console.error("Error fetching compute environment. No compute environment matches id: ", computeEnvID);
+			return;
 		}
 		
 		const algo: ComputeAlgorithm = {
@@ -343,8 +361,9 @@ export class Commands {
 			}
 			assets.push({
 				documentId: ddos[dataDdo].id,
-				serviceId: ddos[dataDdo].services[0].id,
+				serviceId: ddos[dataDdo].services[0].id
 			});
+
 		}
 
 		console.log("Starting compute job using provider: ", providerURI);
@@ -355,7 +374,7 @@ export class Commands {
 				computeEnv.id,
 				computeValidUntil,
 				providerURI,
-				await this.signer.getAddress()
+				this.signer // V1 was this.signer.getAddress()
 			);
 		if (
 			!providerInitializeComputeJob ||
@@ -414,12 +433,25 @@ export class Commands {
 		}
 
 		const additionalDatasets = assets.length > 1 ? assets.slice(1) : null;
-		console.log(
-			"Starting compute job on " +
-				assets[0].documentId +
-				" with additional datasets:" +
-				(!additionalDatasets ? "none" : additionalDatasets[0].documentId)
-		);
+		if(assets.length >0 ) {
+			console.log(
+				"Starting compute job on " +
+					assets[0].documentId +
+					" with additional datasets:" +
+					(!additionalDatasets ? "none" : additionalDatasets[0].documentId)
+			);
+		} else {
+			console.log(
+				"Starting compute job on " +
+					algo.documentId +
+					" with additional datasets:" +
+					(!additionalDatasets ? "none" : additionalDatasets[0].documentId)
+			);
+		}
+		if(additionalDatasets!==null) {
+			console.log('Adding additional datasets to dataset, according to C2D V2 specs')
+			assets.push(additionalDatasets)
+		}
 
 		const output: ComputeOutput =  {
 			metadataUri: await getMetadataURI()
@@ -429,16 +461,181 @@ export class Commands {
 			providerURI,
 			this.signer,
 			computeEnv.id,
-			assets[0],
+			assets, // assets[0] // only c2d v1,
 			algo,
 			null,
-			additionalDatasets,
+			null,
+			// additionalDatasets, only c2d v1
 			output
 		);
+
+		console.log('compute jobs: ', computeJobs)
+
 		if (computeJobs && computeJobs[0]) {
 			const { jobId, agreementId } = computeJobs[0];
 			console.log("Compute started.  JobID: " + jobId);
 			console.log("Agreement ID: " + agreementId);
+		} else {
+			console.log("Error while starting the compute job: ", computeJobs);
+		}
+	}
+
+	public async freeComputeStart(args: string[]) {
+
+		const inputDatasetsString = args[1];
+		let inputDatasets = [];
+
+		if (
+			inputDatasetsString.includes("[") &&
+			inputDatasetsString.includes("]")
+		) {
+			const processedInput = inputDatasetsString
+				.replaceAll("]", "")
+				.replaceAll("[", "");
+			if(processedInput.indexOf(',') > -1) {
+				inputDatasets = processedInput.split(",");
+			}	
+
+		} else {
+			inputDatasets.push(inputDatasetsString);
+		}
+
+		const ddos = [];
+
+		for (const dataset in inputDatasets) {
+			const dataDdo = await this.aquarius.waitForIndexer(inputDatasets[dataset],null,null, this.indexingParams.retryInterval, this.indexingParams.maxRetries);
+			if (!dataDdo) {
+				console.error(
+					"Error fetching DDO " + dataset[1] + ".  Does this asset exists?"
+				);
+				return;
+			} else {
+				ddos.push(dataDdo);
+			}
+		}
+
+		if (inputDatasets.length >  0 && (ddos.length <= 0 || ddos.length != inputDatasets.length) ) {
+			console.error("Not all the data ddos are available.");
+			return;
+		}
+		let providerURI = this.macOsProviderUrl || this.providerUrl
+		if(ddos.length > 0) {
+			providerURI = this.macOsProviderUrl && ddos[0].chainId === 8996
+			? this.macOsProviderUrl
+			: ddos[0].services[0].serviceEndpoint;
+		}
+			
+		const algoDdo = await this.aquarius.waitForIndexer(args[2],null,null, this.indexingParams.retryInterval, this.indexingParams.maxRetries);
+		if (!algoDdo) {
+			console.error(
+				"Error fetching DDO " + args[1] + ".  Does this asset exists?"
+			);
+			return;
+		}
+
+		const computeEnvs = await ProviderInstance.getComputeEnvironments(
+			this.macOsProviderUrl || this.providerUrl
+		);
+
+		if(!computeEnvs || computeEnvs.length  < 1) {
+			console.error(
+				"Error fetching compute environments. No compute environments available."
+			);
+			return;
+		}
+
+		const mytime = new Date();
+		const computeMinutes = 5;
+		mytime.setMinutes(mytime.getMinutes() + computeMinutes);
+
+		const computeEnvID = args[3];
+		// NO chainId needed anymore (is not part of ComputeEnvironment spec anymore)
+		// const chainComputeEnvs = computeEnvs[computeEnvID]; // was algoDdo.chainId
+		let computeEnv = null;// chainComputeEnvs[0];
+
+		if (computeEnvID && computeEnvID.length > 1) {
+			for (const env of computeEnvs) {
+				if (computeEnvID == env.id && env.free) {
+					computeEnv = env;
+					break;
+				}
+			}
+		}
+
+		if(!computeEnv || !computeEnvID) {
+			console.error("Error fetching free compute environment. No free compute environment matches id: ", computeEnvID);
+			return;
+		}
+		
+		const algo: ComputeAlgorithm = {
+			documentId: algoDdo.id,
+			serviceId: algoDdo.services[0].id,
+			meta: algoDdo.metadata.algorithm
+		};
+	
+		const assets = [];
+		for (const dataDdo in ddos) {
+			const canStartCompute = isOrderable(
+				ddos[dataDdo],
+				ddos[dataDdo].services[0].id,
+				algo,
+				algoDdo
+			);
+			if (!canStartCompute) {
+				console.error(
+					"Error Cannot start compute job using the datasets DIDs & algorithm DID provided"
+				);
+				return;
+			}
+			assets.push({
+				documentId: ddos[dataDdo].id,
+				serviceId: ddos[dataDdo].services[0].id
+			});
+
+		}
+
+		console.log("Starting compute job using provider: ", providerURI);
+		const additionalDatasets = assets.length > 1 ? assets.slice(1) : null;
+		if(assets.length > 0) {
+			console.log(
+				"Starting compute job on " +
+					assets[0].documentId +
+					" with additional datasets:" +
+					(!additionalDatasets ? "none" : additionalDatasets[0].documentId)
+			);
+		} else {
+			console.log(
+				"Starting compute job on " +
+					algo.documentId +
+					" with additional datasets:" +
+					(!additionalDatasets ? "none" : additionalDatasets[0].documentId)
+			);
+		}
+		
+		if(additionalDatasets!==null) {
+			console.log('Adding additional datasets to dataset, according to C2D V2 specs')
+			assets.push(additionalDatasets)
+		}
+
+		const output: ComputeOutput =  {
+			metadataUri: await getMetadataURI()
+		}
+
+		const computeJobs = await ProviderInstance.freeComputeStart(
+			providerURI,
+			this.signer,
+			computeEnv.id,
+			assets, // assets[0] // only c2d v1,
+			algo,
+			null,
+			output
+		);
+
+		console.log('compute jobs: ', computeJobs)
+
+		if (computeJobs && computeJobs[0]) {
+			const { jobId } = computeJobs[0];
+			console.log("Compute started.  JobID: " + jobId);	
 		} else {
 			console.log("Error while starting the compute job: ", computeJobs);
 		}
@@ -474,6 +671,48 @@ export class Commands {
 			agreementId
 		);
 		console.log(jobStatus);
+	}
+
+	public async getComputeEnvironments() {
+		const computeEnvs = await ProviderInstance.getComputeEnvironments(
+			this.macOsProviderUrl || this.providerUrl
+		);
+
+		if(!computeEnvs || computeEnvs.length  < 1) {
+			console.error(
+				"Error fetching compute environments. No compute environments available."
+			);
+			return;
+		}
+		console.log('Exiting compute environments: ', computeEnvs)
+	}
+
+	public async computeStreamableLogs(args: string[]) {
+		const jobId = args[0]
+		const logsResponse = await ProviderInstance.computeStreamableLogs(
+			this.macOsProviderUrl || this.providerUrl,
+			this.signer,
+			jobId,
+		);
+		console.log('response: ' , logsResponse)
+
+		if(!logsResponse) {
+			console.error(
+				"Error fetching streamable logs. No logs available."
+			);
+			return;
+		} else {
+			const stream = logsResponse as ReadableStream
+			console.log('stream: ', stream)
+			const text = await new Response(stream).text();
+			console.log('Streamable Logs: ')
+			console.log(text);
+			// for await (const value of stream) {
+			// 	// just print it to the console
+			// 	console.log(value);
+			// }
+		}
+		console.log('Exiting computeStreamableLogs: ', logsResponse)
 	}
 
 	public async allowAlgo(args: string[]) {

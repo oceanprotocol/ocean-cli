@@ -1,6 +1,6 @@
 import { sleep } from '@oceanprotocol/lib';
-import { createCLI } from './cli';
 import {createInterface} from "readline";
+import { createCLI } from './cli.js';
 
 
 let program

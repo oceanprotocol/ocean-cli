@@ -37,7 +37,7 @@
         ]
       },
       "datatokenAddress": "",
-      "serviceEndpoint": "http://10.84.128.6:8001",
+      "serviceEndpoint": "http://127.0.0.1:8001",
       "timeout": 86400,
       "compute": {
         "allowRawAlgorithm": false,

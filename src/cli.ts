@@ -271,7 +271,7 @@ export async function createCLI() {
       const dsDid = options.dataset || datasetDid;
       const jId = options.job || jobId;
       const agrId = options.agreement || agreementId;
-      if (!dsDid || !jId) {
+      if (!jId) {
         console.error(chalk.red('Dataset DID and Job ID are required'));
         process.exit(1);
       }

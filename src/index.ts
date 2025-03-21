@@ -1,4 +1,4 @@
-import { createCLI } from './cli';
+import { createCLI } from './cli.js';
 
 async function main() {
 	try {

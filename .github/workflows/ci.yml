@@ -125,8 +125,8 @@ jobs:
         run: |
           npm run clean
           rm -rf ./node_modules
+          npm ci esbuild@0.18.20
           npm ci
-          npm ci esbuild
           npm run build
           npm run start &
         env:

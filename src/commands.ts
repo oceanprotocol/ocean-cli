@@ -252,13 +252,16 @@ export class Commands {
 		let inputDatasets = [];
 
 		if (
-			inputDatasetsString.includes("[") ||
+			inputDatasetsString.includes("[") &&
 			inputDatasetsString.includes("]")
 		) {
 			const processedInput = inputDatasetsString
 				.replaceAll("]", "")
 				.replaceAll("[", "");
-			inputDatasets = processedInput.split(",");
+				if(processedInput.indexOf(',') > -1) {
+					inputDatasets = processedInput.split(",");
+				}
+			
 		} else {
 			inputDatasets.push(inputDatasetsString);
 		}
@@ -276,14 +279,17 @@ export class Commands {
 				ddos.push(dataDdo);
 			}
 		}
-		if (ddos.length <= 0 || ddos.length != inputDatasets.length) {
+		if (inputDatasets.length > 0 && (ddos.length <= 0 || ddos.length != inputDatasets.length)) {
 			console.error("Not all the data ddos are available.");
 			return;
 		}
-		const providerURI =
-			this.macOsProviderUrl && ddos[0].chainId === 8996
-				? this.macOsProviderUrl
-				: ddos[0].services[0].serviceEndpoint;
+		let providerURI = this.macOsProviderUrl || this.providerUrl
+		if(ddos.length > 0) {
+			providerURI = this.macOsProviderUrl && ddos[0].chainId === 8996
+			? this.macOsProviderUrl
+			: ddos[0].services[0].serviceEndpoint;
+		}
+			
 
 		const algoDdo = await this.aquarius.waitForIndexer(args[2],null,null, this.indexingParams.retryInterval, this.indexingParams.maxRetries);
 		if (!algoDdo) {
@@ -427,12 +433,21 @@ export class Commands {
 		}
 
 		const additionalDatasets = assets.length > 1 ? assets.slice(1) : null;
-		console.log(
-			"Starting compute job on " +
-				assets[0].documentId +
-				" with additional datasets:" +
-				(!additionalDatasets ? "none" : additionalDatasets[0].documentId)
-		);
+		if(assets.length >0 ) {
+			console.log(
+				"Starting compute job on " +
+					assets[0].documentId +
+					" with additional datasets:" +
+					(!additionalDatasets ? "none" : additionalDatasets[0].documentId)
+			);
+		} else {
+			console.log(
+				"Starting compute job on " +
+					algo.documentId +
+					" with additional datasets:" +
+					(!additionalDatasets ? "none" : additionalDatasets[0].documentId)
+			);
+		}
 		if(additionalDatasets!==null) {
 			console.log('Adding additional datasets to dataset, according to C2D V2 specs')
 			assets.push(additionalDatasets)
@@ -471,13 +486,16 @@ export class Commands {
 		let inputDatasets = [];
 
 		if (
-			inputDatasetsString.includes("[") ||
+			inputDatasetsString.includes("[") &&
 			inputDatasetsString.includes("]")
 		) {
 			const processedInput = inputDatasetsString
 				.replaceAll("]", "")
 				.replaceAll("[", "");
-			inputDatasets = processedInput.split(",");
+			if(processedInput.indexOf(',') > -1) {
+				inputDatasets = processedInput.split(",");
+			}	
+
 		} else {
 			inputDatasets.push(inputDatasetsString);
 		}
@@ -495,15 +513,18 @@ export class Commands {
 				ddos.push(dataDdo);
 			}
 		}
-		if (ddos.length <= 0 || ddos.length != inputDatasets.length) {
+
+		if (inputDatasets.length >  0 && (ddos.length <= 0 || ddos.length != inputDatasets.length) ) {
 			console.error("Not all the data ddos are available.");
 			return;
 		}
-		const providerURI =
-			this.macOsProviderUrl && ddos[0].chainId === 8996
-				? this.macOsProviderUrl
-				: ddos[0].services[0].serviceEndpoint;
-
+		let providerURI = this.macOsProviderUrl || this.providerUrl
+		if(ddos.length > 0) {
+			providerURI = this.macOsProviderUrl && ddos[0].chainId === 8996
+			? this.macOsProviderUrl
+			: ddos[0].services[0].serviceEndpoint;
+		}
+			
 		const algoDdo = await this.aquarius.waitForIndexer(args[2],null,null, this.indexingParams.retryInterval, this.indexingParams.maxRetries);
 		if (!algoDdo) {
 			console.error(
@@ -575,12 +596,22 @@ export class Commands {
 
 		console.log("Starting compute job using provider: ", providerURI);
 		const additionalDatasets = assets.length > 1 ? assets.slice(1) : null;
-		console.log(
-			"Starting compute job on " +
-				assets[0].documentId +
-				" with additional datasets:" +
-				(!additionalDatasets ? "none" : additionalDatasets[0].documentId)
-		);
+		if(assets.length > 0) {
+			console.log(
+				"Starting compute job on " +
+					assets[0].documentId +
+					" with additional datasets:" +
+					(!additionalDatasets ? "none" : additionalDatasets[0].documentId)
+			);
+		} else {
+			console.log(
+				"Starting compute job on " +
+					algo.documentId +
+					" with additional datasets:" +
+					(!additionalDatasets ? "none" : additionalDatasets[0].documentId)
+			);
+		}
+		
 		if(additionalDatasets!==null) {
 			console.log('Adding additional datasets to dataset, according to C2D V2 specs')
 			assets.push(additionalDatasets)

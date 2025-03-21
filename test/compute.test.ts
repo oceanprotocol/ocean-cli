@@ -85,19 +85,26 @@ describe("Ocean CLI Free Compute Flow", function () {
 	it("should get compute environments", async () => {
 		const output = await runCommand(`npm run cli getComputeEnvironments`);
 
-		expect(output).to.contain("id");
+		let environments;
+		try {
+			environments = JSON.parse(output);
+		} catch (error) {
+			throw new Error("Output is not valid JSON:\n" + output);
+		}
 
-		const envMatch = output.match(/id: (0x[a-fA-F0-9]+)/);
-		if (!envMatch)
-			throw new Error("No environment ID found in environments output");
+		expect(environments).to.be.an("array").that.is.not.empty;
 
-		computeEnvId = envMatch[1];
+		const firstEnv = environments[0];
+
+		expect(firstEnv).to.have.property("id").that.is.a("string");
+
+		computeEnvId = firstEnv.id;
 		console.log(`Fetched Compute Env ID: ${computeEnvId}`);
 	});
 
 	it("should start a free compute job", async () => {
 		const output = await runCommand(
-			`npm run cli startFreeCompute -- --datasets ${computeDatasetDid} --algo ${algoDid} --env ${computeEnvId}`
+			`npm run cli startFreeCompute --datasets ${computeDatasetDid} --algo ${algoDid} --env ${computeEnvId}`
 		);
 
 		const jobIdMatch = output.match(
@@ -111,7 +118,7 @@ describe("Ocean CLI Free Compute Flow", function () {
 
 	it("should get job status", async () => {
 		const output = await runCommand(
-			`npm run cli getJobStatus -- --dataset ${computeDatasetDid} --job ${jobId}`
+			`npm run cli getJobStatus --dataset ${computeDatasetDid} --job ${jobId}`
 		);
 
 		expect(output).to.contain(jobId);
@@ -121,7 +128,7 @@ describe("Ocean CLI Free Compute Flow", function () {
 
 	it("should fetch streamable logs", async () => {
 		const output = await runCommand(
-			`npm run cli computeStreamableLogs -- --job ${jobId}`
+			`npm run cli computeStreamableLogs --job ${jobId}`
 		);
 
 		expect(output).to.contain(jobId);
@@ -130,7 +137,7 @@ describe("Ocean CLI Free Compute Flow", function () {
 
 	it("should stop the compute job", async () => {
 		const output = await runCommand(
-			`npm run cli stopCompute -- --dataset ${computeDatasetDid} --job ${jobId}`
+			`npm run cli stopCompute --dataset ${computeDatasetDid} --job ${jobId}`
 		);
 
 		expect(output).to.contain("Compute job stopped successfully");

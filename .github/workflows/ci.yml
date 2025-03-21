@@ -123,7 +123,9 @@ jobs:
       - name: Start Ocean Node
         working-directory: ${{ github.workspace }}/ocean-node
         run: |
-          npm i
+          npm cache clean --force
+          rm -rf node_modules package-lock.json
+          npm install --legacy-peer-deps
           npm run build
           npm run start &
         env:

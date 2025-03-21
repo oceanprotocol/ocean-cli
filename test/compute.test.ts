@@ -44,6 +44,7 @@ describe("Ocean CLI Free Compute Flow", function () {
 			process.env.HOME || "",
 			".ocean/ocean-contracts/artifacts/address.json"
 		);
+		console.log("Starting compute tests ... ");
 	});
 
 	it("should publish a compute dataset", async () => {

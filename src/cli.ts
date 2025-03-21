@@ -166,10 +166,10 @@ export async function createCLI() {
   program
     .command('startCompute')
     .description('Starts a compute job')
-    .argument('<datasetDids>', 'Dataset DIDs (comma-separated)')
+    .argument('<datasetDids>', 'Dataset DIDs (comma-separated) OR (empty array for none)')
     .argument('<algoDid>', 'Algorithm DID')
     .argument('<computeEnvId>', 'Compute environment ID')
-    .option('-d, --datasets <datasetDids>', 'Dataset DIDs (comma-separated)')
+    .option('-d, --datasets <datasetDids>', 'Dataset DIDs (comma-separated) OR (empty array for none)')
     .option('-a, --algo <algoDid>', 'Algorithm DID')
     .option('-e, --env <computeEnvId>', 'Compute environment ID')
     .action(async (datasetDids, algoDid, computeEnvId, options) => {
@@ -189,10 +189,10 @@ export async function createCLI() {
   program
     .command('startFreeCompute')
     .description('Starts a FREE compute job')
-    .argument('<datasetDids>', 'Dataset DIDs (comma-separated)')
+    .argument('<datasetDids>', 'Dataset DIDs (comma-separated) OR (empty array for none)')
     .argument('<algoDid>', 'Algorithm DID')
     .argument('<computeEnvId>', 'Compute environment ID')
-    .option('-d, --datasets <datasetDids>', 'Dataset DIDs (comma-separated)')
+    .option('-d, --datasets <datasetDids>', 'Dataset DIDs (comma-separated) OR (empty array for none)')
     .option('-a, --algo <algoDid>', 'Algorithm DID')
     .option('-e, --env <computeEnvId>', 'Compute environment ID')
     .action(async (datasetDids, algoDid, computeEnvId, options) => {

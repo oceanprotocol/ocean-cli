@@ -118,13 +118,11 @@ jobs:
         with:
           repository: 'oceanprotocol/ocean-node'
           path: 'ocean-node'
-          ref: 'main'
+          ref: 'test-esbuild'
 
       - name: Start Ocean Node
         working-directory: ${{ github.workspace }}/ocean-node
         run: |
-          npm run clean
-          npm ci esbuild@0.18.20
           npm ci
           npm run build
           npm run start &

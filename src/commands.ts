@@ -473,7 +473,7 @@ export class Commands {
 
 		if (computeJobs && computeJobs[0]) {
 			const { jobId, agreementId } = computeJobs[0];
-			console.log("Compute started.  JobID: " + jobId);
+			console.log("Compute started. JobID: " + jobId);
 			console.log("Agreement ID: " + agreementId);
 		} else {
 			console.log("Error while starting the compute job: ", computeJobs);
@@ -635,7 +635,7 @@ export class Commands {
 
 		if (computeJobs && computeJobs[0]) {
 			const { jobId } = computeJobs[0];
-			console.log("Compute started.  JobID: " + jobId);	
+			console.log("Compute started. JobID: " + jobId);	
 		} else {
 			console.log("Error while starting the compute job: ", computeJobs);
 		}
@@ -684,7 +684,7 @@ export class Commands {
 			);
 			return;
 		}
-		console.log('Exiting compute environments: ', computeEnvs)
+		console.log('Existing compute environments:', computeEnvs)
 	}
 
 	public async computeStreamableLogs(args: string[]) {
@@ -850,23 +850,30 @@ export class Commands {
 		// args[2] - jobId
 		// args[3] - agreementId
 		const hasAgreementId = args.length === 4;
-		
-		const dataDdo = await this.aquarius.waitForIndexer(args[1],null,null, this.indexingParams.retryInterval, this.indexingParams.maxRetries);
-		if (!dataDdo) {
-			console.error(
-				"Error fetching DDO " + args[1] + ".  Does this asset exists?"
-			);
-			return;
+		const hasDid = args.length >=3
+		let dataDdo = null
+		if(hasDid) {
+			dataDdo = await this.aquarius.waitForIndexer(args[1],null,null, this.indexingParams.retryInterval, this.indexingParams.maxRetries);
+			if (!dataDdo) {
+				console.error(
+					"Error fetching DDO " + args[1] + ".  Does this asset exists?"
+				);
+				return;
+			}
 		}
-		const jobId = args[2]
+		
+		const jobId = hasDid ? args[2] : args[1]
 		let agreementId = null;
 		if(hasAgreementId) {
-			agreementId = args[3];
+			agreementId = hasDid ? args[3] : args[2];
 		}
-		const providerURI =
-			this.macOsProviderUrl && dataDdo.chainId === 8996
-				? this.macOsProviderUrl
-				: dataDdo.services[0].serviceEndpoint;
+		let providerURI = this.macOsProviderUrl || this.providerUrl
+		if(dataDdo) {
+			providerURI = this.macOsProviderUrl && dataDdo.chainId === 8996
+			? this.macOsProviderUrl
+			: dataDdo.services[0].serviceEndpoint;
+		}
+			
 
 		const jobStatus = (await ProviderInstance.computeStatus(
 			providerURI,

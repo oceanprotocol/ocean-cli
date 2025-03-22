@@ -320,7 +320,12 @@ export function isPrivateIP(ip): boolean {
  }
 
  export async function getMetadataURI() {
-	const metadataURI = process.env.AQUARIUS_URL
+	let metadataURI
+	if (!process.env.AQUARIUS_URL || (process.env.AQUARIUS_URL && process.env.NODE_URL)) {
+		metadataURI = process.env.NODE_URL
+	} else {
+		metadataURI = process.env.AQUARIUS_URL
+	}
 	const parsed = new URL(metadataURI);
 	let ip = metadataURI // by default
 	// has port number?

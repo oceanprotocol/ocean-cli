@@ -85,11 +85,20 @@ describe("Ocean CLI Free Compute Flow", function () {
 	it("should get compute environments", async () => {
 		const output = await runCommand(`npm run cli getComputeEnvironments`);
 
+		const jsonMatch = output.match(
+			/Exiting compute environments:\s*(\[[\s\S]*\])/
+		);
+		if (!jsonMatch) {
+			console.error("Raw output:", output);
+			throw new Error("Could not find JSON in the output");
+		}
+
 		let environments;
 		try {
-			environments = JSON.parse(output);
+			environments = JSON.parse(jsonMatch[1]);
 		} catch (error) {
-			throw new Error("Output is not valid JSON:\n" + output);
+			console.error("Extracted JSON:", jsonMatch[1]);
+			throw new Error("Extracted output is not valid JSON:\n" + jsonMatch[1]);
 		}
 
 		expect(environments).to.be.an("array").that.is.not.empty;

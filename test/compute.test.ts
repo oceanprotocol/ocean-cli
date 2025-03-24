@@ -117,7 +117,7 @@ describe("Ocean CLI Free Compute Flow", function () {
 		);
 
 		const jobIdMatch = output.match(
-			/Job started successfully with ID: ([a-f0-9-]+)/i
+			/Compute started\.\s+JobID:\s+(0x[a-f0-9-]+)/i
 		);
 		expect(jobIdMatch, "No Job ID found in output").to.not.be.null;
 

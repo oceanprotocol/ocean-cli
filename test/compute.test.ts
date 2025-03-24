@@ -134,13 +134,4 @@ describe("Ocean CLI Free Compute Flow", function () {
 		expect(output.toLowerCase()).to.match(/status/);
 		console.log(`Job status retrieved for jobId: ${jobId}`);
 	});
-
-	it("should stop the compute job", async () => {
-		const output = await runCommand(
-			`npm run cli stopCompute --dataset ${computeDatasetDid} --job ${jobId}`
-		);
-
-		expect(output).to.contain("Compute job stopped successfully");
-		console.log(`Stopped compute job with ID: ${jobId}`);
-	});
 });

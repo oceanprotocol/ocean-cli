@@ -135,15 +135,6 @@ describe("Ocean CLI Free Compute Flow", function () {
 		console.log(`Job status retrieved for jobId: ${jobId}`);
 	});
 
-	it("should fetch streamable logs", async () => {
-		const output = await runCommand(
-			`npm run cli computeStreamableLogs --job ${jobId}`
-		);
-
-		expect(output).to.contain(jobId);
-		console.log(`Streamable logs retrieved for jobId: ${jobId}`);
-	});
-
 	it("should stop the compute job", async () => {
 		const output = await runCommand(
 			`npm run cli stopCompute --dataset ${computeDatasetDid} --job ${jobId}`

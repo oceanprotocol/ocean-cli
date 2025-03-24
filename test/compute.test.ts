@@ -85,20 +85,18 @@ describe("Ocean CLI Free Compute Flow", function () {
 	it("should get compute environments", async () => {
 		const output = await runCommand(`npm run cli getComputeEnvironments`);
 
-		const jsonMatch = output.match(
-			/Exiting compute environments:\s*(\[[\s\S]*\])/
-		);
+		const jsonMatch = output.match(/Exiting compute environments:\s*([\s\S]*)/);
 		if (!jsonMatch) {
 			console.error("Raw output:", output);
-			throw new Error("Could not find JSON in the output");
+			throw new Error("Could not find compute environments in the output");
 		}
 
 		let environments;
 		try {
-			environments = JSON.parse(jsonMatch[1]);
+			environments = eval(`(${jsonMatch[1]})`);
 		} catch (error) {
-			console.error("Extracted JSON:", jsonMatch[1]);
-			throw new Error("Extracted output is not valid JSON:\n" + jsonMatch[1]);
+			console.error("Extracted output:", jsonMatch[1]);
+			throw new Error("Failed to parse the extracted output:\n" + error);
 		}
 
 		expect(environments).to.be.an("array").that.is.not.empty;
@@ -106,6 +104,8 @@ describe("Ocean CLI Free Compute Flow", function () {
 		const firstEnv = environments[0];
 
 		expect(firstEnv).to.have.property("id").that.is.a("string");
+		expect(firstEnv).to.have.property("consumerAddress").that.is.a("string");
+		expect(firstEnv).to.have.property("resources").that.is.an("array");
 
 		computeEnvId = firstEnv.id;
 		console.log(`Fetched Compute Env ID: ${computeEnvId}`);

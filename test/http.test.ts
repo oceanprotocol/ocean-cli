@@ -64,10 +64,10 @@ describe('Direct Command Endpoint', () => {
 });
 
 
-describe('getOceanPeers Endpoint', () => {
+describe('getP2PPeers Endpoint', () => {
 
   it('should return correct status', async () => {
-    const response = await fetch('http://localhost:8001/getOceanPeers');
+    const response = await fetch('http://localhost:8001/getP2PPeers');
     const responseBody = await response.json();
 
     expect(response.status).to.equal(200);

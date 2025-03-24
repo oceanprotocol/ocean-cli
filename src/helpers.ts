@@ -209,7 +209,10 @@ export async function handleComputeOrder(
        - have validOrder and providerFees -> then order is valid but providerFees are not valid, we need to call reuseOrder and pay only providerFees
        - no validOrder -> we need to call startOrder, to pay 1 DT & providerFees
     */
-	if (order.providerFee && order.providerFee.providerFeeAmount) {
+   const hasProviderFees = order.providerFee && order.providerFee.providerFeeAmount
+   // no need to approve if it is 0
+	if (hasProviderFees && Number(order.providerFee.providerFeeAmount) > 0) {
+		
 		await approveWei(
 			payerAccount,
 			config,
@@ -218,6 +221,7 @@ export async function handleComputeOrder(
 			asset.services[0].datatokenAddress,
 			order.providerFee.providerFeeAmount
 		);
+		
 	}
 	if (order.validOrder) {
 		if (!order.providerFee) return order.validOrder;
@@ -320,7 +324,12 @@ export function isPrivateIP(ip): boolean {
  }
 
  export async function getMetadataURI() {
-	const metadataURI = process.env.AQUARIUS_URL
+	let metadataURI
+	if (!process.env.AQUARIUS_URL || (process.env.AQUARIUS_URL && process.env.NODE_URL)) {
+		metadataURI = process.env.NODE_URL
+	} else {
+		metadataURI = process.env.AQUARIUS_URL
+	}
 	const parsed = new URL(metadataURI);
 	let ip = metadataURI // by default
 	// has port number?
@@ -352,8 +361,8 @@ export function isPrivateIP(ip): boolean {
  // defines how much time we wait for an asset to index + the interval for retries
  export function getIndexingWaitSettings(): IndexerWaitParams {
 	const indexingParams: IndexerWaitParams = {
-		maxRetries: 100, // 100 retries
-		retryInterval: 3000 // retries every 3 seconds
+		maxRetries: 120, // 120 retries
+		retryInterval: 4000 // retries every 4 seconds
 	}
 	try {
 
@@ -361,7 +370,7 @@ export function isPrivateIP(ip): boolean {
 			
 			indexingParams.retryInterval = Number(process.env.INDEXING_RETRY_INTERVAL)
 			if(indexingParams.retryInterval < 0) {
-				indexingParams.retryInterval = 3000
+				indexingParams.retryInterval = 4000
 			}
 
 		}
@@ -369,7 +378,7 @@ export function isPrivateIP(ip): boolean {
 			
 			indexingParams.maxRetries = Number(process.env.INDEXING_MAX_RETRIES)
 			if(indexingParams.maxRetries < 0) {
-				indexingParams.maxRetries = 100
+				indexingParams.maxRetries = 120
 			}
 		}
 	}catch(err) {

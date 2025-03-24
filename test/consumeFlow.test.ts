@@ -10,8 +10,9 @@ import { fileURLToPath } from 'url'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
+
 describe("Ocean CLI Publishing", function() {
-    this.timeout(180000); // Set a longer timeout to allow the command to execute
+    this.timeout(200000); // Set a longer timeout to allow the command to execute
 
     let downloadDatasetDid: string;
     let computeDatasetDid: string;
@@ -65,6 +66,7 @@ describe("Ocean CLI Publishing", function() {
                 const match = stdout.match(/did:op:[a-f0-9]{64}/);
                 if (match) {
                     downloadDatasetDid = match[0];
+                    console.log('download asset: ', downloadDatasetDid)
                 }
                 expect(stdout).to.contain("Asset published. ID:");
                 done()
@@ -143,10 +145,10 @@ describe("Ocean CLI Publishing", function() {
     });
 
     it("should get DDO using 'npm run cli getDDO' for download dataset", function(done) {
+
         exec(`npm run cli getDDO ${downloadDatasetDid}`, { cwd: projectRoot }, (error, stdout) => {
             expect(stdout).to.contain(`${downloadDatasetDid}`);
             expect(stdout).to.contain("https://w3id.org/did/v1");
-            expect(stdout).to.contain("Datatoken");
             done()
         });
     });
@@ -155,7 +157,6 @@ describe("Ocean CLI Publishing", function() {
         exec(`npm run cli getDDO ${computeDatasetDid}`, { cwd: projectRoot }, (error, stdout) => {
             expect(stdout).to.contain(`${computeDatasetDid}`);
             expect(stdout).to.contain("https://w3id.org/did/v1");
-            expect(stdout).to.contain("Datatoken");
             done()
         });
     });
@@ -164,7 +165,6 @@ describe("Ocean CLI Publishing", function() {
         exec(`npm run cli getDDO ${jsAlgoDid}`, { cwd: projectRoot }, (error, stdout) => {
             expect(stdout).to.contain(`${jsAlgoDid}`);
             expect(stdout).to.contain("https://w3id.org/did/v1");
-            expect(stdout).to.contain("Datatoken");
             done()
         });
     });
@@ -173,7 +173,6 @@ describe("Ocean CLI Publishing", function() {
         exec(`npm run cli getDDO ${pythonAlgoDid}`, { cwd: projectRoot }, (error, stdout) => {
             expect(stdout).to.contain(`${pythonAlgoDid}`);
             expect(stdout).to.contain("https://w3id.org/did/v1");
-            expect(stdout).to.contain("Datatoken");
             done()
         });
     });

@@ -206,6 +206,17 @@ npm run cli <command> [options] <arguments>
 
 ---
 
+**Start Free Compute:**
+
+- **Positional:**  
+  `npm run cli startFreeCompute did1,did2 algoDid env1`
+
+- **Named Options:**  
+  `npm run cli startFreeCompute --datasets did1,did2 --algo algoDid --env env1`  
+  (Options can be provided in any order.)
+
+---
+
 **Stop Compute:**
 
 - **Positional:**  
@@ -214,6 +225,18 @@ npm run cli <command> [options] <arguments>
 - **Named Options:**  
   `npm run cli stopCompute --dataset did:op:123 --job job-123`  
   (Optionally, you can also provide an agreement ID using `--agreement`.)
+
+---
+
+**Get Compute Environments:**
+
+  `npm run cli getComputeEnvironments`
+
+---
+
+**Get Compute Streamable Logs:**
+
+  `npm run cli computeStreamableLogs`
 
 ---
 
@@ -272,6 +295,15 @@ npm run cli <command> [options] <arguments>
   `-d, --datasets <datasetDids>`  
   `-a, --algo <algoDid>`  
   `-e, --env <computeEnvId>`
+
+- **startFreeCompute:**  
+  `-d, --datasets <datasetDids>`  
+  `-a, --algo <algoDid>`  
+  `-e, --env <computeEnvId>`
+
+- **getComputeEnvironments:**  
+
+- **computeStreamableLogs:**  
 
 - **stopCompute:**  
   `-d, --dataset <datasetDid>`  

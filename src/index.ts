@@ -74,16 +74,21 @@ async function main() {
 		if (process.argv.includes('--help') || process.argv.includes('-h')) {
 			program.outputHelp();
 		}
-		
-		do {
-			program.exitOverride();
-			try {
-				await program.parseAsync(process.argv);
-			}catch(err) {
-				// silently ignore
-			}
-			await waitForCommands()
-		}while(!exit)
+
+		if(process.env.AVOID_LOOP_RUN !== 'true') {
+			do {
+				program.exitOverride();
+				try {
+					await program.parseAsync(process.argv);
+				}catch(err) {
+					// silently ignore
+				}
+				await waitForCommands()
+			}while(!exit)
+		} else {
+			// one shot
+			await program.parseAsync(process.argv);
+		}
 
 	} catch (error) {
 		console.error('Program Error:', error.message);

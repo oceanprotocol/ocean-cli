@@ -93,6 +93,14 @@ export INDEXING_MAX_RETRIES='100'
 export INDEXING_RETRY_INTERVAL='3000'
 ```
 
+- Optional set AVOID_LOOP_RUN to 'true' to run each command and exit afterwards (usefull for CI test env and default bahaviour). IF not set or set to 'false' the CLI will listen interactively for commands, until exit is manually forced 
+
+```
+export AVOID_LOOP_RUN='true/false'
+```
+
+
+
 ### Build the TypeScript code
 
 ```

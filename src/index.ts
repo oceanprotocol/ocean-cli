@@ -5,13 +5,15 @@ import { createCLI } from './cli.js';
 
 let program
 let exit = false
+const supportedCommands: string[] = [] 
 async function waitForCommands() {
-  const command = await readLine("Enter command:\n")
-  console.log('Got command:', command)
-  if(command === "quit" || command === "exit") {
+  const commandLine = await readLine("Enter command ('exit' | 'quit' or CTRL-C to terminate'):\n")
+  let command = null
+  if(commandLine === "quit" || commandLine === "exit" || commandLine === "\\q") {
 	exit = true
+	return
   }
-  const commandSplitted: string[] = command.split(" ")
+  const commandSplitted: string[] = commandLine.split(" ")
   if(commandSplitted.length < 1) {
 	console.log("Invalid command, missing one or more arguments!")
 	return
@@ -19,9 +21,27 @@ async function waitForCommands() {
   if(commandSplitted.length>=3) {
 	if(commandSplitted[0] === "npm" && commandSplitted[1] === "run" && commandSplitted[2] === "cli") {
 		commandSplitted.splice(0,3)
-		console.log("cleaned command:", commandSplitted.join(" "))
+		command = commandSplitted.join(" ")
 	}
+  } else if(commandSplitted.length === 1) {
+	// just the command without npm run cli
+	command = commandSplitted[0]
   }
+
+  if(command && command.length > 0) {
+	const args = command.split(" ")
+	const commandName = args[0]
+	if(!supportedCommands.includes(commandName)) {
+		console.log("Invalid option: ", commandName)
+		return
+	} 
+	try {
+		await program.parseAsync(args);
+	}catch(error) {
+		console.log('Command error: ', error)
+	}
+  } 
+  
 }
 
 async function readLine(question: string): Promise<string> {
@@ -44,22 +64,29 @@ async function readLine(question: string): Promise<string> {
 async function main() {
 	try {
 		program = await createCLI();
+		for(const command of program.commands) {
+			supportedCommands.push(command.name())
+			supportedCommands.push(command.alias())
+		}
 		
-		console.log("Type 'exit' or 'quit' to terminate process")
+		console.log("Type 'exit' or 'quit' or 'CTRL-C' to terminate process")
 		// Handle help command without initializing signer
 		if (process.argv.includes('--help') || process.argv.includes('-h')) {
 			program.outputHelp();
-			process.exit(0);
 		}
-
-		await program.parseAsync(process.argv);
+		
 		do {
+			program.exitOverride();
+			try {
+				await program.parseAsync(process.argv);
+			}catch(err) {
+				// silently ignore
+			}
 			await waitForCommands()
 		}while(!exit)
-		
 
 	} catch (error) {
-		console.error('Error:', error.message);
+		console.error('Program Error:', error.message);
 		exit = true
 		process.exit(1);
 	}

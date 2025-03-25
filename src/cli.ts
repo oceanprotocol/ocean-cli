@@ -56,7 +56,8 @@ export async function createCLI() {
       const assetDid = options.did || did;
       if (!assetDid) {
         console.error(chalk.red('DID is required'));
-        process.exit(1);
+        // process.exit(1);
+        return
       }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
@@ -74,7 +75,8 @@ export async function createCLI() {
       const file = options.file || metadataFile;
       if (!file) {
         console.error(chalk.red('Metadata file is required'));
-        process.exit(1);
+        // process.exit(1);
+        return
       }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
@@ -92,7 +94,8 @@ export async function createCLI() {
       const file = options.file || metadataFile;
       if (!file) {
         console.error(chalk.red('Metadata file is required'));
-        process.exit(1);
+        // process.exit(1);
+        return
       }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
@@ -114,7 +117,8 @@ export async function createCLI() {
       const file = options.file || metadataFile;
       if (!dsDid || !file) {
         console.error(chalk.red('Dataset DID and metadata file are required'));
-        process.exit(1);
+        // process.exit(1);
+        return
       }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
@@ -134,7 +138,8 @@ export async function createCLI() {
       const destFolder = options.folder || folder || '.';
       if (!assetDid) {
         console.error(chalk.red('DID is required'));
-        process.exit(1);
+        // process.exit(1);
+        return
       }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
@@ -155,7 +160,8 @@ export async function createCLI() {
       const aDid = options.algo || algoDid;
       if (!dsDid || !aDid) {
         console.error(chalk.red('Dataset DID and Algorithm DID are required'));
-        process.exit(1);
+        // process.exit(1);
+        return
       }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
@@ -178,7 +184,8 @@ export async function createCLI() {
       const envId = options.env || computeEnvId;
       if (!dsDids || !aDid || !envId) {
         console.error(chalk.red('Missing required arguments'));
-        process.exit(1);
+        // process.exit(1);
+        return
       }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
@@ -201,7 +208,8 @@ export async function createCLI() {
       const envId = options.env || computeEnvId;
       if (!dsDids || !aDid || !envId) {
         console.error(chalk.red('Missing required arguments'));
-        process.exit(1);
+        // process.exit(1);
+        return
       }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
@@ -248,7 +256,8 @@ export async function createCLI() {
       const agrId = options.agreement || agreementId;
       if (!dsDid || !jId) {
         console.error(chalk.red('Dataset DID and Job ID are required'));
-        process.exit(1);
+        // process.exit(1);
+        return
       }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
@@ -273,7 +282,8 @@ export async function createCLI() {
       const agrId = options.agreement || agreementId;
       if (!dsDid || !jId) {
         console.error(chalk.red('Dataset DID and Job ID are required'));
-        process.exit(1);
+        // process.exit(1);
+        return
       }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);

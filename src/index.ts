@@ -2,10 +2,11 @@ import { sleep } from '@oceanprotocol/lib';
 import {createInterface} from "readline";
 import { createCLI } from './cli.js';
 
-
 let program
 let exit = false
 const supportedCommands: string[] = [] 
+const initializeCommands: string[] = []
+
 async function waitForCommands() {
   const commandLine = await readLine("Enter command ('exit' | 'quit' or CTRL-C to terminate'):\n")
   let command = null
@@ -13,28 +14,32 @@ async function waitForCommands() {
 	exit = true
 	return
   }
+
   const commandSplitted: string[] = commandLine.split(" ")
   if(commandSplitted.length < 1) {
 	console.log("Invalid command, missing one or more arguments!")
 	return
   }
+
   if(commandSplitted.length>=3) {
 	if(commandSplitted[0] === "npm" && commandSplitted[1] === "run" && commandSplitted[2] === "cli") {
 		commandSplitted.splice(0,3)
 		command = commandSplitted.join(" ")
 	}
-  } else if(commandSplitted.length === 1) {
+  } else if(commandSplitted.length >= 1) {
 	// just the command without npm run cli
 	command = commandSplitted[0]
   }
 
-  if(command && command.length > 0) {
-	const args = command.split(" ")
-	const commandName = args[0]
+  if(command && command.length > 0 && commandSplitted.length>0) {
+	const commandName = commandSplitted[0]
+	const args = initializeCommands.concat(commandSplitted)
+
 	if(!supportedCommands.includes(commandName)) {
 		console.log("Invalid option: ", commandName)
 		return
 	} 
+	
 	try {
 		await program.parseAsync(args);
 	}catch(error) {
@@ -75,11 +80,18 @@ async function main() {
 			program.outputHelp();
 		}
 
+		const initialCommandLine:string [] = process.argv
 		if(process.env.AVOID_LOOP_RUN !== 'true') {
+			
 			do {
 				program.exitOverride();
 				try {
-					await program.parseAsync(process.argv);
+					if(initializeCommands.length === 0 && initialCommandLine.length > 2) {
+						initializeCommands.push(initialCommandLine[0]) // node
+						initializeCommands.push(initialCommandLine[1]) // file path
+						// just once
+						await program.parseAsync(initialCommandLine);
+					}
 				}catch(err) {
 					// silently ignore
 				}
@@ -87,7 +99,7 @@ async function main() {
 			}while(!exit)
 		} else {
 			// one shot
-			await program.parseAsync(process.argv);
+			await program.parseAsync(initialCommandLine);
 		}
 
 	} catch (error) {

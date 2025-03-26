@@ -63,37 +63,37 @@ export RPC='XXXX'
 export NODE_URL='XXXX'
 ```
 
-- Optional set metadataCache URL if you want to use a custom Aquarius version instead of the default one. This will not be used if you have set an Ocean Node url.
+- Optional, set metadataCache URL if you want to use a custom Aquarius version instead of the default one. This will not be used if you have set an Ocean Node url.
 
 ```
 export AQUARIUS_URL='XXXX'
 ```
 
-- Optional set Provider URL if you want to use a custom Provider version instead of the default one. This will not be used if you have set an Ocean Node url.
+- Optional, set Provider URL if you want to use a custom Provider version instead of the default one. This will not be used if you have set an Ocean Node url.
 
 ```
 export PROVIDER_URL='XXXX'
 ```
 
-- Optional set ADDRESS_FILE if you want to use a custom set of smart contract address
+- Optional, set ADDRESS_FILE if you want to use a custom set of smart contract address
 
 ```
 export ADDRESS_FILE='path-to-address-file'
 ```
 
-- Optional set INDEXING_MAX_RETRIES to the max number of retries when waiting for an asset to be indexed. Default is 100 retries max.
+- Optional, set INDEXING_MAX_RETRIES to the max number of retries when waiting for an asset to be indexed. Default is 100 retries max.
 
 ```
 export INDEXING_MAX_RETRIES='100'
 ```
 
-- Optional set INDEXING_RETRY_INTERVAL to the interval (in miliseconds) for each retry when waiting for an asset to be indexed. Default is 3 seconds.
+- Optional, set INDEXING_RETRY_INTERVAL to the interval (in miliseconds) for each retry when waiting for an asset to be indexed. Default is 3 seconds.
 
 ```
 export INDEXING_RETRY_INTERVAL='3000'
 ```
 
-- Optional set AVOID_LOOP_RUN to 'true' to run each command and exit afterwards (usefull for CI test env and default bahaviour). IF not set or set to 'false' the CLI will listen interactively for commands, until exit is manually forced 
+- Optional, set AVOID_LOOP_RUN to 'true' to run each command and exit afterwards (usefull for CI test env and default behaviour). IF not set or set to 'false' the CLI will listen interactively for commands, until exit is manually forced 
 
 ```
 export AVOID_LOOP_RUN='true/false'

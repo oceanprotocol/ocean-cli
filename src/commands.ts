@@ -1,5 +1,4 @@
 import fs from "fs";
-import os from "os";
 import util from "util";
 import {
 	createAssetUtil,
@@ -35,39 +34,20 @@ export class Commands {
 	public config: Config;
 	public aquarius: Aquarius;
 	public providerUrl: string;
-	public macOsProviderUrl: string;
 	// optional settings for indexing wait time
 	private indexingParams: IndexerWaitParams;
 
 	constructor(signer: Signer, network: string | number, config?: Config) {
 		this.signer = signer;
 		this.config = config || new ConfigHelper().getConfig(network);
-		this.providerUrl = process.env.NODE_URL || process.env.PROVIDER_URL || this.config.providerUri;
+		this.providerUrl = process.env.NODE_URL;
 		this.indexingParams = getIndexingWaitSettings();
-		if (
-			!process.env.PROVIDER_URL && !process.env.NODE_URL &&
-			this.config.chainId === 8996 &&
-			os.type() === "Darwin"
-		) {
-			this.macOsProviderUrl = "http://127.0.0.1:8030";
-		}
+
 		console.log("Using Provider :", this.providerUrl);
-		this.macOsProviderUrl &&
-			console.log(" -> MacOS provider url :", this.macOsProviderUrl);
-		if (
-			!process.env.AQUARIUS_URL && !process.env.NODE_URL &&
-			this.config.chainId === 8996 &&
-			os.type() === "Darwin"
-		) {
-			this.config.metadataCacheUri = "http://127.0.0.1:5000";
-		}
-		this.aquarius = new Aquarius(
-			process.env.NODE_URL || process.env.AQUARIUS_URL || this.config.metadataCacheUri
-		);
-		console.log(
-			"Using Aquarius :",
-			process.env.NODE_URL || process.env.AQUARIUS_URL || this.config.metadataCacheUri
-		);
+		this.config.metadataCacheUri = this.providerUrl;
+		
+		this.aquarius = new Aquarius(this.config.metadataCacheUri);
+		console.log("Using Aquarius :", this.config.metadataCacheUri);
 	}
 
 	public async start() {
@@ -103,7 +83,7 @@ export class Commands {
 				this.signer,
 				asset.services[0].files,
 				asset,
-				this.providerUrl || this.macOsProviderUrl,
+				this.providerUrl,
 				this.config,
 				this.aquarius,
 				encryptDDO
@@ -134,7 +114,7 @@ export class Commands {
 					this.signer,
 					algoAsset.services[0].files,
 					algoAsset,
-					this.providerUrl || this.macOsProviderUrl,
+					this.providerUrl,
 					this.config,
 					this.aquarius,
 					encryptDDO
@@ -178,7 +158,6 @@ export class Commands {
 			asset,
 			this.providerUrl,
 			this.aquarius,
-			this.macOsProviderUrl,
 			encryptDDO
 		);
 		console.log("Asset updated. Tx: " + JSON.stringify(updateAssetTx, null, 2));
@@ -206,8 +185,8 @@ export class Commands {
 		}
 
 		const providerURI =
-			this.macOsProviderUrl && dataDdo.chainId === 8996
-				? this.macOsProviderUrl
+			this.providerUrl && dataDdo.chainId === 8996
+				? this.providerUrl
 				: dataDdo.services[0].serviceEndpoint;
 		console.log("Downloading asset using provider: ", providerURI);
 		const datatoken = new Datatoken(this.signer, this.config.chainId, this.config);
@@ -283,10 +262,10 @@ export class Commands {
 			console.error("Not all the data ddos are available.");
 			return;
 		}
-		let providerURI = this.macOsProviderUrl || this.providerUrl
+		let providerURI = this.providerUrl
 		if(ddos.length > 0) {
-			providerURI = this.macOsProviderUrl && ddos[0].chainId === 8996
-			? this.macOsProviderUrl
+			providerURI = this.providerUrl && ddos[0].chainId === 8996
+			? this.providerUrl
 			: ddos[0].services[0].serviceEndpoint;
 		}
 			
@@ -299,9 +278,7 @@ export class Commands {
 			return;
 		}
 
-		const computeEnvs = await ProviderInstance.getComputeEnvironments(
-			this.macOsProviderUrl || this.providerUrl
-		);
+		const computeEnvs = await ProviderInstance.getComputeEnvironments(this.providerUrl);
 
 		if(!computeEnvs || computeEnvs.length  < 1) {
 			console.error(
@@ -518,10 +495,10 @@ export class Commands {
 			console.error("Not all the data ddos are available.");
 			return;
 		}
-		let providerURI = this.macOsProviderUrl || this.providerUrl
+		let providerURI = this.providerUrl
 		if(ddos.length > 0) {
-			providerURI = this.macOsProviderUrl && ddos[0].chainId === 8996
-			? this.macOsProviderUrl
+			providerURI = this.providerUrl && ddos[0].chainId === 8996
+			? this.providerUrl
 			: ddos[0].services[0].serviceEndpoint;
 		}
 			
@@ -533,9 +510,7 @@ export class Commands {
 			return;
 		}
 
-		const computeEnvs = await ProviderInstance.getComputeEnvironments(
-			this.macOsProviderUrl || this.providerUrl
-		);
+		const computeEnvs = await ProviderInstance.getComputeEnvironments(this.providerUrl);
 
 		if(!computeEnvs || computeEnvs.length  < 1) {
 			console.error(
@@ -658,8 +633,8 @@ export class Commands {
 		}
 
 		const providerURI =
-			this.macOsProviderUrl && dataDdo.chainId === 8996
-				? this.macOsProviderUrl
+			this.providerUrl && dataDdo.chainId === 8996
+				? this.providerUrl
 				: dataDdo.services[0].serviceEndpoint;
 
 		const jobStatus = await ProviderInstance.computeStop(
@@ -674,9 +649,7 @@ export class Commands {
 	}
 
 	public async getComputeEnvironments() {
-		const computeEnvs = await ProviderInstance.getComputeEnvironments(
-			this.macOsProviderUrl || this.providerUrl
-		);
+		const computeEnvs = await ProviderInstance.getComputeEnvironments(this.providerUrl);
 
 		if(!computeEnvs || computeEnvs.length  < 1) {
 			console.error(
@@ -689,10 +662,7 @@ export class Commands {
 
 	public async computeStreamableLogs(args: string[]) {
 		const jobId = args[0]
-		const logsResponse = await ProviderInstance.computeStreamableLogs(
-			this.macOsProviderUrl || this.providerUrl,
-			this.signer,
-			jobId,
+		const logsResponse = await ProviderInstance.computeStreamableLogs(this.providerUrl,this.signer,jobId,
 		);
 		console.log('response: ' , logsResponse)
 
@@ -775,7 +745,6 @@ export class Commands {
 				asset,
 				this.providerUrl,
 				this.aquarius,
-				this.macOsProviderUrl,
 				encryptDDO
 			);
 			console.log("Successfully updated asset metadata: " + txid);
@@ -839,7 +808,6 @@ export class Commands {
 			asset,
 			this.providerUrl,
 			this.aquarius,
-			this.macOsProviderUrl,
 			encryptDDO
 		);
 		console.log("Asset updated " + txid);
@@ -864,8 +832,8 @@ export class Commands {
 			agreementId = args[3];
 		}
 		const providerURI =
-			this.macOsProviderUrl && dataDdo.chainId === 8996
-				? this.macOsProviderUrl
+			this.providerUrl && dataDdo.chainId === 8996
+				? this.providerUrl
 				: dataDdo.services[0].serviceEndpoint;
 
 		const jobStatus = (await ProviderInstance.computeStatus(

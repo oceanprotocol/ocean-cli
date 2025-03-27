@@ -13,6 +13,11 @@ async function initializeSigner() {
     process.exit(1);
   }
 
+  if (!process.env.NODE_URL) {
+    console.error(chalk.red("Have you forgot to set env NODE_URL?"));
+    process.exit(1);
+  }
+
   const provider = new ethers.providers.JsonRpcProvider(process.env.RPC);
   let signer;
   

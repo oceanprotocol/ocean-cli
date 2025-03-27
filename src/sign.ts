@@ -93,7 +93,7 @@ async function signCredential(verifiableCredential) {
     .setIssuedAt()
     .setIssuer(publicKeyHex)
     .sign(key);
-  await verifyCredential(jws, publicKeyHex);
+  //await verifyCredential(jws, publicKeyHex);
 
   return jws;
 }

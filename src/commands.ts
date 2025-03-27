@@ -33,26 +33,23 @@ export class Commands {
 	public signer: Signer;
 	public config: Config;
 	public aquarius: Aquarius;
-	public providerUrl: string;
+	public oceanNodeUrl: string;
 	// optional settings for indexing wait time
 	private indexingParams: IndexerWaitParams;
 
 	constructor(signer: Signer, network: string | number, config?: Config) {
 		this.signer = signer;
 		this.config = config || new ConfigHelper().getConfig(network);
-		this.providerUrl = process.env.NODE_URL;
+		this.oceanNodeUrl = process.env.NODE_URL;
 		this.indexingParams = getIndexingWaitSettings();
-
-		console.log("Using Provider :", this.providerUrl);
-		this.config.metadataCacheUri = this.providerUrl;
-		
+		console.log("Using Ocean Node URL :", this.oceanNodeUrl);
+		this.config.metadataCacheUri = this.oceanNodeUrl;
 		this.aquarius = new Aquarius(this.config.metadataCacheUri);
-		console.log("Using Aquarius :", this.config.metadataCacheUri);
 	}
 
 	public async start() {
 		console.log('Starting the interactive CLI flow...\n\n');
-		const data = await interactiveFlow(this.providerUrl); // Collect data via CLI
+		const data = await interactiveFlow(this.oceanNodeUrl); // Collect data via CLI
 		await publishAsset(data, this.signer, this.config); // Publish asset with collected data
 	  }
 
@@ -83,7 +80,7 @@ export class Commands {
 				this.signer,
 				asset.services[0].files,
 				asset,
-				this.providerUrl,
+				this.oceanNodeUrl,
 				this.config,
 				this.aquarius,
 				encryptDDO
@@ -114,7 +111,7 @@ export class Commands {
 					this.signer,
 					algoAsset.services[0].files,
 					algoAsset,
-					this.providerUrl,
+					this.oceanNodeUrl,
 					this.config,
 					this.aquarius,
 					encryptDDO
@@ -156,7 +153,7 @@ export class Commands {
 		const updateAssetTx = await updateAssetMetadata(
 			this.signer,
 			asset,
-			this.providerUrl,
+			this.oceanNodeUrl,
 			this.aquarius,
 			encryptDDO
 		);
@@ -185,8 +182,8 @@ export class Commands {
 		}
 
 		const providerURI =
-			this.providerUrl && dataDdo.chainId === 8996
-				? this.providerUrl
+			this.oceanNodeUrl && dataDdo.chainId === 8996
+				? this.oceanNodeUrl
 				: dataDdo.services[0].serviceEndpoint;
 		console.log("Downloading asset using provider: ", providerURI);
 		const datatoken = new Datatoken(this.signer, this.config.chainId, this.config);
@@ -262,10 +259,10 @@ export class Commands {
 			console.error("Not all the data ddos are available.");
 			return;
 		}
-		let providerURI = this.providerUrl
+		let providerURI = this.oceanNodeUrl
 		if(ddos.length > 0) {
-			providerURI = this.providerUrl && ddos[0].chainId === 8996
-			? this.providerUrl
+			providerURI = this.oceanNodeUrl && ddos[0].chainId === 8996
+			? this.oceanNodeUrl
 			: ddos[0].services[0].serviceEndpoint;
 		}
 			
@@ -278,7 +275,7 @@ export class Commands {
 			return;
 		}
 
-		const computeEnvs = await ProviderInstance.getComputeEnvironments(this.providerUrl);
+		const computeEnvs = await ProviderInstance.getComputeEnvironments(this.oceanNodeUrl);
 
 		if(!computeEnvs || computeEnvs.length  < 1) {
 			console.error(
@@ -495,10 +492,10 @@ export class Commands {
 			console.error("Not all the data ddos are available.");
 			return;
 		}
-		let providerURI = this.providerUrl
+		let providerURI = this.oceanNodeUrl
 		if(ddos.length > 0) {
-			providerURI = this.providerUrl && ddos[0].chainId === 8996
-			? this.providerUrl
+			providerURI = this.oceanNodeUrl && ddos[0].chainId === 8996
+			? this.oceanNodeUrl
 			: ddos[0].services[0].serviceEndpoint;
 		}
 			
@@ -510,7 +507,7 @@ export class Commands {
 			return;
 		}
 
-		const computeEnvs = await ProviderInstance.getComputeEnvironments(this.providerUrl);
+		const computeEnvs = await ProviderInstance.getComputeEnvironments(this.oceanNodeUrl);
 
 		if(!computeEnvs || computeEnvs.length  < 1) {
 			console.error(
@@ -633,8 +630,8 @@ export class Commands {
 		}
 
 		const providerURI =
-			this.providerUrl && dataDdo.chainId === 8996
-				? this.providerUrl
+			this.oceanNodeUrl && dataDdo.chainId === 8996
+				? this.oceanNodeUrl
 				: dataDdo.services[0].serviceEndpoint;
 
 		const jobStatus = await ProviderInstance.computeStop(
@@ -649,7 +646,7 @@ export class Commands {
 	}
 
 	public async getComputeEnvironments() {
-		const computeEnvs = await ProviderInstance.getComputeEnvironments(this.providerUrl);
+		const computeEnvs = await ProviderInstance.getComputeEnvironments(this.oceanNodeUrl);
 
 		if(!computeEnvs || computeEnvs.length  < 1) {
 			console.error(
@@ -662,7 +659,7 @@ export class Commands {
 
 	public async computeStreamableLogs(args: string[]) {
 		const jobId = args[0]
-		const logsResponse = await ProviderInstance.computeStreamableLogs(this.providerUrl,this.signer,jobId,
+		const logsResponse = await ProviderInstance.computeStreamableLogs(this.oceanNodeUrl,this.signer,jobId,
 		);
 		console.log('response: ' , logsResponse)
 
@@ -743,7 +740,7 @@ export class Commands {
 			const txid = await updateAssetMetadata(
 				this.signer,
 				asset,
-				this.providerUrl,
+				this.oceanNodeUrl,
 				this.aquarius,
 				encryptDDO
 			);
@@ -806,7 +803,7 @@ export class Commands {
 		const txid = await updateAssetMetadata(
 			this.signer,
 			asset,
-			this.providerUrl,
+			this.oceanNodeUrl,
 			this.aquarius,
 			encryptDDO
 		);
@@ -832,8 +829,8 @@ export class Commands {
 			agreementId = args[3];
 		}
 		const providerURI =
-			this.providerUrl && dataDdo.chainId === 8996
-				? this.providerUrl
+			this.oceanNodeUrl && dataDdo.chainId === 8996
+				? this.oceanNodeUrl
 				: dataDdo.services[0].serviceEndpoint;
 
 		const jobStatus = (await ProviderInstance.computeStatus(
@@ -848,7 +845,7 @@ export class Commands {
 	public async downloadJobResults(args: string[]) {
 	
 		const jobResult = await ProviderInstance.getComputeResultUrl(
-			this.providerUrl,
+			this.oceanNodeUrl,
 			this.signer,
 			args[1],
 			parseInt(args[2])

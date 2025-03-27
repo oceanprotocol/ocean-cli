@@ -16,8 +16,7 @@ describe("Ocean CLI Interactive Publishing", function() {
     it("should publish an asset using 'npm run cli start' interactive flow", function(done) {
         process.env.PRIVATE_KEY = "0x1d751ded5a32226054cd2e71261039b65afb9ee1c746d055dd699b1150a5befc";
         process.env.RPC = "http://127.0.0.1:8545";
-        process.env.AQUARIUS_URL = "http://127.0.0.1:8001";
-        process.env.PROVIDER_URL = "http://127.0.0.1:8001";
+        process.env.NODE_URL = "http://127.0.0.1:8001";
         process.env.ADDRESS_FILE = path.join(process.env.HOME || "", ".ocean/ocean-contracts/artifacts/address.json");
 
         const child = exec(`npm run cli start`, { cwd: projectRoot });

@@ -111,7 +111,7 @@ export async function createAssetUtil(
 	owner: Signer,
 	assetUrl: any,
 	ddo: any,
-	providerUrl: string,
+	oceanNodeUrl: string,
 	config: Config,
 	aquariusInstance: Aquarius,
 	encryptDDO: boolean = true,
@@ -120,7 +120,6 @@ export async function createAssetUtil(
 	accessListFactory?: string,
 	allowAccessList?: string,
 	denyAccessList?: string,
-	macOsProviderUrl?: string,
 	
 ) {
 	const isAddress = typeof templateIDorAddress === 'string'
@@ -144,9 +143,9 @@ export async function createAssetUtil(
 			await owner.getAddress(),
 			[await owner.getAddress(), ZERO_ADDRESS]
 		)
-		return await createAsset(name, symbol, signer, assetUrl, templateIDorAddress, ddo, encryptDDO, providerUrl || macOsProviderUrl, providerFeeToken, aquariusInstance, accessListFactory, allowAccessList, denyAccessList);
+		return await createAsset(name, symbol, signer, assetUrl, templateIDorAddress, ddo, encryptDDO, oceanNodeUrl, providerFeeToken, aquariusInstance, accessListFactory, allowAccessList, denyAccessList);
 	}
-	return await createAsset(name, symbol, signer, assetUrl, templateIDorAddress, ddo, encryptDDO, providerUrl || macOsProviderUrl, providerFeeToken, aquariusInstance);
+	return await createAsset(name, symbol, signer, assetUrl, templateIDorAddress, ddo, encryptDDO, oceanNodeUrl, providerFeeToken, aquariusInstance);
 }
 
 
@@ -154,20 +153,19 @@ export async function createAssetUtil(
 export async function updateAssetMetadata(
 	owner: Signer,
 	updatedDdo: DDO,
-	providerUrl: string,
+	oceanNodeUrl: string,
 	aquariusInstance: Aquarius,
-	macOsProviderUrl?: string,
 	encryptDDO: boolean = true
 ): Promise<any> {
 	const nft = new Nft(owner, (await owner.provider.getNetwork()).chainId);
 	let flags;
 	let metadata;
-	const validateResult = await aquariusInstance.validate(updatedDdo, owner, providerUrl || macOsProviderUrl);
+	const validateResult = await aquariusInstance.validate(updatedDdo, owner, oceanNodeUrl);
 	if (encryptDDO) {
 		const providerResponse = await ProviderInstance.encrypt(
 			updatedDdo,
 			updatedDdo.chainId,
-			macOsProviderUrl || providerUrl
+			oceanNodeUrl
 		);
 		metadata = await providerResponse;
 		flags = 2
@@ -183,7 +181,7 @@ export async function updateAssetMetadata(
 		updatedDdo.nftAddress,
 		await owner.getAddress(),
 		0,
-		providerUrl,
+		oceanNodeUrl,
 		"",
 		ethers.utils.hexlify(flags),
 		metadata,
@@ -201,7 +199,7 @@ export async function handleComputeOrder(
 	datatoken: Datatoken,
 	config: Config,
 	providerFees: ProviderFees,
-	providerUrl: string,
+	oceanNodeUrl: string,
 	consumeMarkerFee?: ConsumeMarketFee
 ) {
 	/* We do have 3 possible situations:
@@ -240,7 +238,7 @@ export async function handleComputeOrder(
 		payerAccount,
 		config,
 		datatoken,
-		providerUrl,
+		oceanNodeUrl,
 		consumerAddress,
 		consumeMarkerFee,
 		providerFees
@@ -324,12 +322,7 @@ export function isPrivateIP(ip): boolean {
  }
 
  export async function getMetadataURI() {
-	let metadataURI
-	if (!process.env.AQUARIUS_URL || (process.env.AQUARIUS_URL && process.env.NODE_URL)) {
-		metadataURI = process.env.NODE_URL
-	} else {
-		metadataURI = process.env.AQUARIUS_URL
-	}
+	const metadataURI = process.env.NODE_URL
 	const parsed = new URL(metadataURI);
 	let ip = metadataURI // by default
 	// has port number?

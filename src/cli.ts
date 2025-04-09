@@ -4,15 +4,7 @@ import { ethers } from 'ethers';
 import chalk from 'chalk';
 
 async function initializeSigner() {
-  if (!process.env.MNEMONIC && !process.env.PRIVATE_KEY) {
-    console.error(chalk.red("Have you forgot to set MNEMONIC or PRIVATE_KEY?"));
-    process.exit(1);
-  }
-  if (!process.env.RPC) {
-    console.error(chalk.red("Have you forgot to set env RPC?"));
-    process.exit(1);
-  }
-
+  
   const provider = new ethers.providers.JsonRpcProvider(process.env.RPC);
   let signer;
   
@@ -28,6 +20,21 @@ async function initializeSigner() {
 }
 
 export async function createCLI() {
+
+  if (!process.env.MNEMONIC && !process.env.PRIVATE_KEY) {
+    console.error(chalk.red("Have you forgot to set MNEMONIC or PRIVATE_KEY?"));
+    process.exit(1);
+  }
+  if (!process.env.RPC) {
+    console.error(chalk.red("Have you forgot to set env RPC?"));
+    process.exit(1);
+  }
+
+  if (!process.env.NODE_URL) {
+    console.error(chalk.red("Have you forgot to set env NODE_URL?"));
+    process.exit(1);
+  }
+  
   const program = new Command();
 
   program

@@ -134,4 +134,41 @@ describe("Ocean CLI Free Compute Flow", function () {
 		expect(output.toLowerCase()).to.match(/status/);
 		console.log(`Job status retrieved for jobId: ${jobId}`);
 	});
+
+	const waitForJobCompletion = async (
+		datasetDid,
+		jobId,
+		maxWaitMs = 120000,
+		pollIntervalMs = 5000
+	) => {
+		const start = Date.now();
+		while (Date.now() - start < maxWaitMs) {
+			const output = await runCommand(
+				`npm run cli getJobStatus --dataset ${datasetDid} --job ${jobId}`
+			);
+			console.log(`Job status cmd output : ${output}`);
+			if (/status:\s*Job finished/i.test(output)) {
+				return;
+			}
+			await new Promise((res) => setTimeout(res, pollIntervalMs));
+		}
+		throw new Error(
+			`Job ${jobId} did not finish within ${maxWaitMs / 1000} seconds`
+		);
+	};
+
+	it("should download compute job results", async () => {
+		await waitForJobCompletion(computeDatasetDid, jobId, 180000, 7000);
+
+		const destFolder = path.join(projectRoot, "test-results", jobId);
+		fs.mkdirSync(destFolder, { recursive: true });
+
+		const output = await runCommand(
+			`npm run cli downloadJobResults ${jobId} 0 ${destFolder}`
+		);
+
+		console.log(`Download job results cmd output: ${output}`);
+
+		expect(output.toLowerCase()).to.match(/download(ed)?/);
+	});
 });

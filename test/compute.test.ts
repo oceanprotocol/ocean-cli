@@ -147,9 +147,35 @@ describe("Ocean CLI Free Compute Flow", function () {
 				`npm run cli getJobStatus --dataset ${datasetDid} --job ${jobId}`
 			);
 			console.log(`Job status cmd output : ${output}`);
-			if (/status:\s*Job finished/i.test(output)) {
-				return;
+
+			const jsonMatch = output.match(/\[\s*{[\s\S]*}\s*\]/);
+			if (!jsonMatch) {
+				console.warn("Could not find JSON array in output, will retry...");
+				await new Promise((res) => setTimeout(res, pollIntervalMs));
+				continue;
 			}
+
+			let jobs;
+			try {
+				jobs = JSON.parse(jsonMatch[0]);
+			} catch (e) {
+				console.warn("Failed to parse job status JSON, will retry...");
+				await new Promise((res) => setTimeout(res, pollIntervalMs));
+				continue;
+			}
+
+			if (Array.isArray(jobs) && jobs.length > 0) {
+				const job = jobs[0];
+				if (
+					(typeof job.statusText === "string" &&
+						job.statusText.toLowerCase().includes("finished")) ||
+					job.status === 70
+				) {
+					console.log("Job is finished!");
+					return job;
+				}
+			}
+
 			await new Promise((res) => setTimeout(res, pollIntervalMs));
 		}
 		throw new Error(
@@ -158,17 +184,26 @@ describe("Ocean CLI Free Compute Flow", function () {
 	};
 
 	it("should download compute job results", async () => {
-		await waitForJobCompletion(computeDatasetDid, jobId, 180000, 7000);
+		// Wait for job to finish and get job details
+		const job = await waitForJobCompletion(
+			computeDatasetDid,
+			jobId,
+			180000,
+			7000
+		);
+		console.log("Job details:", job);
 
 		const destFolder = path.join(projectRoot, "test-results", jobId);
 		fs.mkdirSync(destFolder, { recursive: true });
 
 		const output = await runCommand(
-			`npm run cli downloadJobResults ${jobId} 0 ${destFolder}`
+			`npm run cli downloadJobResults ${jobId} 1 ${destFolder}`
 		);
 
-		console.log(`Download job results cmd output: ${output}`);
-
 		expect(output.toLowerCase()).to.match(/download(ed)?/);
+
+		// const files = fs.readdirSync(destFolder);
+		// expect(files.length).to.be.greaterThan(0, "No result files downloaded");
+		// console.log(`Downloaded results to: ${destFolder}`);
 	});
 });

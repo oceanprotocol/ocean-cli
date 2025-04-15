@@ -157,7 +157,11 @@ describe("Ocean CLI Free Compute Flow", function () {
 
 			let jobs;
 			try {
-				jobs = JSON.parse(jsonMatch[0]);
+				const jsonStr = jsonMatch[0]
+					.replace(/([{,]\s*)'([^']+?)'\s*:/g, '$1"$2":')
+					.replace(/:\s*'([^']*?)'/g, ': "$1"');
+
+				jobs = JSON.parse(jsonStr);
 			} catch (e) {
 				console.warn("Failed to parse job status JSON, will retry...");
 				await new Promise((res) => setTimeout(res, pollIntervalMs));
@@ -182,9 +186,7 @@ describe("Ocean CLI Free Compute Flow", function () {
 			`Job ${jobId} did not finish within ${maxWaitMs / 1000} seconds`
 		);
 	};
-
 	it("should download compute job results", async () => {
-		// Wait for job to finish and get job details
 		const job = await waitForJobCompletion(
 			computeDatasetDid,
 			jobId,

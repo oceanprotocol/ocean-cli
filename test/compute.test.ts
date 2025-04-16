@@ -161,7 +161,15 @@ describe("Ocean CLI Free Compute Flow", function () {
 					continue;
 				}
 
-				const jsonStr = jsonMatch[0];
+				const jsonStr = jsonMatch[0].trim();
+				console.log("🕵️ Extracted JSON string before parsing:\n", jsonStr);
+
+				if (!jsonStr.startsWith("[")) {
+					console.warn(`❌ Extracted string is not a JSON array: ${jsonStr}`);
+					await new Promise((res) => setTimeout(res, pollIntervalMs));
+					continue;
+				}
+
 				jobs = JSON.parse(jsonStr);
 				console.log("✅ Parsed job status JSON:", jobs);
 			} catch (e) {

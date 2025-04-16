@@ -3,6 +3,7 @@ import { exec } from "child_process";
 import path from "path";
 import fs from "fs";
 import util from "util";
+import stripAnsi from "strip-ansi";
 
 import { dirname } from "path";
 import { fileURLToPath } from "url";
@@ -147,38 +148,36 @@ describe("Ocean CLI Free Compute Flow", function () {
 			const output = await runCommand(
 				`npm run cli getJobStatus --dataset ${datasetDid} --job ${jobId}`
 			);
-			console.log(`Job status cmd output : ${output}`);
+			const cleanOutput = stripAnsi(output);
+			const jsonMatch = cleanOutput.match(/\[[\s\S]*\]/);
 
-			const arrayMatch = output.match(/\[[\s\S]*\]/);
-			if (!arrayMatch) {
-				console.warn("Could not find array in output, will retry...");
+			if (!jsonMatch || !jsonMatch[0]) {
+				console.warn("❌ Could not locate JSON in output, retrying...");
 				await new Promise((res) => setTimeout(res, pollIntervalMs));
 				continue;
 			}
-			console.log("Found array in output:", arrayMatch[0]);
-			let jobs;
+
+			let jsonStr = jsonMatch[0].trim();
+			console.log("🕵️ Cleaned JSON string:\n", jsonStr);
+
 			try {
-				let jsonStr = arrayMatch[0];
-				jsonStr = jsonStr.replace(/([{,\[]\s*)([a-zA-Z0-9_]+)\s*:/g, '$1"$2":');
-				jsonStr = jsonStr.replace(/'([^']*?)'/g, '"$1"');
-				jobs = JSON.parse(jsonStr);
-				console.log("Parsed job status JSON:", jobs);
+				jsonStr = jsonStr
+					.replace(/([{,]\s*)'([^']+?)'\s*:/g, '$1"$2":') // fix 'key':
+					.replace(/:\s*'([^']*?)'/g, ': "$1"') // fix : 'value'
+					.replace(/'/g, '"'); // fallback for single quotes
+
+				const jobs = JSON.parse(jsonStr);
+				console.log("✅ Parsed job status JSON:", jobs);
+
+				if (Array.isArray(jobs) && jobs.length > 0 && jobs[0].status === 70) {
+					console.log("🎉 Job is finished!");
+					return jobs[0];
+				}
 			} catch (e) {
-				console.error("Failed to parse job status JSON, will retry...", e);
+				console.error("❌ Failed to parse job status JSON, will retry...", e);
 				await new Promise((res) => setTimeout(res, pollIntervalMs));
 				continue;
 			}
-
-			if (Array.isArray(jobs) && jobs.length > 0) {
-				const job = jobs[0];
-				if (job.status === 70) {
-					console.log("Job is finished!");
-					return job;
-				}
-			} else {
-				console.warn("No jobs found in the output, will retry...");
-			}
-
 			await new Promise((res) => setTimeout(res, pollIntervalMs));
 		}
 		throw new Error(

@@ -143,45 +143,51 @@ describe("Ocean CLI Free Compute Flow", function () {
 		pollIntervalMs = 5000
 	) => {
 		const start = Date.now();
+
 		while (Date.now() - start < maxWaitMs) {
 			const output = await runCommand(
 				`npm run cli getJobStatus --dataset ${datasetDid} --job ${jobId}`
 			);
-			console.log(`Job status cmd output :\n${output}`);
+			console.log(`Job status cmd output:\n${output}`);
+
 			let jobs;
+
 			try {
-				const jsonStart = output.indexOf("[{");
-				const jsonEnd = output.lastIndexOf("}]");
-				if (jsonStart === -1 || jsonEnd === -1) {
-					console.warn("Could not locate JSON in output, retrying...");
+				const jsonMatch = output.match(/\[\s*{[\s\S]*?}\s*\]/);
+
+				if (!jsonMatch || !jsonMatch[0]) {
+					console.warn("❌ Could not locate JSON in output, retrying...");
 					await new Promise((res) => setTimeout(res, pollIntervalMs));
 					continue;
 				}
-				const jsonStr = output.slice(jsonStart, jsonEnd + 2);
+
+				const jsonStr = jsonMatch[0];
 				jobs = JSON.parse(jsonStr);
-				console.log("Parsed job status JSON:", jobs);
+				console.log("✅ Parsed job status JSON:", jobs);
 			} catch (e) {
-				console.error("Failed to parse job status JSON, retrying...", e);
+				console.error("❌ Failed to parse job status JSON, retrying...", e);
 				await new Promise((res) => setTimeout(res, pollIntervalMs));
 				continue;
 			}
 
 			if (Array.isArray(jobs) && jobs.length > 0) {
 				const job = jobs[0];
-				console.log("jobs[0]:", job);
+				console.log("🧪 jobs[0]:", job);
 				if (job.status === 70) {
 					console.log("✅ Job is finished!");
 					return job;
 				} else {
-					console.log(`Job status: ${job.status}, waiting...`);
+					console.log(`⏳ Job not finished yet. Status: ${job.status}`);
 				}
 			} else {
-				console.warn("No jobs found in the output, will retry...");
+				console.warn("⚠️ No jobs found in the output, will retry...");
 			}
+
 			await new Promise((res) => setTimeout(res, pollIntervalMs));
 		}
+
 		throw new Error(
-			`Job ${jobId} did not finish within ${maxWaitMs / 1000} seconds`
+			`❌ Job ${jobId} did not finish within ${maxWaitMs / 1000} seconds`
 		);
 	};
 

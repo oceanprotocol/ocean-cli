@@ -137,8 +137,8 @@ describe("Ocean CLI Free Compute Flow", function () {
 	});
 
 	const waitForJobCompletion = async (
-		datasetDid,
-		jobId,
+		datasetDid: string,
+		jobId: string,
 		maxWaitMs = 120000,
 		pollIntervalMs = 5000
 	) => {
@@ -147,40 +147,37 @@ describe("Ocean CLI Free Compute Flow", function () {
 			const output = await runCommand(
 				`npm run cli getJobStatus --dataset ${datasetDid} --job ${jobId}`
 			);
-			console.log(`Job status cmd output : ${output}`);
-
-			const jsonMatch = output.match(/\[\s*{[\s\S]*}\s*\]/);
-			if (!jsonMatch) {
-				console.warn("Could not find JSON array in output, will retry...");
-				await new Promise((res) => setTimeout(res, pollIntervalMs));
-				continue;
-			}
-
+			console.log(`Job status cmd output :\n${output}`);
 			let jobs;
 			try {
-				const jsonStr = jsonMatch[0]
-					.replace(/([{,]\s*)'([^']+?)'\s*:/g, '$1"$2":')
-					.replace(/:\s*'([^']*?)'/g, ': "$1"');
-
+				const jsonStart = output.indexOf("[{");
+				const jsonEnd = output.lastIndexOf("}]");
+				if (jsonStart === -1 || jsonEnd === -1) {
+					console.warn("Could not locate JSON in output, retrying...");
+					await new Promise((res) => setTimeout(res, pollIntervalMs));
+					continue;
+				}
+				const jsonStr = output.slice(jsonStart, jsonEnd + 2);
 				jobs = JSON.parse(jsonStr);
 				console.log("Parsed job status JSON:", jobs);
 			} catch (e) {
-				console.warn("Failed to parse job status JSON, will retry...");
+				console.error("Failed to parse job status JSON, retrying...", e);
 				await new Promise((res) => setTimeout(res, pollIntervalMs));
 				continue;
 			}
 
 			if (Array.isArray(jobs) && jobs.length > 0) {
 				const job = jobs[0];
-				console.log("jobs[0] :", jobs[0]);
+				console.log("jobs[0]:", job);
 				if (job.status === 70) {
-					console.log("Job is finished!");
+					console.log("✅ Job is finished!");
 					return job;
+				} else {
+					console.log(`Job status: ${job.status}, waiting...`);
 				}
 			} else {
 				console.warn("No jobs found in the output, will retry...");
 			}
-
 			await new Promise((res) => setTimeout(res, pollIntervalMs));
 		}
 		throw new Error(

@@ -125,7 +125,7 @@ jobs:
         run: |
           npm ci
           npm run build
-          npm run start &
+           npm run start > ocean-node.log 2>&1 &
         env:
           PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
           IPFS_GATEWAY: http://172.15.0.16:8080/
@@ -161,3 +161,9 @@ jobs:
           INDEXING_MAX_RETRIES: 120
           NODE_URL: "http://127.0.0.1:8001"
           AVOID_LOOP_RUN: true
+
+      - name: Print Ocean Node Logs if tests fail
+        if: ${{ failure() }}
+        run: |
+          echo "========== Ocean Node Logs =========="
+          tac ${{ github.workspace }}/ocean-node/ocean-node.log || echo "Log file not found"

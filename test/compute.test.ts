@@ -137,8 +137,6 @@ describe("Ocean CLI Free Compute Flow", function () {
 		console.log(`Job status retrieved for jobId: ${jobId}`);
 	});
 
-	import stripAnsi from "strip-ansi";
-
 	const waitForJobCompletion = async (
 		datasetDid: string,
 		jobId: string,
@@ -147,7 +145,6 @@ describe("Ocean CLI Free Compute Flow", function () {
 	): Promise<any> => {
 		const start = Date.now();
 
-		// Helper to extract full JSON array
 		function extractFullJsonArray(output: string): string | null {
 			const startIndex = output.indexOf("[");
 			if (startIndex === -1) return null;

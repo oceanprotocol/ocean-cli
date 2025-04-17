@@ -137,50 +137,75 @@ describe("Ocean CLI Free Compute Flow", function () {
 		console.log(`Job status retrieved for jobId: ${jobId}`);
 	});
 
+	import stripAnsi from "strip-ansi";
+
 	const waitForJobCompletion = async (
-		datasetDid,
-		jobId,
+		datasetDid: string,
+		jobId: string,
 		maxWaitMs = 120000,
 		pollIntervalMs = 5000
-	) => {
+	): Promise<any> => {
 		const start = Date.now();
+
+		// Helper to extract full JSON array
+		function extractFullJsonArray(output: string): string | null {
+			const startIndex = output.indexOf("[");
+			if (startIndex === -1) return null;
+
+			let bracketCount = 0;
+			for (let i = startIndex; i < output.length; i++) {
+				if (output[i] === "[") bracketCount++;
+				if (output[i] === "]") bracketCount--;
+
+				if (bracketCount === 0) return output.slice(startIndex, i + 1);
+			}
+
+			return null;
+		}
+
 		while (Date.now() - start < maxWaitMs) {
 			const output = await runCommand(
 				`npm run cli getJobStatus --dataset ${datasetDid} --job ${jobId}`
 			);
+			console.log("[CMD]: getJobStatus");
+			console.log("[OUTPUT]:\n", output);
 
 			const cleanOutput = stripAnsi(output);
-			const jsonMatch = cleanOutput.match(/\[[\s\S]*?\}\s*\]/);
+			const jsonStr = extractFullJsonArray(cleanOutput);
 
-			if (!jsonMatch || !jsonMatch[0]) {
-				console.warn("❌ Could not locate JSON in output, retrying...");
+			if (!jsonStr) {
+				console.warn("❌ Could not locate full JSON in output, retrying...");
 				await new Promise((res) => setTimeout(res, pollIntervalMs));
 				continue;
 			}
 
-			const jsonStr = jsonMatch[0]
-				.trim()
-				.replace(/([{,]\s*)'([^']+?)'\s*:/g, '$1"$2":')
-				.replace(/:\s*'([^']*?)'/g, ': "$1"')
-				.replace(/'/g, '"');
-
-			console.log("🕵️ Cleaned JSON string:\n", jsonStr);
-
 			try {
-				const jobs = JSON.parse(jsonStr);
+				const cleanedJson = jsonStr
+					.replace(/([{,]\s*)'([^']+?)'\s*:/g, '$1"$2":')
+					.replace(/:\s*'([^']*?)'/g, ': "$1"')
+					.replace(/'/g, '"');
+
+				console.log("🕵️ Cleaned JSON string:\n", cleanedJson);
+
+				const jobs = JSON.parse(cleanedJson);
 				console.log("✅ Parsed job status JSON:", jobs);
 
-				if (Array.isArray(jobs) && jobs.length > 0 && jobs[0].status === 70) {
-					console.log("🎉 Job is finished!");
-					return jobs[0];
+				if (Array.isArray(jobs) && jobs.length > 0) {
+					const job = jobs[0];
+					if (job.status === 70) {
+						console.log("🎉 Job is finished!");
+						return job;
+					}
+				} else {
+					console.warn("⚠️ No jobs found in the parsed JSON, will retry...");
 				}
 			} catch (e) {
 				console.error("❌ Still failed to parse JSON, will retry...", e);
-				await new Promise((res) => setTimeout(res, pollIntervalMs));
-				continue;
 			}
+
 			await new Promise((res) => setTimeout(res, pollIntervalMs));
 		}
+
 		throw new Error(
 			`Job ${jobId} did not finish within ${maxWaitMs / 1000} seconds`
 		);

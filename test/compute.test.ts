@@ -148,8 +148,9 @@ describe("Ocean CLI Free Compute Flow", function () {
 			const output = await runCommand(
 				`npm run cli getJobStatus --dataset ${datasetDid} --job ${jobId}`
 			);
+
 			const cleanOutput = stripAnsi(output);
-			const jsonMatch = cleanOutput.match(/\[[\s\S]*\]/);
+			const jsonMatch = cleanOutput.match(/\[[\s\S]*?\}\s*\]/);
 
 			if (!jsonMatch || !jsonMatch[0]) {
 				console.warn("❌ Could not locate JSON in output, retrying...");
@@ -157,15 +158,15 @@ describe("Ocean CLI Free Compute Flow", function () {
 				continue;
 			}
 
-			let jsonStr = jsonMatch[0].trim();
+			const jsonStr = jsonMatch[0]
+				.trim()
+				.replace(/([{,]\s*)'([^']+?)'\s*:/g, '$1"$2":')
+				.replace(/:\s*'([^']*?)'/g, ': "$1"')
+				.replace(/'/g, '"');
+
 			console.log("🕵️ Cleaned JSON string:\n", jsonStr);
 
 			try {
-				jsonStr = jsonStr
-					.replace(/([{,]\s*)'([^']+?)'\s*:/g, '$1"$2":') // fix 'key':
-					.replace(/:\s*'([^']*?)'/g, ': "$1"') // fix : 'value'
-					.replace(/'/g, '"'); // fallback for single quotes
-
 				const jobs = JSON.parse(jsonStr);
 				console.log("✅ Parsed job status JSON:", jobs);
 
@@ -174,7 +175,7 @@ describe("Ocean CLI Free Compute Flow", function () {
 					return jobs[0];
 				}
 			} catch (e) {
-				console.error("❌ Failed to parse job status JSON, will retry...", e);
+				console.error("❌ Still failed to parse JSON, will retry...", e);
 				await new Promise((res) => setTimeout(res, pollIntervalMs));
 				continue;
 			}

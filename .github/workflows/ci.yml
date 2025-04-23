@@ -85,7 +85,7 @@ jobs:
       - name: Run Barge (Ocean Node enabled)
         working-directory: ${{ github.workspace }}/barge
         run: |
-          bash -x start_ocean.sh --with-node --no-aquarius --no-provider --no-dashboard --with-typesense 2>&1 > start_ocean.log &
+          bash -x start_ocean.sh --no-aquarius --no-provider --no-dashboard --with-typesense 2>&1 > start_ocean.log &
 
       - run: npm ci
       - run: npm run build
@@ -103,19 +103,71 @@ jobs:
           docker image rm -f moby/buildkit:latest
           rm -rf /usr/share/swift/
 
-      - name: Wait for contracts deployment, C2D cluster, and Ocean Node to be ready
+      - name: Wait for services with detailed logging
         working-directory: ${{ github.workspace }}/barge
         run: |
-          for i in $(seq 1 250); do
+          # Start log tail in background
+          tail -f start_ocean.log &
+          TAIL_PID=$!
+
+          # Wait for services with status reporting
+          for i in {1..50}; do
+            echo "=== Check attempt $i/50 ==="
+            
+            # Check contract deployment
+            CONTRACTS_READY=$([ -f "$HOME/.ocean/ocean-contracts/artifacts/ready" ] && echo "yes" || echo "no")
+            
+            # Check Node container status
+            NODE_CONTAINER=$(docker ps -q --filter "name=ocean_node")
+            NODE_RUNNING=$([ -n "$NODE_CONTAINER" ] && echo "yes" || echo "no")
+            
+            # Check Node health endpoint
+            NODE_HEALTH=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8001/health || true)
+            
+            echo "Contracts ready: $CONTRACTS_READY"
+            echo "Node container running: $NODE_RUNNING"
+            echo "Node health status: $NODE_HEALTH"
+            
+            # If container exists but isn't healthy, show logs immediately
+            if [ "$NODE_RUNNING" = "yes" ] && [ "$NODE_HEALTH" != "200" ]; then
+              echo "Node container found but unhealthy. Current logs:"
+              docker logs ocean_node_1 --tail 50 || true
+              exit 1
+            fi
+
+            # Exit condition
+            if [ "$CONTRACTS_READY" = "yes" ] && [ "$NODE_RUNNING" = "yes" ] && [ "$NODE_HEALTH" = "200" ]; then
+              echo "All services operational!"
+              kill $TAIL_PID
+              exit 0
+            fi
+            
             sleep 10
-            [ -f "$HOME/.ocean/ocean-contracts/artifacts/ready" ] && \
-            docker ps | grep -q ocean_node_1 && \
-            curl --output /dev/null --silent --head --fail "http://localhost:8001" && break
           done
 
-      - name: docker logs
-        run: docker logs ocean_ocean-contracts_1 && docker logs ocean_kindcluster_1 && docker logs ocean_computetodata_1 && docker logs ocean_typesense_1 && docker logs ocean_node_1
+          # Timeout handling
+          echo "!!! Service startup timed out !!!"
+          echo "=== Barge startup log ==="
+          cat start_ocean.log
+          echo "\n=== Node container logs ==="
+          docker logs ocean_node_1 --tail 1000 || echo "No node container found"
+          echo "\n=== Docker compose status ==="
+          docker compose -f docker-compose.yml ps
+          exit 1
+
+      - name: Capture failure logs
         if: ${{ failure() }}
+        run: |
+          echo "=== Full Docker Container List ==="
+          docker ps -a
+          echo "\n=== Barge Docker Compose Logs ==="
+          docker compose -f ${{ github.workspace }}/barge/docker-compose.yml logs --no-color --tail=1000
+          echo "\n=== Node Container Logs ==="
+          docker logs ocean_node_1 --tail 1000 2>&1 || echo "No node container logs available"
+          echo "\n=== Contracts Container Logs ==="
+          docker logs ocean_ocean-contracts_1 --tail 1000 2>&1 || echo "No contracts container logs available"
+          echo "\n=== C2D Container Logs ==="
+          docker logs ocean_computetodata_1 --tail 1000 2>&1 || echo "No C2D container logs available"
 
       - name: Run system tests
         run: npm run test:system

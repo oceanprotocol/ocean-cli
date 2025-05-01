@@ -253,6 +253,11 @@ export class Commands {
 	}
 
 	public async downloadSSI(args: string[]) {
+		if (args.length < 4) {
+			console.error("Not enough arguments, you need to pass did, serviceIndex, path");
+			return;
+		}
+		console.log("Resolving Asset with DID: " + args[1]);
 		const dataDdo = await this.aquarius.waitForIndexer(args[1], null, null, this.indexingParams.retryInterval, this.indexingParams.maxRetries);
 		if (!dataDdo) {
 			console.error(
@@ -273,7 +278,8 @@ export class Commands {
 		let downloadEnabled = false
 		let policyServer = null
 		try {
-			const result = await checkCredentials(dataDdo, this.providerUrl, this.waltIdWalletApi, this.signer)
+			const serviceIndex = Number(args[3])
+			const result = await checkCredentials(dataDdo, this.providerUrl, this.waltIdWalletApi, this.signer, serviceIndex)
 			downloadEnabled = result.downloadEnabled
 			policyServer = result.policyServer
 		} catch (error) {

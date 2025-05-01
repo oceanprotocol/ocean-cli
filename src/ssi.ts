@@ -8,12 +8,12 @@ function extractSessionId(url: string): string | null {
   return match ? decodeURIComponent(match[1]) : null;
 }
 
-export async function checkCredentials(ddo: any, providerUrl: string, waltIdWalletApi: string, signer: Signer): Promise<{ downloadEnabled: boolean; policyServer: PolicyServerDownalodAction }> {
+export async function checkCredentials(ddo: any, providerUrl: string, waltIdWalletApi: string, signer: Signer, serviceIndex: number): Promise<{ downloadEnabled: boolean; policyServer: PolicyServerDownalodAction }> {
   try {
-    const credentialPresentation = await requestCredentialPresentation(ddo, providerUrl);
+    const consumerAddress = await signer.getAddress();
+    const credentialPresentation = await requestCredentialPresentation(ddo, providerUrl, serviceIndex, consumerAddress);
     const sessionId = extractSessionId(credentialPresentation.openid4vc)
     const pd = await getPd(sessionId, providerUrl)
-    await checkSessionId(sessionId, providerUrl)
     const token = await getSSIToken(waltIdWalletApi, signer);
     const wallets = await getSSIWallets(token, waltIdWalletApi);
     const walletId = wallets[0].id;
@@ -99,7 +99,7 @@ export async function getSSIWalletKeys(
   }
 }
 
-export async function requestCredentialPresentation(ddo: any, providerUrl: string): Promise<{
+export async function requestCredentialPresentation(ddo: any, providerUrl: string, serviceIndex: number, consumer: string): Promise<{
   success: boolean
   openid4vc: string
   policyServerData: PolicyServerInitiateActionData
@@ -112,14 +112,14 @@ export async function requestCredentialPresentation(ddo: any, providerUrl: strin
     responseRedirectUri: ``,
     presentationDefinitionUri: ``
   }
-
   const action: PolicyServerInitiateAction = {
     action: SSI_ACTIONS.INITIATE,
     sessionId,
     ddo,
-    policyServer
+    policyServer,
+    serviceId: ddo.credentialSubject.services[serviceIndex].id,
+    consumerAddress: consumer,
   }
-
   try {
     const response = await axios.post(
       `${providerUrl}/api/services/PolicyServerPassthrough`,
@@ -204,7 +204,6 @@ export async function checkSessionId(sessionId: string, providerUrl: string): Pr
   const action: PolicyServerCheckSessionIdAction = {
     action: SSI_ACTIONS.CHECK_SESSION_ID,
     sessionId,
-    policyServer: {}
   }
   try {
     const response = await axios.post(

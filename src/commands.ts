@@ -254,7 +254,7 @@ export class Commands {
 
 	public async downloadSSI(args: string[]) {
 		if (args.length < 4) {
-			console.error("Not enough arguments, you need to pass did, serviceIndex, path");
+			console.error("Not enough arguments, you need to pass did, path, serviceIndex");
 			return;
 		}
 		console.log("Resolving Asset with DID: " + args[1]);

@@ -12,7 +12,25 @@ export async function checkCredentials(ddo: any, providerUrl: string, waltIdWall
   try {
     const consumerAddress = await signer.getAddress();
     const credentialPresentation = await requestCredentialPresentation(ddo, providerUrl, serviceIndex, consumerAddress);
-    const sessionId = extractSessionId(credentialPresentation.openid4vc)
+    if (!credentialPresentation.success) {
+      throw new Error('Error requesting credential presentation');
+    }
+    if (typeof credentialPresentation.openid4vc === 'object' && credentialPresentation.openid4vc.redirectUri) {
+      const sessionId = extractSessionId(credentialPresentation.openid4vc.redirectUri);
+
+      if (credentialPresentation.openid4vc.redirectUri.includes('success')) {
+        return {
+          downloadEnabled: true,
+          policyServer: { sessionId }
+        };
+      }
+      return {
+        downloadEnabled: false,
+        policyServer: { sessionId }
+      };
+    }
+
+    const sessionId = extractSessionId(credentialPresentation.openid4vc as string);
     const pd = await getPd(sessionId, providerUrl)
     const token = await getSSIToken(waltIdWalletApi, signer);
     const wallets = await getSSIWallets(token, waltIdWalletApi);
@@ -21,7 +39,7 @@ export async function checkCredentials(ddo: any, providerUrl: string, waltIdWall
     const filteredCredentials = filterCredentials(credentials, ConfigRules);
     const dids = await getDIDs(waltIdWalletApi, walletId, token);
     const selectedDid = dids[0];
-    const presentationRequest = credentialPresentation.openid4vc
+    const presentationRequest = credentialPresentation.openid4vc as string
     const consumer = selectedDid.did
     const selectedCredentials = filteredCredentials.map(cred => cred.parsedDocument.id);
 
@@ -101,9 +119,15 @@ export async function getSSIWalletKeys(
 
 export async function requestCredentialPresentation(ddo: any, providerUrl: string, serviceIndex: number, consumer: string): Promise<{
   success: boolean
-  openid4vc: string
+  openid4vc: string | {
+    redirectUri: string
+  }
   policyServerData: PolicyServerInitiateActionData
 }> {
+  const service = ddo.credentialSubject.services[serviceIndex]
+  if (!service) {
+    throw new Error(`Service with index ${serviceIndex} not found in DDO`)
+  }
   const sessionId = randomUUID()
 
   const policyServer: PolicyServerInitiateActionData = {

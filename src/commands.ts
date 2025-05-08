@@ -277,8 +277,9 @@ export class Commands {
 
 		let downloadEnabled = false
 		let policyServer = null
+		const serviceIndex = Number(args[3])
 		try {
-			const serviceIndex = Number(args[3])
+
 			const result = await checkCredentials(dataDdo, this.providerUrl, this.waltIdWalletApi, this.signer, serviceIndex)
 			downloadEnabled = result.downloadEnabled
 			policyServer = result.policyServer
@@ -304,7 +305,7 @@ export class Commands {
 			const orderTx = await tx.wait();
 			const urlDownloadUrl = await ProviderInstance.getDownloadUrl(
 				dataDdo.id,
-				services[0].id,
+				services[serviceIndex].id,
 				0,
 				orderTx.transactionHash,
 				providerURI,

@@ -42,6 +42,8 @@ export interface PolicyServerInitiateAction {
   sessionId?: string;
   ddo: any;
   policyServer: PolicyServerInitiateActionData;
+  serviceId: string
+  consumerAddress: string
 }
 
 export interface PolicyServerGetPdAction {
@@ -52,7 +54,7 @@ export interface PolicyServerGetPdAction {
 export interface PolicyServerCheckSessionIdAction {
   action: SSI_ACTIONS.CHECK_SESSION_ID;
   sessionId: string;
-  policyServer: any;
+  policyServer?: any;
 }
 
 export interface PolicyServerVerifyAction {
@@ -88,7 +90,7 @@ export const ConfigRules: ConfigRule[] = [
 ];
 
 
-export type PolicyServerResponse ={
+export type PolicyServerResponse = {
   success: boolean
   message: string
 }

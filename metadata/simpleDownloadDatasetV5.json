@@ -9,7 +9,7 @@
       "created": "2025-02-19T10:23:59Z",
       "updated": "2025-02-19T10:23:59Z",
       "type": "dataset",
-      "name": "The Digital Project Management Office (DigitalPMO)",
+      "name": "AssetForever",
       "description": {
         "@value": "fdsfsdfsdfsdfsdfsd",
         "@direction": "",
@@ -52,7 +52,6 @@
               "values": [
                 {
                   "vp_policies": ["signature", "expired"],
-                  "vc_policies": ["signature", "expired"],
                   "request_credentials": [
                     {
                       "type": "VerifiableId",
@@ -66,12 +65,13 @@
               "type": "address",
               "values": [
                 {
-                  "address": "0xe2DD09d719Da89e5a3D0F2549c7E24566e947260"
+                  "address": "*"
                 }
               ]
             }
           ]
         },
+        "state": 0,
         "files": {
           "datatokenAddress": "0x0",
           "nftAddress": "0x0",
@@ -92,10 +92,30 @@
     "credentials": {
       "allow": [
         {
+          "values": [
+            {
+              "request_credentials": [
+                {
+                  "format": "jwt_vc_json",
+                  "policies": [],
+                  "type": "UniversityDegree"
+                }
+              ],
+              "vc_policies": [
+                "signature",
+                "not-before",
+                "revoked-status-list"
+              ],
+              "vp_policies": []
+            }
+          ],
+          "type": "SSIpolicy"
+        },
+        {
           "type": "address",
           "values": [
             {
-              "address": "0xe2DD09d719Da89e5a3D0F2549c7E24566e947260"
+              "address": "*"
             }
           ]
         }
@@ -117,7 +137,9 @@
       "allocated": 0,
       "orders": 0,
       "price": {
-        "value": "0"
+        "value": 0,
+        "tokenSymbol": "OCEAN",
+        "tokenAddress": "0xBECd54f3977E8c2F36Cd927cE3A89A612EE34DeE"
       }
     }
   },

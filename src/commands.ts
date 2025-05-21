@@ -238,7 +238,7 @@ export class Commands {
 		}
 	}
 
-	public async computeStart(args: string[]) {
+	public async initializeCompute(args: string[]) {
 		const inputDatasetsString = args[1];
 		let inputDatasets = [];
 
@@ -318,10 +318,7 @@ export class Commands {
 			this.config
 		);
 
-		const mytime = new Date();
-		const computeMinutes = 5;
-		mytime.setMinutes(mytime.getMinutes() + computeMinutes);
-		const computeValidUntil = Math.floor(mytime.getTime() / 1000);
+		// TODO: check valid maxJobDuration
 
 		const computeEnvID = args[3];
 		// NO chainId needed anymore (is not part of ComputeEnvironment spec anymore)
@@ -369,16 +366,19 @@ export class Commands {
 				serviceId: ddos[dataDdo].services[0].id,
 			});
 		}
-
-		console.log("Starting compute job using provider: ", providerURI);
+		const maxJobDuration = Number(args[4])
+		const paymentToken = args[5]
+		const resources = args[6] // resources object should be stringified in cli when calling initializecompute
 		const providerInitializeComputeJob =
 			await ProviderInstance.initializeCompute(
 				assets,
 				algo,
 				computeEnv.id,
-				computeValidUntil,
+				paymentToken,
+				maxJobDuration,
 				providerURI,
-				this.signer // V1 was this.signer.getAddress()
+				this.signer, // V1 was this.signer.getAddress()
+				JSON.parse(resources)
 			);
 		if (
 			!providerInitializeComputeJob ||
@@ -435,6 +435,129 @@ export class Commands {
 				return;
 			}
 		}
+	}
+
+	public async computeStart(args: string[]) {
+		const inputDatasetsString = args[1];
+		let inputDatasets = [];
+
+		if (
+			inputDatasetsString.includes("[") &&
+			inputDatasetsString.includes("]")
+		) {
+			const processedInput = inputDatasetsString
+				.replaceAll("]", "")
+				.replaceAll("[", "");
+			if (processedInput.indexOf(",") > -1) {
+				inputDatasets = processedInput.split(",");
+			}
+		} else {
+			inputDatasets.push(inputDatasetsString);
+		}
+
+		const ddos = [];
+
+		for (const dataset in inputDatasets) {
+			const dataDdo = await this.aquarius.waitForIndexer(
+				inputDatasets[dataset],
+				null,
+				null,
+				this.indexingParams.retryInterval,
+				this.indexingParams.maxRetries
+			);
+			if (!dataDdo) {
+				console.error(
+					"Error fetching DDO " + dataset[1] + ".  Does this asset exists?"
+				);
+				return;
+			} else {
+				ddos.push(dataDdo);
+			}
+		}
+		if (
+			inputDatasets.length > 0 &&
+			(ddos.length <= 0 || ddos.length != inputDatasets.length)
+		) {
+			console.error("Not all the data ddos are available.");
+			return;
+		}
+		let providerURI = this.oceanNodeUrl;
+		if (ddos.length > 0) {
+			providerURI = ddos[0].services[0].serviceEndpoint;
+		}
+
+		const algoDdo = await this.aquarius.waitForIndexer(
+			args[2],
+			null,
+			null,
+			this.indexingParams.retryInterval,
+			this.indexingParams.maxRetries
+		);
+		if (!algoDdo) {
+			console.error(
+				"Error fetching DDO " + args[1] + ".  Does this asset exists?"
+			);
+			return;
+		}
+
+		const computeEnvs = await ProviderInstance.getComputeEnvironments(
+			this.oceanNodeUrl
+		);
+
+		if (!computeEnvs || computeEnvs.length < 1) {
+			console.error(
+				"Error fetching compute environments. No compute environments available."
+			);
+			return;
+		}
+
+		const computeEnvID = args[3];
+		// NO chainId needed anymore (is not part of ComputeEnvironment spec anymore)
+		// const chainComputeEnvs = computeEnvs[computeEnvID]; // was algoDdo.chainId
+		let computeEnv = null; // chainComputeEnvs[0];
+
+		if (computeEnvID && computeEnvID.length > 1) {
+			for (const index in computeEnvs) {
+				if (computeEnvID == computeEnvs[index].id) {
+					computeEnv = computeEnvs[index];
+					break;
+				}
+			}
+		}
+		if (!computeEnv || !computeEnvID) {
+			console.error(
+				"Error fetching compute environment. No compute environment matches id: ",
+				computeEnvID
+			);
+			return;
+		}
+
+		const algo: ComputeAlgorithm = {
+			documentId: algoDdo.id,
+			serviceId: algoDdo.services[0].id,
+			meta: algoDdo.metadata.algorithm,
+		};
+
+		const assets = [];
+		for (const dataDdo in ddos) {
+			const canStartCompute = isOrderable(
+				ddos[dataDdo],
+				ddos[dataDdo].services[0].id,
+				algo,
+				algoDdo
+			);
+			if (!canStartCompute) {
+				console.error(
+					"Error Cannot start compute job using the datasets DIDs & algorithm DID provided"
+				);
+				return;
+			}
+			assets.push({
+				documentId: ddos[dataDdo].id,
+				serviceId: ddos[dataDdo].services[0].id,
+			});
+		}
+		console.log("Starting compute job using provider: ", providerURI);
 
 		const additionalDatasets = assets.length > 1 ? assets.slice(1) : null;
 		if (assets.length > 0) {
@@ -462,15 +585,20 @@ export class Commands {
 		const output: ComputeOutput = {
 			metadataUri: await getMetadataURI(),
 		};
-
+		// TODO: check valid maxJobDuration
+		const maxJobDuration = Number(args[4])
+		const paymentToken = args[5]
+		const resources = args[6]
 		const computeJobs = await ProviderInstance.computeStart(
 			providerURI,
 			this.signer,
 			computeEnv.id,
 			assets, // assets[0] // only c2d v1,
 			algo,
-			null,
-			null,
+			maxJobDuration,
+			paymentToken,
+			JSON.parse(resources),
+			await this.signer.getChainId(),
 			// additionalDatasets, only c2d v1
 			output
 		);

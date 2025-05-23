@@ -3,9 +3,9 @@ import { Signer } from 'ethers';
 import {
   Config,
   Aquarius,
-  Asset
 } from '@oceanprotocol/lib';
 import { createAssetUtil, updateAssetMetadata } from './helpers.js';
+import { Asset } from '@oceanprotocol/ddo-js';
 
 export interface PublishAssetParams {
   title: string;
@@ -25,7 +25,7 @@ export interface PublishAssetParams {
 
 export async function publishAsset(params: PublishAssetParams, signer: Signer, config: Config) {
   try {
-    const aquarius = new Aquarius(config.metadataCacheUri);
+    const aquarius = new Aquarius(config.oceanNodeUri);
 
     // Prepare initial metadata for the asset
     const metadata: Asset = {
@@ -44,13 +44,30 @@ export async function publishAsset(params: PublishAssetParams, signer: Signer, c
         license: 'MIT',
         tags: params.tags
       },
-      stats: {
-        allocated: 0,
-        orders: 0,
-        price: {
-          value: params.isCharged ? Number(params.price) : 0
-        }
+      indexedMetadata: {
+        stats: [{
+          datatokenAddress: '0x0',
+          name: 'Ocean Data NFT',
+          symbol: 'OCEAN-NFT',
+          serviceId: 'access',
+          orders: 0,
+          prices: [{
+            type: 'fixedrate',
+            contract: '0x0',
+            price: params.isCharged ? Number(params.price).toString() : '0'
+          }]
+        }],
+        nft: {
+          address: "",
+          name: "Ocean Data NFT",
+          symbol: "OCEAN-NFT",
+          state: 5,
+          tokenURI: "",
+          owner: "",
+          created: ""
+        },
       },
+
       services: [
         {
           id: 'access',
@@ -62,18 +79,6 @@ export async function publishAsset(params: PublishAssetParams, signer: Signer, c
           timeout: Number(params.timeout),
         },
       ],
-      nft: {
-        address: "",
-        name: "Ocean Data NFT",
-        symbol: "OCEAN-NFT",
-        state: 5,
-        tokenURI: "",
-        owner: "",
-        created: ""
-      },
-      datatokens: [],
-      event: undefined,
-      purgatory: undefined
     };
 
     // Asset URL setup based on storage type

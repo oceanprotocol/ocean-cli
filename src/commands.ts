@@ -12,7 +12,6 @@ import {
 } from "./helpers.js";
 import {
 	Aquarius,
-	Asset,
 	ComputeAlgorithm,
 	ComputeJob,
 	ComputeOutput,
@@ -43,8 +42,7 @@ export class Commands {
 		this.oceanNodeUrl = process.env.NODE_URL;
 		this.indexingParams = getIndexingWaitSettings();
 		console.log("Using Ocean Node URL :", this.oceanNodeUrl);
-		this.config.metadataCacheUri = this.oceanNodeUrl;
-		this.aquarius = new Aquarius(this.config.metadataCacheUri);
+		this.config.nodeUri = this.oceanNodeUrl;
 	}
 
 	public async start() {
@@ -63,7 +61,7 @@ export class Commands {
 	// commands
 	public async publish(args: string[]) {
 		console.log("start publishing");
-		let asset: Asset;
+		let asset;
 		try {
 			asset = JSON.parse(fs.readFileSync(args[1], "utf8"));
 		} catch (e) {

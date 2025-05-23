@@ -42,7 +42,7 @@ export class Commands {
 		this.oceanNodeUrl = process.env.NODE_URL;
 		this.indexingParams = getIndexingWaitSettings();
 		console.log("Using Ocean Node URL :", this.oceanNodeUrl);
-		this.aquarius = new Aquarius(this.config.oceanNodeUri);
+		this.aquarius = new Aquarius(this.oceanNodeUrl);
 	}
 
 	public async start() {

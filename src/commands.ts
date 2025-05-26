@@ -374,9 +374,11 @@ export class Commands {
 				assets,
 				algo,
 				computeEnv.id,
+				null,
 				computeValidUntil,
 				providerURI,
-				this.signer // V1 was this.signer.getAddress()
+				this.signer,
+				null
 			);
 		if (
 			!providerInitializeComputeJob ||
@@ -469,8 +471,10 @@ export class Commands {
 			algo,
 			null,
 			null,
+			null,
+			null,
 			// additionalDatasets, only c2d v1
-			output
+			output,
 		);
 
 		console.log("compute jobs: ", computeJobs);

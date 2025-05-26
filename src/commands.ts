@@ -673,7 +673,7 @@ export class Commands {
 			this.signer
 		)
 		console.log("Verifying payment...");
-		const validationEscrow = escrow.verifyFundsForEscrowPayment(
+		const validationEscrow = await escrow.verifyFundsForEscrowPayment(
 			paymentToken,
 			computeEnv.consumerAddress,
 			await unitsToAmount(this.signer, paymentToken, amountToDeposit),

@@ -3,7 +3,6 @@ import { Signer } from 'ethers';
 import {
   Config,
   Aquarius,
-  Asset
 } from '@oceanprotocol/lib';
 import { createAssetUtil, updateAssetMetadata } from './helpers.js';
 
@@ -23,12 +22,11 @@ export interface PublishAssetParams {
   providerUrl: string;
 }
 
-export async function publishAsset(params: PublishAssetParams, signer: Signer, config: Config) {
+export async function publishAsset(aquarius: Aquarius, params: PublishAssetParams, signer: Signer, config: Config) {
   try {
-    const aquarius = new Aquarius(config.metadataCacheUri);
 
     // Prepare initial metadata for the asset
-    const metadata: Asset = {
+    const metadata = {
       '@context': ['https://w3id.org/did/v1'],
       id: '', // Will be updated after creating asset
       version: '4.1.0',
@@ -74,7 +72,7 @@ export async function publishAsset(params: PublishAssetParams, signer: Signer, c
       datatokens: [],
       event: undefined,
       purgatory: undefined
-    };
+    } as any;
 
     // Asset URL setup based on storage type
     const assetUrl = {

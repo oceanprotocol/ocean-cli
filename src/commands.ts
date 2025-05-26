@@ -12,7 +12,6 @@ import {
 } from "./helpers.js";
 import {
 	Aquarius,
-	Asset,
 	ComputeAlgorithm,
 	ComputeJob,
 	ComputeOutput,
@@ -43,14 +42,13 @@ export class Commands {
 		this.oceanNodeUrl = process.env.NODE_URL;
 		this.indexingParams = getIndexingWaitSettings();
 		console.log("Using Ocean Node URL :", this.oceanNodeUrl);
-		this.config.metadataCacheUri = this.oceanNodeUrl;
-		this.aquarius = new Aquarius(this.config.metadataCacheUri);
+		this.aquarius = new Aquarius(this.oceanNodeUrl);
 	}
 
 	public async start() {
 		console.log("Starting the interactive CLI flow...\n\n");
 		const data = await interactiveFlow(this.oceanNodeUrl); // Collect data via CLI
-		await publishAsset(data, this.signer, this.config); // Publish asset with collected data
+		await publishAsset(this.aquarius, data, this.signer, this.config); // Publish asset with collected data
 	}
 
 	// utils
@@ -63,7 +61,7 @@ export class Commands {
 	// commands
 	public async publish(args: string[]) {
 		console.log("start publishing");
-		let asset: Asset;
+		let asset;
 		try {
 			asset = JSON.parse(fs.readFileSync(args[1], "utf8"));
 		} catch (e) {
@@ -157,7 +155,7 @@ export class Commands {
 
 		const updateAssetTx = await updateAssetMetadata(
 			this.signer,
-			asset,
+			asset as any,
 			this.oceanNodeUrl,
 			this.aquarius,
 			encryptDDO
@@ -177,8 +175,8 @@ export class Commands {
 		if (!resolvedDDO) {
 			console.error(
 				"Error fetching Asset with DID: " +
-					args[1] +
-					".  Does this asset exists?"
+				args[1] +
+				".  Does this asset exists?"
 			);
 		} else console.log(util.inspect(resolvedDDO, false, null, true));
 	}
@@ -356,7 +354,7 @@ export class Commands {
 				ddos[dataDdo],
 				ddos[dataDdo].services[0].id,
 				algo,
-				algoDdo
+				algoDdo as any
 			);
 			if (!canStartCompute) {
 				console.error(
@@ -386,9 +384,9 @@ export class Commands {
 		) {
 			console.error(
 				"Error initializing Provider for the compute job using dataset DID " +
-					args[1] +
-					" and algorithm DID " +
-					args[2]
+				args[1] +
+				" and algorithm DID " +
+				args[2]
 			);
 			return;
 		}
@@ -396,7 +394,7 @@ export class Commands {
 		console.log("Ordering algorithm: ", args[2]);
 		algo.transferTxId = await handleComputeOrder(
 			providerInitializeComputeJob.algorithm,
-			algoDdo,
+			algoDdo as any,
 			this.signer,
 			computeEnv.consumerAddress,
 			0,
@@ -408,8 +406,8 @@ export class Commands {
 		if (!algo.transferTxId) {
 			console.error(
 				"Error ordering compute for algorithm with DID: " +
-					args[2] +
-					".  Do you have enough tokens?"
+				args[2] +
+				".  Do you have enough tokens?"
 			);
 			return;
 		}
@@ -429,8 +427,8 @@ export class Commands {
 			if (!assets[i].transferTxId) {
 				console.error(
 					"Error ordering dataset with DID: " +
-						assets[i] +
-						".  Do you have enough tokens?"
+					assets[i] +
+					".  Do you have enough tokens?"
 				);
 				return;
 			}
@@ -440,16 +438,16 @@ export class Commands {
 		if (assets.length > 0) {
 			console.log(
 				"Starting compute job on " +
-					assets[0].documentId +
-					" with additional datasets:" +
-					(!additionalDatasets ? "none" : additionalDatasets[0].documentId)
+				assets[0].documentId +
+				" with additional datasets:" +
+				(!additionalDatasets ? "none" : additionalDatasets[0].documentId)
 			);
 		} else {
 			console.log(
 				"Starting compute job on " +
-					algo.documentId +
-					" with additional datasets:" +
-					(!additionalDatasets ? "none" : additionalDatasets[0].documentId)
+				algo.documentId +
+				" with additional datasets:" +
+				(!additionalDatasets ? "none" : additionalDatasets[0].documentId)
 			);
 		}
 		if (additionalDatasets !== null) {
@@ -599,7 +597,7 @@ export class Commands {
 				ddos[dataDdo],
 				ddos[dataDdo].services[0].id,
 				algo,
-				algoDdo
+				algoDdo as any
 			);
 			if (!canStartCompute) {
 				console.error(
@@ -618,16 +616,16 @@ export class Commands {
 		if (assets.length > 0) {
 			console.log(
 				"Starting compute job on " +
-					assets[0].documentId +
-					" with additional datasets:" +
-					(!additionalDatasets ? "none" : additionalDatasets[0].documentId)
+				assets[0].documentId +
+				" with additional datasets:" +
+				(!additionalDatasets ? "none" : additionalDatasets[0].documentId)
 			);
 		} else {
 			console.log(
 				"Starting compute job on " +
-					algo.documentId +
-					" with additional datasets:" +
-					(!additionalDatasets ? "none" : additionalDatasets[0].documentId)
+				algo.documentId +
+				" with additional datasets:" +
+				(!additionalDatasets ? "none" : additionalDatasets[0].documentId)
 			);
 		}
 
@@ -749,6 +747,7 @@ export class Commands {
 			return;
 		}
 
+		// @ts-ignore
 		if (asset.nft.owner !== (await this.signer.getAddress())) {
 			console.error(
 				"You are not the owner of this asset, and there for you cannot update it."
@@ -759,8 +758,8 @@ export class Commands {
 		if (asset.services[0].type !== "compute") {
 			console.error(
 				"Error getting computeService for " +
-					args[1] +
-					".  Does this asset has an computeService?"
+				args[1] +
+				".  Does this asset has an computeService?"
 			);
 			return;
 		}
@@ -803,7 +802,7 @@ export class Commands {
 		try {
 			const txid = await updateAssetMetadata(
 				this.signer,
-				asset,
+				asset as any,
 				this.oceanNodeUrl,
 				this.aquarius,
 				encryptDDO
@@ -829,6 +828,7 @@ export class Commands {
 			);
 			return;
 		}
+		// @ts-ignore
 		if (asset.nft.owner !== (await this.signer.getAddress())) {
 			console.error(
 				"You are not the owner of this asset, and there for you cannot update it."
@@ -838,8 +838,8 @@ export class Commands {
 		if (asset.services[0].type !== "compute") {
 			console.error(
 				"Error getting computeService for " +
-					args[1] +
-					".  Does this asset has an computeService?"
+				args[1] +
+				".  Does this asset has an computeService?"
 			);
 			return;
 		}
@@ -863,16 +863,16 @@ export class Commands {
 		} else {
 			console.error(
 				" " +
-					args[2] +
-					".  is not allowed by the publisher to run on " +
-					args[1]
+				args[2] +
+				".  is not allowed by the publisher to run on " +
+				args[1]
 			);
 			return;
 		}
 
 		const txid = await updateAssetMetadata(
 			this.signer,
-			asset,
+			asset as any,
 			this.oceanNodeUrl,
 			this.aquarius,
 			encryptDDO

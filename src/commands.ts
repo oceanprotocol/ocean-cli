@@ -9,6 +9,7 @@ import {
 	getMetadataURI,
 	getIndexingWaitSettings,
 	IndexerWaitParams,
+	isEthersFormat,
 } from "./helpers.js";
 import {
 	Aquarius,
@@ -23,6 +24,8 @@ import {
 	getHash,
 	orderAsset,
 	sendTx,
+	unitsToAmount,
+	EscrowContract
 } from "@oceanprotocol/lib";
 import { Signer, ethers } from "ethers";
 import { interactiveFlow } from "./interactiveFlow.js";
@@ -310,12 +313,6 @@ export class Commands {
 			return;
 		}
 
-		const datatoken = new Datatoken(
-			this.signer,
-			(await this.signer.provider.getNetwork()).chainId,
-			this.config
-		);
-
 		// TODO: check valid maxJobDuration
 
 		const computeEnvID = args[3];
@@ -365,8 +362,38 @@ export class Commands {
 			});
 		}
 		const maxJobDuration = Number(args[4])
+		if (!maxJobDuration) {
+			console.error(
+				"Error initializing Provider for the compute job using dataset DID " +
+					args[1] +
+					" and algorithm DID " +
+					args[2] +
+					" because maxJobDuration was not provided."
+			);
+			return;
+		}
 		const paymentToken = args[5]
-		const resources = args[6] // resources object should be stringified in cli when calling initializecompute
+		if (!paymentToken) {
+			console.error(
+				"Error initializing Provider for the compute job using dataset DID " +
+					args[1] +
+					" and algorithm DID " +
+					args[2] +
+					" because paymentToken was not provided."
+			);
+			return;
+		}
+		const resources = args[6] // resources object should be stringified in cli when calling initializeCompute
+		if (!resources) {
+			console.error(
+				"Error initializing Provider for the compute job using dataset DID " +
+					args[1] +
+					" and algorithm DID " +
+					args[2] +
+					" because resources for compute were not provided."
+			);
+			return;
+		}
 		const providerInitializeComputeJob =
 			await ProviderInstance.initializeCompute(
 				assets,
@@ -391,48 +418,8 @@ export class Commands {
 			return;
 		}
 
-		console.log("Ordering algorithm: ", args[2]);
-		algo.transferTxId = await handleComputeOrder(
-			providerInitializeComputeJob.algorithm,
-			algoDdo,
-			this.signer,
-			computeEnv.consumerAddress,
-			0,
-			datatoken,
-			this.config,
-			providerInitializeComputeJob?.algorithm?.providerFee,
-			providerURI
-		);
-		if (!algo.transferTxId) {
-			console.error(
-				"Error ordering compute for algorithm with DID: " +
-					args[2] +
-					".  Do you have enough tokens?"
-			);
-			return;
-		}
+		console.log(`initialize compute details including Escrow payment for compute jobs: ${JSON.stringify(providerInitializeComputeJob)}`)
 
-		for (let i = 0; i < ddos.length; i++) {
-			assets[i].transferTxId = await handleComputeOrder(
-				providerInitializeComputeJob.datasets[i],
-				ddos[i],
-				this.signer,
-				computeEnv.consumerAddress,
-				0,
-				datatoken,
-				this.config,
-				providerInitializeComputeJob?.datasets[i].providerFee,
-				providerURI
-			);
-			if (!assets[i].transferTxId) {
-				console.error(
-					"Error ordering dataset with DID: " +
-						assets[i] +
-						".  Do you have enough tokens?"
-				);
-				return;
-			}
-		}
 	}
 
 	public async computeStart(args: string[]) {
@@ -555,6 +542,157 @@ export class Commands {
 				serviceId: ddos[dataDdo].services[0].id,
 			});
 		}
+		const providerInitializeComputeJob = JSON.parse(args[4]); // provider fees + payment
+		console.log("Ordering algorithm: ", args[2]);
+		const datatoken = new Datatoken(
+			this.signer,
+			(await this.signer.provider.getNetwork()).chainId,
+			this.config
+		);
+		algo.transferTxId = await handleComputeOrder(
+			providerInitializeComputeJob.algorithm,
+			algoDdo,
+			this.signer,
+			computeEnv.consumerAddress,
+			0,
+			datatoken,
+			this.config,
+			providerInitializeComputeJob?.algorithm?.providerFee,
+			providerURI
+		);
+		if (!algo.transferTxId) {
+			console.error(
+				"Error ordering compute for algorithm with DID: " +
+					args[2] +
+					".  Do you have enough tokens?"
+			);
+			return;
+		}
+		console.log("Ordering assets: ", args[1]);
+
+		for (let i = 0; i < ddos.length; i++) {
+			assets[i].transferTxId = await handleComputeOrder(
+				providerInitializeComputeJob.datasets[i],
+				ddos[i],
+				this.signer,
+				computeEnv.consumerAddress,
+				0,
+				datatoken,
+				this.config,
+				providerInitializeComputeJob?.datasets[i].providerFee,
+				providerURI
+			);
+			if (!assets[i].transferTxId) {
+				console.error(
+					"Error ordering dataset with DID: " +
+						assets[i] +
+						".  Do you have enough tokens?"
+				);
+				return;
+			}
+		}
+		// payment check
+		// TODO: check valid maxJobDuration
+		const maxJobDuration = Number(args[5])
+		if (!maxJobDuration) {
+			console.error(
+				"Error initializing Provider for the compute job using dataset DID " +
+					args[1] +
+					" and algorithm DID " +
+					args[2] +
+					" because maxJobDuration was not provided."
+			);
+			return;
+		}
+		const paymentToken = args[6]
+		if (!paymentToken) {
+			console.error(
+				"Error initializing Provider for the compute job using dataset DID " +
+					args[1] +
+					" and algorithm DID " +
+					args[2] +
+					" because paymentToken was not provided."
+			);
+			return;
+		}
+		const resources = args[7] // resources object should be stringified in cli when calling initializeCompute
+		if (!resources) {
+			console.error(
+				"Error initializing Provider for the compute job using dataset DID " +
+					args[1] +
+					" and algorithm DID " +
+					args[2] +
+					" because resources for compute were not provided."
+			);
+			return;
+		}
+		const safePaymentDetails =
+			await ProviderInstance.initializeCompute(
+				assets,
+				algo,
+				computeEnv.id,
+				paymentToken,
+				maxJobDuration,
+				providerURI,
+				this.signer, // V1 was this.signer.getAddress()
+				JSON.parse(resources)
+			);
+		const paymentAmount = isEthersFormat(providerInitializeComputeJob.payment.amount.toString()) 
+							? ethers.BigNumber.from(providerInitializeComputeJob.payment.amount)
+							: providerInitializeComputeJob.payment.amount;
+
+		const expectedAmount = ethers.BigNumber.from(safePaymentDetails.payment.amount);
+
+		if (paymentAmount.lt(expectedAmount)) {
+			console.error(
+				"Error starting compute job dataset DID " +
+				args[1] +
+				" and algorithm DID " +
+				args[2] +
+				" because payment amount provided is cheaper than the expected one: " +
+				JSON.stringify(safePaymentDetails.payment)
+			);
+			return;
+		}
+
+		let amountToDeposit = args[8];
+		if (!amountToDeposit) {
+			console.warn(
+				"Warning starting compute job dataset DID " +
+				args[1] +
+				" and algorithm DID " +
+				args[2] +
+				" because amount to deposit in Escrow contract was not provided, fallback to escrow payment ammount : " +
+				safePaymentDetails.payment.amount.toString()
+			);
+			amountToDeposit = safePaymentDetails.payment.amount.toString()
+		}
+
+		const escrow = new EscrowContract(
+			ethers.utils.getAddress(safePaymentDetails.payment.escrowAddress),
+			this.signer
+		)
+		console.log("Verifying payment...");
+		const validationEscrow = escrow.verifyFundsForEscrowPayment(
+			paymentToken,
+			computeEnv.consumerAddress,
+			await unitsToAmount(this.signer, paymentToken, amountToDeposit),
+			safePaymentDetails.payment.amount.toString(),
+			safePaymentDetails.payment.minLockSeconds.toString(),
+			'10'
+		)
+		if (validationEscrow.isValid === false) {
+			console.error(
+				"Error starting compute job dataset DID " +
+				args[1] +
+				" and algorithm DID " +
+				args[2] +
+				" because escrow funds check failed: "
+				+ validationEscrow.message
+			);
+			return;
+		}
+
 		console.log("Starting compute job using provider: ", providerURI);
 
 		const additionalDatasets = assets.length > 1 ? assets.slice(1) : null;
@@ -583,10 +721,7 @@ export class Commands {
 		const output: ComputeOutput = {
 			metadataUri: await getMetadataURI(),
 		};
-		// TODO: check valid maxJobDuration
-		const maxJobDuration = Number(args[4])
-		const paymentToken = args[5]
-		const resources = args[6]
+		
 		const computeJobs = await ProviderInstance.computeStart(
 			providerURI,
 			this.signer,

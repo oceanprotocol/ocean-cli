@@ -190,6 +190,134 @@ export async function updateAssetMetadata(
 	return updateDdoTX;
 }
 
+// export async function verifyParsedProviderFees(
+//   txId: string,
+//   userAddress: string,
+//   provider: JsonRpcApiProvider,
+//   service: any
+// ): Promise<> {
+//   /* given a transaction, check if there is a valid provider fee event
+//    * We could have multiple orders, for multiple assets & providers
+//    */
+//   if (!txId) {
+//     console.error('Invalid txId')
+//     return {
+//       isValid: false,
+//       message: 'Invalid txId',
+//       validUntil: 0
+//     }
+//   }
+
+//   const contractInterface = new Interface(ERC20Template.abi)
+//   const now = Math.round(new Date().getTime() / 1000)
+//   const txReceiptMined = await fetchTransactionReceipt(txId, provider)
+//   const blockMined = await txReceiptMined.getBlock()
+
+//   if (!txReceiptMined) {
+//     const message = `Tx receipt cannot be processed, because tx id ${txId} was not mined.`
+//     console.error(message)
+//     return { isValid: false, message, validUntil: 0 }
+//   }
+
+//   const providerFeesEvents = fetchEventFromTransaction(
+//     txReceiptMined,
+//     'ProviderFee',
+//     contractInterface
+//   )
+
+//   let foundValid = false
+//   let providerData
+//   for (const event of providerFeesEvents) {
+//     const validUntilContract = parseInt(event.args[7].toString())
+//     const utf = ethers.toUtf8String(event.args[3])
+
+//     try {
+//       providerData = JSON.parse(utf)
+//     } catch (e) {
+//       console.error('ProviderFee event JSON parsing failed')
+//       continue
+//     }
+
+//     if (
+//       providerData &&
+//       providerData.id === service.id &&
+//       providerData.dt?.toLowerCase() === service.datatokenAddress?.toLowerCase()
+//     ) {
+//       if (validUntilContract !== 0) {
+//         // check if it's expired
+//         if (now - blockMined.timestamp <= validUntilContract) {
+//           foundValid = true
+//           break
+//         }
+//       } else {
+//         foundValid = true
+//         break
+//       }
+//     }
+//   }
+
+//   if (!foundValid) {
+//     const message = 'No valid providerFee events'
+//     console.error(message)
+//     return { isValid: false, message, validUntil: 0 }
+//   }
+
+//   return {
+//     isValid: true,
+//     message: 'Validation successful',
+//     validUntil: providerData.timestamp
+//   }
+// }
+
+
+// export function fetchEventFromTransaction(
+//   txReceipt: any,
+//   eventName: string,
+//   contractInterface: Interface
+// ): any[] {
+//   try {
+//     // Filter and decode logs
+//     const events = txReceipt.logs
+//       .map((log: any) => ({
+//         topics: [...log.topics],
+//         data: log.data
+//       }))
+//       .filter((log: any) => {
+//         try {
+//           const parsedLog = contractInterface.parseLog(log)
+//           return parsedLog.name === eventName
+//         } catch (error) {
+//           return false
+//         }
+//       })
+//       .map((log: any) => ({
+//         ...contractInterface.parseLog(log),
+//         log
+//       }))
+
+//     return events.length > 0 ? events : null
+//   } catch (error) {
+//     PROVIDER_LOGGER.log(
+//       LOG_LEVELS_STR.LEVEL_ERROR,
+//       'Error fetching event from transaction: ' + error.message,
+//       true
+//     )
+//     return null
+//   }
+// }
+
+export function isEthersFormat(value: string) {
+  try {
+    // Try to convert the value into a BigNumber
+    const bigNumberValue = ethers.BigNumber.from(value);
+    
+    // Check if the conversion was successful
+    return bigNumberValue instanceof ethers.BigNumber;
+  } catch (e) {
+    return false; // Return false if conversion fails
+  }
+}
+
 export async function handleComputeOrder(
 	order: ProviderComputeInitialize,
 	asset: Asset,

@@ -118,7 +118,7 @@ jobs:
         with:
           repository: 'oceanprotocol/ocean-node'
           path: 'ocean-node'
-          ref: 'update-job-id-generation'
+          ref: 'main'
       - name: Extract Ocean address using jq
         run: |
             OCEAN_ADDRESS=$(jq -r '.development | select(.chainId == 8996) | .Ocean' "$ADDRESS_FILE")
@@ -154,7 +154,7 @@ jobs:
       - name: Check Ocean Node is running
         run: |
           for i in $(seq 1 30); do
-            if curl --output /dev/null --silent --head --fail "http://localhost:8001"; then
+            if curl --output /dev/null --silent --head --fail "http://127.0.0.1:8001"; then
               echo "Ocean Node is up"
               exit 0
             fi

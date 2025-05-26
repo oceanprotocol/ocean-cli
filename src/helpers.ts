@@ -3,6 +3,7 @@ import fetch from "cross-fetch";
 import { promises as fs } from "fs";
 import * as path from "path";
 import * as sapphire from '@oasisprotocol/sapphire-paratime';
+import { Asset, DDO } from '@oceanprotocol/ddo-js';
 import {
 	AccesslistFactory,
 	Aquarius,
@@ -15,11 +16,9 @@ import {
 	ConsumeMarketFee,
 	Datatoken,
 	Config,
-	DDO,
 	orderAsset,
 	getEventFromTx,
 	DownloadResponse,
-	Asset,
 	ProviderFees,
 	ComputeAlgorithm,
 	LoggerInstance,
@@ -152,7 +151,7 @@ export async function createAssetUtil(
 
 export async function updateAssetMetadata(
 	owner: Signer,
-	updatedDdo: DDO,
+	updatedDdo: Asset,
 	oceanNodeUrl: string,
 	aquariusInstance: Aquarius,
 	encryptDDO: boolean = true

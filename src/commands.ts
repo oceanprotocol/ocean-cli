@@ -27,6 +27,7 @@ import {
 	unitsToAmount,
 	EscrowContract
 } from "@oceanprotocol/lib";
+import { Asset } from '@oceanprotocol/ddo-js';
 import { Signer, ethers } from "ethers";
 import { interactiveFlow } from "./interactiveFlow.js";
 import { publishAsset } from "./publishAsset.js";
@@ -64,7 +65,7 @@ export class Commands {
 	// commands
 	public async publish(args: string[]) {
 		console.log("start publishing");
-		let asset;
+		let asset: Asset;
 		try {
 			asset = JSON.parse(fs.readFileSync(args[1], "utf8"));
 		} catch (e) {
@@ -76,8 +77,8 @@ export class Commands {
 		try {
 			// add some more checks
 			const urlAssetId = await createAssetUtil(
-				asset.nft.name,
-				asset.nft.symbol,
+				asset.indexedMetadata.nft.name,
+				asset.indexedMetadata.nft.symbol,
 				this.signer,
 				asset.services[0].files,
 				asset,
@@ -95,7 +96,7 @@ export class Commands {
 	}
 
 	public async publishAlgo(args: string[]) {
-		let algoAsset;
+		let algoAsset: Asset;
 		try {
 			algoAsset = JSON.parse(fs.readFileSync(args[1], "utf8"));
 		} catch (e) {
@@ -107,8 +108,8 @@ export class Commands {
 		// add some more checks
 		try {
 			const algoDid = await createAssetUtil(
-				algoAsset.nft.name,
-				algoAsset.nft.symbol,
+				algoAsset.indexedMetadata.nft.name,
+				algoAsset.indexedMetadata.nft.symbol,
 				this.signer,
 				algoAsset.services[0].files,
 				algoAsset,
@@ -1010,7 +1011,7 @@ export class Commands {
 			return;
 		}
 
-		if (asset.nft.owner !== (await this.signer.getAddress())) {
+		if (asset.indexedMetadata.nft.owner !== (await this.signer.getAddress())) {
 			console.error(
 				"You are not the owner of this asset, and there for you cannot update it."
 			);
@@ -1090,7 +1091,7 @@ export class Commands {
 			);
 			return;
 		}
-		if (asset.nft.owner !== (await this.signer.getAddress())) {
+		if (asset.indexedMetadata.nft.owner !== (await this.signer.getAddress())) {
 			console.error(
 				"You are not the owner of this asset, and there for you cannot update it."
 			);

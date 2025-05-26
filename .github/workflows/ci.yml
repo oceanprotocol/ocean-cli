@@ -71,6 +71,7 @@ jobs:
         with:
           repository: 'oceanprotocol/barge'
           path: 'barge'
+          ref: 'feature/barge_with_node'
 
       - name: Login to Docker Hub
         if: ${{ env.DOCKERHUB_PASSWORD && env.DOCKERHUB_USERNAME }}
@@ -84,7 +85,7 @@ jobs:
       - name: Run Barge
         working-directory: ${{ github.workspace }}/barge
         run: |
-          bash -x start_ocean.sh --no-aquarius --no-provider --no-dashboard --with-typesense 2>&1 > start_ocean.log &
+          bash -x start_ocean.sh --with-typesense 2>&1 > start_ocean.log &
       - run: npm ci
       - run: npm run build
       - run: docker image ls
@@ -104,10 +105,26 @@ jobs:
       - name: Wait for contracts deployment and C2D cluster to be ready
         working-directory: ${{ github.workspace }}/barge
         run: |
-          for i in $(seq 1 250); do
+          max_attempts=60
+          attempt=1
+          echo "Waiting for node container to be ready (timeout: 300s)..."
+          while [ $attempt -le $max_attempts ]; do
+            if [ "$(docker inspect -f '{{.State.Running}}' ocean-node-1 2>/dev/null)" = "true" ]; then
+              echo "Node container is running!"
+              break
+            fi
+            echo "Attempt $attempt/$max_attempts: Node container not ready yet, waiting..."
+            if [ $attempt -eq $max_attempts ]; then
+              echo "Error: Node container failed to start within 300 seconds"
+              docker ps -a
+              docker inspect ocean-node-1
+              exit 1
+            fi
             sleep 10
-            [ -f "$HOME/.ocean/ocean-contracts/artifacts/ready" ] && break
+            attempt=$((attempt + 1))
           done
+      - name: docker logs
+        run: docker logs ocean-ocean-contracts-1 && docker logs ocean-ganache-1 && docker logs ocean-typesense-1 
 
       - name: docker logs
         run: docker logs ocean_ocean-contracts_1 && docker logs ocean_typesense_1

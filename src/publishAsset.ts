@@ -3,9 +3,9 @@ import { Signer } from 'ethers';
 import {
   Config,
   Aquarius,
-  Asset
 } from '@oceanprotocol/lib';
 import { createAssetUtil, updateAssetMetadata } from './helpers.js';
+import { Asset } from '@oceanprotocol/ddo-js';
 
 export interface PublishAssetParams {
   title: string;
@@ -23,9 +23,8 @@ export interface PublishAssetParams {
   providerUrl: string;
 }
 
-export async function publishAsset(params: PublishAssetParams, signer: Signer, config: Config) {
+export async function publishAsset(aquarius: Aquarius, params: PublishAssetParams, signer: Signer, config: Config) {
   try {
-    const aquarius = new Aquarius(config.metadataCacheUri);
 
     // Prepare initial metadata for the asset
     const metadata: Asset = {
@@ -44,12 +43,33 @@ export async function publishAsset(params: PublishAssetParams, signer: Signer, c
         license: 'MIT',
         tags: params.tags
       },
-      stats: {
-        allocated: 0,
-        orders: 0,
-        price: {
-          value: params.isCharged ? Number(params.price) : 0
-        }
+      indexedMetadata: {
+        nft: {
+          address: "",
+          name: "Ocean Data NFT",
+          symbol: "OCEAN-NFT",
+          state: 5,
+          tokenURI: "",
+          owner: "",
+          created: ""
+        },
+        event: undefined,
+        purgatory: undefined,
+        stats: [
+          {
+            orders: 0,
+            prices: [{
+              price: params.price,
+              contract: '0x282d8efCe846A88B159800bd4130ad77443Fa1A1',
+              token: params.token,
+              type: params.isCharged === false ? 'dispenser' : 'fixedrate'
+            }],
+            datatokenAddress: '',
+            name: 'access',
+            serviceId: 'access',
+            symbol: ''
+          }
+        ]
       },
       services: [
         {
@@ -61,20 +81,9 @@ export async function publishAsset(params: PublishAssetParams, signer: Signer, c
           serviceEndpoint: params.providerUrl,
           timeout: Number(params.timeout),
         },
-      ],
-      nft: {
-        address: "",
-        name: "Ocean Data NFT",
-        symbol: "OCEAN-NFT",
-        state: 5,
-        tokenURI: "",
-        owner: "",
-        created: ""
-      },
-      datatokens: [],
-      event: undefined,
-      purgatory: undefined
+      ]
     };
+
 
     // Asset URL setup based on storage type
     const assetUrl = {

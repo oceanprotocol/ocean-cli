@@ -12,7 +12,6 @@ import {
 } from "./helpers.js";
 import {
 	Aquarius,
-	Asset,
 	ComputeAlgorithm,
 	ComputeJob,
 	ComputeOutput,
@@ -43,14 +42,13 @@ export class Commands {
 		this.oceanNodeUrl = process.env.NODE_URL;
 		this.indexingParams = getIndexingWaitSettings();
 		console.log("Using Ocean Node URL :", this.oceanNodeUrl);
-		this.config.metadataCacheUri = this.oceanNodeUrl;
-		this.aquarius = new Aquarius(this.config.metadataCacheUri);
+		this.aquarius = new Aquarius(this.oceanNodeUrl);
 	}
 
 	public async start() {
 		console.log("Starting the interactive CLI flow...\n\n");
 		const data = await interactiveFlow(this.oceanNodeUrl); // Collect data via CLI
-		await publishAsset(data, this.signer, this.config); // Publish asset with collected data
+		await publishAsset(this.aquarius, data, this.signer, this.config); // Publish asset with collected data
 	}
 
 	// utils
@@ -63,7 +61,7 @@ export class Commands {
 	// commands
 	public async publish(args: string[]) {
 		console.log("start publishing");
-		let asset: Asset;
+		let asset;
 		try {
 			asset = JSON.parse(fs.readFileSync(args[1], "utf8"));
 		} catch (e) {
@@ -177,8 +175,8 @@ export class Commands {
 		if (!resolvedDDO) {
 			console.error(
 				"Error fetching Asset with DID: " +
-					args[1] +
-					".  Does this asset exists?"
+				args[1] +
+				".  Does this asset exists?"
 			);
 		} else console.log(util.inspect(resolvedDDO, false, null, true));
 	}
@@ -376,9 +374,11 @@ export class Commands {
 				assets,
 				algo,
 				computeEnv.id,
+				null,
 				computeValidUntil,
 				providerURI,
-				this.signer // V1 was this.signer.getAddress()
+				this.signer,
+				null
 			);
 		if (
 			!providerInitializeComputeJob ||
@@ -386,9 +386,9 @@ export class Commands {
 		) {
 			console.error(
 				"Error initializing Provider for the compute job using dataset DID " +
-					args[1] +
-					" and algorithm DID " +
-					args[2]
+				args[1] +
+				" and algorithm DID " +
+				args[2]
 			);
 			return;
 		}
@@ -408,8 +408,8 @@ export class Commands {
 		if (!algo.transferTxId) {
 			console.error(
 				"Error ordering compute for algorithm with DID: " +
-					args[2] +
-					".  Do you have enough tokens?"
+				args[2] +
+				".  Do you have enough tokens?"
 			);
 			return;
 		}
@@ -429,8 +429,8 @@ export class Commands {
 			if (!assets[i].transferTxId) {
 				console.error(
 					"Error ordering dataset with DID: " +
-						assets[i] +
-						".  Do you have enough tokens?"
+					assets[i] +
+					".  Do you have enough tokens?"
 				);
 				return;
 			}
@@ -440,16 +440,16 @@ export class Commands {
 		if (assets.length > 0) {
 			console.log(
 				"Starting compute job on " +
-					assets[0].documentId +
-					" with additional datasets:" +
-					(!additionalDatasets ? "none" : additionalDatasets[0].documentId)
+				assets[0].documentId +
+				" with additional datasets:" +
+				(!additionalDatasets ? "none" : additionalDatasets[0].documentId)
 			);
 		} else {
 			console.log(
 				"Starting compute job on " +
-					algo.documentId +
-					" with additional datasets:" +
-					(!additionalDatasets ? "none" : additionalDatasets[0].documentId)
+				algo.documentId +
+				" with additional datasets:" +
+				(!additionalDatasets ? "none" : additionalDatasets[0].documentId)
 			);
 		}
 		if (additionalDatasets !== null) {
@@ -471,8 +471,10 @@ export class Commands {
 			algo,
 			null,
 			null,
+			null,
+			null,
 			// additionalDatasets, only c2d v1
-			output
+			output,
 		);
 
 		console.log("compute jobs: ", computeJobs);
@@ -618,16 +620,16 @@ export class Commands {
 		if (assets.length > 0) {
 			console.log(
 				"Starting compute job on " +
-					assets[0].documentId +
-					" with additional datasets:" +
-					(!additionalDatasets ? "none" : additionalDatasets[0].documentId)
+				assets[0].documentId +
+				" with additional datasets:" +
+				(!additionalDatasets ? "none" : additionalDatasets[0].documentId)
 			);
 		} else {
 			console.log(
 				"Starting compute job on " +
-					algo.documentId +
-					" with additional datasets:" +
-					(!additionalDatasets ? "none" : additionalDatasets[0].documentId)
+				algo.documentId +
+				" with additional datasets:" +
+				(!additionalDatasets ? "none" : additionalDatasets[0].documentId)
 			);
 		}
 
@@ -749,7 +751,7 @@ export class Commands {
 			return;
 		}
 
-		if (asset.nft.owner !== (await this.signer.getAddress())) {
+		if (asset.indexedMetadata.nft.owner !== (await this.signer.getAddress())) {
 			console.error(
 				"You are not the owner of this asset, and there for you cannot update it."
 			);
@@ -759,8 +761,8 @@ export class Commands {
 		if (asset.services[0].type !== "compute") {
 			console.error(
 				"Error getting computeService for " +
-					args[1] +
-					".  Does this asset has an computeService?"
+				args[1] +
+				".  Does this asset has an computeService?"
 			);
 			return;
 		}
@@ -829,7 +831,7 @@ export class Commands {
 			);
 			return;
 		}
-		if (asset.nft.owner !== (await this.signer.getAddress())) {
+		if (asset.indexedMetadata.nft.owner !== (await this.signer.getAddress())) {
 			console.error(
 				"You are not the owner of this asset, and there for you cannot update it."
 			);
@@ -838,8 +840,8 @@ export class Commands {
 		if (asset.services[0].type !== "compute") {
 			console.error(
 				"Error getting computeService for " +
-					args[1] +
-					".  Does this asset has an computeService?"
+				args[1] +
+				".  Does this asset has an computeService?"
 			);
 			return;
 		}
@@ -863,9 +865,9 @@ export class Commands {
 		} else {
 			console.error(
 				" " +
-					args[2] +
-					".  is not allowed by the publisher to run on " +
-					args[1]
+				args[2] +
+				".  is not allowed by the publisher to run on " +
+				args[1]
 			);
 			return;
 		}

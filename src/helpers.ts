@@ -26,7 +26,6 @@ import {
 } from "@oceanprotocol/lib";
 import { hexlify } from "ethers/lib/utils";
 import ERC20Template from '@oceanprotocol/contracts/artifacts/contracts/templates/ERC20Template.sol/ERC20Template.json';
-import { DDO, Asset } from '@oceanprotocol/ddo-js';
 
 
 export async function downloadFile(

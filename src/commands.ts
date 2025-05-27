@@ -27,7 +27,6 @@ import {
 import { Signer, ethers } from "ethers";
 import { interactiveFlow } from "./interactiveFlow.js";
 import { publishAsset } from "./publishAsset.js";
-import { Asset } from "@oceanprotocol/ddo-js";
 
 export class Commands {
 	public signer: Signer;
@@ -62,7 +61,7 @@ export class Commands {
 	// commands
 	public async publish(args: string[]) {
 		console.log("start publishing");
-		let asset: Asset;
+		let asset;
 		try {
 			asset = JSON.parse(fs.readFileSync(args[1], "utf8"));
 		} catch (e) {
@@ -74,8 +73,8 @@ export class Commands {
 		try {
 			// add some more checks
 			const urlAssetId = await createAssetUtil(
-				asset.indexedMetadata.nft.name,
-				asset.indexedMetadata.nft.symbol,
+				asset.nft.name,
+				asset.nft.symbol,
 				this.signer,
 				asset.services[0].files,
 				asset,
@@ -93,7 +92,7 @@ export class Commands {
 	}
 
 	public async publishAlgo(args: string[]) {
-		let algoAsset: Asset;
+		let algoAsset;
 		try {
 			algoAsset = JSON.parse(fs.readFileSync(args[1], "utf8"));
 		} catch (e) {
@@ -105,8 +104,8 @@ export class Commands {
 		// add some more checks
 		try {
 			const algoDid = await createAssetUtil(
-				algoAsset.indexedMetadata.nft.name,
-				algoAsset.indexedMetadata.nft.symbol,
+				algoAsset.nft.name,
+				algoAsset.nft.symbol,
 				this.signer,
 				algoAsset.services[0].files,
 				algoAsset,

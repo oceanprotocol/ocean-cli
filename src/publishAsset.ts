@@ -2,7 +2,7 @@
 import { Signer } from 'ethers';
 import {
   Config,
-  Aquarius
+  Aquarius,
 } from '@oceanprotocol/lib';
 import { Asset } from '@oceanprotocol/ddo-js';
 import { createAssetUtil, updateAssetMetadata } from './helpers.js';
@@ -23,9 +23,8 @@ export interface PublishAssetParams {
   providerUrl: string;
 }
 
-export async function publishAsset(params: PublishAssetParams, signer: Signer, config: Config) {
+export async function publishAsset(aquarius: Aquarius, params: PublishAssetParams, signer: Signer, config: Config) {
   try {
-    const aquarius = new Aquarius(config.nodeUri);
 
     // Prepare initial metadata for the asset
     const metadata: Asset = {
@@ -84,6 +83,7 @@ export async function publishAsset(params: PublishAssetParams, signer: Signer, c
         },
       ]
     };
+
 
     // Asset URL setup based on storage type
     const assetUrl = {

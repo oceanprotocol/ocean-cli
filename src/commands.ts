@@ -47,12 +47,13 @@ export class Commands {
 		this.indexingParams = getIndexingWaitSettings();
 		console.log("Using Ocean Node URL :", this.oceanNodeUrl);
 		this.config.nodeUri = this.oceanNodeUrl;
+		this.aquarius = new Aquarius(this.oceanNodeUrl);
 	}
 
 	public async start() {
 		console.log("Starting the interactive CLI flow...\n\n");
 		const data = await interactiveFlow(this.oceanNodeUrl); // Collect data via CLI
-		await publishAsset(data, this.signer, this.config); // Publish asset with collected data
+		await publishAsset(this.aquarius, data, this.signer, this.config); // Publish asset with collected data
 	}
 
 	// utils
@@ -65,7 +66,7 @@ export class Commands {
 	// commands
 	public async publish(args: string[]) {
 		console.log("start publishing");
-		let asset: Asset;
+		let asset;
 		try {
 			asset = JSON.parse(fs.readFileSync(args[1], "utf8"));
 		} catch (e) {
@@ -179,8 +180,8 @@ export class Commands {
 		if (!resolvedDDO) {
 			console.error(
 				"Error fetching Asset with DID: " +
-					args[1] +
-					".  Does this asset exists?"
+				args[1] +
+				".  Does this asset exists?"
 			);
 		} else console.log(util.inspect(resolvedDDO, false, null, true));
 	}
@@ -564,8 +565,8 @@ export class Commands {
 		if (!algo.transferTxId) {
 			console.error(
 				"Error ordering compute for algorithm with DID: " +
-					args[2] +
-					".  Do you have enough tokens?"
+				args[2] +
+				".  Do you have enough tokens?"
 			);
 			return;
 		}
@@ -586,8 +587,8 @@ export class Commands {
 			if (!assets[i].transferTxId) {
 				console.error(
 					"Error ordering dataset with DID: " +
-						assets[i] +
-						".  Do you have enough tokens?"
+					assets[i] +
+					".  Do you have enough tokens?"
 				);
 				return;
 			}
@@ -700,16 +701,16 @@ export class Commands {
 		if (assets.length > 0) {
 			console.log(
 				"Starting compute job on " +
-					assets[0].documentId +
-					" with additional datasets:" +
-					(!additionalDatasets ? "none" : additionalDatasets[0].documentId)
+				assets[0].documentId +
+				" with additional datasets:" +
+				(!additionalDatasets ? "none" : additionalDatasets[0].documentId)
 			);
 		} else {
 			console.log(
 				"Starting compute job on " +
-					algo.documentId +
-					" with additional datasets:" +
-					(!additionalDatasets ? "none" : additionalDatasets[0].documentId)
+				algo.documentId +
+				" with additional datasets:" +
+				(!additionalDatasets ? "none" : additionalDatasets[0].documentId)
 			);
 		}
 		if (additionalDatasets !== null) {
@@ -734,7 +735,7 @@ export class Commands {
 			JSON.parse(resources),
 			await this.signer.getChainId(),
 			// additionalDatasets, only c2d v1
-			output
+			output,
 		);
 
 		console.log("compute jobs: ", computeJobs);
@@ -880,16 +881,16 @@ export class Commands {
 		if (assets.length > 0) {
 			console.log(
 				"Starting compute job on " +
-					assets[0].documentId +
-					" with additional datasets:" +
-					(!additionalDatasets ? "none" : additionalDatasets[0].documentId)
+				assets[0].documentId +
+				" with additional datasets:" +
+				(!additionalDatasets ? "none" : additionalDatasets[0].documentId)
 			);
 		} else {
 			console.log(
 				"Starting compute job on " +
-					algo.documentId +
-					" with additional datasets:" +
-					(!additionalDatasets ? "none" : additionalDatasets[0].documentId)
+				algo.documentId +
+				" with additional datasets:" +
+				(!additionalDatasets ? "none" : additionalDatasets[0].documentId)
 			);
 		}
 
@@ -1021,8 +1022,8 @@ export class Commands {
 		if (asset.services[0].type !== "compute") {
 			console.error(
 				"Error getting computeService for " +
-					args[1] +
-					".  Does this asset has an computeService?"
+				args[1] +
+				".  Does this asset has an computeService?"
 			);
 			return;
 		}
@@ -1100,8 +1101,8 @@ export class Commands {
 		if (asset.services[0].type !== "compute") {
 			console.error(
 				"Error getting computeService for " +
-					args[1] +
-					".  Does this asset has an computeService?"
+				args[1] +
+				".  Does this asset has an computeService?"
 			);
 			return;
 		}
@@ -1125,9 +1126,9 @@ export class Commands {
 		} else {
 			console.error(
 				" " +
-					args[2] +
-					".  is not allowed by the publisher to run on " +
-					args[1]
+				args[2] +
+				".  is not allowed by the publisher to run on " +
+				args[1]
 			);
 			return;
 		}

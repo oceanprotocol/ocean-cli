@@ -109,7 +109,7 @@ export async function createAssetUtil(
 	symbol: string,
 	owner: Signer,
 	assetUrl: any,
-	ddo: any,
+	ddo: DDO,
 	oceanNodeUrl: string,
 	config: Config,
 	aquariusInstance: Aquarius,
@@ -159,10 +159,10 @@ export async function updateAssetMetadata(
 	const nft = new Nft(owner, (await owner.provider.getNetwork()).chainId);
 	let flags;
 	let metadata;
-	const validateResult = await aquariusInstance.validate(updatedDdo as any, owner, oceanNodeUrl);
+	const validateResult = await aquariusInstance.validate(updatedDdo, owner, oceanNodeUrl);
 	if (encryptDDO) {
 		const providerResponse = await ProviderInstance.encrypt(
-			updatedDdo as any,
+			updatedDdo,
 			updatedDdo.chainId,
 			oceanNodeUrl
 		);
@@ -233,7 +233,7 @@ export async function handleComputeOrder(
 	}
 	console.log("Ordering asset with DID: ", asset.id);
 	const txStartOrder = await orderAsset(
-		asset as any,
+		asset,
 		payerAccount,
 		config,
 		datatoken,

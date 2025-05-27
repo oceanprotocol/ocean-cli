@@ -155,7 +155,7 @@ export class Commands {
 
 		const updateAssetTx = await updateAssetMetadata(
 			this.signer,
-			asset as any,
+			asset,
 			this.oceanNodeUrl,
 			this.aquarius,
 			encryptDDO
@@ -354,7 +354,7 @@ export class Commands {
 				ddos[dataDdo],
 				ddos[dataDdo].services[0].id,
 				algo,
-				algoDdo as any
+				algoDdo
 			);
 			if (!canStartCompute) {
 				console.error(
@@ -396,7 +396,7 @@ export class Commands {
 		console.log("Ordering algorithm: ", args[2]);
 		algo.transferTxId = await handleComputeOrder(
 			providerInitializeComputeJob.algorithm,
-			algoDdo as any,
+			algoDdo,
 			this.signer,
 			computeEnv.consumerAddress,
 			0,
@@ -601,7 +601,7 @@ export class Commands {
 				ddos[dataDdo],
 				ddos[dataDdo].services[0].id,
 				algo,
-				algoDdo as any
+				algoDdo
 			);
 			if (!canStartCompute) {
 				console.error(
@@ -751,8 +751,7 @@ export class Commands {
 			return;
 		}
 
-		// @ts-ignore
-		if (asset.nft.owner !== (await this.signer.getAddress())) {
+		if (asset.indexedMetadata.nft.owner !== (await this.signer.getAddress())) {
 			console.error(
 				"You are not the owner of this asset, and there for you cannot update it."
 			);
@@ -806,7 +805,7 @@ export class Commands {
 		try {
 			const txid = await updateAssetMetadata(
 				this.signer,
-				asset as any,
+				asset,
 				this.oceanNodeUrl,
 				this.aquarius,
 				encryptDDO
@@ -832,8 +831,7 @@ export class Commands {
 			);
 			return;
 		}
-		// @ts-ignore
-		if (asset.nft.owner !== (await this.signer.getAddress())) {
+		if (asset.indexedMetadata.nft.owner !== (await this.signer.getAddress())) {
 			console.error(
 				"You are not the owner of this asset, and there for you cannot update it."
 			);
@@ -876,7 +874,7 @@ export class Commands {
 
 		const txid = await updateAssetMetadata(
 			this.signer,
-			asset as any,
+			asset,
 			this.oceanNodeUrl,
 			this.aquarius,
 			encryptDDO

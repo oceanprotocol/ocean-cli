@@ -5,6 +5,7 @@ import {
   Aquarius,
 } from '@oceanprotocol/lib';
 import { createAssetUtil, updateAssetMetadata } from './helpers.js';
+import { Asset } from '@oceanprotocol/ddo-js';
 
 export interface PublishAssetParams {
   title: string;
@@ -26,7 +27,7 @@ export async function publishAsset(aquarius: Aquarius, params: PublishAssetParam
   try {
 
     // Prepare initial metadata for the asset
-    const metadata = {
+    const metadata: Asset = {
       '@context': ['https://w3id.org/did/v1'],
       id: '', // Will be updated after creating asset
       version: '4.1.0',
@@ -42,12 +43,33 @@ export async function publishAsset(aquarius: Aquarius, params: PublishAssetParam
         license: 'MIT',
         tags: params.tags
       },
-      stats: {
-        allocated: 0,
-        orders: 0,
-        price: {
-          value: params.isCharged ? Number(params.price) : 0
-        }
+      indexedMetadata: {
+        nft: {
+          address: "",
+          name: "Ocean Data NFT",
+          symbol: "OCEAN-NFT",
+          state: 5,
+          tokenURI: "",
+          owner: "",
+          created: ""
+        },
+        event: undefined,
+        purgatory: undefined,
+        stats: [
+          {
+            orders: 0,
+            prices: [{
+              price: params.price,
+              contract: '0x282d8efCe846A88B159800bd4130ad77443Fa1A1',
+              token: params.token,
+              type: params.isCharged === false ? 'dispenser' : 'fixedrate'
+            }],
+            datatokenAddress: '',
+            name: 'access',
+            serviceId: 'access',
+            symbol: ''
+          }
+        ]
       },
       services: [
         {
@@ -59,20 +81,9 @@ export async function publishAsset(aquarius: Aquarius, params: PublishAssetParam
           serviceEndpoint: params.providerUrl,
           timeout: Number(params.timeout),
         },
-      ],
-      nft: {
-        address: "",
-        name: "Ocean Data NFT",
-        symbol: "OCEAN-NFT",
-        state: 5,
-        tokenURI: "",
-        owner: "",
-        created: ""
-      },
-      datatokens: [],
-      event: undefined,
-      purgatory: undefined
-    } as any;
+      ]
+    };
+
 
     // Asset URL setup based on storage type
     const assetUrl = {

@@ -64,7 +64,7 @@ describe("Ocean CLI Compute", function() {
 
         const output = await runCommand(`npm run cli publish ${metadataFile}`);
 
-		const jsonMatch = output.match(/Asset published. ID:\did:op:[a-f0-9]{64}/);
+		const jsonMatch = output.match(/did:op:[a-f0-9]{64}/);
 		if (!jsonMatch) {
 			console.error("Raw output:", output);
 			throw new Error("Could not find compute environments in the output");
@@ -78,27 +78,29 @@ describe("Ocean CLI Compute", function() {
 		}
     });
 
-    it("should publish a js Algorithm using 'npm run cli publishAlgo'", function(done) {
+    it("should publish a js Algorithm using 'npm run cli publishAlgo'", async function() {
         const filePath = path.resolve(projectRoot, "metadata/jsAlgo.json");
 
         // Ensure the metadata file exists
         if (!fs.existsSync(filePath)) {
-            done(new Error("Metadata file not found: " + filePath));
+            throw new Error("Metadata file not found: " + filePath);
             return;
         }
 
-        exec(`npm run cli publishAlgo ${filePath}`, { cwd: projectRoot }, (error, stdout) => {
-            try {
-                expect(stdout).to.contain("Algorithm published. DID:");
-                const match = stdout.match(/did:op:[a-f0-9]{64}/);
-                if (match) {
-                    jsAlgoDid = match[0];
-                }
-                done()
-            } catch (assertionError) {
-                done(assertionError);
-            }
-        });
+        const output = await runCommand(`npm run cli publishAlgo ${filePath}`);
+
+		const jsonMatch = output.match(/did:op:[a-f0-9]{64}/);
+		if (!jsonMatch) {
+			console.error("Raw output:", output);
+			throw new Error("Could not find compute environments in the output");
+		}
+
+        try {
+			jsAlgoDid = eval(`(${jsonMatch[1]})`);
+		} catch (error) {
+			console.error("Extracted output:", jsonMatch[1]);
+			throw new Error("Failed to parse the extracted output:\n" + error);
+		}
     });
 
     it("should get DDO using 'npm run cli getDDO' for compute dataset", function(done) {

@@ -148,7 +148,7 @@ jobs:
         run: |
           npm ci
           npm run build
-          npm run start &
+          npm run start > ocean-node.log 2>&1 &
         env:
           PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
           IPFS_GATEWAY: http://172.15.0.16:8080/
@@ -192,8 +192,3 @@ jobs:
         run: |
           echo "========== Ocean Node Logs =========="
           tac ${{ github.workspace }}/ocean-node/ocean-node.log || echo "Log file not found"
-      - name: Upload coverage
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-integration
-          path: coverage/

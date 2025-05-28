@@ -103,20 +103,42 @@ describe("Ocean CLI Compute", function() {
 		}
     });
 
-    it("should get DDO using 'npm run cli getDDO' for compute dataset", function(done) {
-        exec(`npm run cli getDDO ${computeDatasetDid}`, { cwd: projectRoot }, (error, stdout) => {
-            expect(stdout).to.contain(`${computeDatasetDid}`);
-            expect(stdout).to.contain("https://w3id.org/did/v1");
-            done()
-        });
+    it("should get DDO using 'npm run cli getDDO' for compute dataset", async function() {
+        const output = await runCommand(`npm run cli getDDO ${computeDatasetDid}`);
+
+		const jsonMatch = output.match(/s*([\s\S]*)/);
+		if (!jsonMatch) {
+			console.error("Raw output:", output);
+			throw new Error("Could not find compute environments in the output");
+		}
+
+        try {
+			const computeDataset = eval(`(${jsonMatch[1]})`);
+            expect(computeDataset).to.be.an("object")
+            expect(computeDataset.did).to.be.equal(computeDatasetDid)
+		} catch (error) {
+			console.error("Extracted output:", jsonMatch[1]);
+			throw new Error("Failed to parse the extracted output:\n" + error);
+		}
     });
 
-    it("should get DDO using 'npm run cli getDDO' for JS algorithm", function(done) {
-        exec(`npm run cli getDDO ${jsAlgoDid}`, { cwd: projectRoot }, (error, stdout) => {
-            expect(stdout).to.contain(`${jsAlgoDid}`);
-            expect(stdout).to.contain("https://w3id.org/did/v1");
-            done()
-        });
+    it("should get DDO using 'npm run cli getDDO' for JS algorithm", async function() {
+        const output = await runCommand(`npm run cli getDDO ${jsAlgoDid}`);
+
+		const jsonMatch = output.match(/s*([\s\S]*)/);
+		if (!jsonMatch) {
+			console.error("Raw output:", output);
+			throw new Error("Could not find compute environments in the output");
+		}
+
+        try {
+			const jsAlgoDataset = eval(`(${jsonMatch[1]})`);
+            expect(jsAlgoDataset).to.be.an("object")
+            expect(jsAlgoDataset.did).to.be.equal(jsAlgoDid)
+		} catch (error) {
+			console.error("Extracted output:", jsonMatch[1]);
+			throw new Error("Failed to parse the extracted output:\n" + error);
+		}
     });
 
      it("should get compute environments using 'npm run cli getComputeEnvironments'", async function() {

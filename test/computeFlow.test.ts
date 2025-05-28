@@ -13,7 +13,7 @@ const execPromise = util.promisify(exec);
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 
-describe("Ocean CLI Publishing", function() {
+describe("Ocean CLI Compute", function() {
     this.timeout(200000); // Set a longer timeout to allow the command to execute
 
     let computeDatasetDid: string;

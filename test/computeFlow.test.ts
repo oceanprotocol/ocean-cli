@@ -48,11 +48,11 @@ describe("Ocean CLI Compute", function() {
         return data.development
     };
 
-    it("should publish a compute dataset using 'npm run cli publish'", function(done) {
+    it("should publish a compute dataset using 'npm run cli publish'", async function() {
         const metadataFile = path.resolve(projectRoot, "metadata/simpleComputeDataset.json");
         // Ensure the metadata file exists
         if (!fs.existsSync(metadataFile)) {
-            done(new Error("Metadata file not found: " + metadataFile));
+            throw new Error("Metadata file not found: " + metadataFile);
             return;
         }
 
@@ -62,19 +62,20 @@ describe("Ocean CLI Compute", function() {
         process.env.NODE_URL = "http://127.0.0.1:8001";
         process.env.ADDRESS_FILE = path.join(process.env.HOME || "", ".ocean/ocean-contracts/artifacts/address.json");
 
+        const output = await runCommand(`npm run cli publish ${metadataFile}`);
 
-        exec(`npm run cli publish ${metadataFile}`, { cwd: projectRoot }, (error, stdout) => {
-            try {
-                const match = stdout.match(/did:op:[a-f0-9]{64}/);
-                if (match) {
-                    computeDatasetDid = match[0];
-                }
-                expect(stdout).to.contain("Asset published. ID:");
-                done()
-            } catch (assertionError) {
-                done(assertionError);
-            }
-        });
+		const jsonMatch = output.match(/Asset published. ID:\did:op:[a-f0-9]{64}/);
+		if (!jsonMatch) {
+			console.error("Raw output:", output);
+			throw new Error("Could not find compute environments in the output");
+		}
+
+		try {
+			computeDatasetDid = eval(`(${jsonMatch[1]})`);
+		} catch (error) {
+			console.error("Extracted output:", jsonMatch[1]);
+			throw new Error("Failed to parse the extracted output:\n" + error);
+		}
     });
 
     it("should publish a js Algorithm using 'npm run cli publishAlgo'", function(done) {
@@ -168,14 +169,12 @@ describe("Ocean CLI Compute", function() {
 			throw new Error("Could not find initialize response in the output");
 		}
 
-		let providerInitializeComputeJob;
 		try {
-			providerInitializeComputeJob = eval(`(${jsonMatch[1]})`);
+			providerInitializeResponse = eval(`(${jsonMatch[1]})`);
 		} catch (error) {
 			console.error("Extracted output:", jsonMatch[1]);
 			throw new Error("Failed to parse the extracted output:\n" + error);
 		}
-        providerInitializeResponse = providerInitializeComputeJob
         console.log(`providerInitializeResponse: ${JSON.stringify(providerInitializeResponse)}`)
         expect(providerInitializeResponse).to.have.property("payment").that.is.an("object");
 		// expect(providerInitializeResponse).to.have.property("consumerAddress").that.is.a("string");

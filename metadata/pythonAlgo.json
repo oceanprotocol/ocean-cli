@@ -48,20 +48,27 @@
       "serviceEndpoint": "http://10.84.128.6:8001"
     }
   ],
-  "stats": {
-    "allocated": 0,
-    "orders": 0,
-    "price": {
-      "value": "0"
-    }
-  },
-  "nft": {
-    "address": "",
-    "name": "Ocean Data NFT",
-    "symbol": "OCEAN-NFT",
-    "state": 5,
-    "tokenURI": "",
-    "owner": "",
-    "created": ""
-  }
+  "indexedMetadata": {
+      "event": {},
+      "nft": {
+        "address": "",
+        "name": "Ocean Data NFT",
+        "symbol": "OCEAN-NFT",
+        "state": 5,
+        "tokenURI": "",
+        "owner": "",
+        "created": ""
+      },
+      "purgatory": {
+        "state": false
+      },
+      "stats": {
+        "allocated": 0,
+        "orders": 0,
+        "price": {
+          "value": "2"
+        }
+      }
+    },
+    "datatokens": []
 }

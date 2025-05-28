@@ -41,27 +41,28 @@
       "timeout": 86400
     }
   ],
-  "event": {
-  },
-  "nft": {
-    "address": "",
-    "name": "Ocean Data NFT",
-    "symbol": "OCEAN-NFT",
-    "state": 5,
-    "tokenURI": "",
-    "owner": "",
-    "created": ""
-  },
-  "purgatory": {
-    "state": false
-  },
-  "datatokens": [
-  ],
-  "stats": {
-    "allocated": 0,
-    "orders": 0,
-    "price": {
-      "value": "2"
-    }
-  }
+  "indexedMetadata": {
+      "event": {},
+      "nft": {
+        "address": "",
+        "name": "Ocean Data NFT",
+        "symbol": "OCEAN-NFT",
+        "state": 5,
+        "tokenURI": "",
+        "owner": "",
+        "created": ""
+      },
+      "purgatory": {
+        "state": false
+      },
+      "stats": {
+        "allocated": 0,
+        "orders": 0,
+        "price": {
+          "value": "2"
+        }
+      }
+    },
+    "datatokens": []
+  
 }

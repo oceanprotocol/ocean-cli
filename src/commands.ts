@@ -420,7 +420,7 @@ export class Commands {
 			return;
 		}
 
-		console.log(`initialize compute details including Escrow payment for compute jobs: ${JSON.stringify(providerInitializeComputeJob)}`)
+		console.log(`initialize compute details: ${JSON.stringify(providerInitializeComputeJob)}`)
 
 	}
 

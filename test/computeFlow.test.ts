@@ -21,6 +21,7 @@ describe("Ocean CLI Compute", function() {
     let computeEnvId: string;
     let resources: any;
     let providerInitializeResponse: any
+    let computeJobId: string
 
     const projectRoot = path.resolve(__dirname, "..");
 
@@ -175,10 +176,31 @@ describe("Ocean CLI Compute", function() {
 			throw new Error("Failed to parse the extracted output:\n" + error);
 		}
         providerInitializeResponse = providerInitializeComputeJob
+        console.log(`providerInitializeResponse: ${JSON.stringify(providerInitializeResponse)}`)
         expect(providerInitializeResponse).to.have.property("payment").that.is.an("object");
 		// expect(providerInitializeResponse).to.have.property("consumerAddress").that.is.a("string");
 		// expect(providerInitializeResponse).to.have.property("resources").that.is.an("array");
 
+    });
+
+    it("should start paid compute on compute dataset and algorithm", async function() {
+        const paymentToken = getAddresses().Ocean
+        const output = await runCommand(`npm run cli startCompute ${computeDatasetDid} ${jsAlgoDid} ${computeEnvId} ${JSON.stringify(providerInitializeResponse)} 900 ${paymentToken} ${JSON.stringify(resources)} ${providerInitializeResponse.payment.amount}`);
+        const jsonMatch = output.match(/JobID:\s*([\s\S]*)/);
+		if (!jsonMatch) {
+			console.error("Raw output:", output);
+			throw new Error("Could not find initialize response in the output");
+		}
+
+		let jobId;
+		try {
+			jobId = eval(`(${jsonMatch[1]})`);
+		} catch (error) {
+			console.error("Extracted output:", jsonMatch[1]);
+			throw new Error("Failed to parse the extracted output:\n" + error);
+		}
+        computeJobId = jobId
+        expect(computeJobId).to.be.a("string");
     });
     
 });

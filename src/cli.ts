@@ -229,7 +229,7 @@ export async function createCLI() {
     .option('-d, --datasets <datasetDids>', 'Dataset DIDs (comma-separated) OR (empty array for none)')
     .option('-a, --algo <algoDid>', 'Algorithm DID')
     .option('-e, --env <computeEnvId>', 'Compute environment ID')
-    .option('-init <initializeResponse>', 'Initialize response')
+    .option('--init <initializeResponse>', 'Initialize response')
     .option('--maxJobDuration <maxJobDuration>', 'Compute maxJobDuration')
     .option('-t, --token <paymentToken>', 'Compute payment token')
     .option('--resources <resources>', 'Compute resources')

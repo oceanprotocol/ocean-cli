@@ -7,7 +7,9 @@ import { homedir } from 'os'
 
 import { dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { ProviderInstance } from "../node_modules/@oceanprotocol/lib/dist/types/index";
+import {
+	ProviderInstance
+} from "@oceanprotocol/lib";
 
 const execPromise = util.promisify(exec);
 
@@ -65,6 +67,11 @@ describe("Ocean CLI Compute", function() {
         const output = await runCommand(`npm run cli publish ${metadataFile}`);
 
 		const jsonMatch = output.match(/did:op:[a-f0-9]{64}/);
+        if (!jsonMatch) {
+			console.error("Raw output:", output);
+			throw new Error("Could not find compute environments in the output");
+		}
+
 		try {
 			computeDatasetDid = jsonMatch[0];
 		} catch (error) {
@@ -141,6 +148,10 @@ describe("Ocean CLI Compute", function() {
 		}
         const match = jsonMatch[0].match(/Exiting compute environments:\s*(.*)/s);
         const result = match ? match[1].trim() : null;
+        if (!result) {
+			console.error("Raw output:", output);
+			throw new Error("Could not find compute environments in the output");
+		}
 
 		let environments;
 		try {
@@ -166,6 +177,8 @@ describe("Ocean CLI Compute", function() {
     it("should initialize compute on compute dataset and algorithm", async function() {
         const computeEnvs = await ProviderInstance.getComputeEnvironments('http://127.0.0.1:8001');
         const env = computeEnvs[0];
+        expect(env).to.be.an('object').and.to.not.be.null.and.to.not.be.undefined;
+
         console.log(`env: ${JSON.stringify(env)}`)
         resources = [
             {
@@ -191,7 +204,10 @@ describe("Ocean CLI Compute", function() {
 		}
         const match = jsonMatch[0].match(/initialize compute details:\s*(.*)/s);
         const result = match ? match[1].trim() : null;
-
+        if (!result) {
+			console.error("Raw output:", output);
+			throw new Error("Could not find initialize compute response in the output");
+		}
 		try {
 			providerInitializeResponse = eval(result);
 		} catch (error) {
@@ -215,6 +231,10 @@ describe("Ocean CLI Compute", function() {
 		}
         const match = jsonMatch[0].match(/JobID:\s*(.*)/s);
         const result = match ? match[1].trim() : null;
+        if (!result) {
+			console.error("Raw output:", output);
+			throw new Error("Could not find compute job in the output");
+		}
         computeJobId = result
         expect(computeJobId).to.be.a("string");
     });

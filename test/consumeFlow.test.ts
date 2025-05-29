@@ -214,44 +214,4 @@ describe("Ocean CLI Publishing", function() {
             }
         })();
     });
-
-    it("should initialize compute on compute dataset and algorithm", async function(done) {
-        this.timeout(10000); // Increase timeout if needed
-    
-        (async () => {
-            try {
-                const { stdout } = await new Promise<{ stdout: string, error: Error | null }>((resolve, reject) => {
-                    exec(`npm run cli initializeCompute ${computeDatasetDid} ${jsAlgoDid} `, { cwd: projectRoot }, (error, stdout) => {
-                        if (error) {
-                            reject(error);
-                        } else {
-                            resolve({ stdout, error: null });
-                        }
-                    });
-                });
-    
-                expect(stdout).to.contain("File downloaded successfully");
-    
-                // Path to the downloaded file
-                const downloadedFilePath = './LICENSE';
-    
-                // Verify the downloaded file content hash matches the original file hash
-                const downloadedFileHash = computeFileHash(downloadedFilePath);
-                const originalFilePath = './metadata/LICENSE';
-    
-                await downloadFile("https://raw.githubusercontent.com/oceanprotocol/ocean-node/refs/heads/main/LICENSE", originalFilePath);
-                const originalFileHash = computeFileHash(originalFilePath);
-    
-                expect(downloadedFileHash).to.equal(originalFileHash);
-    
-                // Clean up downloaded original file
-                fs.unlinkSync(originalFilePath);
-    
-                done()
-            } catch (err) {
-                done(err);
-            }
-        })();
-    });
-    
 });

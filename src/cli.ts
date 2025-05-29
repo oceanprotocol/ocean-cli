@@ -174,6 +174,38 @@ export async function createCLI() {
       const commands = new Commands(signer, chainId);
       await commands.allowAlgo([null, dsDid, aDid, options.encrypt.toString()]);
     });
+  // initializeCommand command
+  program
+    .command('initializeCompute')
+    .description('Initialises provider fees and payment for a compute job')
+    .argument('<datasetDids>', 'Dataset DIDs (comma-separated) OR (empty array for none)')
+    .argument('<algoDid>', 'Algorithm DID')
+    .argument('<computeEnvId>', 'Compute environment ID')
+    .argument('<computeValidUntil>', 'Valid Until for fees availability')
+    .argument('<paymentToken>', 'Payment token for compute')
+    .argument('<resources>', 'Resources of compute environment stringified')
+    .option('-d, --datasets <datasetDids>', 'Dataset DIDs (comma-separated) OR (empty array for none)')
+    .option('-a, --algo <algoDid>', 'Algorithm DID')
+    .option('-e, --env <computeEnvId>', 'Compute environment ID')
+    .option('--validUntil <validUntil>', 'Compute fees valid until')
+    .option('--token <paymentToken>', 'Compute payment token')
+    .option('--resources <resources>', 'Compute resources')
+    .action(async (datasetDids, algoDid, computeEnvId, computeValidUntil, paymentToken, resources, options) => {
+      const dsDids = options.datasets || datasetDids;
+      const aDid = options.algo || algoDid;
+      const envId = options.env || computeEnvId;
+      const validUntil = options.validUntil || computeValidUntil;
+      const token = options.token ||paymentToken;
+      const res = options.resources ||resources;
+      if (!dsDids || !aDid || !envId || !validUntil || !token || !res) {
+        console.error(chalk.red('Missing required arguments'));
+        // process.exit(1);
+        return
+      }
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
+      await commands.initializeCompute([null, dsDids, aDid, envId, validUntil, token, res]);
+    });
 
   // startCompute command
   program
@@ -182,21 +214,34 @@ export async function createCLI() {
     .argument('<datasetDids>', 'Dataset DIDs (comma-separated) OR (empty array for none)')
     .argument('<algoDid>', 'Algorithm DID')
     .argument('<computeEnvId>', 'Compute environment ID')
+    .argument('<computeEnvId>', 'Compute environment ID')
+    .argument('<maxJobDuration>', 'maxJobDuration for compute job')
+    .argument('<paymentToken>', 'Payment token for compute')
+    .argument('<resources>', 'Resources of compute environment stringified')
+    .argument('<amountToDeposit>', 'Amount to deposit in escrow contract, optional.')
     .option('-d, --datasets <datasetDids>', 'Dataset DIDs (comma-separated) OR (empty array for none)')
     .option('-a, --algo <algoDid>', 'Algorithm DID')
     .option('-e, --env <computeEnvId>', 'Compute environment ID')
-    .action(async (datasetDids, algoDid, computeEnvId, options) => {
+    .option('--maxJobDuration <maxJobDuration>', 'Compute maxJobDuration')
+    .option('--token <paymentToken>', 'Compute payment token')
+    .option('--resources <resources>', 'Compute resources')
+    .option('--amount <amountToDeposit>', 'AMount to deposit in escrow')
+    .action(async (datasetDids, algoDid, computeEnvId, maxJobDuration, paymentToken, resources, amountToDeposit, options) => {
       const dsDids = options.datasets || datasetDids;
       const aDid = options.algo || algoDid;
       const envId = options.env || computeEnvId;
-      if (!dsDids || !aDid || !envId) {
+      const jobDuration = options.maxJobDuration || maxJobDuration;
+      const token = options.token ||paymentToken;
+      const res = options.resources ||resources;
+      const amount = options.amount || amountToDeposit;
+      if (!dsDids || !aDid || !envId || !jobDuration || !token || !res) {
         console.error(chalk.red('Missing required arguments'));
         // process.exit(1);
         return
       }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
-      await commands.computeStart([null, dsDids, aDid, envId]);
+      await commands.computeStart([null, dsDids, aDid, envId, jobDuration, token, res, amount]);
     });
 
   // startFreeCompute command

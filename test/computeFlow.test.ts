@@ -53,7 +53,6 @@ describe("Ocean CLI Compute", function() {
         // Ensure the metadata file exists
         if (!fs.existsSync(metadataFile)) {
             throw new Error("Metadata file not found: " + metadataFile);
-            return;
         }
 
         process.env.PRIVATE_KEY = "0x1d751ded5a32226054cd2e71261039b65afb9ee1c746d055dd699b1150a5befc";
@@ -72,9 +71,9 @@ describe("Ocean CLI Compute", function() {
 		}
 
 		try {
-			computeDatasetDid = eval(`(${jsonMatch[1]})`);
+			computeDatasetDid = eval(`(${jsonMatch[0]})`);
 		} catch (error) {
-			console.error("Extracted output:", jsonMatch[1]);
+			console.error("Extracted output:", jsonMatch[0]);
 			throw new Error("Failed to parse the extracted output:\n" + error);
 		}
     });
@@ -85,7 +84,6 @@ describe("Ocean CLI Compute", function() {
         // Ensure the metadata file exists
         if (!fs.existsSync(filePath)) {
             throw new Error("Metadata file not found: " + filePath);
-            return;
         }
 
         const output = await runCommand(`npm run cli publishAlgo ${filePath}`);
@@ -97,9 +95,9 @@ describe("Ocean CLI Compute", function() {
 		}
 
         try {
-			jsAlgoDid = eval(`(${jsonMatch[1]})`);
+			jsAlgoDid = eval(`(${jsonMatch[0]})`);
 		} catch (error) {
-			console.error("Extracted output:", jsonMatch[1]);
+			console.error("Extracted output:", jsonMatch[0]);
 			throw new Error("Failed to parse the extracted output:\n" + error);
 		}
     });

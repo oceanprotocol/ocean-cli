@@ -64,14 +64,8 @@ describe("Ocean CLI Compute", function() {
         const output = await runCommand(`npm run cli publish ${metadataFile}`);
 
 		const jsonMatch = output.match(/did:op:[a-f0-9]{64}/);
-        console.log(`json match compute dataset: ${JSON.stringify(jsonMatch)}`)
-		if (!jsonMatch) {
-			console.error("Raw output:", output);
-			throw new Error("Could not find compute environments in the output");
-		}
-
 		try {
-			computeDatasetDid = eval(`(${jsonMatch[0]})`);
+			computeDatasetDid = jsonMatch[0];
 		} catch (error) {
 			console.error("Extracted output:", jsonMatch[0]);
 			throw new Error("Failed to parse the extracted output:\n" + error);
@@ -95,7 +89,7 @@ describe("Ocean CLI Compute", function() {
 		}
 
         try {
-			jsAlgoDid = eval(`(${jsonMatch[0]})`);
+			jsAlgoDid = jsonMatch[0];
 		} catch (error) {
 			console.error("Extracted output:", jsonMatch[0]);
 			throw new Error("Failed to parse the extracted output:\n" + error);

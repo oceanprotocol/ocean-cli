@@ -138,12 +138,14 @@ describe("Ocean CLI Compute", function() {
 			console.error("Raw output:", output);
 			throw new Error("Could not find compute environments in the output");
 		}
+        const match = jsonMatch[0].match(/Exiting compute environments:\s*(.*)/s);
+        const result = match ? match[1].trim() : null;
 
 		let environments;
 		try {
-			environments = eval(`(${jsonMatch[0]})`);
+			environments = eval(result);
 		} catch (error) {
-			console.error("Extracted output:", jsonMatch[0]);
+			console.error(`Extracted output: ${jsonMatch[0]} and final result: ${result}`);
 			throw new Error("Failed to parse the extracted output:\n" + error);
 		}
 

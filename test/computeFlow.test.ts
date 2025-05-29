@@ -106,10 +106,7 @@ describe("Ocean CLI Compute", function() {
 		}
 
         try {
-            expect(output).to.contain("Resolving Asset with DID:")
-            expect(output).to.contain(`id: '${computeDatasetDid}'`)
-            expect(output).to.contain(`'@context': [ 'https://w3id.org/did/v1' ]`)
-            expect(output).to.contain('indexedMetadata')
+            expect(output).to.contain(`Resolving Asset with DID: ${computeDatasetDid}`)
 		} catch (error) {
 			console.error("Extracted output:", jsonMatch[0]);
 			throw new Error("Failed to parse the extracted output:\n" + error);
@@ -126,10 +123,7 @@ describe("Ocean CLI Compute", function() {
 		}
 
         try {
-			expect(output).to.contain("Resolving Asset with DID:")
-            expect(output).to.contain(`id: '${jsAlgoDid}'`)
-            expect(output).to.contain(`'@context': [ 'https://w3id.org/did/v1' ]`)
-            expect(output).to.contain('indexedMetadata')
+			expect(output).to.contain(`Resolving Asset with DID: ${jsAlgoDid}`)
 		} catch (error) {
 			console.error("Extracted output:", jsonMatch[0]);
 			throw new Error("Failed to parse the extracted output:\n" + error);

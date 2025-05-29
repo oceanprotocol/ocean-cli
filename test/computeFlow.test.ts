@@ -106,10 +106,10 @@ describe("Ocean CLI Compute", function() {
 		}
 
         try {
-            expect(jsonMatch).to.contain("Resolving Asset with DID:")
-            expect(jsonMatch).to.contain(`id: '${computeDatasetDid}'`)
-            expect(jsonMatch).to.contain(`'@context': [ 'https://w3id.org/did/v1' ]`)
-            expect(jsonMatch).to.contain('indexedMetadata')
+            expect(output).to.contain("Resolving Asset with DID:")
+            expect(output).to.contain(`id: '${computeDatasetDid}'`)
+            expect(output).to.contain(`'@context': [ 'https://w3id.org/did/v1' ]`)
+            expect(output).to.contain('indexedMetadata')
 		} catch (error) {
 			console.error("Extracted output:", jsonMatch[0]);
 			throw new Error("Failed to parse the extracted output:\n" + error);
@@ -126,10 +126,10 @@ describe("Ocean CLI Compute", function() {
 		}
 
         try {
-			expect(jsonMatch).to.contain("Resolving Asset with DID:")
-            expect(jsonMatch).to.contain(`id: '${jsAlgoDid}'`)
-            expect(jsonMatch).to.contain(`'@context': [ 'https://w3id.org/did/v1' ]`)
-            expect(jsonMatch).to.contain('indexedMetadata')
+			expect(output).to.contain("Resolving Asset with DID:")
+            expect(output).to.contain(`id: '${jsAlgoDid}'`)
+            expect(output).to.contain(`'@context': [ 'https://w3id.org/did/v1' ]`)
+            expect(output).to.contain('indexedMetadata')
 		} catch (error) {
 			console.error("Extracted output:", jsonMatch[0]);
 			throw new Error("Failed to parse the extracted output:\n" + error);
@@ -212,9 +212,9 @@ describe("Ocean CLI Compute", function() {
 
 		let jobId;
 		try {
-			jobId = eval(`(${jsonMatch[1]})`);
+			jobId = eval(`(${jsonMatch[0]})`);
 		} catch (error) {
-			console.error("Extracted output:", jsonMatch[1]);
+			console.error("Extracted output:", jsonMatch[0]);
 			throw new Error("Failed to parse the extracted output:\n" + error);
 		}
         computeJobId = jobId

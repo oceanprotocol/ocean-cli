@@ -196,7 +196,7 @@ describe("Ocean CLI Compute", function() {
         ]
         console.log(`resources: ${JSON.stringify(resources)}`)
         const paymentToken = getAddresses().Ocean
-        const output = await runCommand(`npm run cli initializeCompute ${computeDatasetDid} ${jsAlgoDid} ${computeEnvId} 900 ${paymentToken} ${(JSON.stringify(resources)).toString()}`);
+        const output = await runCommand(`npm run cli initializeCompute ${computeDatasetDid} ${jsAlgoDid} ${computeEnvId} 900 ${paymentToken} ${JSON.stringify(resources)}`);
         const jsonMatch = output.match(/initialize compute details:\s*([\s\S]*)/);
 		if (!jsonMatch) {
 			console.error("Raw output:", output);

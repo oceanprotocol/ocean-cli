@@ -210,7 +210,7 @@ export async function createCLI() {
       }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
-      await commands.initializeCompute([null, dsDids, aDid, envId, validUntil, token, res]);
+      await commands.initializeCompute([null, dsDids, aDid, envId, validUntil.toString(), token, JSON.stringify(res)]);
     });
 
   // startCompute command

@@ -32,7 +32,6 @@ import { Asset } from '@oceanprotocol/ddo-js';
 import { Signer, ethers } from "ethers";
 import { interactiveFlow } from "./interactiveFlow.js";
 import { publishAsset } from "./publishAsset.js";
-import { stringify } from "querystring";
 
 export class Commands {
 	public signer: Signer;

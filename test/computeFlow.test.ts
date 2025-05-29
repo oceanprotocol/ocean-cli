@@ -202,19 +202,13 @@ describe("Ocean CLI Compute", function() {
 			console.error("Raw output:", output);
 			throw new Error("Could not find initialize response in the output");
 		}
-        const match = jsonMatch[0].match(/initialize compute details:\s*(.*)/s);
-        const result = match ? match[1].trim() : null;
-        if (!result) {
-			console.error("Raw output:", output);
-			throw new Error("Could not find initialize compute response in the output");
-		}
+        const result = jsonMatch[0].split('initialize compute details:')[1]?.trim();
 		try {
-			providerInitializeResponse = eval(result);
+			providerInitializeResponse = JSON.parse(result);
 		} catch (error) {
-			console.error("Extracted output:", jsonMatch[0]);
+			console.error(`Extracted output: ${jsonMatch[0]} and final result: ${result}`);
 			throw new Error("Failed to parse the extracted output:\n" + error);
 		}
-        console.log(`providerInitializeResponse: ${JSON.stringify(providerInitializeResponse)}`)
         expect(providerInitializeResponse).to.have.property("payment").that.is.an("object");
 		// expect(providerInitializeResponse).to.have.property("consumerAddress").that.is.a("string");
 		// expect(providerInitializeResponse).to.have.property("resources").that.is.an("array");

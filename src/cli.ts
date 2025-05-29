@@ -229,7 +229,7 @@ export async function createCLI() {
     .option('-a, --algo <algoDid>', 'Algorithm DID')
     .option('-e, --env <computeEnvId>', 'Compute environment ID')
     .option('--maxJobDuration <maxJobDuration>', 'Compute maxJobDuration')
-    .option('--token <paymentToken>', 'Compute payment token')
+    .option('-t, --token <paymentToken>', 'Compute payment token')
     .option('--resources <resources>', 'Compute resources')
     .option('--amount <amountToDeposit>', 'AMount to deposit in escrow')
     .action(async (datasetDids, algoDid, computeEnvId, maxJobDuration, paymentToken, resources, amountToDeposit, options) => {
@@ -247,7 +247,7 @@ export async function createCLI() {
       }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
-      await commands.computeStart([null, dsDids, aDid, envId, jobDuration, token, res, amount]);
+      await commands.computeStart([null, dsDids, aDid, envId, jobDuration.toString(), token, JSON.stringify(res), amount.toString()]);
     });
 
   // startFreeCompute command

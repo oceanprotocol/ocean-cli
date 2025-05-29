@@ -398,7 +398,7 @@ export class Commands {
 			return;
 		}
 		const chainId = await this.signer.getChainId()
-		if (!computeEnv.fees.keys().includes(chainId)) {
+		if (!Object.keys(computeEnv.fees).includes(chainId.toString())) {
 			console.error(
 				"Error starting paid compute using dataset DID " +
 					args[1] +
@@ -674,7 +674,7 @@ export class Commands {
 			);
 			return;
 		}
-		if (!computeEnv.fees.keys().includes(chainId)) {
+		if (!Object.keys(computeEnv.fees).includes(chainId.toString())) {
 			console.error(
 				"Error starting paid compute using dataset DID " +
 					args[1] +

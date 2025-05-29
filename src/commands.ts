@@ -362,7 +362,6 @@ export class Commands {
 			});
 		}
 		const maxJobDuration = Number(args[4])
-		console.log(`maxJobDuration: `, args[4])
 		if (!maxJobDuration) {
 			console.error(
 				"Error initializing Provider for the compute job using dataset DID " +
@@ -388,7 +387,6 @@ export class Commands {
 			supportedMaxJobDuration = computeEnv.maxJobDuration;
 		}
 		const paymentToken = args[5]
-		console.log(`paymentToken: `, args[5])
 		if (!paymentToken) {
 			console.error(
 				"Error initializing Provider for the compute job using dataset DID " +
@@ -400,7 +398,6 @@ export class Commands {
 			return;
 		}
 		const chainId = await this.signer.getChainId()
-		console.log(`chainId: `, chainId)
 		if (!Object.keys(computeEnv.fees).includes(chainId.toString())) {
 			console.error(
 				"Error starting paid compute using dataset DID " +
@@ -434,7 +431,6 @@ export class Commands {
 			return;
 		}
 		const resources = args[6] // resources object should be stringified in cli when calling initializeCompute
-		console.log(`args[6]: `, args[6])
 		if (!resources) {
 			console.error(
 				"Error initializing Provider for the compute job using dataset DID " +
@@ -1069,7 +1065,7 @@ export class Commands {
 			return;
 		}
 
-		console.log("Exiting compute environments: ", computeEnvs);
+		console.log("Exiting compute environments: ", JSON.stringify(computeEnvs));
 	}
 
 	public async computeStreamableLogs(args: string[]) {

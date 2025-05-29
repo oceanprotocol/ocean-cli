@@ -233,17 +233,17 @@ export async function createCLI() {
     .option('--maxJobDuration <maxJobDuration>', 'Compute maxJobDuration')
     .option('-t, --token <paymentToken>', 'Compute payment token')
     .option('--resources <resources>', 'Compute resources')
-    .option('--amount <amountToDeposit>', 'AMount to deposit in escrow')
+    .option('--amount <amountToDeposit>', 'Amount to deposit in escrow')
     .action(async (datasetDids, algoDid, computeEnvId, initializeResponse, maxJobDuration, paymentToken, resources, amountToDeposit, options) => {
       const dsDids = options.datasets || datasetDids;
       const aDid = options.algo || algoDid;
       const envId = options.env || computeEnvId;
       const initResp = options.init || initializeResponse;
       const jobDuration = options.maxJobDuration || maxJobDuration;
-      const token = options.token ||paymentToken;
-      const res = options.resources ||resources;
+      const token = options.token || paymentToken;
+      const res = options.resources || resources;
       const amount = options.amount || amountToDeposit;
-      if (!dsDids || !aDid || !envId || !jobDuration || !token || !res) {
+      if (!dsDids || !aDid || !initResp ||!envId || !jobDuration || !token || !res || !amount) {
         console.error(chalk.red('Missing required arguments'));
         // process.exit(1);
         return

@@ -69,7 +69,10 @@ async function readLine(question: string): Promise<string> {
 async function main() {
 	try {
 		program = await createCLI();
+		console.log(`program: ${program}`)
 		for(const command of program.commands) {
+			console.log(`command name: ${command.name()}`)
+			console.log(`command alias: ${command.alias()}`)
 			supportedCommands.push(command.name())
 			supportedCommands.push(command.alias())
 		}
@@ -99,6 +102,7 @@ async function main() {
 			}while(!exit)
 		} else {
 			// one shot
+			console.log(`initialCommandLine: ${initialCommandLine}`)
 			await program.parseAsync(initialCommandLine);
 		}
 

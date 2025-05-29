@@ -7,6 +7,7 @@ import { homedir } from 'os'
 
 import { dirname } from 'path'
 import { fileURLToPath } from 'url'
+import { ProviderInstance } from "../node_modules/@oceanprotocol/lib/dist/types/index";
 
 const execPromise = util.promisify(exec);
 
@@ -158,25 +159,29 @@ describe("Ocean CLI Compute", function() {
 		expect(firstEnv).to.have.property("resources").that.is.an("array");
 
 		computeEnvId = firstEnv.id;
-        console.log(`firstEnv.resources: ${JSON.stringify(firstEnv.resources)}`)
+        
+		console.log(`Fetched Compute Env ID: ${computeEnvId}`);
+    });
+
+    it("should initialize compute on compute dataset and algorithm", async function() {
+        const computeEnvs = await ProviderInstance.getComputeEnvironments('http://127.0.0.1:8001');
+        const env = computeEnvs[0];
+        console.log(`env: ${JSON.stringify(env)}`)
         resources = [
             {
                 id: 'cpu',
-                amount: firstEnv.resources[0].max - firstEnv.resources[0].inUse - 1 
+                amount: env.resources[0].max - env.resources[0].inUse - 1 
             },
             {
                 id: 'ram',
-                amount: firstEnv.resources[1].max - firstEnv.resources[1].inUse - 1000
+                amount: env.resources[1].max - env.resources[1].inUse - 1000
             },
             {
                 id: 'disk',
                 amount: 0
             }
         ]
-		console.log(`Fetched Compute Env ID: ${computeEnvId}`);
-    });
-
-    it("should initialize compute on compute dataset and algorithm", async function() {
+        console.log(`resources: ${JSON.stringify(resources)}`)
         const paymentToken = getAddresses().Ocean
         const output = await runCommand(`npm run cli initializeCompute ${computeDatasetDid} ${jsAlgoDid} ${computeEnvId} 900 ${paymentToken} ${JSON.stringify(resources)}`);
         const jsonMatch = output.match(/initialize compute details:\s*([\s\S]*)/);
@@ -206,7 +211,7 @@ describe("Ocean CLI Compute", function() {
         const jsonMatch = output.match(/JobID:\s*([\s\S]*)/);
 		if (!jsonMatch) {
 			console.error("Raw output:", output);
-			throw new Error("Could not find initialize response in the output");
+			throw new Error("Could not find start compute response in the output");
 		}
         const match = jsonMatch[0].match(/JobID:\s*(.*)/s);
         const result = match ? match[1].trim() : null;

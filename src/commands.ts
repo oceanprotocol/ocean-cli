@@ -9,8 +9,7 @@ import {
 	getMetadataURI,
 	getIndexingWaitSettings,
 	IndexerWaitParams,
-	isEthersFormat,
-	stringifyResources,
+	isEthersFormat
 } from "./helpers.js";
 import {
 	Aquarius,
@@ -1069,13 +1068,8 @@ export class Commands {
 			);
 			return;
 		}
-		const parsedComputeEnvs = [];
-		for (const env of computeEnvs) {
-			const stringified = stringifyResources(env);
-			parsedComputeEnvs.push(stringified);
-		}
 
-		console.log("Exiting compute environments: ", parsedComputeEnvs);
+		console.log("Exiting compute environments: ", computeEnvs);
 	}
 
 	public async computeStreamableLogs(args: string[]) {

@@ -192,17 +192,11 @@ export async function createCLI() {
     .option('--resources <resources>', 'Compute resources')
     .action(async (datasetDids, algoDid, computeEnvId, computeValidUntil, paymentToken, resources, options) => {
       const dsDids = options.datasets || datasetDids;
-      console.log(`dsDids: ${dsDids}`)
       const aDid = options.algo || algoDid;
-      console.log(`aDid: ${aDid}`)
       const envId = options.env || computeEnvId;
-      console.log(`envId: ${envId}`)
       const validUntil = options.validUntil || computeValidUntil;
-      console.log(`validUntil: ${validUntil}`)
       const token = options.token || paymentToken;
-      console.log(`token: ${token}`)
       const res = options.resources || resources;
-      console.log(`res: ${res}`)
       if (!dsDids || !aDid || !envId || !validUntil || !token || !res) {
         console.error(chalk.red('Missing required arguments'));
         // process.exit(1);

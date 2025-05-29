@@ -97,7 +97,6 @@ describe("Ocean CLI Compute", function() {
     });
 
     it("should get DDO using 'npm run cli getDDO' for compute dataset", async function() {
-        console.log(computeDatasetDid)
         const output = await runCommand(`npm run cli getDDO ${computeDatasetDid}`);
 
 		const jsonMatch = output.match(/s*([\s\S]*)/);
@@ -105,7 +104,7 @@ describe("Ocean CLI Compute", function() {
 			console.error("Raw output:", output);
 			throw new Error("Could not find compute environments in the output");
 		}
-
+        console.log(`jsonMatch: ${JSON.stringify(jsonMatch)}`)
         try {
 			const computeDataset = eval(`(${jsonMatch[1]})`);
             expect(computeDataset).to.be.an("object")

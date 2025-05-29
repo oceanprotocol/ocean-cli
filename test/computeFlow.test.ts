@@ -104,13 +104,14 @@ describe("Ocean CLI Compute", function() {
 			console.error("Raw output:", output);
 			throw new Error("Could not find compute environments in the output");
 		}
-        console.log(`jsonMatch: ${JSON.stringify(jsonMatch)}`)
+
         try {
-			const computeDataset = eval(`(${jsonMatch[1]})`);
-            expect(computeDataset).to.be.an("object")
-            expect(computeDataset.did).to.be.equal(computeDatasetDid)
+            expect(jsonMatch).to.contain("Resolving Asset with DID:")
+            expect(jsonMatch).to.contain(`id: '${computeDatasetDid}'`)
+            expect(jsonMatch).to.contain(`'@context': [ 'https://w3id.org/did/v1' ]`)
+            expect(jsonMatch).to.contain('indexedMetadata')
 		} catch (error) {
-			console.error("Extracted output:", jsonMatch[1]);
+			console.error("Extracted output:", jsonMatch[0]);
 			throw new Error("Failed to parse the extracted output:\n" + error);
 		}
     });
@@ -125,11 +126,12 @@ describe("Ocean CLI Compute", function() {
 		}
 
         try {
-			const jsAlgoDataset = eval(`(${jsonMatch[1]})`);
-            expect(jsAlgoDataset).to.be.an("object")
-            expect(jsAlgoDataset.did).to.be.equal(jsAlgoDid)
+			expect(jsonMatch).to.contain("Resolving Asset with DID:")
+            expect(jsonMatch).to.contain(`id: '${jsAlgoDid}'`)
+            expect(jsonMatch).to.contain(`'@context': [ 'https://w3id.org/did/v1' ]`)
+            expect(jsonMatch).to.contain('indexedMetadata')
 		} catch (error) {
-			console.error("Extracted output:", jsonMatch[1]);
+			console.error("Extracted output:", jsonMatch[0]);
 			throw new Error("Failed to parse the extracted output:\n" + error);
 		}
     });
@@ -145,9 +147,9 @@ describe("Ocean CLI Compute", function() {
 
 		let environments;
 		try {
-			environments = eval(`(${jsonMatch[1]})`);
+			environments = eval(`(${jsonMatch[0]})`);
 		} catch (error) {
-			console.error("Extracted output:", jsonMatch[1]);
+			console.error("Extracted output:", jsonMatch[0]);
 			throw new Error("Failed to parse the extracted output:\n" + error);
 		}
 

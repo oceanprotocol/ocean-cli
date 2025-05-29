@@ -99,6 +99,7 @@ async function main() {
 			}while(!exit)
 		} else {
 			// one shot
+			console.log(`initialCommandLine: ${initialCommandLine}`)
 			await program.parseAsync(initialCommandLine);
 		}
 

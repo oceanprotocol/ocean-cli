@@ -243,7 +243,7 @@ export async function createCLI() {
       const token = options.token || paymentToken;
       const res = options.resources || resources;
       const amount = options.amount || amountToDeposit;
-      if (!dsDids || !aDid || !initResp ||!envId || !jobDuration || !token || !res || !amount) {
+      if (!dsDids || !aDid ||!envId || !initResp || !jobDuration || !token || !res || !amount) {
         console.error(chalk.red('Missing required arguments'));
         // process.exit(1);
         return

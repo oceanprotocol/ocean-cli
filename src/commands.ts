@@ -414,7 +414,15 @@ export class Commands {
 			);
 			return;
 		}
-		if (computeEnv.fees[chainId].feeToken !== paymentToken) {
+		console.log(`computeEnv.fees[chainId].feeToken: `, computeEnv.fees[chainId].feeToken)
+		let found: boolean = false;
+		for (const fee of computeEnv.fees[chainId.toString()]) {
+			if (fee.feeToken.toLowerCase() === paymentToken.toLowerCase()) {
+				found = true;
+				break;
+			}
+		}
+		if (found === false) {
 			console.error(
 				"Error initializing Provider for the compute job using dataset DID " +
 					args[1] +
@@ -691,8 +699,14 @@ export class Commands {
 			);
 			return;
 		}
-		
-		if (computeEnv.fees[chainId].feeToken !== paymentToken) {
+		let found: boolean = false;
+		for (const fee of computeEnv.fees[chainId.toString()]) {
+			if (fee.feeToken.toLowerCase() === paymentToken.toLowerCase()) {
+				found = true;
+				break;
+			}
+		}
+		if (found === false) {
 			console.error(
 				"Error starting paid compute using dataset DID " +
 					args[1] +

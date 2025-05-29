@@ -507,3 +507,15 @@ export function getIndexingWaitSettings(): IndexerWaitParams {
 
 	return indexingParams
 }
+
+export function stringifyResources(obj) {
+  for (const key in obj) {
+    if (obj[key] && typeof obj[key] === 'object') {
+      if (key === 'resources' && Array.isArray(obj[key])) {
+        obj[key] = obj[key].map(item => JSON.stringify(item));
+      } else {
+        stringifyResources(obj[key]);
+      }
+    }
+  }
+}

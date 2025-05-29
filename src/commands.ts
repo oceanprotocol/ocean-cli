@@ -10,6 +10,7 @@ import {
 	getIndexingWaitSettings,
 	IndexerWaitParams,
 	isEthersFormat,
+	stringifyResources,
 } from "./helpers.js";
 import {
 	Aquarius,
@@ -31,6 +32,7 @@ import { Asset } from '@oceanprotocol/ddo-js';
 import { Signer, ethers } from "ethers";
 import { interactiveFlow } from "./interactiveFlow.js";
 import { publishAsset } from "./publishAsset.js";
+import { stringify } from "querystring";
 
 export class Commands {
 	public signer: Signer;
@@ -1068,7 +1070,13 @@ export class Commands {
 			);
 			return;
 		}
-		console.log("Exiting compute environments: ", computeEnvs);
+		const parsedComputeEnvs = [];
+		for (const env of computeEnvs) {
+			const stringified = stringifyResources(env);
+			parsedComputeEnvs.push(stringified);
+		}
+
+		console.log("Exiting compute environments: ", parsedComputeEnvs);
 	}
 
 	public async computeStreamableLogs(args: string[]) {

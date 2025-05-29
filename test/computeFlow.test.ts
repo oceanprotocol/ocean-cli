@@ -158,14 +158,15 @@ describe("Ocean CLI Compute", function() {
 		expect(firstEnv).to.have.property("resources").that.is.an("array");
 
 		computeEnvId = firstEnv.id;
+        console.log(`firstEnv.resources: ${JSON.stringify(firstEnv.resources)}`)
         resources = [
             {
                 id: 'cpu',
-                amount: firstEnv.resources[0].max - 1 
+                amount: firstEnv.resources[0].max - firstEnv.resources[0].inUse - 1 
             },
             {
                 id: 'ram',
-                amount: firstEnv.resources[1].max - 1000
+                amount: firstEnv.resources[1].max - firstEnv.resources[1].inUse - 1000
             },
             {
                 id: 'disk',
@@ -183,11 +184,13 @@ describe("Ocean CLI Compute", function() {
 			console.error("Raw output:", output);
 			throw new Error("Could not find initialize response in the output");
 		}
+        const match = jsonMatch[0].match(/initialize compute details:\s*(.*)/s);
+        const result = match ? match[1].trim() : null;
 
 		try {
-			providerInitializeResponse = eval(`(${jsonMatch[1]})`);
+			providerInitializeResponse = eval(result);
 		} catch (error) {
-			console.error("Extracted output:", jsonMatch[1]);
+			console.error("Extracted output:", jsonMatch[0]);
 			throw new Error("Failed to parse the extracted output:\n" + error);
 		}
         console.log(`providerInitializeResponse: ${JSON.stringify(providerInitializeResponse)}`)
@@ -205,15 +208,9 @@ describe("Ocean CLI Compute", function() {
 			console.error("Raw output:", output);
 			throw new Error("Could not find initialize response in the output");
 		}
-
-		let jobId;
-		try {
-			jobId = eval(`(${jsonMatch[0]})`);
-		} catch (error) {
-			console.error("Extracted output:", jsonMatch[0]);
-			throw new Error("Failed to parse the extracted output:\n" + error);
-		}
-        computeJobId = jobId
+        const match = jsonMatch[0].match(/JobID:\s*(.*)/s);
+        const result = match ? match[1].trim() : null;
+        computeJobId = result
         expect(computeJobId).to.be.a("string");
     });
     

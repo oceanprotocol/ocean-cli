@@ -315,8 +315,6 @@ export class Commands {
 			return;
 		}
 
-		// TODO: check valid maxJobDuration
-
 		const computeEnvID = args[3];
 		// NO chainId needed anymore (is not part of ComputeEnvironment spec anymore)
 		// const chainComputeEnvs = computeEnvs[computeEnvID]; // was algoDdo.chainId
@@ -374,6 +372,20 @@ export class Commands {
 			);
 			return;
 		}
+		if (maxJobDuration < 0) {
+			console.error(
+				"Error initializing Provider for the compute job using dataset DID " +
+					args[1] +
+					" and algorithm DID " +
+					args[2] +
+					" because maxJobDuration is less than 0. It should be in seconds."
+			);
+			return;
+		}
+		let supportedMaxJobDuration: number = maxJobDuration;
+		if (maxJobDuration > computeEnv.maxJobDuration) {
+			supportedMaxJobDuration = computeEnv.maxJobDuration;
+		}
 		const paymentToken = args[5]
 		if (!paymentToken) {
 			console.error(
@@ -382,6 +394,31 @@ export class Commands {
 					" and algorithm DID " +
 					args[2] +
 					" because paymentToken was not provided."
+			);
+			return;
+		}
+		const chainId = await this.signer.getChainId()
+		if (!computeEnv.fees.keys().includes(chainId)) {
+			console.error(
+				"Error starting paid compute using dataset DID " +
+					args[1] +
+					" and algorithm DID " +
+					args[2] +
+					" because chainId is not supported by compute environment. " +
+					args[3] +
+					". Supported chain IDs: " +
+					computeEnv.fees.keys()
+			);
+			return;
+		}
+		if (computeEnv.fees[chainId].feeToken !== paymentToken) {
+			console.error(
+				"Error initializing Provider for the compute job using dataset DID " +
+					args[1] +
+					" and algorithm DID " +
+					args[2] +
+					" because paymentToken is not supported by this environment " +
+					args[3]
 			);
 			return;
 		}
@@ -396,16 +433,22 @@ export class Commands {
 			);
 			return;
 		}
+		const parsedResources = JSON.parse(resources);
+		// for (const resource of parsedResources) {
+		// 	if (resource.amount > computeEnv.resources[resource.id].amount) {
+
+		// 	}
+		// }
 		const providerInitializeComputeJob =
 			await ProviderInstance.initializeCompute(
 				assets,
 				algo,
 				computeEnv.id,
 				paymentToken,
-				maxJobDuration,
+				supportedMaxJobDuration,
 				providerURI,
 				this.signer, // V1 was this.signer.getAddress()
-				JSON.parse(resources)
+				parsedResources
 			);
 		if (
 			!providerInitializeComputeJob ||
@@ -594,7 +637,6 @@ export class Commands {
 			}
 		}
 		// payment check
-		// TODO: check valid maxJobDuration
 		const maxJobDuration = Number(args[5])
 		if (!maxJobDuration) {
 			console.error(
@@ -606,10 +648,25 @@ export class Commands {
 			);
 			return;
 		}
+		if (maxJobDuration < 0) {
+			console.error(
+				"Error starting paid compute using dataset DID " +
+					args[1] +
+					" and algorithm DID " +
+					args[2] +
+					" because maxJobDuration is less than 0. It should be in seconds."
+			);
+			return;
+		}
+		let supportedMaxJobDuration: number = maxJobDuration;
+		if (maxJobDuration > computeEnv.maxJobDuration) {
+			supportedMaxJobDuration = computeEnv.maxJobDuration;
+		}
+		const chainId = await this.signer.getChainId()
 		const paymentToken = args[6]
 		if (!paymentToken) {
 			console.error(
-				"Error initializing Provider for the compute job using dataset DID " +
+				"Error starting paid compute using dataset DID " +
 					args[1] +
 					" and algorithm DID " +
 					args[2] +
@@ -617,10 +674,35 @@ export class Commands {
 			);
 			return;
 		}
+		if (!computeEnv.fees.keys().includes(chainId)) {
+			console.error(
+				"Error starting paid compute using dataset DID " +
+					args[1] +
+					" and algorithm DID " +
+					args[2] +
+					" because chainId is not supported by compute environment. " +
+					args[3] +
+					". Supported chain IDs: " +
+					computeEnv.fees.keys()
+			);
+			return;
+		}
+		
+		if (computeEnv.fees[chainId].feeToken !== paymentToken) {
+			console.error(
+				"Error starting paid compute using dataset DID " +
+					args[1] +
+					" and algorithm DID " +
+					args[2] +
+					" because paymentToken is not supported by this environment " +
+					args[3]
+			);
+			return;
+		}
 		const resources = args[7] // resources object should be stringified in cli when calling initializeCompute
 		if (!resources) {
 			console.error(
-				"Error initializing Provider for the compute job using dataset DID " +
+				"Error starting paid compute using dataset DID " +
 					args[1] +
 					" and algorithm DID " +
 					args[2] +
@@ -634,7 +716,7 @@ export class Commands {
 				algo,
 				computeEnv.id,
 				paymentToken,
-				maxJobDuration,
+				supportedMaxJobDuration,
 				providerURI,
 				this.signer, // V1 was this.signer.getAddress()
 				JSON.parse(resources)

@@ -196,6 +196,7 @@ describe("Ocean CLI Compute", function() {
         ]
         console.log(`resources: ${JSON.stringify(resources)}`)
         const paymentToken = getAddresses().Ocean
+        const escrow = getAddresses().Escrow;
         const output = await runCommand(`npm run cli initializeCompute ${computeDatasetDid} ${jsAlgoDid} ${computeEnvId} 900 ${paymentToken} ${JSON.stringify(resources)}`);
         const jsonMatch = output.match(/initialize compute details:\s*([\s\S]*)/);
 		if (!jsonMatch) {
@@ -210,8 +211,21 @@ describe("Ocean CLI Compute", function() {
 			throw new Error("Failed to parse the extracted output:\n" + error);
 		}
         expect(providerInitializeResponse).to.have.property("payment").that.is.an("object");
-		// expect(providerInitializeResponse).to.have.property("consumerAddress").that.is.a("string");
-		// expect(providerInitializeResponse).to.have.property("resources").that.is.an("array");
+        expect(providerInitializeResponse.payment).to.have.property("escrowAddress").that.is.a("string").and.that.is.eq(escrow);
+        expect(providerInitializeResponse.payment).to.have.property("token").that.is.a("string").and.that.is.eq(paymentToken);
+        expect(providerInitializeResponse.payment).to.have.property("amount").that.is.a("string");
+        expect(providerInitializeResponse).to.have.property("algorithm").that.is.an("object");
+        expect(providerInitializeResponse.algorithm).to.have.property("providerFee").that.is.an("object");
+        expect(providerInitializeResponse.algorithm.providerFee).to.have.property("providerFeeAddress").that.is.a("string");
+        expect(providerInitializeResponse.algorithm.providerFee).to.have.property("providerFeeToken").that.is.a("string").and.that.is.eq(paymentToken);
+        expect(providerInitializeResponse.algorithm.providerFee).to.have.property("providerFeeAmount").that.is.a("string").and.that.is.eq('0');
+        expect(providerInitializeResponse.algorithm.providerFee).to.have.property("providerData").that.is.a("string");
+        expect(providerInitializeResponse).to.have.property("datasets").that.is.an("array");
+        expect(providerInitializeResponse.datasets[0]).to.have.property("providerFee").that.is.an("object");
+        expect(providerInitializeResponse.datasets[0].providerFee).to.have.property("providerFeeAddress").that.is.a("string");
+        expect(providerInitializeResponse.datasets[0].providerFee).to.have.property("providerFeeToken").that.is.a("string").and.that.is.eq(paymentToken);
+        expect(providerInitializeResponse.datasets[0].providerFee).to.have.property("providerFeeAmount").that.is.a("string").and.that.is.eq('0');
+        expect(providerInitializeResponse.datasets[0].providerFee).to.have.property("providerData").that.is.a("string");
 
     });
 
@@ -223,8 +237,7 @@ describe("Ocean CLI Compute", function() {
 			console.error("Raw output:", output);
 			throw new Error("Could not find start compute response in the output");
 		}
-        const match = jsonMatch[0].match(/JobID:\s*(.*)/s);
-        const result = match ? match[1].trim() : null;
+        const result = jsonMatch[0].split('JobID:')[1]?.trim();
         if (!result) {
 			console.error("Raw output:", output);
 			throw new Error("Could not find compute job in the output");

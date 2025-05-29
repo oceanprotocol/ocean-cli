@@ -221,6 +221,7 @@ export async function createCLI() {
     .argument('<algoDid>', 'Algorithm DID')
     .argument('<computeEnvId>', 'Compute environment ID')
     .argument('<computeEnvId>', 'Compute environment ID')
+    .argument('<providerInitializeResponse>', 'Initialize compute response')
     .argument('<maxJobDuration>', 'maxJobDuration for compute job')
     .argument('<paymentToken>', 'Payment token for compute')
     .argument('<resources>', 'Resources of compute environment stringified')
@@ -228,14 +229,16 @@ export async function createCLI() {
     .option('-d, --datasets <datasetDids>', 'Dataset DIDs (comma-separated) OR (empty array for none)')
     .option('-a, --algo <algoDid>', 'Algorithm DID')
     .option('-e, --env <computeEnvId>', 'Compute environment ID')
+    .option('-init <initializeResponse>', 'Initialize response')
     .option('--maxJobDuration <maxJobDuration>', 'Compute maxJobDuration')
     .option('-t, --token <paymentToken>', 'Compute payment token')
     .option('--resources <resources>', 'Compute resources')
     .option('--amount <amountToDeposit>', 'AMount to deposit in escrow')
-    .action(async (datasetDids, algoDid, computeEnvId, maxJobDuration, paymentToken, resources, amountToDeposit, options) => {
+    .action(async (datasetDids, algoDid, computeEnvId, initializeResponse, maxJobDuration, paymentToken, resources, amountToDeposit, options) => {
       const dsDids = options.datasets || datasetDids;
       const aDid = options.algo || algoDid;
       const envId = options.env || computeEnvId;
+      const initResp = options.init || initializeResponse;
       const jobDuration = options.maxJobDuration || maxJobDuration;
       const token = options.token ||paymentToken;
       const res = options.resources ||resources;
@@ -247,7 +250,7 @@ export async function createCLI() {
       }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
-      await commands.computeStart([null, dsDids, aDid, envId, jobDuration.toString(), token, JSON.stringify(res), amount.toString()]);
+      await commands.computeStart([null, dsDids, aDid, envId, JSON.stringify(initResp), jobDuration.toString(), token, JSON.stringify(res), amount.toString()]);
     });
 
   // startFreeCompute command

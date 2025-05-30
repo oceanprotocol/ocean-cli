@@ -2,12 +2,13 @@ import { expect } from "chai";
 import { exec } from "child_process";
 import path from "path";
 import fs from "fs";
+import util from "util";
 import crypto from "crypto";
 import https from "https";
 
 import { dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { runCommand } from "./computeFlow.test";
+const execPromise = util.promisify(exec);
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -42,6 +43,18 @@ describe("Ocean CLI Publishing", function() {
                 fs.unlink(dest, () => reject(err));
             });
         });
+    };
+
+    const runCommand = async (command: string): Promise<string> => {
+        console.log(`\n[CMD]: ${command}`);
+        try {
+            const { stdout } = await execPromise(command, { cwd: projectRoot });
+            console.log(`[OUTPUT]:\n${stdout}`);
+            return stdout;
+        } catch (error: any) {
+            console.error(`[ERROR]:\n${error.stderr || error.message}`);
+            throw error;
+        }
     };
     
     

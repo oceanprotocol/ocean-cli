@@ -214,7 +214,6 @@ export async function createCLI() {
     .argument('<datasetDids>', 'Dataset DIDs (comma-separated) OR (empty array for none)')
     .argument('<algoDid>', 'Algorithm DID')
     .argument('<computeEnvId>', 'Compute environment ID')
-    .argument('<computeEnvId>', 'Compute environment ID')
     .argument('<providerInitializeResponse>', 'Initialize compute response')
     .argument('<maxJobDuration>', 'maxJobDuration for compute job')
     .argument('<paymentToken>', 'Payment token for compute')
@@ -236,7 +235,7 @@ export async function createCLI() {
       const jobDuration = options.maxJobDuration || maxJobDuration;
       const token = options.token || paymentToken;
       const res = options.resources || resources;
-      const amount = options.amount || amountToDeposit;
+      const amount = options.amountToDeposit || amountToDeposit;
       if (!dsDids || !aDid ||!envId || !initResp || !jobDuration || !token || !res || !amount) {
         console.error(chalk.red('Missing required arguments'));
         // process.exit(1);

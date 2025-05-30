@@ -48,7 +48,7 @@ describe("Ocean CLI Compute", function() {
 		const jsonMatch = output.match(/did:op:[a-f0-9]{64}/);
         if (!jsonMatch) {
 			console.error("Raw output:", output);
-			throw new Error("Could not find compute environments in the output");
+			throw new Error("Could not find compute dataset did in the output");
 		}
 
 		try {
@@ -72,7 +72,7 @@ describe("Ocean CLI Compute", function() {
 		const jsonMatch = output.match(/did:op:[a-f0-9]{64}/);
 		if (!jsonMatch) {
 			console.error("Raw output:", output);
-			throw new Error("Could not find compute environments in the output");
+			throw new Error("Could not find algo did in the output");
 		}
 
         try {

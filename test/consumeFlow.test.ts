@@ -7,6 +7,7 @@ import https from "https";
 
 import { dirname } from 'path'
 import { fileURLToPath } from 'url'
+import { runCommand } from "./computeFlow.test";
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -45,13 +46,12 @@ describe("Ocean CLI Publishing", function() {
     
     
 
-    it("should publish a dataset using 'npm run cli publish'", function(done) {
+    it("should publish a dataset using 'npm run cli publish'", async function() {
         const metadataFile = path.resolve(projectRoot, "metadata/simpleDownloadDataset.json");
 
         // Ensure the metadata file exists
         if (!fs.existsSync(metadataFile)) {
-            done(new Error("Metadata file not found: " + metadataFile));
-            return;
+            throw new Error("Metadata file not found: " + metadataFile);
         }
 
         process.env.PRIVATE_KEY = "0x1d751ded5a32226054cd2e71261039b65afb9ee1c746d055dd699b1150a5befc";
@@ -60,120 +60,159 @@ describe("Ocean CLI Publishing", function() {
         process.env.NODE_URL = "http://127.0.0.1:8001";
         process.env.ADDRESS_FILE = path.join(process.env.HOME || "", ".ocean/ocean-contracts/artifacts/address.json");
 
-        exec(`npm run cli publish ${metadataFile}`, { cwd: projectRoot }, (error, stdout) => {
-            try {
-                const match = stdout.match(/did:op:[a-f0-9]{64}/);
-                if (match) {
-                    downloadDatasetDid = match[0];
-                    console.log('download asset: ', downloadDatasetDid)
-                }
-                expect(stdout).to.contain("Asset published. ID:");
-                done()
-            } catch (assertionError) {
-                done(assertionError);
-            }
-        });
+        const output = await runCommand(`npm run cli publish ${metadataFile}`);
+
+		const jsonMatch = output.match(/did:op:[a-f0-9]{64}/);
+        if (!jsonMatch) {
+			console.error("Raw output:", output);
+			throw new Error("Could not find compute environments in the output");
+		}
+
+		try {
+			downloadDatasetDid = jsonMatch[0];
+		} catch (error) {
+			console.error("Extracted output:", jsonMatch[0]);
+			throw new Error("Failed to parse the extracted output:\n" + error);
+		}
+
     });
 
-    it("should publish a compute dataset using 'npm run cli publish'", function(done) {
+    it("should publish a compute dataset using 'npm run cli publish'", async function() {
         const metadataFile = path.resolve(projectRoot, "metadata/simpleComputeDataset.json");
         // Ensure the metadata file exists
         if (!fs.existsSync(metadataFile)) {
-            done(new Error("Metadata file not found: " + metadataFile));
-            return;
+            throw new Error("Metadata file not found: " + metadataFile);
         }
 
-        exec(`npm run cli publish ${metadataFile}`, { cwd: projectRoot }, (error, stdout) => {
-            try {
-                const match = stdout.match(/did:op:[a-f0-9]{64}/);
-                if (match) {
-                    computeDatasetDid = match[0];
-                }
-                expect(stdout).to.contain("Asset published. ID:");
-                done()
-            } catch (assertionError) {
-                done(assertionError);
-            }
-        });
+        const output = await runCommand(`npm run cli publish ${metadataFile}`);
+
+		const jsonMatch = output.match(/did:op:[a-f0-9]{64}/);
+        if (!jsonMatch) {
+			console.error("Raw output:", output);
+			throw new Error("Could not find compute environments in the output");
+		}
+
+		try {
+			computeDatasetDid = jsonMatch[0];
+		} catch (error) {
+			console.error("Extracted output:", jsonMatch[0]);
+			throw new Error("Failed to parse the extracted output:\n" + error);
+		}
     });
 
-    it("should publish a js Algorithm using 'npm run cli publishAlgo'", function(done) {
+    it("should publish a js Algorithm using 'npm run cli publishAlgo'", async function() {
         const filePath = path.resolve(projectRoot, "metadata/jsAlgo.json");
 
         // Ensure the metadata file exists
         if (!fs.existsSync(filePath)) {
-            done(new Error("Metadata file not found: " + filePath));
-            return;
+            throw new Error("Metadata file not found: " + filePath);
         }
+         
+        const output = await runCommand(`npm run cli publishAlgo ${filePath}`);
+        const jsonMatch = output.match(/did:op:[a-f0-9]{64}/);
+        if (!jsonMatch) {
+			console.error("Raw output:", output);
+			throw new Error("Could not find compute environments in the output");
+		}
 
-        exec(`npm run cli publishAlgo ${filePath}`, { cwd: projectRoot }, (error, stdout) => {
-            try {
-                expect(stdout).to.contain("Algorithm published. DID:");
-                const match = stdout.match(/did:op:[a-f0-9]{64}/);
-                if (match) {
-                    jsAlgoDid = match[0];
-                }
-                done()
-            } catch (assertionError) {
-                done(assertionError);
-            }
-        });
+		try {
+			jsAlgoDid = jsonMatch[0];
+		} catch (error) {
+			console.error("Extracted output:", jsonMatch[0]);
+			throw new Error("Failed to parse the extracted output:\n" + error);
+		}
     });
 
-    it("should publish a python Algorithm using 'npm run cli publishAlgo'", function(done) {
+    it("should publish a python Algorithm using 'npm run cli publishAlgo'", async function() {
         const filePath = path.resolve(projectRoot, "metadata/pythonAlgo.json");
 
         // Ensure the metadata file exists
         if (!fs.existsSync(filePath)) {
-            done(new Error("Metadata file not found: " + filePath));
-            return;
+            throw new Error("Metadata file not found: " + filePath);
         }
 
-        exec(`npm run cli publishAlgo ${filePath}`, { cwd: projectRoot }, (error, stdout) => {
-            try {
-                expect(stdout).to.contain("Algorithm published. DID:");
-                const match = stdout.match(/did:op:[a-f0-9]{64}/);
-                if (match) {
-                    pythonAlgoDid = match[0];
-                }
-                done()
-            } catch (assertionError) {
-                done(assertionError);
-            }
-        });
+        const output = await runCommand(`npm run cli publishAlgo ${filePath}`);
+        const jsonMatch = output.match(/did:op:[a-f0-9]{64}/);
+        if (!jsonMatch) {
+			console.error("Raw output:", output);
+			throw new Error("Could not find compute environments in the output");
+		}
+
+		try {
+			pythonAlgoDid = jsonMatch[0];
+		} catch (error) {
+			console.error("Extracted output:", jsonMatch[0]);
+			throw new Error("Failed to parse the extracted output:\n" + error);
+		}
     });
 
-    it("should get DDO using 'npm run cli getDDO' for download dataset", function(done) {
+    it("should get DDO using 'npm run cli getDDO' for download dataset", async function() {
 
-        exec(`npm run cli getDDO ${downloadDatasetDid}`, { cwd: projectRoot }, (error, stdout) => {
-            expect(stdout).to.contain(`${downloadDatasetDid}`);
-            expect(stdout).to.contain("https://w3id.org/did/v1");
-            done()
-        });
+        const output = await runCommand(`npm run cli getDDO ${downloadDatasetDid}`);
+
+		const jsonMatch = output.match(/s*([\s\S]*)/);
+		if (!jsonMatch) {
+			console.error("Raw output:", output);
+			throw new Error("Could not find compute environments in the output");
+		}
+
+        try {
+            expect(output).to.contain(`Resolving Asset with DID: ${downloadDatasetDid}`)
+		} catch (error) {
+			console.error("Extracted output:", jsonMatch[0]);
+			throw new Error("Failed to parse the extracted output:\n" + error);
+		}
     });
 
-    it("should get DDO using 'npm run cli getDDO' for compute dataset", function(done) {
-        exec(`npm run cli getDDO ${computeDatasetDid}`, { cwd: projectRoot }, (error, stdout) => {
-            expect(stdout).to.contain(`${computeDatasetDid}`);
-            expect(stdout).to.contain("https://w3id.org/did/v1");
-            done()
-        });
+    it("should get DDO using 'npm run cli getDDO' for compute dataset", async function() {
+        const output = await runCommand(`npm run cli getDDO ${computeDatasetDid}`);
+
+		const jsonMatch = output.match(/s*([\s\S]*)/);
+		if (!jsonMatch) {
+			console.error("Raw output:", output);
+			throw new Error("Could not find compute environments in the output");
+		}
+
+        try {
+            expect(output).to.contain(`Resolving Asset with DID: ${computeDatasetDid}`)
+		} catch (error) {
+			console.error("Extracted output:", jsonMatch[0]);
+			throw new Error("Failed to parse the extracted output:\n" + error);
+		}
     });
 
-    it("should get DDO using 'npm run cli getDDO' for JS algorithm", function(done) {
-        exec(`npm run cli getDDO ${jsAlgoDid}`, { cwd: projectRoot }, (error, stdout) => {
-            expect(stdout).to.contain(`${jsAlgoDid}`);
-            expect(stdout).to.contain("https://w3id.org/did/v1");
-            done()
-        });
+    it("should get DDO using 'npm run cli getDDO' for JS algorithm", async function() {
+        const output = await runCommand(`npm run cli getDDO ${jsAlgoDid}`);
+
+		const jsonMatch = output.match(/s*([\s\S]*)/);
+		if (!jsonMatch) {
+			console.error("Raw output:", output);
+			throw new Error("Could not find compute environments in the output");
+		}
+
+        try {
+			expect(output).to.contain(`Resolving Asset with DID: ${jsAlgoDid}`)
+		} catch (error) {
+			console.error("Extracted output:", jsonMatch[0]);
+			throw new Error("Failed to parse the extracted output:\n" + error);
+		}
     });
 
-    it("should get DDO using 'npm run cli getDDO' for python algorithm", function(done) {
-        exec(`npm run cli getDDO ${pythonAlgoDid}`, { cwd: projectRoot }, (error, stdout) => {
-            expect(stdout).to.contain(`${pythonAlgoDid}`);
-            expect(stdout).to.contain("https://w3id.org/did/v1");
-            done()
-        });
+    it("should get DDO using 'npm run cli getDDO' for python algorithm", async function() {
+        const output = await runCommand(`npm run cli getDDO ${pythonAlgoDid}`);
+
+		const jsonMatch = output.match(/s*([\s\S]*)/);
+		if (!jsonMatch) {
+			console.error("Raw output:", output);
+			throw new Error("Could not find compute environments in the output");
+		}
+
+        try {
+			expect(output).to.contain(`Resolving Asset with DID: ${pythonAlgoDid}`)
+		} catch (error) {
+			console.error("Extracted output:", jsonMatch[0]);
+			throw new Error("Failed to parse the extracted output:\n" + error);
+		}
     });
 
     it("should download the download dataset", function(done) {

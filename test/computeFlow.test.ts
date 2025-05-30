@@ -15,20 +15,8 @@ const execPromise = util.promisify(exec);
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
-
-describe("Ocean CLI Compute", function() {
-    this.timeout(600000); // Set a longer timeout to allow the command to execute
-
-    let computeDatasetDid: string;
-    let jsAlgoDid: string;
-    let computeEnvId: string;
-    let resources: any;
-    let providerInitializeResponse: any
-    let computeJobId: string
-
-    const projectRoot = path.resolve(__dirname, "..");
-
-    const runCommand = async (command: string): Promise<string> => {
+const projectRoot = path.resolve(__dirname, "..");
+export const runCommand = async (command: string): Promise<string> => {
 		console.log(`\n[CMD]: ${command}`);
 		try {
 			const { stdout } = await execPromise(command, { cwd: projectRoot });
@@ -39,6 +27,16 @@ describe("Ocean CLI Compute", function() {
 			throw error;
 		}
 	};
+
+describe("Ocean CLI Compute", function() {
+    this.timeout(600000); // Set a longer timeout to allow the command to execute
+
+    let computeDatasetDid: string;
+    let jsAlgoDid: string;
+    let computeEnvId: string;
+    let resources: any;
+    let providerInitializeResponse: any
+    let computeJobId: string
 
     const getAddresses = () => {
         const data = JSON.parse(

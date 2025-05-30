@@ -227,24 +227,16 @@ export async function createCLI() {
     .option('--maxJobDuration <maxJobDuration>', 'Compute maxJobDuration')
     .option('-t, --token <paymentToken>', 'Compute payment token')
     .option('--resources <resources>', 'Compute resources')
-    .option('--amount <amountToDeposit>', 'Amount to deposit in escrow')
+    .option('--amountToDeposit <amountToDeposit>', 'Amount to deposit in escrow')
     .action(async (datasetDids, algoDid, computeEnvId, initializeResponse, maxJobDuration, paymentToken, resources, amountToDeposit, options) => {
       const dsDids = options.datasets || datasetDids;
-      console.log(`dsDids: `, dsDids)
       const aDid = options.algo || algoDid;
-      console.log(`aDid: `, aDid)
       const envId = options.env || computeEnvId;
-      console.log(`envId: `, envId)
       const initResp = options.init || initializeResponse;
-      console.log(`initResp: `, initResp)
       const jobDuration = options.maxJobDuration || maxJobDuration;
-      console.log(`jobDuration: `, jobDuration)
       const token = options.token || paymentToken;
-      console.log(`token: `, token)
       const res = options.resources || resources;
-      console.log(`res: `, res)
       const amount = options.amount || amountToDeposit;
-      console.log(`amount: `, amount)
       if (!dsDids || !aDid ||!envId || !initResp || !jobDuration || !token || !res || !amount) {
         console.error(chalk.red('Missing required arguments'));
         // process.exit(1);
@@ -252,7 +244,7 @@ export async function createCLI() {
       }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
-      await commands.computeStart([null, dsDids, aDid, envId, JSON.stringify(initResp), jobDuration.toString(), token, JSON.stringify(res), amount.toString()]);
+      await commands.computeStart([null, dsDids, aDid, envId, JSON.stringify(initResp), jobDuration, token, JSON.stringify(res), amount.toString()]);
     });
 
   // startFreeCompute command

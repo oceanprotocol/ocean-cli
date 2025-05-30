@@ -2,16 +2,10 @@ import { expect } from "chai";
 import { exec } from "child_process";
 import path from "path";
 import fs from "fs";
-import util from "util";
 import crypto from "crypto";
 import https from "https";
 
-import { dirname } from 'path'
-import { fileURLToPath } from 'url'
-const execPromise = util.promisify(exec);
-
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = dirname(__filename)
+import { projectRoot, runCommand } from "./util.js";
 
 describe("Ocean CLI Publishing", function() {
     this.timeout(200000); // Set a longer timeout to allow the command to execute
@@ -21,7 +15,6 @@ describe("Ocean CLI Publishing", function() {
     let jsAlgoDid: string;
     let pythonAlgoDid: string;
 
-    const projectRoot = path.resolve(__dirname, "..");
 
     // Function to compute hash of a file
     const computeFileHash = (filePath: string): string => {
@@ -44,19 +37,6 @@ describe("Ocean CLI Publishing", function() {
             });
         });
     };
-
-    const runCommand = async (command: string): Promise<string> => {
-        console.log(`\n[CMD]: ${command}`);
-        try {
-            const { stdout } = await execPromise(command, { cwd: projectRoot });
-            console.log(`[OUTPUT]:\n${stdout}`);
-            return stdout;
-        } catch (error: any) {
-            console.error(`[ERROR]:\n${error.stderr || error.message}`);
-            throw error;
-        }
-    };
-    
     
 
     it("should publish a dataset using 'npm run cli publish'", async function() {

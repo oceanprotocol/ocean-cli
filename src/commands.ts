@@ -596,6 +596,7 @@ export class Commands {
 			});
 		}
 		const providerInitializeComputeJob = JSON.parse(args[4]); // provider fees + payment
+		console.log(`providerInitializeComputeJob: ${JSON.stringify(providerInitializeComputeJob)}`)
 		console.log("Ordering algorithm: ", args[2]);
 		const datatoken = new Datatoken(
 			this.signer,

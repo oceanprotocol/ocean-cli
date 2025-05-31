@@ -9,7 +9,6 @@ import {
 	getMetadataURI,
 	getIndexingWaitSettings,
 	IndexerWaitParams,
-	isEthersFormat,
 	fixAndParseProviderFees
 } from "./helpers.js";
 import {
@@ -412,7 +411,6 @@ export class Commands {
 			);
 			return;
 		}
-		console.log(`computeEnv.fees[chainId]: `, JSON.stringify(computeEnv.fees[chainId.toString()]))
 		let found: boolean = false;
 		for (const fee of computeEnv.fees[chainId.toString()]) {
 			if (fee.feeToken.toLowerCase() === paymentToken.toLowerCase()) {

@@ -1,5 +1,4 @@
 import { expect } from "chai";
-import { exec } from "child_process";
 import path from "path";
 import fs from "fs";
 import crypto from "crypto";
@@ -208,42 +207,26 @@ describe("Ocean CLI Publishing", function() {
 		}
     });
 
-    it("should download the download dataset", function(done) {
+    it("should download the download dataset", async function() {
         this.timeout(10000); // Increase timeout if needed
+        const output = await runCommand(`npm run cli download ${downloadDatasetDid} .`);
     
-        (async () => {
-            try {
-                const { stdout } = await new Promise<{ stdout: string, error: Error | null }>((resolve, reject) => {
-                    exec(`npm run cli download ${downloadDatasetDid} .`, { cwd: projectRoot }, (error, stdout) => {
-                        if (error) {
-                            reject(error);
-                        } else {
-                            resolve({ stdout, error: null });
-                        }
-                    });
-                });
+        expect(output).to.contain("File downloaded successfully");
+
+        // Path to the downloaded file
+        const downloadedFilePath = './LICENSE';
+
+        // Verify the downloaded file content hash matches the original file hash
+        const downloadedFileHash = computeFileHash(downloadedFilePath);
+        const originalFilePath = './metadata/LICENSE';
+
+        await downloadFile("https://raw.githubusercontent.com/oceanprotocol/ocean-node/refs/heads/main/LICENSE", originalFilePath);
+        const originalFileHash = computeFileHash(originalFilePath);
+
+        expect(downloadedFileHash).to.equal(originalFileHash);
+
+        // Clean up downloaded original file
+        fs.unlinkSync(originalFilePath);
     
-                expect(stdout).to.contain("File downloaded successfully");
-    
-                // Path to the downloaded file
-                const downloadedFilePath = './LICENSE';
-    
-                // Verify the downloaded file content hash matches the original file hash
-                const downloadedFileHash = computeFileHash(downloadedFilePath);
-                const originalFilePath = './metadata/LICENSE';
-    
-                await downloadFile("https://raw.githubusercontent.com/oceanprotocol/ocean-node/refs/heads/main/LICENSE", originalFilePath);
-                const originalFileHash = computeFileHash(originalFilePath);
-    
-                expect(downloadedFileHash).to.equal(originalFileHash);
-    
-                // Clean up downloaded original file
-                fs.unlinkSync(originalFilePath);
-    
-                done()
-            } catch (err) {
-                done(err);
-            }
-        })();
     });
 });

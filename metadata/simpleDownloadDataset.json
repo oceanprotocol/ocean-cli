@@ -55,14 +55,16 @@
       "purgatory": {
         "state": false
       },
-      "stats": {
-        "allocated": 0,
+      "stats": [
+        {
         "orders": 0,
-        "price": {
-          "value": "2"
-        }
+        "prices": [
+          {
+            "price": "0"
+          }
+        ]
       }
-    },
+    ],
     "datatokens": []
-  
+  }
 }

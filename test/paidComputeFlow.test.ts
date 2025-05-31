@@ -9,7 +9,7 @@ import { projectRoot, runCommand } from "./util.js";
 
 
 
-describe("Ocean CLI Compute", function() {
+describe("Ocean CLI Paid Compute", function() {
     this.timeout(600000); // Set a longer timeout to allow the command to execute
 
     let computeDatasetDid: string;
@@ -18,6 +18,7 @@ describe("Ocean CLI Compute", function() {
     let resources: any;
     let providerInitializeResponse: any
     let computeJobId: string
+    let agreementId: string
 
     const getAddresses = () => {
         const data = JSON.parse(
@@ -211,18 +212,62 @@ describe("Ocean CLI Compute", function() {
     it("should start paid compute on compute dataset and algorithm", async function() {
         const paymentToken = getAddresses().Ocean
         const output = await runCommand(`npm run cli startCompute ${computeDatasetDid} ${jsAlgoDid} ${computeEnvId} ${JSON.stringify(providerInitializeResponse)} 900 ${paymentToken} ${JSON.stringify(resources)} ${providerInitializeResponse.payment.amount}`);
-        const jsonMatch = output.match(/JobID:\s*([\s\S]*)/);
-		if (!jsonMatch) {
-			console.error("Raw output:", output);
-			throw new Error("Could not find start compute response in the output");
-		}
-        const result = jsonMatch[0].split('JobID:')[1]?.trim();
-        if (!result) {
-			console.error("Raw output:", output);
-			throw new Error("Could not find compute job in the output");
-		}
-        computeJobId = result
+        const jobIdMatch = output.match(/JobID:\s*([^\s]+)/);
+        const agreementIdMatch = output.match(/Agreement ID:\s*([^\s]+)/);
+
+        if (!jobIdMatch) {
+            console.error("Raw output:", output);
+            throw new Error("Could not find Job ID in the output");
+        }
+
+        if (!agreementIdMatch) {
+            console.error("Raw output for finding agreement:", output);
+            throw new Error("Could not find Agreement ID in the output");
+        }
+
+        computeJobId = jobIdMatch[1];
+        agreementId = agreementIdMatch[1];
+
+        console.log(`jobId: ${computeJobId}`);
+        console.log(`agreementId: ${agreementId}`);
+
+        if (!computeJobId) {
+            console.error("Job ID was empty:", output);
+            throw new Error("Job ID is missing");
+        }
+
+        if (!agreementId) {
+            console.error("Agreement ID was empty:", output);
+            throw new Error("Agreement ID is missing");
+        }
+
         expect(computeJobId).to.be.a("string");
+        expect(agreementId).to.be.a("string");
     });
+
+    it('should delay for compute job', (done) => {
+        setTimeout(() => done(), 10000)
+    }).timeout(10200)
+
+    it("should get job status", async () => {
+		const output = await runCommand(`npm run cli getJobStatus ${computeDatasetDid} ${computeJobId} ${agreementId}`);
+		expect(output).to.contain(computeJobId);
+		expect(output.toLowerCase()).to.match(/status/);
+		console.log(`Job status retrieved for jobId: ${computeJobId}`);
+	});
+
+	it("should download compute job results", async () => {
+		const destFolder = path.join(projectRoot, "test-results", computeJobId);
+		fs.mkdirSync(destFolder, { recursive: true });
+
+		const output = await runCommand(`npm run cli downloadJobResults ${computeJobId} 1 ${destFolder}`);
+
+		expect(output.toLowerCase()).to.match(/download(ed)?/);
+
+		const files = fs.readdirSync(destFolder);
+		expect(files.length).to.be.greaterThan(0, "No result files downloaded");
+		console.log(`Downloaded results to: ${destFolder}`);
+        fs.rmSync(path.join(projectRoot, "test-results"), { recursive: true })
+	});
     
 });

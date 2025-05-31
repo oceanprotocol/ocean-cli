@@ -305,17 +305,6 @@ export async function updateAssetMetadata(
 //   }
 // }
 
-export function isEthersFormat(value: string) {
-  try {
-    // Try to convert the value into a BigNumber
-    const bigNumberValue = ethers.BigNumber.from(value);
-    
-    // Check if the conversion was successful
-    return bigNumberValue instanceof ethers.BigNumber;
-  } catch (e) {
-    return false; // Return false if conversion fails
-  }
-}
 
 export async function handleComputeOrder(
 	order: ProviderComputeInitialize,
@@ -506,4 +495,21 @@ export function getIndexingWaitSettings(): IndexerWaitParams {
 	}
 
 	return indexingParams
+}
+
+export function fixAndParseProviderFees(rawString: string) {
+  // Remove surrounding quotes if present
+  if (rawString.startsWith('"') && rawString.endsWith('"')) {
+    rawString = rawString.slice(1, -1).replace(/\\"/g, '"');
+  }
+
+  const fixed = rawString
+    .replace(/([{,])(\s*)([a-zA-Z0-9_]+)\s*:/g, '$1"$3":')
+    .replace(/:\s*(did:[^,}\]]+)/g, ':"$1"')
+    .replace(/:\s*(0x[a-fA-F0-9]+)/g, ':"$1"')
+    .replace(/providerData:\s*([^,}\]]+)/g, 'providerData:"$1"')
+    .replace(/:false/g, ':false')
+    .replace(/:true/g, ':true');
+
+  return JSON.parse(fixed);
 }

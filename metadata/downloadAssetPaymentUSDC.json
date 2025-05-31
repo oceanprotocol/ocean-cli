@@ -55,14 +55,15 @@
       "purgatory": {
         "state": false
       },
-      "stats": {
+      "stats": [{
         "orders": 0,
-        "price": {
-          "value": "2",
-          "tokenAddress":  "0xf08A50178dfcDe18524640EA6618a1f965821715",
-          "tokenSymbol": "USDC"
-        }
-      }
+        "token":  "0xf08A50178dfcDe18524640EA6618a1f965821715",
+        "prices": [
+          {
+            "price": "2"
+          }
+        ]
+      }]
     },
     "datatokens": [
     ],

@@ -9,7 +9,8 @@ import {
 	getMetadataURI,
 	getIndexingWaitSettings,
 	IndexerWaitParams,
-	isEthersFormat
+	isEthersFormat,
+	fixAndParseProviderFees
 } from "./helpers.js";
 import {
 	Aquarius,
@@ -523,7 +524,6 @@ export class Commands {
 		if (ddos.length > 0) {
 			providerURI = ddos[0].services[0].serviceEndpoint;
 		}
-
 		const algoDdo = await this.aquarius.waitForIndexer(
 			args[2],
 			null,
@@ -548,7 +548,6 @@ export class Commands {
 			);
 			return;
 		}
-
 		const computeEnvID = args[3];
 		// NO chainId needed anymore (is not part of ComputeEnvironment spec anymore)
 		// const chainComputeEnvs = computeEnvs[computeEnvID]; // was algoDdo.chainId
@@ -595,8 +594,8 @@ export class Commands {
 				serviceId: ddos[dataDdo].services[0].id,
 			});
 		}
-		const providerInitializeComputeJob = JSON.parse(args[4]); // provider fees + payment
-		console.log(`providerInitializeComputeJob: ${JSON.stringify(providerInitializeComputeJob)}`)
+		const providerInitializeComputeJob = args[4]; // provider fees + payment
+		const parsedProviderInitializeComputeJob = fixAndParseProviderFees(providerInitializeComputeJob)
 		console.log("Ordering algorithm: ", args[2]);
 		const datatoken = new Datatoken(
 			this.signer,
@@ -604,14 +603,14 @@ export class Commands {
 			this.config
 		);
 		algo.transferTxId = await handleComputeOrder(
-			providerInitializeComputeJob.algorithm,
+			parsedProviderInitializeComputeJob?.algorithm,
 			algoDdo,
 			this.signer,
 			computeEnv.consumerAddress,
 			0,
 			datatoken,
 			this.config,
-			providerInitializeComputeJob?.algorithm?.providerFee,
+			parsedProviderInitializeComputeJob?.algorithm?.providerFee,
 			providerURI
 		);
 		if (!algo.transferTxId) {
@@ -626,14 +625,14 @@ export class Commands {
 
 		for (let i = 0; i < ddos.length; i++) {
 			assets[i].transferTxId = await handleComputeOrder(
-				providerInitializeComputeJob.datasets[i],
+				parsedProviderInitializeComputeJob?.datasets[i],
 				ddos[i],
 				this.signer,
 				computeEnv.consumerAddress,
 				0,
 				datatoken,
 				this.config,
-				providerInitializeComputeJob?.datasets[i].providerFee,
+				parsedProviderInitializeComputeJob?.datasets[i].providerFee,
 				providerURI
 			);
 			if (!assets[i].transferTxId) {
@@ -736,12 +735,9 @@ export class Commands {
 				this.signer, // V1 was this.signer.getAddress()
 				JSON.parse(resources)
 			);
-		const paymentAmount = isEthersFormat(providerInitializeComputeJob.payment.amount.toString()) 
-							? ethers.BigNumber.from(providerInitializeComputeJob.payment.amount)
-							: providerInitializeComputeJob.payment.amount;
-
-		const expectedAmount = ethers.BigNumber.from(safePaymentDetails.payment.amount);
-
+		
+		const paymentAmount = ethers.BigNumber.from(parsedProviderInitializeComputeJob.payment.amount.toString());
+		const expectedAmount = ethers.BigNumber.from(safePaymentDetails.payment.amount.toString());
 		if (paymentAmount.lt(expectedAmount)) {
 			console.error(
 				"Error starting compute job dataset DID " +
@@ -755,7 +751,7 @@ export class Commands {
 		}
 
 		let amountToDeposit = args[8];
-		if (!amountToDeposit) {
+		if (amountToDeposit === '') {
 			console.warn(
 				"Warning starting compute job dataset DID " +
 				args[1] +
@@ -838,9 +834,9 @@ export class Commands {
 		console.log("compute jobs: ", computeJobs);
 
 		if (computeJobs && computeJobs[0]) {
-			const { jobId, agreementId } = computeJobs[0];
+			const { jobId, payment } = computeJobs[0];
 			console.log("Compute started.  JobID: " + jobId);
-			console.log("Agreement ID: " + agreementId);
+			console.log("Agreement ID: " + payment.lockTx);
 		} else {
 			console.log("Error while starting the compute job: ", computeJobs);
 		}

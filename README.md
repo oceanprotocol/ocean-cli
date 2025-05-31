@@ -287,10 +287,23 @@ npm run cli <command> [options] <arguments>
   `-d, --did <did>`  
   `-f, --folder [destinationFolder]` (Default: `.`)
 
+- **initializeCompute:**
+  `-d, --datasets <datasetDids>`  
+  `-a, --algo <algoDid>`  
+  `-e, --env <computeEnvId>`
+  `--validUntil <validUntil>`
+  `-t, --token <paymentToken>`
+  `--resources <resources>`
+
 - **startCompute:**  
   `-d, --datasets <datasetDids>`  
   `-a, --algo <algoDid>`  
   `-e, --env <computeEnvId>`
+  `--init <initializeResponse>`
+  `--maxJobDuration <maxJobDuration>`
+  `-t, --token <paymentToken>`
+  `--resources <resources>`
+  `--amountToDeposit <amountToDeposit>` (Id `''`, it will fallback to initialize compute payment amount.)
 
 - **startFreeCompute:**  
   `-d, --datasets <datasetDids>`  

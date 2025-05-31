@@ -4,8 +4,8 @@ import {
   Config,
   Aquarius,
 } from '@oceanprotocol/lib';
-import { createAssetUtil, updateAssetMetadata } from './helpers.js';
 import { Asset } from '@oceanprotocol/ddo-js';
+import { createAssetUtil, updateAssetMetadata } from './helpers.js';
 
 export interface PublishAssetParams {
   title: string;
@@ -56,20 +56,20 @@ export async function publishAsset(aquarius: Aquarius, params: PublishAssetParam
         event: undefined,
         purgatory: undefined,
         stats: [
-          {
-            orders: 0,
-            prices: [{
-              price: params.price,
-              contract: '0x282d8efCe846A88B159800bd4130ad77443Fa1A1',
-              token: params.token,
-              type: params.isCharged === false ? 'dispenser' : 'fixedrate'
-            }],
-            datatokenAddress: '',
-            name: 'access',
-            serviceId: 'access',
-            symbol: ''
-          }
-        ]
+        {
+          orders: 0,
+          prices: [{
+            price: params.price,
+            contract: '0x282d8efCe846A88B159800bd4130ad77443Fa1A1',
+            token: params.token,
+            type: params.isCharged === false ? 'dispenser' : 'fixedrate'
+          }],
+          datatokenAddress: '',
+          name: 'access',
+          serviceId: 'access',
+          symbol: ''
+      }
+      ]
       },
       services: [
         {

@@ -174,6 +174,38 @@ export async function createCLI() {
       const commands = new Commands(signer, chainId);
       await commands.allowAlgo([null, dsDid, aDid, options.encrypt.toString()]);
     });
+  // initializeCommand command
+  program
+    .command('initializeCompute')
+    .description('Initialises provider fees and payment for a compute job')
+    .argument('<datasetDids>', 'Dataset DIDs (comma-separated) OR (empty array for none)')
+    .argument('<algoDid>', 'Algorithm DID')
+    .argument('<computeEnvId>', 'Compute environment ID')
+    .argument('<computeValidUntil>', 'Valid Until for fees availability')
+    .argument('<paymentToken>', 'Payment token for compute')
+    .argument('<resources>', 'Resources of compute environment stringified')
+    .option('-d, --datasets <datasetDids>', 'Dataset DIDs (comma-separated) OR (empty array for none)')
+    .option('-a, --algo <algoDid>', 'Algorithm DID')
+    .option('-e, --env <computeEnvId>', 'Compute environment ID')
+    .option('--validUntil <validUntil>', 'Compute fees valid until')
+    .option('-t, --token <paymentToken>', 'Compute payment token')
+    .option('--resources <resources>', 'Compute resources')
+    .action(async (datasetDids, algoDid, computeEnvId, computeValidUntil, paymentToken, resources, options) => {
+      const dsDids = options.datasets || datasetDids;
+      const aDid = options.algo || algoDid;
+      const envId = options.env || computeEnvId;
+      const validUntil = options.validUntil || computeValidUntil;
+      const token = options.token || paymentToken;
+      const res = options.resources || resources;
+      if (!dsDids || !aDid || !envId || !validUntil || !token || !res) {
+        console.error(chalk.red('Missing required arguments'));
+        // process.exit(1);
+        return
+      }
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
+      await commands.initializeCompute([null, dsDids, aDid, envId, validUntil.toString(), token, JSON.stringify(res)]);
+    });
 
   // startCompute command
   program
@@ -182,21 +214,36 @@ export async function createCLI() {
     .argument('<datasetDids>', 'Dataset DIDs (comma-separated) OR (empty array for none)')
     .argument('<algoDid>', 'Algorithm DID')
     .argument('<computeEnvId>', 'Compute environment ID')
+    .argument('<providerInitializeResponse>', 'Initialize compute response')
+    .argument('<maxJobDuration>', 'maxJobDuration for compute job')
+    .argument('<paymentToken>', 'Payment token for compute')
+    .argument('<resources>', 'Resources of compute environment stringified')
+    .argument('<amountToDeposit>', 'Amount to deposit in escrow contract, optional.')
     .option('-d, --datasets <datasetDids>', 'Dataset DIDs (comma-separated) OR (empty array for none)')
     .option('-a, --algo <algoDid>', 'Algorithm DID')
     .option('-e, --env <computeEnvId>', 'Compute environment ID')
-    .action(async (datasetDids, algoDid, computeEnvId, options) => {
+    .option('--init <initializeResponse>', 'Initialize response')
+    .option('--maxJobDuration <maxJobDuration>', 'Compute maxJobDuration')
+    .option('-t, --token <paymentToken>', 'Compute payment token')
+    .option('--resources <resources>', 'Compute resources')
+    .option('--amountToDeposit <amountToDeposit>', 'Amount to deposit in escrow')
+    .action(async (datasetDids, algoDid, computeEnvId, initializeResponse, maxJobDuration, paymentToken, resources, amountToDeposit, options) => {
       const dsDids = options.datasets || datasetDids;
       const aDid = options.algo || algoDid;
       const envId = options.env || computeEnvId;
-      if (!dsDids || !aDid || !envId) {
+      const initResp = options.init || initializeResponse;
+      const jobDuration = options.maxJobDuration || maxJobDuration;
+      const token = options.token || paymentToken;
+      const res = options.resources || resources;
+      const amount = options.amountToDeposit || amountToDeposit;
+      if (!dsDids || !aDid ||!envId || !initResp || !jobDuration || !token || !res || !amount) {
         console.error(chalk.red('Missing required arguments'));
         // process.exit(1);
         return
       }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
-      await commands.computeStart([null, dsDids, aDid, envId]);
+      await commands.computeStart([null, dsDids, aDid, envId, JSON.stringify(initResp), jobDuration.toString(), token, JSON.stringify(res), amount.toString()]);
     });
 
   // startFreeCompute command
@@ -253,23 +300,22 @@ export async function createCLI() {
     .description('Stops a compute job')
     .argument('<datasetDid>', 'Dataset DID')
     .argument('<jobId>', 'Job ID')
-    .argument('[agreementId]', 'Agreement ID')
+    .argument('<agreementId>', 'Agreement ID')
     .option('-d, --dataset <datasetDid>', 'Dataset DID')
     .option('-j, --job <jobId>', 'Job ID')
-    .option('-a, --agreement [agreementId]', 'Agreement ID')
+    .option('-a, --agreement <agreementId>', 'Agreement ID')
     .action(async (datasetDid, jobId, agreementId, options) => {
       const dsDid = options.dataset || datasetDid;
       const jId = options.job || jobId;
       const agrId = options.agreement || agreementId;
-      if (!dsDid || !jId) {
+      if (!dsDid || !jId || !agrId) {
         console.error(chalk.red('Dataset DID and Job ID are required'));
         // process.exit(1);
         return
       }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
-      const args = [null, dsDid, jId];
-      if (agrId) args.push(agrId);
+      const args = [null, dsDid, jId, agrId];
       await commands.computeStop(args);
     });
 
@@ -279,23 +325,22 @@ export async function createCLI() {
     .description('Displays the compute job status')
     .argument('<datasetDid>', 'Dataset DID')
     .argument('<jobId>', 'Job ID')
-    .argument('[agreementId]', 'Agreement ID')
+    .argument('<agreementId>', 'Agreement ID')
     .option('-d, --dataset <datasetDid>', 'Dataset DID')
     .option('-j, --job <jobId>', 'Job ID')
-    .option('-a, --agreement [agreementId]', 'Agreement ID')
+    .option('-a, --agreement <agreementId>', 'Agreement ID')
     .action(async (datasetDid, jobId, agreementId, options) => {
       const dsDid = options.dataset || datasetDid;
       const jId = options.job || jobId;
       const agrId = options.agreement || agreementId;
-      if (!dsDid || !jId) {
+      if (!dsDid || !jId || !agrId) {
         console.error(chalk.red('Dataset DID and Job ID are required'));
         // process.exit(1);
         return
       }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
-      const args = [null, dsDid, jId];
-      if (agrId) args.push(agrId);
+      const args = [null, dsDid, jId, agrId];
       await commands.getJobStatus(args);
     });
 

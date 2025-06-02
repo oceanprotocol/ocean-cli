@@ -441,11 +441,6 @@ export class Commands {
 			return;
 		}
 		const parsedResources = JSON.parse(resources);
-		// for (const resource of parsedResources) {
-		// 	if (resource.amount > computeEnv.resources[resource.id].amount) {
-
-		// 	}
-		// }
 		const providerInitializeComputeJob =
 			await ProviderInstance.initializeCompute(
 				assets,

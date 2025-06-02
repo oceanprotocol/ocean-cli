@@ -303,19 +303,20 @@ export async function createCLI() {
     .argument('<agreementId>', 'Agreement ID')
     .option('-d, --dataset <datasetDid>', 'Dataset DID')
     .option('-j, --job <jobId>', 'Job ID')
-    .option('-a, --agreement <agreementId>', 'Agreement ID')
+    .option('-a, --agreement [agreementId]', 'Agreement ID')
     .action(async (datasetDid, jobId, agreementId, options) => {
       const dsDid = options.dataset || datasetDid;
       const jId = options.job || jobId;
       const agrId = options.agreement || agreementId;
-      if (!dsDid || !jId || !agrId) {
+      if (!dsDid || !jId) {
         console.error(chalk.red('Dataset DID and Job ID are required'));
         // process.exit(1);
         return
       }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
-      const args = [null, dsDid, jId, agrId];
+       const args = [null, dsDid, jId];
+      if (agrId) args.push(agrId);
       await commands.computeStop(args);
     });
 
@@ -328,19 +329,20 @@ export async function createCLI() {
     .argument('<agreementId>', 'Agreement ID')
     .option('-d, --dataset <datasetDid>', 'Dataset DID')
     .option('-j, --job <jobId>', 'Job ID')
-    .option('-a, --agreement <agreementId>', 'Agreement ID')
+    .option('-a, --agreement [agreementId]', 'Agreement ID')
     .action(async (datasetDid, jobId, agreementId, options) => {
       const dsDid = options.dataset || datasetDid;
       const jId = options.job || jobId;
       const agrId = options.agreement || agreementId;
-      if (!dsDid || !jId || !agrId) {
+      if (!dsDid || !jId) {
         console.error(chalk.red('Dataset DID and Job ID are required'));
         // process.exit(1);
         return
       }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
-      const args = [null, dsDid, jId, agrId];
+      const args = [null, dsDid, jId];
+      if (agrId) args.push(agrId);
       await commands.getJobStatus(args);
     });
 

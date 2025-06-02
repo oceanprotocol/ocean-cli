@@ -226,7 +226,7 @@ export async function createCLI() {
     .option('--maxJobDuration <maxJobDuration>', 'Compute maxJobDuration')
     .option('-t, --token <paymentToken>', 'Compute payment token')
     .option('--resources <resources>', 'Compute resources')
-    .option('--amountToDeposit <amountToDeposit>', 'Amount to deposit in escrow')
+    .option('--amountToDeposit [amountToDeposit]', 'Amount to deposit in escrow')
     .action(async (datasetDids, algoDid, computeEnvId, initializeResponse, maxJobDuration, paymentToken, resources, amountToDeposit, options) => {
       const dsDids = options.datasets || datasetDids;
       const aDid = options.algo || algoDid;
@@ -236,14 +236,16 @@ export async function createCLI() {
       const token = options.token || paymentToken;
       const res = options.resources || resources;
       const amount = options.amountToDeposit || amountToDeposit;
-      if (!dsDids || !aDid ||!envId || !initResp || !jobDuration || !token || !res || !amount) {
+      if (!dsDids || !aDid ||!envId || !initResp || !jobDuration || !token || !res) {
         console.error(chalk.red('Missing required arguments'));
         // process.exit(1);
         return
       }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
-      await commands.computeStart([null, dsDids, aDid, envId, JSON.stringify(initResp), jobDuration.toString(), token, JSON.stringify(res), amount.toString()]);
+      const args = [null, dsDids, aDid, envId, JSON.stringify(initResp), jobDuration.toString(), token, JSON.stringify(res)]
+      if (amount) args.push(amount.toString())
+      await commands.computeStart(args);
     });
 
   // startFreeCompute command

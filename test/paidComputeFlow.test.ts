@@ -175,7 +175,7 @@ describe("Ocean CLI Paid Compute", function() {
         ]
         const paymentToken = getAddresses().Ocean
         const escrow = getAddresses().Escrow;
-        const output = await runCommand(`npm run cli startCompute ${computeDatasetDid} ${jsAlgoDid} ${computeEnvId} 900 ${paymentToken} ${JSON.stringify(resources)} ${providerInitializeResponse.payment.amount} -y`);
+        const output = await runCommand(`npm run cli startCompute ${computeDatasetDid} ${jsAlgoDid} ${computeEnvId} 900 ${paymentToken} '${JSON.stringify(resources)}' --yes`);
         const jobIdMatch = output.match(/JobID:\s*([^\s]+)/);
         const agreementIdMatch = output.match(/Agreement ID:\s*([^\s]+)/);
         const providerInitializeResponseMatch = output.match(/initialize compute details:\s*([\s\S]*)/);

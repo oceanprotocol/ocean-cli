@@ -184,63 +184,63 @@ export async function createCLI() {
     .argument('<datasetDids>', 'Dataset DIDs (comma-separated) OR (empty array for none)')
     .argument('<algoDid>', 'Algorithm DID')
     .argument('<computeEnvId>', 'Compute environment ID')
-    .argument('<providerInitializeResponse>', 'Initialize compute response')
     .argument('<maxJobDuration>', 'maxJobDuration for compute job')
     .argument('<paymentToken>', 'Payment token for compute')
     .argument('<resources>', 'Resources of compute environment stringified')
-    .argument('<amountToDeposit>', 'Amount to deposit in escrow contract, optional.')
     .option('-d, --datasets <datasetDids>', 'Dataset DIDs (comma-separated) OR (empty array for none)')
     .option('-a, --algo <algoDid>', 'Algorithm DID')
     .option('-e, --env <computeEnvId>', 'Compute environment ID')
     .option('--maxJobDuration <maxJobDuration>', 'Compute maxJobDuration')
     .option('-t, --token <paymentToken>', 'Compute payment token')
     .option('--resources <resources>', 'Compute resources')
-    .option('--amountToDeposit [amountToDeposit]', 'Amount to deposit in escrow')
-    .option('-y, --yes', 'Accept payment from initialize compute')
-    .action(async (datasetDids, algoDid, computeEnvId, maxJobDuration, paymentToken, resources, amountToDeposit, options) => {
+    .option('-y, --yes', 'Automatically approve payment and start job without prompt')
+    .action(async (datasetDids, algoDid, computeEnvId, maxJobDuration, paymentToken, resources, options) => {
       const dsDids = options.datasets || datasetDids;
       const aDid = options.algo || algoDid;
       const envId = options.env || computeEnvId;
       const jobDuration = options.maxJobDuration || maxJobDuration;
       const token = options.token || paymentToken;
       const res = options.resources || resources;
-      const amount = options.amountToDeposit || amountToDeposit;
+      console.log(`proceed: `, options.yes);
       if (!dsDids || !aDid ||!envId || !jobDuration || !token || !res) {
         console.error(chalk.red('Missing required arguments'));
         // process.exit(1);
         return
       }
       const { signer, chainId } = await initializeSigner();
-    const commands = new Commands(signer, chainId);
+      const commands = new Commands(signer, chainId);
 
-    const initArgs = [null, dsDids, aDid, envId, jobDuration, token, res];
-    const initResp = await commands.initializeCompute(initArgs);
+      const initArgs = [null, dsDids, aDid, envId, jobDuration, token, res];
+      const initResp = await commands.initializeCompute(initArgs);
+      console.log(`JSON.stringify(initResp): ${JSON.stringify(initResp)}`)
 
-    if (!initResp) {
-      console.error(chalk.red('Initialization failed. Aborting.'));
-      return;
-    }
-
-    console.log(chalk.yellow('\n--- Payment Details ---'));
-    console.log(JSON.stringify(initResp, null, 2));
-
-    const proceed = options.yes;
-
-    if (!proceed) {
-      const rl = createInterface({ input, output });
-      const confirmation = await rl.question(`\nProceed with payment for starting compute job at price ${ethers.BigNumber.from(initResp.payment.amount)} in tokens from address ${initResp.payment.token}? (y/n): `);
-      rl.close();
-      if (confirmation.trim().toLowerCase() !== 'y') {
-        console.log(chalk.red('Compute job canceled by user.'));
+      if (!initResp) {
+        console.error(chalk.red('Initialization failed. Aborting.'));
         return;
       }
-    }
 
-    const computeArgs = [null, dsDids, aDid, envId, JSON.stringify(initResp), jobDuration, token, res];
-    if (amount) computeArgs.push(amount.toString());
+      console.log(chalk.yellow('\n--- Payment Details ---'));
+      console.log(JSON.stringify(initResp, null, 2));
 
-    await commands.computeStart(computeArgs);
-    console.log(chalk.green('Compute job started successfully.'));
+      const proceed = options.yes;
+      console.log(`proceed: `, proceed);
+      if (!proceed) {
+        const rl = createInterface({ input, output });
+        console.log(`JSON.stringify(initResp): ${JSON.stringify(initResp)}`)
+        const confirmation = await rl.question(`\nProceed with payment for starting compute job at price ${ethers.BigNumber.from(initResp.payment.amount)} in tokens from address ${initResp.payment.token}? (y/n): `);
+        rl.close();
+        if (confirmation.trim().toLowerCase() !== 'y' || confirmation.trim().toLowerCase() !== 'yes') {
+          console.log(chalk.red('Compute job canceled by user.'));
+          return;
+        }
+      } else {
+        console.log(chalk.cyan('Auto-confirm enabled with --yes flag.'));
+      }
+
+      const computeArgs = [null, dsDids, aDid, envId, JSON.stringify(initResp), jobDuration, token, res];
+
+      await commands.computeStart(computeArgs);
+      console.log(chalk.green('Compute job started successfully.'));
   });
 
   // startFreeCompute command

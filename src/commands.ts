@@ -718,19 +718,6 @@ export class Commands {
 			return;
 		}
 
-		let amountToDeposit = args[8];
-		if (amountToDeposit === '') {
-			console.warn(
-				"Warning starting compute job dataset DID " +
-				args[1] +
-				" and algorithm DID " +
-				args[2] +
-				" because amount to deposit in Escrow contract was not provided, fallback to escrow payment ammount : " +
-				parsedProviderInitializeComputeJob.payment.amount.toString()
-			);
-			amountToDeposit = parsedProviderInitializeComputeJob.payment.amount.toString()
-		}
-
 		const escrow = new EscrowContract(
 			ethers.utils.getAddress(parsedProviderInitializeComputeJob.payment.escrowAddress),
 			this.signer
@@ -739,7 +726,7 @@ export class Commands {
 		const validationEscrow = await escrow.verifyFundsForEscrowPayment(
 			paymentToken,
 			computeEnv.consumerAddress,
-			await unitsToAmount(this.signer, paymentToken, amountToDeposit),
+			await unitsToAmount(this.signer, paymentToken, parsedProviderInitializeComputeJob.payment.amount),
 			parsedProviderInitializeComputeJob.payment.amount.toString(),
 			parsedProviderInitializeComputeJob.payment.minLockSeconds.toString(),
 			'10'

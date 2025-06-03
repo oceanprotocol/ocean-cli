@@ -287,14 +287,6 @@ npm run cli <command> [options] <arguments>
   `-d, --did <did>`  
   `-f, --folder [destinationFolder]` (Default: `.`)
 
-- **initializeCompute:**
-  `-d, --datasets <datasetDids>`  
-  `-a, --algo <algoDid>`  
-  `-e, --env <computeEnvId>`
-  `--validUntil <validUntil>`
-  `-t, --token <paymentToken>`
-  `--resources <resources>`
-
 - **startCompute:**  
   `-d, --datasets <datasetDids>`  
   `-a, --algo <algoDid>`  

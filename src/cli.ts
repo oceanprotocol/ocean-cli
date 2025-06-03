@@ -2,6 +2,8 @@ import { Command } from 'commander';
 import { Commands } from './commands.js';
 import { ethers } from 'ethers';
 import chalk from 'chalk';
+import { stdin as input, stdout as output } from 'node:process';
+import { createInterface } from 'readline/promises';
 
 async function initializeSigner() {
   
@@ -174,38 +176,6 @@ export async function createCLI() {
       const commands = new Commands(signer, chainId);
       await commands.allowAlgo([null, dsDid, aDid, options.encrypt.toString()]);
     });
-  // initializeCommand command
-  program
-    .command('initializeCompute')
-    .description('Initialises provider fees and payment for a compute job')
-    .argument('<datasetDids>', 'Dataset DIDs (comma-separated) OR (empty array for none)')
-    .argument('<algoDid>', 'Algorithm DID')
-    .argument('<computeEnvId>', 'Compute environment ID')
-    .argument('<computeValidUntil>', 'Valid Until for fees availability')
-    .argument('<paymentToken>', 'Payment token for compute')
-    .argument('<resources>', 'Resources of compute environment stringified')
-    .option('-d, --datasets <datasetDids>', 'Dataset DIDs (comma-separated) OR (empty array for none)')
-    .option('-a, --algo <algoDid>', 'Algorithm DID')
-    .option('-e, --env <computeEnvId>', 'Compute environment ID')
-    .option('--validUntil <validUntil>', 'Compute fees valid until')
-    .option('-t, --token <paymentToken>', 'Compute payment token')
-    .option('--resources <resources>', 'Compute resources')
-    .action(async (datasetDids, algoDid, computeEnvId, computeValidUntil, paymentToken, resources, options) => {
-      const dsDids = options.datasets || datasetDids;
-      const aDid = options.algo || algoDid;
-      const envId = options.env || computeEnvId;
-      const validUntil = options.validUntil || computeValidUntil;
-      const token = options.token || paymentToken;
-      const res = options.resources || resources;
-      if (!dsDids || !aDid || !envId || !validUntil || !token || !res) {
-        console.error(chalk.red('Missing required arguments'));
-        // process.exit(1);
-        return
-      }
-      const { signer, chainId } = await initializeSigner();
-      const commands = new Commands(signer, chainId);
-      await commands.initializeCompute([null, dsDids, aDid, envId, validUntil.toString(), token, JSON.stringify(res)]);
-    });
 
   // startCompute command
   program
@@ -222,31 +192,56 @@ export async function createCLI() {
     .option('-d, --datasets <datasetDids>', 'Dataset DIDs (comma-separated) OR (empty array for none)')
     .option('-a, --algo <algoDid>', 'Algorithm DID')
     .option('-e, --env <computeEnvId>', 'Compute environment ID')
-    .option('--init <initializeResponse>', 'Initialize response')
     .option('--maxJobDuration <maxJobDuration>', 'Compute maxJobDuration')
     .option('-t, --token <paymentToken>', 'Compute payment token')
     .option('--resources <resources>', 'Compute resources')
     .option('--amountToDeposit [amountToDeposit]', 'Amount to deposit in escrow')
-    .action(async (datasetDids, algoDid, computeEnvId, initializeResponse, maxJobDuration, paymentToken, resources, amountToDeposit, options) => {
+    .option('-y, --yes', 'Accept payment from initialize compute')
+    .action(async (datasetDids, algoDid, computeEnvId, maxJobDuration, paymentToken, resources, amountToDeposit, options) => {
       const dsDids = options.datasets || datasetDids;
       const aDid = options.algo || algoDid;
       const envId = options.env || computeEnvId;
-      const initResp = options.init || initializeResponse;
       const jobDuration = options.maxJobDuration || maxJobDuration;
       const token = options.token || paymentToken;
       const res = options.resources || resources;
       const amount = options.amountToDeposit || amountToDeposit;
-      if (!dsDids || !aDid ||!envId || !initResp || !jobDuration || !token || !res) {
+      if (!dsDids || !aDid ||!envId || !jobDuration || !token || !res) {
         console.error(chalk.red('Missing required arguments'));
         // process.exit(1);
         return
       }
       const { signer, chainId } = await initializeSigner();
-      const commands = new Commands(signer, chainId);
-      const args = [null, dsDids, aDid, envId, JSON.stringify(initResp), jobDuration.toString(), token, JSON.stringify(res)]
-      if (amount) args.push(amount.toString())
-      await commands.computeStart(args);
-    });
+    const commands = new Commands(signer, chainId);
+
+    const initArgs = [null, dsDids, aDid, envId, jobDuration, token, res];
+    const initResp = await commands.initializeCompute(initArgs);
+
+    if (!initResp) {
+      console.error(chalk.red('Initialization failed. Aborting.'));
+      return;
+    }
+
+    console.log(chalk.yellow('\n--- Payment Details ---'));
+    console.log(JSON.stringify(initResp, null, 2));
+
+    const proceed = options.yes;
+
+    if (!proceed) {
+      const rl = createInterface({ input, output });
+      const confirmation = await rl.question(`\nProceed with payment for starting compute job at price ${ethers.BigNumber.from(initResp.payment.amount)} in tokens from address ${initResp.payment.token}? (y/n): `);
+      rl.close();
+      if (confirmation.trim().toLowerCase() !== 'y') {
+        console.log(chalk.red('Compute job canceled by user.'));
+        return;
+      }
+    }
+
+    const computeArgs = [null, dsDids, aDid, envId, JSON.stringify(initResp), jobDuration, token, res];
+    if (amount) computeArgs.push(amount.toString());
+
+    await commands.computeStart(computeArgs);
+    console.log(chalk.green('Compute job started successfully.'));
+  });
 
   // startFreeCompute command
   program

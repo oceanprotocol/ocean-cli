@@ -464,8 +464,8 @@ export class Commands {
 			);
 			return;
 		}
-
 		console.log(`initialize compute details: ${JSON.stringify(providerInitializeComputeJob)}`)
+		return providerInitializeComputeJob;
 
 	}
 
@@ -717,31 +717,6 @@ export class Commands {
 			);
 			return;
 		}
-		const safePaymentDetails =
-			await ProviderInstance.initializeCompute(
-				assets,
-				algo,
-				computeEnv.id,
-				paymentToken,
-				supportedMaxJobDuration,
-				providerURI,
-				this.signer, // V1 was this.signer.getAddress()
-				JSON.parse(resources)
-			);
-		
-		const paymentAmount = ethers.BigNumber.from(parsedProviderInitializeComputeJob.payment.amount.toString());
-		const expectedAmount = ethers.BigNumber.from(safePaymentDetails.payment.amount.toString());
-		if (paymentAmount.lt(expectedAmount)) {
-			console.error(
-				"Error starting compute job dataset DID " +
-				args[1] +
-				" and algorithm DID " +
-				args[2] +
-				" because payment amount provided is cheaper than the expected one: " +
-				JSON.stringify(safePaymentDetails.payment)
-			);
-			return;
-		}
 
 		let amountToDeposit = args[8];
 		if (amountToDeposit === '') {
@@ -751,13 +726,13 @@ export class Commands {
 				" and algorithm DID " +
 				args[2] +
 				" because amount to deposit in Escrow contract was not provided, fallback to escrow payment ammount : " +
-				safePaymentDetails.payment.amount.toString()
+				parsedProviderInitializeComputeJob.payment.amount.toString()
 			);
-			amountToDeposit = safePaymentDetails.payment.amount.toString()
+			amountToDeposit = parsedProviderInitializeComputeJob.payment.amount.toString()
 		}
 
 		const escrow = new EscrowContract(
-			ethers.utils.getAddress(safePaymentDetails.payment.escrowAddress),
+			ethers.utils.getAddress(parsedProviderInitializeComputeJob.payment.escrowAddress),
 			this.signer
 		)
 		console.log("Verifying payment...");
@@ -765,8 +740,8 @@ export class Commands {
 			paymentToken,
 			computeEnv.consumerAddress,
 			await unitsToAmount(this.signer, paymentToken, amountToDeposit),
-			safePaymentDetails.payment.amount.toString(),
-			safePaymentDetails.payment.minLockSeconds.toString(),
+			parsedProviderInitializeComputeJob.payment.amount.toString(),
+			parsedProviderInitializeComputeJob.payment.minLockSeconds.toString(),
 			'10'
 		)
 		if (validationEscrow.isValid === false) {
@@ -816,7 +791,7 @@ export class Commands {
 			computeEnv.id,
 			assets, // assets[0] // only c2d v1,
 			algo,
-			maxJobDuration,
+			supportedMaxJobDuration,
 			paymentToken,
 			JSON.parse(resources),
 			await this.signer.getChainId(),

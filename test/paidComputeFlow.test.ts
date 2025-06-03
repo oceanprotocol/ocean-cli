@@ -154,12 +154,11 @@ describe("Ocean CLI Paid Compute", function() {
 		console.log(`Fetched Compute Env ID: ${computeEnvId}`);
     });
 
-    it("should initialize compute on compute dataset and algorithm", async function() {
+    it("should start paid compute on compute dataset and algorithm", async function() {
         const computeEnvs = await ProviderInstance.getComputeEnvironments('http://127.0.0.1:8001');
         const env = computeEnvs[0];
         expect(env).to.be.an('object').and.to.not.be.null.and.to.not.be.undefined;
 
-        console.log(`env: ${JSON.stringify(env)}`)
         resources = [
             {
                 id: 'cpu',
@@ -174,22 +173,36 @@ describe("Ocean CLI Paid Compute", function() {
                 amount: 0
             }
         ]
-        console.log(`resources: ${JSON.stringify(resources)}`)
         const paymentToken = getAddresses().Ocean
         const escrow = getAddresses().Escrow;
-        const output = await runCommand(`npm run cli initializeCompute ${computeDatasetDid} ${jsAlgoDid} ${computeEnvId} 900 ${paymentToken} ${JSON.stringify(resources)}`);
-        const jsonMatch = output.match(/initialize compute details:\s*([\s\S]*)/);
-		if (!jsonMatch) {
-			console.error("Raw output:", output);
-			throw new Error("Could not find initialize response in the output");
-		}
-        const result = jsonMatch[0].split('initialize compute details:')[1]?.trim();
+        const output = await runCommand(`npm run cli startCompute ${computeDatasetDid} ${jsAlgoDid} ${computeEnvId} 900 ${paymentToken} ${JSON.stringify(resources)} ${providerInitializeResponse.payment.amount} -y`);
+        const jobIdMatch = output.match(/JobID:\s*([^\s]+)/);
+        const agreementIdMatch = output.match(/Agreement ID:\s*([^\s]+)/);
+        const providerInitializeResponseMatch = output.match(/initialize compute details:\s*([\s\S]*)/);
+
+        if (!jobIdMatch) {
+            console.error("Raw output:", output);
+            throw new Error("Could not find Job ID in the output");
+        }
+
+        if (!agreementIdMatch) {
+            console.error("Raw output for finding agreement:", output);
+            throw new Error("Could not find Agreement ID in the output");
+        }
+
+         if (!providerInitializeResponseMatch) {
+            console.error("Raw output for finding agreement:", output);
+            throw new Error("Could not find providerInitializeResponseMatch in the output");
+        }
+        const result = providerInitializeResponseMatch[1]
 		try {
 			providerInitializeResponse = JSON.parse(result);
 		} catch (error) {
-			console.error(`Extracted output: ${jsonMatch[0]} and final result: ${result}`);
+			console.error(`Extracted output: ${providerInitializeResponseMatch[1]} and final result: ${result}`);
 			throw new Error("Failed to parse the extracted output:\n" + error);
 		}
+        expect(computeJobId).to.be.a("string");
+        expect(agreementId).to.be.a("string");
         expect(providerInitializeResponse).to.have.property("payment").that.is.an("object");
         expect(providerInitializeResponse.payment).to.have.property("escrowAddress").that.is.a("string").and.that.is.eq(escrow);
         expect(providerInitializeResponse.payment).to.have.property("token").that.is.a("string").and.that.is.eq(paymentToken);
@@ -207,24 +220,6 @@ describe("Ocean CLI Paid Compute", function() {
         expect(providerInitializeResponse.datasets[0].providerFee).to.have.property("providerFeeAmount").that.is.a("string").and.that.is.eq('0');
         expect(providerInitializeResponse.datasets[0].providerFee).to.have.property("providerData").that.is.a("string");
 
-    });
-
-    it("should start paid compute on compute dataset and algorithm", async function() {
-        const paymentToken = getAddresses().Ocean
-        const output = await runCommand(`npm run cli startCompute ${computeDatasetDid} ${jsAlgoDid} ${computeEnvId} ${JSON.stringify(providerInitializeResponse)} 900 ${paymentToken} ${JSON.stringify(resources)} ${providerInitializeResponse.payment.amount}`);
-        const jobIdMatch = output.match(/JobID:\s*([^\s]+)/);
-        const agreementIdMatch = output.match(/Agreement ID:\s*([^\s]+)/);
-
-        if (!jobIdMatch) {
-            console.error("Raw output:", output);
-            throw new Error("Could not find Job ID in the output");
-        }
-
-        if (!agreementIdMatch) {
-            console.error("Raw output for finding agreement:", output);
-            throw new Error("Could not find Agreement ID in the output");
-        }
-
         computeJobId = jobIdMatch[1];
         agreementId = agreementIdMatch[1];
 
@@ -240,9 +235,6 @@ describe("Ocean CLI Paid Compute", function() {
             console.error("Agreement ID was empty:", output);
             throw new Error("Agreement ID is missing");
         }
-
-        expect(computeJobId).to.be.a("string");
-        expect(agreementId).to.be.a("string");
     });
 
     it('should delay for compute job', (done) => {

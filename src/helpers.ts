@@ -28,6 +28,7 @@ import { hexlify } from "ethers/lib/utils";
 import ERC20Template from '@oceanprotocol/contracts/artifacts/contracts/templates/ERC20Template.sol/ERC20Template.json';
 
 
+
 export async function downloadFile(
 	url: string,
 	downloadPath: string,

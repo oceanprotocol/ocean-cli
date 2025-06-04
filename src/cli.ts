@@ -223,7 +223,7 @@ export async function createCLI() {
       console.log(JSON.stringify(initResp, null, 2));
       const amount = await unitsToAmount(signer, initResp.payment.token, initResp.payment.amount.toString());
 
-      const proceed = options.yes;
+      const proceed = options.accept;
       if (!proceed) {
         const rl = createInterface({ input, output });
         const confirmation = await rl.question(`\nProceed with payment for starting compute job at price ${amount} in tokens from address ${initResp.payment.token}? (y/n): `);

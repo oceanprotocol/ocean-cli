@@ -193,7 +193,7 @@ export async function createCLI() {
     .option('--maxJobDuration <maxJobDuration>', 'Compute maxJobDuration')
     .option('-t, --token <paymentToken>', 'Compute payment token')
     .option('--resources <resources>', 'Compute resources')
-    .option('-y, --yes', 'Automatically approve payment and start job without prompt')
+    .option('--accept [boolean]', 'Automatically approve payment and start job without prompt', true)
     .action(async (datasetDids, algoDid, computeEnvId, maxJobDuration, paymentToken, resources, options) => {
       const dsDids = options.datasets || datasetDids;
       const aDid = options.algo || algoDid;
@@ -212,7 +212,6 @@ export async function createCLI() {
 
       const initArgs = [null, dsDids, aDid, envId, jobDuration, token, res];
       const initResp = await commands.initializeCompute(initArgs);
-      console.log(`JSON.stringify(initResp): ${JSON.stringify(initResp)}`)
 
       if (!initResp) {
         console.error(chalk.red('Initialization failed. Aborting.'));
@@ -223,13 +222,11 @@ export async function createCLI() {
       console.log(JSON.stringify(initResp, null, 2));
 
       const proceed = options.yes;
-      console.log(`proceed: `, proceed);
       if (!proceed) {
         const rl = createInterface({ input, output });
-        console.log(`JSON.stringify(initResp): ${JSON.stringify(initResp)}`)
         const confirmation = await rl.question(`\nProceed with payment for starting compute job at price ${ethers.BigNumber.from(initResp.payment.amount)} in tokens from address ${initResp.payment.token}? (y/n): `);
         rl.close();
-        if (confirmation.trim().toLowerCase() !== 'y' || confirmation.trim().toLowerCase() !== 'yes') {
+        if (confirmation.toLowerCase() !== 'y' && confirmation.toLowerCase() !== 'yes') {
           console.log(chalk.red('Compute job canceled by user.'));
           return;
         }

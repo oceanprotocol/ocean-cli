@@ -4,6 +4,7 @@ import { ethers } from 'ethers';
 import chalk from 'chalk';
 import { stdin as input, stdout as output } from 'node:process';
 import { createInterface } from 'readline/promises';
+import { unitsToAmount } from '@oceanprotocol/lib';
 
 async function initializeSigner() {
   
@@ -220,11 +221,12 @@ export async function createCLI() {
 
       console.log(chalk.yellow('\n--- Payment Details ---'));
       console.log(JSON.stringify(initResp, null, 2));
+      const amount = await unitsToAmount(signer, initResp.payment.token, initResp.payment.amount.toString());
 
       const proceed = options.yes;
       if (!proceed) {
         const rl = createInterface({ input, output });
-        const confirmation = await rl.question(`\nProceed with payment for starting compute job at price ${ethers.BigNumber.from(initResp.payment.amount)} in tokens from address ${initResp.payment.token}? (y/n): `);
+        const confirmation = await rl.question(`\nProceed with payment for starting compute job at price ${amount} in tokens from address ${initResp.payment.token}? (y/n): `);
         rl.close();
         if (confirmation.toLowerCase() !== 'y' && confirmation.toLowerCase() !== 'yes') {
           console.log(chalk.red('Compute job canceled by user.'));

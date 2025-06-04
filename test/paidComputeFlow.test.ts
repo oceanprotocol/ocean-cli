@@ -187,11 +187,11 @@ describe("Ocean CLI Paid Compute", function() {
             throw new Error("Could not find Agreement ID in the output");
         }
 
-        expect(computeJobId).to.be.a("string");
-        expect(agreementId).to.be.a("string");
-
         computeJobId = jobIdMatch[1];
         agreementId = agreementIdMatch[1];
+
+        expect(computeJobId).to.be.a("string");
+        expect(agreementId).to.be.a("string");
 
         console.log(`jobId: ${computeJobId}`);
         console.log(`agreementId: ${agreementId}`);

@@ -202,7 +202,7 @@ export async function createCLI() {
       const jobDuration = options.maxJobDuration || maxJobDuration;
       const token = options.token || paymentToken;
       const res = options.resources || resources;
-      console.log(`proceed: `, options.yes);
+      console.log(`proceed: `, options.accept);
       if (!dsDids || !aDid ||!envId || !jobDuration || !token || !res) {
         console.error(chalk.red('Missing required arguments'));
         // process.exit(1);

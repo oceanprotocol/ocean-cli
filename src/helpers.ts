@@ -397,3 +397,12 @@ export function fixAndParseProviderFees(rawString: string) {
 
   return JSON.parse(fixed);
 }
+
+export function toBoolean(value) {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') {
+    const val = value.trim().toLowerCase();
+    return val === 'true' || val === '1' || val === 'yes' || val === 'y';
+  }
+  return Boolean(value);
+}

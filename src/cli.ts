@@ -5,6 +5,7 @@ import chalk from 'chalk';
 import { stdin as input, stdout as output } from 'node:process';
 import { createInterface } from 'readline/promises';
 import { unitsToAmount } from '@oceanprotocol/lib';
+import { toBoolean } from './helpers.js';
 
 async function initializeSigner() {
   
@@ -194,7 +195,7 @@ export async function createCLI() {
     .option('--maxJobDuration <maxJobDuration>', 'Compute maxJobDuration')
     .option('-t, --token <paymentToken>', 'Compute payment token')
     .option('--resources <resources>', 'Compute resources')
-    .option('--accept [boolean]', 'Automatically approve payment and start job without prompt', true)
+    .option('--accept [boolean]', 'Auto-confirm payment for compute job (true/false)', toBoolean)
     .action(async (datasetDids, algoDid, computeEnvId, maxJobDuration, paymentToken, resources, options) => {
       const dsDids = options.datasets || datasetDids;
       const aDid = options.algo || algoDid;
@@ -202,7 +203,6 @@ export async function createCLI() {
       const jobDuration = options.maxJobDuration || maxJobDuration;
       const token = options.token || paymentToken;
       const res = options.resources || resources;
-      console.log(`proceed: `, options.accept);
       if (!dsDids || !aDid ||!envId || !jobDuration || !token || !res) {
         console.error(chalk.red('Missing required arguments'));
         // process.exit(1);

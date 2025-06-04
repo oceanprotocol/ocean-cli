@@ -16,9 +16,8 @@ describe("Ocean CLI Paid Compute", function() {
     let jsAlgoDid: string;
     let computeEnvId: string;
     let resources: any;
-    let providerInitializeResponse: any
-    let computeJobId: string
-    let agreementId: string
+    let computeJobId: string;
+    let agreementId: string;
 
     const getAddresses = () => {
         const data = JSON.parse(

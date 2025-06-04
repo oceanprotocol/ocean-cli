@@ -31,6 +31,7 @@ import { Asset } from '@oceanprotocol/ddo-js';
 import { Signer, ethers } from "ethers";
 import { interactiveFlow } from "./interactiveFlow.js";
 import { publishAsset } from "./publishAsset.js";
+import chalk from 'chalk';
 
 export class Commands {
 	public signer: Signer;
@@ -464,7 +465,8 @@ export class Commands {
 			);
 			return;
 		}
-		console.log(`initialize compute details: ${JSON.stringify(providerInitializeComputeJob)}`)
+		console.log(chalk.yellow('\n--- Payment Details ---'));
+		console.log(JSON.stringify(providerInitializeComputeJob, null, 2));
 		return providerInitializeComputeJob;
 
 	}

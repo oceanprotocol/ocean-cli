@@ -89,7 +89,7 @@ describe("Ocean CLI Paid Compute", function() {
 		const jsonMatch = output.match(/s*([\s\S]*)/);
 		if (!jsonMatch) {
 			console.error("Raw output:", output);
-			throw new Error("Could not find compute environments in the output");
+			throw new Error("Could not find ddo in the output");
 		}
 
         try {
@@ -106,7 +106,7 @@ describe("Ocean CLI Paid Compute", function() {
 		const jsonMatch = output.match(/s*([\s\S]*)/);
 		if (!jsonMatch) {
 			console.error("Raw output:", output);
-			throw new Error("Could not find compute environments in the output");
+			throw new Error("Could not find ddo in the output");
 		}
 
         try {
@@ -125,18 +125,12 @@ describe("Ocean CLI Paid Compute", function() {
 			console.error("Raw output:", output);
 			throw new Error("Could not find compute environments in the output");
 		}
-        const match = jsonMatch[0].match(/Exiting compute environments:\s*(.*)/s);
-        const result = match ? match[1].trim() : null;
-        if (!result) {
-			console.error("Raw output:", output);
-			throw new Error("Could not find compute environments in the output");
-		}
-
+    
 		let environments;
 		try {
-			environments = eval(result);
+			environments = eval(jsonMatch[1]);
 		} catch (error) {
-			console.error(`Extracted output: ${jsonMatch[0]} and final result: ${result}`);
+			console.error(`Extracted output: ${jsonMatch[0]} and final result: ${jsonMatch[1]}`);
 			throw new Error("Failed to parse the extracted output:\n" + error);
 		}
 

@@ -225,6 +225,10 @@ export async function createCLI() {
 
       const proceed = options.accept;
       if (!proceed) {
+        if (!process.stdin.isTTY) {
+          console.error(chalk.red('Cannot prompt for confirmation (non-TTY). Use "--accept true" to skip.'));
+          process.exit(1);
+        }
         const rl = createInterface({ input, output });
         const confirmation = await rl.question(`\nProceed with payment for starting compute job at price ${amount} in tokens from address ${initResp.payment.token}? (y/n): `);
         rl.close();

@@ -194,11 +194,18 @@ npm run cli <command> [options] <arguments>
 **Start Compute:**
 
 - **Positional:**  
-  `npm run cli startCompute did1,did2 algoDid env1`
+  `npm run cli startCompute -- did1,did2 algoDid env1 maxJobDuration paymentToken resources --accept true`
 
 - **Named Options:**  
-  `npm run cli startCompute --datasets did1,did2 --algo algoDid --env env1`  
+  `npm run cli startCompute --datasets did1,did2 --algo algoDid --env env1 --maxJobDuration maxJobDuration --token paymentToken --resources resources --accept true`  
   (Options can be provided in any order.)
+
+
+- `maxJobDuration` is a required parameter an represents the time measured in seconds for job maximum execution, the payment is based on this maxJobDuration value, user needs to provide this.
+- `paymentToken` is required and represents the address of the token that is supported by the environment for processing the compute job payment. It can be retrieved from `getComputeEnvironments` command output.
+- `resources` is required and represents a stringified JSON object obtained from `getComputeEnvironments` command output. `getComputeEnvironments` command shows the available resources and the selected resources by the user need to be within the available limits.
+e.g.: `'[{"id":"cpu","amount":3},{"id":"ram","amount":16772672536},{"id":"disk","amount":0}]'`
+-  `--accept` option can be set to `true` or `false`. If it is set to `false` a prompt will be displayed to the user for manual accepting the payment before starting a compute job. If it is set to `true`, the compute job starts automatically, without user input.
 
 ---
 

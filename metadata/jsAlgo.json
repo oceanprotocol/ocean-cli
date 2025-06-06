@@ -54,20 +54,30 @@
       }
     }
   ],
-  "stats": {
-    "allocated": 0,
-    "orders": 0,
-    "price": {
-      "value": "0"
-    }
-  },
-  "nft": {
-    "address": "",
-    "name": "Ocean Data NFT",
-    "symbol": "OCEAN-NFT",
-    "state": 5,
-    "tokenURI": "",
-    "owner": "",
-    "created": ""
+  "indexedMetadata": {
+      "event": {},
+      "nft": {
+        "address": "",
+        "name": "Ocean Data NFT",
+        "symbol": "OCEAN-NFT",
+        "state": 5,
+        "tokenURI": "",
+        "owner": "",
+        "created": ""
+      },
+      "purgatory": {
+        "state": false
+      },
+      "stats": [
+        {
+        "orders": 0,
+        "prices": [
+          {
+            "price": "0"
+          }
+        ]
+      }
+    ],
+    "datatokens": []
   }
 }

@@ -1,14 +1,20 @@
 {
   "compilerOptions": {
-    "lib": ["es6", "es7", "dom"],
-    "module": "ES2022",
-    "target": "ES2022",
-    "noUnusedLocals": false,
+    "resolveJsonModule": true,
+    "moduleResolution": "node",
     "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true
+    "allowSyntheticDefaultImports": true,
+    "lib": ["ESNext", "dom"],
+    "declaration": true,
+    "module": "ES2020",
+    "target": "ES2020",
+    "removeComments": false,
+    "experimentalDecorators": true,
+    "preserveConstEnums": true,
+    "outDir": "./dist",
+    "sourceMap": true,
+    "skipLibCheck": true,
   },
-  "ts-node": {
-    "esm": true,
-    "experimentalSpecifierResolution": "node"
-  }
+  "include": ["src/**/*", "src/tests/**/*"],
+  "exclude": ["node_modules"]
 }

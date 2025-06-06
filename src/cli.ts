@@ -2,6 +2,10 @@ import { Command } from 'commander';
 import { Commands } from './commands.js';
 import { ethers } from 'ethers';
 import chalk from 'chalk';
+import { stdin as input, stdout as output } from 'node:process';
+import { createInterface } from 'readline/promises';
+import { unitsToAmount } from '@oceanprotocol/lib';
+import { toBoolean } from './helpers.js';
 
 async function initializeSigner() {
   
@@ -182,22 +186,61 @@ export async function createCLI() {
     .argument('<datasetDids>', 'Dataset DIDs (comma-separated) OR (empty array for none)')
     .argument('<algoDid>', 'Algorithm DID')
     .argument('<computeEnvId>', 'Compute environment ID')
+    .argument('<maxJobDuration>', 'maxJobDuration for compute job')
+    .argument('<paymentToken>', 'Payment token for compute')
+    .argument('<resources>', 'Resources of compute environment stringified')
     .option('-d, --datasets <datasetDids>', 'Dataset DIDs (comma-separated) OR (empty array for none)')
     .option('-a, --algo <algoDid>', 'Algorithm DID')
     .option('-e, --env <computeEnvId>', 'Compute environment ID')
-    .action(async (datasetDids, algoDid, computeEnvId, options) => {
+    .option('--maxJobDuration <maxJobDuration>', 'Compute maxJobDuration')
+    .option('-t, --token <paymentToken>', 'Compute payment token')
+    .option('--resources <resources>', 'Compute resources')
+    .option('--accept [boolean]', 'Auto-confirm payment for compute job (true/false)', toBoolean)
+    .action(async (datasetDids, algoDid, computeEnvId, maxJobDuration, paymentToken, resources, options) => {
       const dsDids = options.datasets || datasetDids;
       const aDid = options.algo || algoDid;
       const envId = options.env || computeEnvId;
-      if (!dsDids || !aDid || !envId) {
+      const jobDuration = options.maxJobDuration || maxJobDuration;
+      const token = options.token || paymentToken;
+      const res = options.resources || resources;
+      if (!dsDids || !aDid ||!envId || !jobDuration || !token || !res) {
         console.error(chalk.red('Missing required arguments'));
         // process.exit(1);
         return
       }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
-      await commands.computeStart([null, dsDids, aDid, envId]);
-    });
+
+      const initArgs = [null, dsDids, aDid, envId, jobDuration, token, res];
+      const initResp = await commands.initializeCompute(initArgs);
+
+      if (!initResp) {
+        console.error(chalk.red('Initialization failed. Aborting.'));
+        return;
+      }
+
+      console.log(chalk.yellow('\n--- Payment Details ---'));
+      console.log(JSON.stringify(initResp, null, 2));
+      const amount = await unitsToAmount(signer, initResp.payment.token, initResp.payment.amount.toString());
+
+      const proceed = options.accept;
+      if (!proceed) {
+        const rl = createInterface({ input, output });
+        const confirmation = await rl.question(`\nProceed with payment for starting compute job at price ${amount} in tokens from address ${initResp.payment.token}? (y/n): `);
+        rl.close();
+        if (confirmation.toLowerCase() !== 'y' && confirmation.toLowerCase() !== 'yes') {
+          console.log(chalk.red('Compute job canceled by user.'));
+          return;
+        }
+      } else {
+        console.log(chalk.cyan('Auto-confirm enabled with --yes flag.'));
+      }
+
+      const computeArgs = [null, dsDids, aDid, envId, JSON.stringify(initResp), jobDuration, token, res];
+
+      await commands.computeStart(computeArgs);
+      console.log(chalk.green('Compute job started successfully.'));
+  });
 
   // startFreeCompute command
   program
@@ -253,7 +296,7 @@ export async function createCLI() {
     .description('Stops a compute job')
     .argument('<datasetDid>', 'Dataset DID')
     .argument('<jobId>', 'Job ID')
-    .argument('[agreementId]', 'Agreement ID')
+    .argument('<agreementId>', 'Agreement ID')
     .option('-d, --dataset <datasetDid>', 'Dataset DID')
     .option('-j, --job <jobId>', 'Job ID')
     .option('-a, --agreement [agreementId]', 'Agreement ID')
@@ -268,7 +311,7 @@ export async function createCLI() {
       }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
-      const args = [null, dsDid, jId];
+       const args = [null, dsDid, jId];
       if (agrId) args.push(agrId);
       await commands.computeStop(args);
     });
@@ -279,7 +322,7 @@ export async function createCLI() {
     .description('Displays the compute job status')
     .argument('<datasetDid>', 'Dataset DID')
     .argument('<jobId>', 'Job ID')
-    .argument('[agreementId]', 'Agreement ID')
+    .argument('<agreementId>', 'Agreement ID')
     .option('-d, --dataset <datasetDid>', 'Dataset DID')
     .option('-j, --job <jobId>', 'Job ID')
     .option('-a, --agreement [agreementId]', 'Agreement ID')

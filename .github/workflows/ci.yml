@@ -121,8 +121,9 @@ jobs:
             sleep 10
             attempt=$((attempt + 1))
           done
+
       - name: docker logs
-        run: docker logs ocean-ocean-contracts-1 && docker logs ocean-ganache-1 && docker logs ocean-typesense-1 
+        run: docker logs ocean_ocean-contracts_1 && docker logs ocean_typesense_1
         if: ${{ failure() }}
 
       - name: Run system tests 
@@ -132,3 +133,8 @@ jobs:
           INDEXING_MAX_RETRIES: 120
           NODE_URL: 'http://127.0.0.1:8001'
           AVOID_LOOP_RUN: true
+      - name: Print Ocean Node Logs if tests fail
+        if: ${{ failure() }}
+        run: |
+          echo "========== Ocean Node Logs =========="
+          tac ${{ github.workspace }}/ocean-node/ocean-node.log || echo "Log file not found"

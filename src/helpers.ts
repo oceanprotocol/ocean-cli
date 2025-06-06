@@ -3,6 +3,7 @@ import fetch from "cross-fetch";
 import { promises as fs } from "fs";
 import * as path from "path";
 import * as sapphire from '@oasisprotocol/sapphire-paratime';
+import { Asset, DDO } from '@oceanprotocol/ddo-js';
 import {
 	AccesslistFactory,
 	Aquarius,
@@ -25,7 +26,7 @@ import {
 } from "@oceanprotocol/lib";
 import { hexlify } from "ethers/lib/utils";
 import ERC20Template from '@oceanprotocol/contracts/artifacts/contracts/templates/ERC20Template.sol/ERC20Template.json';
-import { DDO, Asset } from '@oceanprotocol/ddo-js';
+
 
 
 export async function downloadFile(
@@ -151,7 +152,7 @@ export async function createAssetUtil(
 
 export async function updateAssetMetadata(
 	owner: Signer,
-	updatedDdo: DDO,
+	updatedDdo: Asset,
 	oceanNodeUrl: string,
 	aquariusInstance: Aquarius,
 	encryptDDO: boolean = true
@@ -378,4 +379,30 @@ export function getIndexingWaitSettings(): IndexerWaitParams {
 	}
 
 	return indexingParams
+}
+
+export function fixAndParseProviderFees(rawString: string) {
+  // Remove surrounding quotes if present
+  if (rawString.startsWith('"') && rawString.endsWith('"')) {
+    rawString = rawString.slice(1, -1).replace(/\\"/g, '"');
+  }
+
+  const fixed = rawString
+    .replace(/([{,])(\s*)([a-zA-Z0-9_]+)\s*:/g, '$1"$3":')
+    .replace(/:\s*(did:[^,}\]]+)/g, ':"$1"')
+    .replace(/:\s*(0x[a-fA-F0-9]+)/g, ':"$1"')
+    .replace(/providerData:\s*([^,}\]]+)/g, 'providerData:"$1"')
+    .replace(/:false/g, ':false')
+    .replace(/:true/g, ':true');
+
+  return JSON.parse(fixed);
+}
+
+export function toBoolean(value) {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') {
+    const val = value.trim().toLowerCase();
+    return val === 'true' || val === '1' || val === 'yes' || val === 'y';
+  }
+  return Boolean(value);
 }

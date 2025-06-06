@@ -35,13 +35,13 @@ describe("Ocean CLI Setup", function() {
                 expect(stdout).to.contain("Downloads an asset into specified folder");
                 expect(stdout).to.contain("allowAlgo [options] <datasetDid> <algoDid>");
                 expect(stdout).to.contain("Approves an algorithm to run on a dataset");
-                expect(stdout).to.contain("startCompute [options] <datasetDids> <algoDid> <computeEnvId>");
+                expect(stdout).to.contain("startCompute [options] <datasetDids> <algoDid> <computeEnvId> <maxJobDuration> <paymentToken> <resources>");
                 expect(stdout).to.contain("Starts a compute job");
                 expect(stdout).to.contain("startFreeCompute [options] <datasetDids> <algoDid> <computeEnvId>");
                 expect(stdout).to.contain("Starts a FREE compute job");
-                expect(stdout).to.contain("stopCompute [options] <datasetDid> <jobId> [agreementId]");
+                expect(stdout).to.contain("stopCompute [options] <datasetDid> <jobId> <agreementId>");
                 expect(stdout).to.contain("Stops a compute job");
-                expect(stdout).to.contain("getJobStatus [options] <datasetDid> <jobId> [agreementId]");
+                expect(stdout).to.contain("getJobStatus [options] <datasetDid> <jobId> <agreementId>");
                 expect(stdout).to.contain("Displays the compute job status");
                 expect(stdout).to.contain("downloadJobResults <jobId> <resultIndex> [destinationFolder]");
                 expect(stdout).to.contain("Downloads compute job results");

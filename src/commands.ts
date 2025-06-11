@@ -366,20 +366,20 @@ export class Commands {
 		if (!maxJobDuration) {
 			console.error(
 				"Error initializing Provider for the compute job using dataset DID " +
-					args[1] +
-					" and algorithm DID " +
-					args[2] +
-					" because maxJobDuration was not provided."
+				args[1] +
+				" and algorithm DID " +
+				args[2] +
+				" because maxJobDuration was not provided."
 			);
 			return;
 		}
 		if (maxJobDuration < 0) {
 			console.error(
 				"Error initializing Provider for the compute job using dataset DID " +
-					args[1] +
-					" and algorithm DID " +
-					args[2] +
-					" because maxJobDuration is less than 0. It should be in seconds."
+				args[1] +
+				" and algorithm DID " +
+				args[2] +
+				" because maxJobDuration is less than 0. It should be in seconds."
 			);
 			return;
 		}
@@ -391,10 +391,10 @@ export class Commands {
 		if (!paymentToken) {
 			console.error(
 				"Error initializing Provider for the compute job using dataset DID " +
-					args[1] +
-					" and algorithm DID " +
-					args[2] +
-					" because paymentToken was not provided."
+				args[1] +
+				" and algorithm DID " +
+				args[2] +
+				" because paymentToken was not provided."
 			);
 			return;
 		}
@@ -402,13 +402,13 @@ export class Commands {
 		if (!Object.keys(computeEnv.fees).includes(chainId.toString())) {
 			console.error(
 				"Error starting paid compute using dataset DID " +
-					args[1] +
-					" and algorithm DID " +
-					args[2] +
-					" because chainId is not supported by compute environment. " +
-					args[3] +
-					". Supported chain IDs: " +
-					computeEnv.fees.keys()
+				args[1] +
+				" and algorithm DID " +
+				args[2] +
+				" because chainId is not supported by compute environment. " +
+				args[3] +
+				". Supported chain IDs: " +
+				computeEnv.fees.keys()
 			);
 			return;
 		}
@@ -422,11 +422,11 @@ export class Commands {
 		if (found === false) {
 			console.error(
 				"Error initializing Provider for the compute job using dataset DID " +
-					args[1] +
-					" and algorithm DID " +
-					args[2] +
-					" because paymentToken is not supported by this environment " +
-					args[3]
+				args[1] +
+				" and algorithm DID " +
+				args[2] +
+				" because paymentToken is not supported by this environment " +
+				args[3]
 			);
 			return;
 		}
@@ -434,10 +434,10 @@ export class Commands {
 		if (!resources) {
 			console.error(
 				"Error initializing Provider for the compute job using dataset DID " +
-					args[1] +
-					" and algorithm DID " +
-					args[2] +
-					" because resources for compute were not provided."
+				args[1] +
+				" and algorithm DID " +
+				args[2] +
+				" because resources for compute were not provided."
 			);
 			return;
 		}
@@ -459,9 +459,9 @@ export class Commands {
 		) {
 			console.error(
 				"Error initializing Provider for the compute job using dataset DID " +
-					args[1] +
-					" and algorithm DID " +
-					args[2]
+				args[1] +
+				" and algorithm DID " +
+				args[2]
 			);
 			return;
 		}
@@ -644,20 +644,20 @@ export class Commands {
 		if (!maxJobDuration) {
 			console.error(
 				"Error initializing Provider for the compute job using dataset DID " +
-					args[1] +
-					" and algorithm DID " +
-					args[2] +
-					" because maxJobDuration was not provided."
+				args[1] +
+				" and algorithm DID " +
+				args[2] +
+				" because maxJobDuration was not provided."
 			);
 			return;
 		}
 		if (maxJobDuration < 0) {
 			console.error(
 				"Error starting paid compute using dataset DID " +
-					args[1] +
-					" and algorithm DID " +
-					args[2] +
-					" because maxJobDuration is less than 0. It should be in seconds."
+				args[1] +
+				" and algorithm DID " +
+				args[2] +
+				" because maxJobDuration is less than 0. It should be in seconds."
 			);
 			return;
 		}
@@ -670,23 +670,23 @@ export class Commands {
 		if (!paymentToken) {
 			console.error(
 				"Error starting paid compute using dataset DID " +
-					args[1] +
-					" and algorithm DID " +
-					args[2] +
-					" because paymentToken was not provided."
+				args[1] +
+				" and algorithm DID " +
+				args[2] +
+				" because paymentToken was not provided."
 			);
 			return;
 		}
 		if (!Object.keys(computeEnv.fees).includes(chainId.toString())) {
 			console.error(
 				"Error starting paid compute using dataset DID " +
-					args[1] +
-					" and algorithm DID " +
-					args[2] +
-					" because chainId is not supported by compute environment. " +
-					args[3] +
-					". Supported chain IDs: " +
-					computeEnv.fees.keys()
+				args[1] +
+				" and algorithm DID " +
+				args[2] +
+				" because chainId is not supported by compute environment. " +
+				args[3] +
+				". Supported chain IDs: " +
+				computeEnv.fees.keys()
 			);
 			return;
 		}
@@ -700,11 +700,11 @@ export class Commands {
 		if (found === false) {
 			console.error(
 				"Error starting paid compute using dataset DID " +
-					args[1] +
-					" and algorithm DID " +
-					args[2] +
-					" because paymentToken is not supported by this environment " +
-					args[3]
+				args[1] +
+				" and algorithm DID " +
+				args[2] +
+				" because paymentToken is not supported by this environment " +
+				args[3]
 			);
 			return;
 		}
@@ -712,10 +712,10 @@ export class Commands {
 		if (!resources) {
 			console.error(
 				"Error starting paid compute using dataset DID " +
-					args[1] +
-					" and algorithm DID " +
-					args[2] +
-					" because resources for compute were not provided."
+				args[1] +
+				" and algorithm DID " +
+				args[2] +
+				" because resources for compute were not provided."
 			);
 			return;
 		}
@@ -773,7 +773,7 @@ export class Commands {
 		const output: ComputeOutput = {
 			metadataUri: await getMetadataURI(),
 		};
-		
+
 		const computeJobs = await ProviderInstance.computeStart(
 			providerURI,
 			this.signer,
@@ -1283,5 +1283,28 @@ export class Commands {
 			await this.signer.getAddress(),
 			amountToUnits(null, null, "1000", 18)
 		);
+	}
+
+	public async generateAuthToken() {
+		const authToken = await ProviderInstance.generateAuthToken(
+			this.signer,
+			this.oceanNodeUrl,
+		);
+		console.log(`Auth token successfully generated: ${authToken}`);
+	}
+
+	public async invalidateAuthToken(args: string[]) {
+		const authToken = args[0];
+		const result = await ProviderInstance.invalidateAuthToken(
+			this.signer,
+			authToken,
+			this.oceanNodeUrl,
+		);
+		if (!result.success) {
+			console.log('Auth token could not be invalidated');
+			return;
+		}
+
+		console.log(`Auth token successfully invalidated`);
 	}
 }

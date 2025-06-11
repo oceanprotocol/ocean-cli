@@ -8,10 +8,10 @@ import { unitsToAmount } from '@oceanprotocol/lib';
 import { toBoolean } from './helpers.js';
 
 async function initializeSigner() {
-  
+
   const provider = new ethers.providers.JsonRpcProvider(process.env.RPC);
   let signer;
-  
+
   if (process.env.PRIVATE_KEY) {
     signer = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
   } else {
@@ -38,7 +38,7 @@ export async function createCLI() {
     console.error(chalk.red("Have you forgot to set env NODE_URL?"));
     process.exit(1);
   }
-  
+
   const program = new Command();
 
   program
@@ -203,7 +203,7 @@ export async function createCLI() {
       const jobDuration = options.maxJobDuration || maxJobDuration;
       const token = options.token || paymentToken;
       const res = options.resources || resources;
-      if (!dsDids || !aDid ||!envId || !jobDuration || !token || !res) {
+      if (!dsDids || !aDid || !envId || !jobDuration || !token || !res) {
         console.error(chalk.red('Missing required arguments'));
         // process.exit(1);
         return
@@ -240,7 +240,7 @@ export async function createCLI() {
 
       await commands.computeStart(computeArgs);
       console.log(chalk.green('Compute job started successfully.'));
-  });
+    });
 
   // startFreeCompute command
   program
@@ -311,7 +311,7 @@ export async function createCLI() {
       }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
-       const args = [null, dsDid, jId];
+      const args = [null, dsDid, jId];
       if (agrId) args.push(agrId);
       await commands.computeStop(args);
     });
@@ -364,6 +364,30 @@ export async function createCLI() {
       const commands = new Commands(signer, chainId);
       await commands.mintOceanTokens();
     });
+
+  // Generate new auth token
+  program
+    .command('generateAuthToken')
+    .description('Generate new auth token')
+    .action(async () => {
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
+      await commands.generateAuthToken();
+    });
+
+
+  // Invalidate auth token
+  program
+    .command('invalidateAuthToken')
+    .description('Invalidate auth token')
+    .argument('<token>', 'Auth token')
+    .option('-t, --token <token>', 'Auth token')
+    .action(async (token, options) => {
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
+      await commands.invalidateAuthToken([token || options.token]);
+    });
+
 
   return program;
 }

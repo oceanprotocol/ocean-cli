@@ -9,7 +9,8 @@ import {
 	getMetadataURI,
 	getIndexingWaitSettings,
 	IndexerWaitParams,
-	fixAndParseProviderFees
+	fixAndParseProviderFees,
+	getConfigByChainId,
 } from "./helpers.js";
 import {
 	Aquarius,
@@ -1251,38 +1252,44 @@ export class Commands {
 	}
 
 	public async mintOceanTokens() {
-		const minAbi = [
-			{
-				constant: false,
-				inputs: [
-					{ name: "to", type: "address" },
-					{ name: "value", type: "uint256" },
-				],
-				name: "mint",
-				outputs: [{ name: "", type: "bool" }],
-				payable: false,
-				stateMutability: "nonpayable",
-				type: "function",
-			},
-		];
+		try {
+			const config = await getConfigByChainId(Number(this.config.chainId));
+			const minAbi = [
+				{
+					constant: false,
+					inputs: [
+						{ name: "to", type: "address" },
+						{ name: "value", type: "uint256" },
+					],
+					name: "mint",
+					outputs: [{ name: "", type: "bool" }],
+					payable: false,
+					stateMutability: "nonpayable",
+					type: "function",
+				},
+			];
 
-		const tokenContract = new ethers.Contract(
-			this.config.oceanTokenAddress,
-			minAbi,
-			this.signer
-		);
-		const estGasPublisher = await tokenContract.estimateGas.mint(
-			this.signer.getAddress(),
-			amountToUnits(null, null, "1000", 18)
-		);
-		await sendTx(
-			estGasPublisher,
-			this.signer,
-			1,
-			tokenContract.mint,
-			await this.signer.getAddress(),
-			amountToUnits(null, null, "1000", 18)
-		);
+			const tokenContract = new ethers.Contract(
+				config?.Ocean,
+				minAbi,
+				this.signer
+			);
+			const estGasPublisher = await tokenContract.estimateGas.mint(
+				await this.signer.getAddress(),
+				await amountToUnits(null, null, "1000", 18)
+			);
+			const tx = await sendTx(
+				estGasPublisher,
+				this.signer,
+				1,
+				tokenContract.mint,
+				await this.signer.getAddress(),
+				amountToUnits(null, null, "1000", 18)
+			);
+			await tx.wait();
+		} catch (error) {
+			console.error("Error minting Ocean tokens:", error);
+		}
 	}
 
 	public async generateAuthToken() {
@@ -1307,4 +1314,71 @@ export class Commands {
 
 		console.log(`Auth token successfully invalidated`);
 	}
+
+	public async depositToEscrow(signer: Signer, token: string, amount: string, chainId: number) {
+		try {
+			const amountInUnits = await amountToUnits(signer, token, amount, 18);
+			const config = await getConfigByChainId(chainId);
+			const escrowAddress = config.Escrow;
+
+			const tokenContract = new ethers.Contract(
+				token,
+				['function approve(address spender, uint256 amount) returns (bool)'],
+				signer
+			);
+
+			const escrow = new EscrowContract(
+				ethers.utils.getAddress(escrowAddress),
+				signer,
+				chainId
+			);
+
+			console.log('Approving token transfer...')
+			const approveTx = await tokenContract.approve(escrowAddress, amountInUnits);
+			await approveTx.wait();
+			console.log(`Successfully approved ${amount} ${token} to escrow`);
+
+
+			console.log('Depositing to escrow...')
+			const depositTx = await escrow.deposit(token, amount);
+			await depositTx.wait();
+			return true;
+
+		} catch (error) {
+			console.error("Error depositing to escrow:", error);
+			return false;
+		}
+	}
+
+	// public async authorizeEscrowPayee(
+	// 	escrowAddress: string,
+	// 	token: string,
+	// 	payee: string,
+	// 	maxLockedAmount: string,
+	// 	maxLockSeconds: string,
+	// 	maxLockCounts: string
+	// ) {
+	// 	try {
+	// 		const escrow = new EscrowContract(
+	// 			ethers.utils.getAddress(escrowAddress),
+	// 			this.signer
+	// 		);
+
+	// 		console.log("Authorizing payee...");
+	// 		const authTx = await escrow.authorize(
+	// 			token,
+	// 			payee,
+	// 			maxLockedAmount,
+	// 			maxLockSeconds,
+	// 			maxLockCounts
+	// 		);
+	// 		await authTx.wait();
+	// 		console.log(`Successfully authorized payee ${payee} for token ${token}`);
+
+	// 		return true;
+	// 	} catch (error) {
+	// 		console.error("Error authorizing payee:", error);
+	// 		return false;
+	// 	}
+	// }
 }

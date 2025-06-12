@@ -388,6 +388,52 @@ export async function createCLI() {
       await commands.invalidateAuthToken([token || options.token]);
     });
 
+  // Escrow deposit command
+  program
+    .command('depositEscrow')
+    .description('Deposit tokens into the escrow contract')
+    .argument('<token>', 'Address of the token to deposit')
+    .argument('<amount>', 'Amount of tokens to deposit')
+    .action(async (token, amount) => {
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
+      const success = await commands.depositToEscrow(signer, token, amount, chainId);
+      if (!success) {
+        console.log(chalk.red('Deposit failed'));
+        return;
+      }
+
+      console.log(chalk.green('Deposit successful'));
+    });
+
+  // // Escrow authorization command
+  // program
+  //   .command('authorizeEscrow')
+  //   .description('Authorize a payee to lock and claim funds from escrow')
+  //   .argument('<escrowAddress>', 'Address of the escrow contract')
+  //   .argument('<token>', 'Address of the token to authorize')
+  //   .argument('<payee>', 'Address of the payee to authorize')
+  //   .argument('<maxLockedAmount>', 'Maximum amount that can be locked by payee')
+  //   .argument('<maxLockSeconds>', 'Maximum lock duration in seconds')
+  //   .argument('<maxLockCounts>', 'Maximum number of locks allowed')
+  //   .action(async (escrowAddress, token, payee, maxLockedAmount, maxLockSeconds, maxLockCounts) => {
+  //     const { signer, chainId } = await initializeSigner();
+  //     const commands = new Commands(signer, chainId);
+  //     const success = await commands.authorizeEscrowPayee(
+  //       escrowAddress,
+  //       token,
+  //       payee,
+  //       maxLockedAmount,
+  //       maxLockSeconds,
+  //       maxLockCounts
+  //     );
+  //     if (!success) {
+  //       console.log(chalk.red('Authorization failed'));
+  //       return;
+  //     }
+
+  //     console.log(chalk.green('Authorization successful'));
+  //   });
 
   return program;
 }

@@ -1,6 +1,6 @@
 import { ethers, Signer } from "ethers";
 import fetch from "cross-fetch";
-import { promises as fs } from "fs";
+import { promises as fs, readFileSync } from "fs";
 import * as path from "path";
 import * as sapphire from '@oasisprotocol/sapphire-paratime';
 import { Asset, DDO } from '@oceanprotocol/ddo-js';
@@ -24,10 +24,9 @@ import {
 	LoggerInstance,
 	createAsset
 } from "@oceanprotocol/lib";
-import { hexlify } from "ethers/lib/utils";
-import ERC20Template from '@oceanprotocol/contracts/artifacts/contracts/templates/ERC20Template.sol/ERC20Template.json';
+import { homedir } from "os";
 
-
+const ERC20Template = readFileSync('./node_modules/@oceanprotocol/contracts/artifacts/contracts/templates/ERC20Template.sol/ERC20Template.json', 'utf8') as any;
 
 export async function downloadFile(
 	url: string,
@@ -173,7 +172,7 @@ export async function updateAssetMetadata(
 	else {
 		const stringDDO = JSON.stringify(updatedDdo);
 		const bytes = Buffer.from(stringDDO);
-		metadata = hexlify(bytes);
+		metadata = ethers.utils.hexlify(bytes);
 		flags = 0
 	}
 
@@ -382,27 +381,41 @@ export function getIndexingWaitSettings(): IndexerWaitParams {
 }
 
 export function fixAndParseProviderFees(rawString: string) {
-  // Remove surrounding quotes if present
-  if (rawString.startsWith('"') && rawString.endsWith('"')) {
-    rawString = rawString.slice(1, -1).replace(/\\"/g, '"');
-  }
+	// Remove surrounding quotes if present
+	if (rawString.startsWith('"') && rawString.endsWith('"')) {
+		rawString = rawString.slice(1, -1).replace(/\\"/g, '"');
+	}
 
-  const fixed = rawString
-    .replace(/([{,])(\s*)([a-zA-Z0-9_]+)\s*:/g, '$1"$3":')
-    .replace(/:\s*(did:[^,}\]]+)/g, ':"$1"')
-    .replace(/:\s*(0x[a-fA-F0-9]+)/g, ':"$1"')
-    .replace(/providerData:\s*([^,}\]]+)/g, 'providerData:"$1"')
-    .replace(/:false/g, ':false')
-    .replace(/:true/g, ':true');
+	const fixed = rawString
+		.replace(/([{,])(\s*)([a-zA-Z0-9_]+)\s*:/g, '$1"$3":')
+		.replace(/:\s*(did:[^,}\]]+)/g, ':"$1"')
+		.replace(/:\s*(0x[a-fA-F0-9]+)/g, ':"$1"')
+		.replace(/providerData:\s*([^,}\]]+)/g, 'providerData:"$1"')
+		.replace(/:false/g, ':false')
+		.replace(/:true/g, ':true');
 
-  return JSON.parse(fixed);
+	return JSON.parse(fixed);
 }
 
 export function toBoolean(value) {
-  if (typeof value === 'boolean') return value;
-  if (typeof value === 'string') {
-    const val = value.trim().toLowerCase();
-    return val === 'true' || val === '1' || val === 'yes' || val === 'y';
-  }
-  return Boolean(value);
+	if (typeof value === 'boolean') return value;
+	if (typeof value === 'string') {
+		const val = value.trim().toLowerCase();
+		return val === 'true' || val === '1' || val === 'yes' || val === 'y';
+	}
+	return Boolean(value);
+}
+
+export async function getConfigByChainId(chainId: number) {
+	const addressFilePath = process.env.ADDRESS_FILE || `${homedir}/.ocean/ocean-contracts/artifacts/address.json`;
+	const addressFile = await fs.readFile(addressFilePath, 'utf8');
+
+	const data = JSON.parse(addressFile);
+	const chainConfig = Object.values(data).find((network: any) => network.chainId === chainId) as any;
+
+	if (!chainConfig) {
+		throw new Error(`Chain ${chainId} not found in address file`);
+	}
+
+	return chainConfig;
 }

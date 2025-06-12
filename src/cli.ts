@@ -394,10 +394,14 @@ export async function createCLI() {
     .description('Deposit tokens into the escrow contract')
     .argument('<token>', 'Address of the token to deposit')
     .argument('<amount>', 'Amount of tokens to deposit')
-    .action(async (token, amount) => {
+    .option('-t, --token <token>', 'Address of the token to deposit')
+    .option('-a, --amount <amount>', 'Amount of tokens to deposit')
+    .action(async (token, amount, options) => {
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
-      const success = await commands.depositToEscrow(signer, token, amount, chainId);
+      const tokenAddress = options.token || token;
+      const amountToDeposit = options.amount || amount;
+      const success = await commands.depositToEscrow(signer, tokenAddress, amountToDeposit, chainId);
       if (!success) {
         console.log(chalk.red('Deposit failed'));
         return;
@@ -406,34 +410,44 @@ export async function createCLI() {
       console.log(chalk.green('Deposit successful'));
     });
 
-  // // Escrow authorization command
-  // program
-  //   .command('authorizeEscrow')
-  //   .description('Authorize a payee to lock and claim funds from escrow')
-  //   .argument('<escrowAddress>', 'Address of the escrow contract')
-  //   .argument('<token>', 'Address of the token to authorize')
-  //   .argument('<payee>', 'Address of the payee to authorize')
-  //   .argument('<maxLockedAmount>', 'Maximum amount that can be locked by payee')
-  //   .argument('<maxLockSeconds>', 'Maximum lock duration in seconds')
-  //   .argument('<maxLockCounts>', 'Maximum number of locks allowed')
-  //   .action(async (escrowAddress, token, payee, maxLockedAmount, maxLockSeconds, maxLockCounts) => {
-  //     const { signer, chainId } = await initializeSigner();
-  //     const commands = new Commands(signer, chainId);
-  //     const success = await commands.authorizeEscrowPayee(
-  //       escrowAddress,
-  //       token,
-  //       payee,
-  //       maxLockedAmount,
-  //       maxLockSeconds,
-  //       maxLockCounts
-  //     );
-  //     if (!success) {
-  //       console.log(chalk.red('Authorization failed'));
-  //       return;
-  //     }
+  // Escrow authorization command
+  program
+    .command('authorizeEscrow')
+    .description('Authorize a payee to lock and claim funds from escrow')
+    .argument('<token>', 'Address of the token to authorize')
+    .argument('<payee>', 'Address of the payee to authorize')
+    .argument('<maxLockedAmount>', 'Maximum amount that can be locked by payee')
+    .argument('<maxLockSeconds>', 'Maximum lock duration in seconds')
+    .argument('<maxLockCounts>', 'Maximum number of locks allowed')
+    .option('-t, --token <token>', 'Address of the token to authorize')
+    .option('-p, --payee <payee>', 'Address of the payee to authorize')
+    .option('-m, --maxLockedAmount <maxLockedAmount>', 'Maximum amount that can be locked by payee')
+    .option('-s, --maxLockSeconds <maxLockSeconds>', 'Maximum lock duration in seconds')
+    .option('-c, --maxLockCounts <maxLockCounts>', 'Maximum number of locks allowed')
+    .action(async (token, payee, maxLockedAmount, maxLockSeconds, maxLockCounts, options) => {
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
+      const tokenAddress = options.token || token;
+      const payeeAddress = options.payee || payee;
+      const maxLockedAmountValue = options.maxLockedAmount || maxLockedAmount;
+      const maxLockSecondsValue = options.maxLockSeconds || maxLockSeconds;
+      const maxLockCountsValue = options.maxLockCounts || maxLockCounts;
 
-  //     console.log(chalk.green('Authorization successful'));
-  //   });
+      const success = await commands.authorizeEscrowPayee(
+        tokenAddress,
+        payeeAddress,
+        maxLockedAmountValue,
+        maxLockSecondsValue,
+        maxLockCountsValue,
+      );
+
+      if (!success) {
+        console.log(chalk.red('Authorization failed'));
+        return;
+      }
+
+      console.log(chalk.green('Authorization successful'));
+    });
 
   return program;
 }

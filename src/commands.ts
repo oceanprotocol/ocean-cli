@@ -1350,35 +1350,37 @@ export class Commands {
 		}
 	}
 
-	// public async authorizeEscrowPayee(
-	// 	escrowAddress: string,
-	// 	token: string,
-	// 	payee: string,
-	// 	maxLockedAmount: string,
-	// 	maxLockSeconds: string,
-	// 	maxLockCounts: string
-	// ) {
-	// 	try {
-	// 		const escrow = new EscrowContract(
-	// 			ethers.utils.getAddress(escrowAddress),
-	// 			this.signer
-	// 		);
+	public async authorizeEscrowPayee(
+		token: string,
+		payee: string,
+		maxLockedAmount: string,
+		maxLockSeconds: string,
+		maxLockCounts: string
+	) {
+		try {
+			const config = await getConfigByChainId(Number(this.config.chainId));
+			const escrowAddress = config.Escrow;
 
-	// 		console.log("Authorizing payee...");
-	// 		const authTx = await escrow.authorize(
-	// 			token,
-	// 			payee,
-	// 			maxLockedAmount,
-	// 			maxLockSeconds,
-	// 			maxLockCounts
-	// 		);
-	// 		await authTx.wait();
-	// 		console.log(`Successfully authorized payee ${payee} for token ${token}`);
+			const escrow = new EscrowContract(
+				ethers.utils.getAddress(escrowAddress),
+				this.signer
+			);
 
-	// 		return true;
-	// 	} catch (error) {
-	// 		console.error("Error authorizing payee:", error);
-	// 		return false;
-	// 	}
-	// }
+			console.log("Authorizing payee...");
+			const authorizeTx = await escrow.authorize(
+				ethers.utils.getAddress(token),
+				ethers.utils.getAddress(payee),
+				maxLockedAmount,
+				maxLockSeconds,
+				maxLockCounts
+			);
+			await authorizeTx.wait();
+			console.log(`Successfully authorized payee ${payee} for token ${token}`);
+
+			return true;
+		} catch (error) {
+			console.error("Error authorizing payee:", error);
+			return false;
+		}
+	}
 }

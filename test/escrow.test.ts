@@ -2,12 +2,17 @@ import { expect } from "chai";
 import { homedir } from 'os';
 import { runCommand } from "./util.js";
 import { getConfigByChainId } from "../src/helpers.js";
+import { ethers } from "ethers";
+import { EscrowContract } from "@oceanprotocol/lib";
 
 describe("Ocean CLI Escrow", function () {
     this.timeout(60000); // 60 second timeout
 
     let chainConfig: any;
     let tokenAddress: string;
+    let payee: ethers.Wallet;
+    let payer: ethers.Wallet;
+    let escrowAddress: string;
 
     before(async function () {
         process.env.AVOID_LOOP_RUN = "true";
@@ -18,6 +23,12 @@ describe("Ocean CLI Escrow", function () {
 
         chainConfig = await getConfigByChainId(8996);
         tokenAddress = chainConfig.Ocean;
+        escrowAddress = chainConfig.Escrow;
+
+        const provider = new ethers.providers.JsonRpcProvider(process.env.RPC);
+        payer = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
+        payee = new ethers.Wallet('0xef4b441145c1d0f3b4bc6d61d29f5c6e502359481152f869247c7a4244d45209', provider);
+
 
         await runCommand(`npm run cli -- mintOcean`);
     });
@@ -33,18 +44,6 @@ describe("Ocean CLI Escrow", function () {
         expect(output).to.include("Deposit successful");
     });
 
-    // it("should authorize a payee", async function () {
-    //     const maxLockedAmount = "1000000000000000000"; // 1 token
-    //     const maxLockSeconds = "3600"; // 1 hour
-    //     const maxLockCounts = "10";
-
-    //     const output = await runCommand(
-    //         `npm run cli authorizeEscrow ${escrowAddress} ${tokenAddress} ${payeeAddress} ${maxLockedAmount} ${maxLockSeconds} ${maxLockCounts}`
-    //     );
-
-    //     expect(output).to.include("Authorization successful");
-    // });
-
     it("should fail to deposit with invalid amount", async function () {
         const invalidAmount = "10000000";
 
@@ -55,15 +54,49 @@ describe("Ocean CLI Escrow", function () {
         expect(output).to.include("Deposit failed");
     });
 
-    // it("should fail to authorize with invalid parameters", async function () {
-    //     const invalidAmount = "0";
-    //     const invalidDuration = "0";
-    //     const invalidCounts = "0";
+    it("should authorize a payee", async function () {
+        const maxLockedAmount = "1";
+        const maxLockSeconds = "3600";
+        const maxLockCounts = "10";
 
-    //     const output = await runCommand(
-    //         `npm run cli authorizeEscrow ${escrowAddress} ${tokenAddress} ${payeeAddress} ${invalidAmount} ${invalidDuration} ${invalidCounts}`
-    //     );
+        const output = await runCommand(
+            `npm run cli authorizeEscrow ${tokenAddress} ${payee.address} ${maxLockedAmount} ${maxLockSeconds} ${maxLockCounts}`
+        );
 
-    //     expect(output).to.include("Authorization failed");
-    // });
+        const escrow = new EscrowContract(
+            ethers.utils.getAddress(escrowAddress),
+            payer,
+            chainConfig.chainId
+        );
+
+        const authorizations = await escrow.getAuthorizations(
+            tokenAddress,
+            payer.address,
+            payee.address
+        );
+
+        const maxLockedAmountFromEscrowBN = authorizations[0].maxLockedAmount;
+        const maxLockedAmountFromEscrow = ethers.utils.formatEther(maxLockedAmountFromEscrowBN);
+
+        expect(Number(maxLockedAmountFromEscrow)).to.equal(Number(maxLockedAmount));
+
+
+        expect(output).to.satisfy((msg: string) =>
+            msg.includes("Authorization successful") || msg.includes("already authorized")
+        );
+    });
+
+
+
+    it("should fail to authorize with invalid parameters", async function () {
+        const invalidAmount = "10000000000";
+        const invalidDuration = "0";
+        const invalidCounts = "0";
+
+        const output = await runCommand(
+            `npm run cli authorizeEscrow ${tokenAddress} ${payee.address} ${invalidAmount} ${invalidDuration} ${invalidCounts}`
+        );
+
+        expect(output).to.include("Authorization failed");
+    });
 }); 

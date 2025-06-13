@@ -85,7 +85,6 @@ jobs:
       - name: Run Barge
         working-directory: ${{ github.workspace }}/barge
         run: |
-          export NODE_VERSION=pr-950
           bash -x start_ocean.sh --with-typesense 2>&1 > start_ocean.log &
       - run: npm ci
       - run: npm run build

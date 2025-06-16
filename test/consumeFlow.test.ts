@@ -57,7 +57,7 @@ describe("Ocean CLI Publishing", function() {
 		const jsonMatch = output.match(/did:op:[a-f0-9]{64}/);
         if (!jsonMatch) {
 			console.error("Raw output:", output);
-			throw new Error("Could not find compute environments in the output");
+			throw new Error("Could not find did in the output");
 		}
 
 		try {
@@ -81,7 +81,7 @@ describe("Ocean CLI Publishing", function() {
 		const jsonMatch = output.match(/did:op:[a-f0-9]{64}/);
         if (!jsonMatch) {
 			console.error("Raw output:", output);
-			throw new Error("Could not find compute environments in the output");
+			throw new Error("Could not find did in the output");
 		}
 
 		try {
@@ -104,7 +104,7 @@ describe("Ocean CLI Publishing", function() {
         const jsonMatch = output.match(/did:op:[a-f0-9]{64}/);
         if (!jsonMatch) {
 			console.error("Raw output:", output);
-			throw new Error("Could not find compute environments in the output");
+			throw new Error("Could not find did in the output");
 		}
 
 		try {
@@ -127,7 +127,7 @@ describe("Ocean CLI Publishing", function() {
         const jsonMatch = output.match(/did:op:[a-f0-9]{64}/);
         if (!jsonMatch) {
 			console.error("Raw output:", output);
-			throw new Error("Could not find compute environments in the output");
+			throw new Error("Could not find did in the output");
 		}
 
 		try {
@@ -145,7 +145,7 @@ describe("Ocean CLI Publishing", function() {
 		const jsonMatch = output.match(/s*([\s\S]*)/);
 		if (!jsonMatch) {
 			console.error("Raw output:", output);
-			throw new Error("Could not find compute environments in the output");
+			throw new Error("Could not find ddo in the output");
 		}
 
         try {
@@ -162,7 +162,7 @@ describe("Ocean CLI Publishing", function() {
 		const jsonMatch = output.match(/s*([\s\S]*)/);
 		if (!jsonMatch) {
 			console.error("Raw output:", output);
-			throw new Error("Could not find compute environments in the output");
+			throw new Error("Could not find ddo in the output");
 		}
 
         try {
@@ -179,7 +179,7 @@ describe("Ocean CLI Publishing", function() {
 		const jsonMatch = output.match(/s*([\s\S]*)/);
 		if (!jsonMatch) {
 			console.error("Raw output:", output);
-			throw new Error("Could not find compute environments in the output");
+			throw new Error("Could not find ddo in the output");
 		}
 
         try {
@@ -196,7 +196,7 @@ describe("Ocean CLI Publishing", function() {
 		const jsonMatch = output.match(/s*([\s\S]*)/);
 		if (!jsonMatch) {
 			console.error("Raw output:", output);
-			throw new Error("Could not find compute environments in the output");
+			throw new Error("Could not find ddo in the output");
 		}
 
         try {

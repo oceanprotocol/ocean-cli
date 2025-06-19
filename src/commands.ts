@@ -1327,15 +1327,10 @@ export class Commands {
 		try {
 			const balance = await escrow.getUserFunds(await this.signer.getAddress(), token);
 			const decimals = await getTokenDecimals(this.signer, token);
-
-			const sum = await balance.reduce(async (accPromise, curr) => {
-				const acc = await accPromise;
-				const amount = await unitsToAmount(this.signer, token, curr, decimals);
-				return acc + Number(amount);
-			}, Promise.resolve(0));
-
-			console.log(`Escrow user funds for token ${token}: ${sum}`);
-			return sum;
+			const available = balance.available;
+			const amount = await unitsToAmount(this.signer, token, available, decimals);
+			console.log(`Escrow user funds for token ${token}: ${amount}`);
+			return Number(amount);
 		} catch (error) {
 			console.error("Error getting escrow balance:", error);
 		}

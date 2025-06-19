@@ -10,7 +10,7 @@ import {
 	getIndexingWaitSettings,
 	IndexerWaitParams,
 	fixAndParseProviderFees,
-	getConfigByChainId,
+	getConfigByChainId
 } from "./helpers.js";
 import {
 	Aquarius,
@@ -26,7 +26,8 @@ import {
 	orderAsset,
 	sendTx,
 	unitsToAmount,
-	EscrowContract
+	EscrowContract,
+	getTokenDecimals
 } from "@oceanprotocol/lib";
 import { Asset } from '@oceanprotocol/ddo-js';
 import { Signer, ethers } from "ethers";
@@ -1313,6 +1314,50 @@ export class Commands {
 		}
 
 		console.log(`Auth token successfully invalidated`);
+	}
+
+	public async getEscrowBalance(token: string): Promise<number> {
+		const config = await getConfigByChainId(Number(this.config.chainId));
+		const escrow = new EscrowContract(
+			ethers.utils.getAddress(config.Escrow),
+			this.signer,
+			Number(this.config.chainId)
+		);
+
+		try {
+			const balance = await escrow.getUserFunds(await this.signer.getAddress(), token);
+			const decimals = await getTokenDecimals(this.signer, token);
+
+			const sum = await balance.reduce(async (accPromise, curr) => {
+				const acc = await accPromise;
+				const amount = await unitsToAmount(this.signer, token, curr, decimals);
+				return acc + Number(amount);
+			}, Promise.resolve(0));
+
+			console.log(`Escrow user funds for token ${token}: ${sum}`);
+			return sum;
+		} catch (error) {
+			console.error("Error getting escrow balance:", error);
+		}
+	}
+
+	public async withdrawFromEscrow(token: string, amount: string): Promise<void> {
+		const config = await getConfigByChainId(Number(this.config.chainId));
+		const escrow = new EscrowContract(
+			ethers.utils.getAddress(config.Escrow),
+			this.signer,
+			Number(this.config.chainId)
+		);
+
+		const balance = await this.getEscrowBalance(token);
+		if (balance < Number(amount)) {
+			console.error(`Insufficient balance in escrow for token ${token}`);
+			return;
+		}
+
+		const withdrawTx = await escrow.withdraw([token], [amount]);
+		await withdrawTx.wait();
+		console.log(`Successfully withdrawn ${amount} ${token} from escrow`);
 	}
 
 	public async depositToEscrow(signer: Signer, token: string, amount: string, chainId: number) {

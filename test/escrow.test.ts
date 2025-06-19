@@ -36,20 +36,38 @@ describe("Ocean CLI Escrow", function () {
     it("should deposit tokens into escrow", async function () {
         const depositAmount = "1";
 
+        const initialTokenBalance = await runCommand(`npm run cli getUserFundsEscrow ${tokenAddress}`);
+        const initialTokenBalanceNumber = initialTokenBalance.split(`${tokenAddress}: `)[1].trim();
+        const numberInitialTokenBalance = Number(initialTokenBalanceNumber);
+
         const output = await runCommand(
             `npm run cli depositEscrow ${tokenAddress} ${depositAmount}`
         );
 
+        const finalTokenBalance = await runCommand(`npm run cli getUserFundsEscrow ${tokenAddress}`);
+        const finalTokenBalanceNumber = finalTokenBalance.split(`${tokenAddress}: `)[1].trim();
+        const numberFinalTokenBalance = Number(finalTokenBalanceNumber);
 
         expect(output).to.include("Deposit successful");
+        expect(numberFinalTokenBalance).to.equal(Number(depositAmount) + numberInitialTokenBalance);
+    });
+
+    it("should withdraw tokens from escrow", async function () {
+        const withdrawAmount = "1";
+        const output = await runCommand(
+            `npm run cli withdrawFromEscrow ${tokenAddress} ${withdrawAmount}`
+        );
+
+        expect(output).to.include("Successfully withdrawn");
     });
 
     it("should fail to deposit with invalid amount", async function () {
-        const invalidAmount = "10000000";
+        const invalidAmount = "1000000000000000";
 
         const output = await runCommand(
             `npm run cli depositEscrow ${tokenAddress} ${invalidAmount}`
         );
+
 
         expect(output).to.include("Deposit failed");
     });

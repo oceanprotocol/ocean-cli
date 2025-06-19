@@ -414,6 +414,32 @@ export async function createCLI() {
       console.log(chalk.green('Deposit successful'));
     });
 
+  // Check escrow deposited balance
+  program
+    .command('getUserFundsEscrow')
+    .description('Get deposited token amount in escrow for user')
+    .argument('<token>', 'Address of the token to check')
+    .option('-t, --token <token>', 'Address of the token to check')
+    .action(async (token, options) => {
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
+      await commands.getEscrowBalance(token || options.token);
+    });
+
+  // Withdraw from escrow
+  program
+    .command('withdrawFromEscrow')
+    .description('Withdraw tokens from escrow')
+    .argument('<token>', 'Address of the token to check')
+    .argument('<amount>', 'Amount of tokens to withdraw')
+    .option('-t, --token <token>', 'Address of the token to check')
+    .option('-a, --amount <amount>', 'Amount of tokens to withdraw')
+    .action(async (token, amount, options) => {
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
+      await commands.withdrawFromEscrow(token || options.token, amount);
+    });
+
   // Escrow authorization command
   program
     .command('authorizeEscrow')

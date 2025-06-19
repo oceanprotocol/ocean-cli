@@ -26,7 +26,7 @@ import {
 } from "@oceanprotocol/lib";
 import { homedir } from "os";
 
-const ERC20Template = readFileSync('./node_modules/@oceanprotocol/contracts/artifacts/contracts/templates/ERC20Template.sol/ERC20Template.json', 'utf8') as any;
+const ERC20Template = readFileSync('./node_modules/@oceanprotocol/contracts/artifacts/@openzeppelin/contracts/token/ERC20/ERC20.sol/ERC20.json', 'utf8') as any;
 
 export async function downloadFile(
 	url: string,

@@ -8,10 +8,10 @@ import { unitsToAmount } from '@oceanprotocol/lib';
 import { toBoolean } from './helpers.js';
 
 async function initializeSigner() {
-  
+
   const provider = new ethers.providers.JsonRpcProvider(process.env.RPC);
   let signer;
-  
+
   if (process.env.PRIVATE_KEY) {
     signer = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
   } else {
@@ -38,7 +38,7 @@ export async function createCLI() {
     console.error(chalk.red("Have you forgot to set env NODE_URL?"));
     process.exit(1);
   }
-  
+
   const program = new Command();
 
   program
@@ -203,7 +203,7 @@ export async function createCLI() {
       const jobDuration = options.maxJobDuration || maxJobDuration;
       const token = options.token || paymentToken;
       const res = options.resources || resources;
-      if (!dsDids || !aDid ||!envId || !jobDuration || !token || !res) {
+      if (!dsDids || !aDid || !envId || !jobDuration || !token || !res) {
         console.error(chalk.red('Missing required arguments'));
         // process.exit(1);
         return
@@ -244,7 +244,7 @@ export async function createCLI() {
 
       await commands.computeStart(computeArgs);
       console.log(chalk.green('Compute job started successfully.'));
-  });
+    });
 
   // startFreeCompute command
   program
@@ -315,7 +315,7 @@ export async function createCLI() {
       }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
-       const args = [null, dsDid, jId];
+      const args = [null, dsDid, jId];
       if (agrId) args.push(agrId);
       await commands.computeStop(args);
     });
@@ -367,6 +367,128 @@ export async function createCLI() {
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
       await commands.mintOceanTokens();
+    });
+
+  // Generate new auth token
+  program
+    .command('generateAuthToken')
+    .description('Generate new auth token')
+    .action(async () => {
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
+      await commands.generateAuthToken();
+    });
+
+
+  // Invalidate auth token
+  program
+    .command('invalidateAuthToken')
+    .description('Invalidate auth token')
+    .argument('<token>', 'Auth token')
+    .option('-t, --token <token>', 'Auth token')
+    .action(async (token, options) => {
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
+      await commands.invalidateAuthToken([token || options.token]);
+    });
+
+  // Escrow deposit command
+  program
+    .command('depositEscrow')
+    .description('Deposit tokens into the escrow contract')
+    .argument('<token>', 'Address of the token to deposit')
+    .argument('<amount>', 'Amount of tokens to deposit')
+    .option('-t, --token <token>', 'Address of the token to deposit')
+    .option('-a, --amount <amount>', 'Amount of tokens to deposit')
+    .action(async (token, amount, options) => {
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
+      const tokenAddress = options.token || token;
+      const amountToDeposit = options.amount || amount;
+      const success = await commands.depositToEscrow(signer, tokenAddress, amountToDeposit, chainId);
+      if (!success) {
+        console.log(chalk.red('Deposit failed'));
+        return;
+      }
+
+      console.log(chalk.green('Deposit successful'));
+    });
+
+  // Check escrow deposited balance
+  program
+    .command('getUserFundsEscrow')
+    .description('Get deposited token amount in escrow for user')
+    .argument('<token>', 'Address of the token to check')
+    .option('-t, --token <token>', 'Address of the token to check')
+    .action(async (token, options) => {
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
+      await commands.getEscrowBalance(token || options.token);
+    });
+
+  // Withdraw from escrow
+  program
+    .command('withdrawFromEscrow')
+    .description('Withdraw tokens from escrow')
+    .argument('<token>', 'Address of the token to check')
+    .argument('<amount>', 'Amount of tokens to withdraw')
+    .option('-t, --token <token>', 'Address of the token to check')
+    .option('-a, --amount <amount>', 'Amount of tokens to withdraw')
+    .action(async (token, amount, options) => {
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
+      await commands.withdrawFromEscrow(token || options.token, amount);
+    });
+
+  // Escrow authorization command
+  program
+    .command('authorizeEscrow')
+    .description('Authorize a payee to lock and claim funds from escrow')
+    .argument('<token>', 'Address of the token to authorize')
+    .argument('<payee>', 'Address of the payee to authorize')
+    .argument('<maxLockedAmount>', 'Maximum amount that can be locked by payee')
+    .argument('<maxLockSeconds>', 'Maximum lock duration in seconds')
+    .argument('<maxLockCounts>', 'Maximum number of locks allowed')
+    .option('-t, --token <token>', 'Address of the token to authorize')
+    .option('-p, --payee <payee>', 'Address of the payee to authorize')
+    .option('-m, --maxLockedAmount <maxLockedAmount>', 'Maximum amount that can be locked by payee')
+    .option('-s, --maxLockSeconds <maxLockSeconds>', 'Maximum lock duration in seconds')
+    .option('-c, --maxLockCounts <maxLockCounts>', 'Maximum number of locks allowed')
+    .action(async (token, payee, maxLockedAmount, maxLockSeconds, maxLockCounts, options) => {
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
+      const tokenAddress = options.token || token;
+      const payeeAddress = options.payee || payee;
+      const maxLockedAmountValue = options.maxLockedAmount || maxLockedAmount;
+      const maxLockSecondsValue = options.maxLockSeconds || maxLockSeconds;
+      const maxLockCountsValue = options.maxLockCounts || maxLockCounts;
+
+      const success = await commands.authorizeEscrowPayee(
+        tokenAddress,
+        payeeAddress,
+        maxLockedAmountValue,
+        maxLockSecondsValue,
+        maxLockCountsValue,
+      );
+
+      if (!success) {
+        console.log(chalk.red('Authorization failed'));
+        return;
+      }
+
+      console.log(chalk.green('Authorization successful'));
+    });
+
+  program
+    .command('getAuthorizationsEscrow')
+    .description('Get authorizations for escrow')
+    .argument('<token>', 'Address of the token to check')
+    .argument('<payee>', 'Address of the payee to check')
+    .option('-t, --token <token>', 'Address of the token to check')
+    .action(async (token, payee, options) => {
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
+      await commands.getAuthorizationsEscrow(token || options.token, payee || options.payee);
     });
 
   return program;

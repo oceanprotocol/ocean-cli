@@ -9,7 +9,8 @@ import {
 	getMetadataURI,
 	getIndexingWaitSettings,
 	IndexerWaitParams,
-	fixAndParseProviderFees
+	fixAndParseProviderFees,
+	getConfigByChainId
 } from "./helpers.js";
 import {
 	Aquarius,
@@ -25,7 +26,8 @@ import {
 	orderAsset,
 	sendTx,
 	unitsToAmount,
-	EscrowContract
+	EscrowContract,
+	getTokenDecimals
 } from "@oceanprotocol/lib";
 import { Asset } from '@oceanprotocol/ddo-js';
 import { Signer, ethers } from "ethers";
@@ -366,20 +368,20 @@ export class Commands {
 		if (!maxJobDuration) {
 			console.error(
 				"Error initializing Provider for the compute job using dataset DID " +
-					args[1] +
-					" and algorithm DID " +
-					args[2] +
-					" because maxJobDuration was not provided."
+				args[1] +
+				" and algorithm DID " +
+				args[2] +
+				" because maxJobDuration was not provided."
 			);
 			return;
 		}
 		if (maxJobDuration < 0) {
 			console.error(
 				"Error initializing Provider for the compute job using dataset DID " +
-					args[1] +
-					" and algorithm DID " +
-					args[2] +
-					" because maxJobDuration is less than 0. It should be in seconds."
+				args[1] +
+				" and algorithm DID " +
+				args[2] +
+				" because maxJobDuration is less than 0. It should be in seconds."
 			);
 			return;
 		}
@@ -391,10 +393,10 @@ export class Commands {
 		if (!paymentToken) {
 			console.error(
 				"Error initializing Provider for the compute job using dataset DID " +
-					args[1] +
-					" and algorithm DID " +
-					args[2] +
-					" because paymentToken was not provided."
+				args[1] +
+				" and algorithm DID " +
+				args[2] +
+				" because paymentToken was not provided."
 			);
 			return;
 		}
@@ -402,13 +404,13 @@ export class Commands {
 		if (!Object.keys(computeEnv.fees).includes(chainId.toString())) {
 			console.error(
 				"Error starting paid compute using dataset DID " +
-					args[1] +
-					" and algorithm DID " +
-					args[2] +
-					" because chainId is not supported by compute environment. " +
-					args[3] +
-					". Supported chain IDs: " +
-					computeEnv.fees.keys()
+				args[1] +
+				" and algorithm DID " +
+				args[2] +
+				" because chainId is not supported by compute environment. " +
+				args[3] +
+				". Supported chain IDs: " +
+				computeEnv.fees.keys()
 			);
 			return;
 		}
@@ -422,11 +424,11 @@ export class Commands {
 		if (found === false) {
 			console.error(
 				"Error initializing Provider for the compute job using dataset DID " +
-					args[1] +
-					" and algorithm DID " +
-					args[2] +
-					" because paymentToken is not supported by this environment " +
-					args[3]
+				args[1] +
+				" and algorithm DID " +
+				args[2] +
+				" because paymentToken is not supported by this environment " +
+				args[3]
 			);
 			return;
 		}
@@ -434,10 +436,10 @@ export class Commands {
 		if (!resources) {
 			console.error(
 				"Error initializing Provider for the compute job using dataset DID " +
-					args[1] +
-					" and algorithm DID " +
-					args[2] +
-					" because resources for compute were not provided."
+				args[1] +
+				" and algorithm DID " +
+				args[2] +
+				" because resources for compute were not provided."
 			);
 			return;
 		}
@@ -459,9 +461,9 @@ export class Commands {
 		) {
 			console.error(
 				"Error initializing Provider for the compute job using dataset DID " +
-					args[1] +
-					" and algorithm DID " +
-					args[2]
+				args[1] +
+				" and algorithm DID " +
+				args[2]
 			);
 			return;
 		}
@@ -644,20 +646,20 @@ export class Commands {
 		if (!maxJobDuration) {
 			console.error(
 				"Error initializing Provider for the compute job using dataset DID " +
-					args[1] +
-					" and algorithm DID " +
-					args[2] +
-					" because maxJobDuration was not provided."
+				args[1] +
+				" and algorithm DID " +
+				args[2] +
+				" because maxJobDuration was not provided."
 			);
 			return;
 		}
 		if (maxJobDuration < 0) {
 			console.error(
 				"Error starting paid compute using dataset DID " +
-					args[1] +
-					" and algorithm DID " +
-					args[2] +
-					" because maxJobDuration is less than 0. It should be in seconds."
+				args[1] +
+				" and algorithm DID " +
+				args[2] +
+				" because maxJobDuration is less than 0. It should be in seconds."
 			);
 			return;
 		}
@@ -670,23 +672,23 @@ export class Commands {
 		if (!paymentToken) {
 			console.error(
 				"Error starting paid compute using dataset DID " +
-					args[1] +
-					" and algorithm DID " +
-					args[2] +
-					" because paymentToken was not provided."
+				args[1] +
+				" and algorithm DID " +
+				args[2] +
+				" because paymentToken was not provided."
 			);
 			return;
 		}
 		if (!Object.keys(computeEnv.fees).includes(chainId.toString())) {
 			console.error(
 				"Error starting paid compute using dataset DID " +
-					args[1] +
-					" and algorithm DID " +
-					args[2] +
-					" because chainId is not supported by compute environment. " +
-					args[3] +
-					". Supported chain IDs: " +
-					computeEnv.fees.keys()
+				args[1] +
+				" and algorithm DID " +
+				args[2] +
+				" because chainId is not supported by compute environment. " +
+				args[3] +
+				". Supported chain IDs: " +
+				computeEnv.fees.keys()
 			);
 			return;
 		}
@@ -700,11 +702,11 @@ export class Commands {
 		if (found === false) {
 			console.error(
 				"Error starting paid compute using dataset DID " +
-					args[1] +
-					" and algorithm DID " +
-					args[2] +
-					" because paymentToken is not supported by this environment " +
-					args[3]
+				args[1] +
+				" and algorithm DID " +
+				args[2] +
+				" because paymentToken is not supported by this environment " +
+				args[3]
 			);
 			return;
 		}
@@ -712,10 +714,10 @@ export class Commands {
 		if (!resources) {
 			console.error(
 				"Error starting paid compute using dataset DID " +
-					args[1] +
-					" and algorithm DID " +
-					args[2] +
-					" because resources for compute were not provided."
+				args[1] +
+				" and algorithm DID " +
+				args[2] +
+				" because resources for compute were not provided."
 			);
 			return;
 		}
@@ -773,7 +775,7 @@ export class Commands {
 		const output: ComputeOutput = {
 			metadataUri: await getMetadataURI(),
 		};
-		
+
 		const computeJobs = await ProviderInstance.computeStart(
 			providerURI,
 			this.signer,
@@ -1251,37 +1253,207 @@ export class Commands {
 	}
 
 	public async mintOceanTokens() {
-		const minAbi = [
-			{
-				constant: false,
-				inputs: [
-					{ name: "to", type: "address" },
-					{ name: "value", type: "uint256" },
-				],
-				name: "mint",
-				outputs: [{ name: "", type: "bool" }],
-				payable: false,
-				stateMutability: "nonpayable",
-				type: "function",
-			},
-		];
+		try {
+			const config = await getConfigByChainId(Number(this.config.chainId));
+			const minAbi = [
+				{
+					constant: false,
+					inputs: [
+						{ name: "to", type: "address" },
+						{ name: "value", type: "uint256" },
+					],
+					name: "mint",
+					outputs: [{ name: "", type: "bool" }],
+					payable: false,
+					stateMutability: "nonpayable",
+					type: "function",
+				},
+			];
 
-		const tokenContract = new ethers.Contract(
-			this.config.oceanTokenAddress,
-			minAbi,
-			this.signer
-		);
-		const estGasPublisher = await tokenContract.estimateGas.mint(
-			this.signer.getAddress(),
-			amountToUnits(null, null, "1000", 18)
-		);
-		await sendTx(
-			estGasPublisher,
+			const tokenContract = new ethers.Contract(
+				config?.Ocean,
+				minAbi,
+				this.signer
+			);
+			const estGasPublisher = await tokenContract.estimateGas.mint(
+				await this.signer.getAddress(),
+				await amountToUnits(null, null, "1000", 18)
+			);
+			const tx = await sendTx(
+				estGasPublisher,
+				this.signer,
+				1,
+				tokenContract.mint,
+				await this.signer.getAddress(),
+				amountToUnits(null, null, "1000", 18)
+			);
+			await tx.wait();
+		} catch (error) {
+			console.error("Error minting Ocean tokens:", error);
+		}
+	}
+
+	public async generateAuthToken() {
+		const authToken = await ProviderInstance.generateAuthToken(
 			this.signer,
-			1,
-			tokenContract.mint,
-			await this.signer.getAddress(),
-			amountToUnits(null, null, "1000", 18)
+			this.oceanNodeUrl,
 		);
+		console.log(`Auth token successfully generated: ${authToken}`);
+	}
+
+	public async invalidateAuthToken(args: string[]) {
+		const authToken = args[0];
+		const result = await ProviderInstance.invalidateAuthToken(
+			this.signer,
+			authToken,
+			this.oceanNodeUrl,
+		);
+		if (!result.success) {
+			console.log('Auth token could not be invalidated');
+			return;
+		}
+
+		console.log(`Auth token successfully invalidated`);
+	}
+
+	public async getEscrowBalance(token: string): Promise<number> {
+		const config = await getConfigByChainId(Number(this.config.chainId));
+		const escrow = new EscrowContract(
+			ethers.utils.getAddress(config.Escrow),
+			this.signer,
+			Number(this.config.chainId)
+		);
+
+		try {
+			const balance = await escrow.getUserFunds(await this.signer.getAddress(), token);
+			const decimals = await getTokenDecimals(this.signer, token);
+			const available = balance.available;
+			const amount = await unitsToAmount(this.signer, token, available, decimals);
+			console.log(`Escrow user funds for token ${token}: ${amount}`);
+			return Number(amount);
+		} catch (error) {
+			console.error("Error getting escrow balance:", error);
+		}
+	}
+
+	public async withdrawFromEscrow(token: string, amount: string): Promise<void> {
+		const config = await getConfigByChainId(Number(this.config.chainId));
+		const escrow = new EscrowContract(
+			ethers.utils.getAddress(config.Escrow),
+			this.signer,
+			Number(this.config.chainId)
+		);
+
+		const balance = await this.getEscrowBalance(token);
+		if (balance < Number(amount)) {
+			console.error(`Insufficient balance in escrow for token ${token}`);
+			return;
+		}
+
+		const withdrawTx = await escrow.withdraw([token], [amount]);
+		await withdrawTx.wait();
+		console.log(`Successfully withdrawn ${amount} ${token} from escrow`);
+	}
+
+	public async depositToEscrow(signer: Signer, token: string, amount: string, chainId: number) {
+		try {
+			const amountInUnits = await amountToUnits(signer, token, amount, 18);
+			const config = await getConfigByChainId(chainId);
+			const escrowAddress = config.Escrow;
+
+			const tokenContract = new ethers.Contract(
+				token,
+				['function approve(address spender, uint256 amount) returns (bool)'],
+				signer
+			);
+
+			const escrow = new EscrowContract(
+				ethers.utils.getAddress(escrowAddress),
+				signer,
+				chainId
+			);
+
+			console.log('Approving token transfer...')
+			const approveTx = await tokenContract.approve(escrowAddress, amountInUnits);
+			await approveTx.wait();
+			console.log(`Successfully approved ${amount} ${token} to escrow`);
+
+
+			console.log('Depositing to escrow...')
+			const depositTx = await escrow.deposit(token, amount);
+			await depositTx.wait();
+			return true;
+
+		} catch (error) {
+			console.error("Error depositing to escrow:", error);
+			return false;
+		}
+	}
+
+	public async authorizeEscrowPayee(
+		token: string,
+		payee: string,
+		maxLockedAmount: string,
+		maxLockSeconds: string,
+		maxLockCounts: string
+	) {
+		try {
+			const config = await getConfigByChainId(Number(this.config.chainId));
+			const escrowAddress = config.Escrow;
+
+			const escrow = new EscrowContract(
+				ethers.utils.getAddress(escrowAddress),
+				this.signer
+			);
+
+			console.log("Authorizing payee...");
+			const authorizeTx = await escrow.authorize(
+				ethers.utils.getAddress(token),
+				ethers.utils.getAddress(payee),
+				maxLockedAmount,
+				maxLockSeconds,
+				maxLockCounts
+			);
+			await authorizeTx.wait();
+			console.log(`Successfully authorized payee ${payee} for token ${token}`);
+
+			return true;
+		} catch (error) {
+			console.error("Error authorizing payee:", error);
+			return false;
+		}
+	}
+
+	public async getAuthorizationsEscrow(token: string, payee: string) {
+		const config = await getConfigByChainId(Number(this.config.chainId));
+		const payer = await this.signer.getAddress();
+		const tokenAddress = ethers.utils.getAddress(token);
+		const payerAddress = ethers.utils.getAddress(payer);
+		const payeeAddress = ethers.utils.getAddress(payee);
+		const decimals = await getTokenDecimals(this.signer, token);
+		const escrow = new EscrowContract(
+			ethers.utils.getAddress(config.Escrow),
+			this.signer,
+			Number(this.config.chainId)
+		);
+
+		const authorizations = await escrow.getAuthorizations(tokenAddress, payerAddress, payeeAddress);
+		const authorization = authorizations[0]
+		if (!authorization || authorization.length === 0) {
+			console.log('No authorizations found');
+			return;
+		}
+
+		const currentLockedAmount = await unitsToAmount(this.signer, token, authorization.currentLockedAmount.toString(), decimals);
+		const maxLockedAmount = await unitsToAmount(this.signer, token, authorization.maxLockedAmount.toString(), decimals);
+
+		console.log('Authorizations found:')
+		console.log(`- Current Locked Amount: ${Number(currentLockedAmount)}`)
+		console.log(`- Current Locks: ${authorization.currentLocks}`)
+		console.log(`- Max locked amount: ${Number(maxLockedAmount)}`)
+		console.log(`- Max lock seconds: ${authorization.maxLockSeconds}`)
+		console.log(`- Max lock counts: ${authorization.maxLockCounts}`)
+
+		return authorizations;
 	}
 }

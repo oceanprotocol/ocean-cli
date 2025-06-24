@@ -479,5 +479,17 @@ export async function createCLI() {
       console.log(chalk.green('Authorization successful'));
     });
 
+  program
+    .command('getAuthorizationsEscrow')
+    .description('Get authorizations for escrow')
+    .argument('<token>', 'Address of the token to check')
+    .argument('<payee>', 'Address of the payee to check')
+    .option('-t, --token <token>', 'Address of the token to check')
+    .action(async (token, payee, options) => {
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
+      await commands.getAuthorizationsEscrow(token || options.token, payee || options.payee);
+    });
+
   return program;
 }

@@ -117,4 +117,14 @@ describe("Ocean CLI Escrow", function () {
 
         expect(output).to.include("Authorization failed");
     });
+
+    it("should get authorizations for a payee", async function () {
+        const output = await runCommand(
+            `npm run cli getAuthorizationsEscrow ${tokenAddress} ${payee.address}`
+        );
+
+        expect(output).to.include("Max locked amount: 1");
+        expect(output).to.include("Max lock seconds: 3600");
+        expect(output).to.include("Max lock counts: 10");
+    });
 }); 

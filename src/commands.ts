@@ -1423,4 +1423,37 @@ export class Commands {
 			return false;
 		}
 	}
+
+	public async getAuthorizationsEscrow(token: string, payee: string) {
+		const config = await getConfigByChainId(Number(this.config.chainId));
+		const payer = await this.signer.getAddress();
+		const tokenAddress = ethers.utils.getAddress(token);
+		const payerAddress = ethers.utils.getAddress(payer);
+		const payeeAddress = ethers.utils.getAddress(payee);
+		const decimals = await getTokenDecimals(this.signer, token);
+		const escrow = new EscrowContract(
+			ethers.utils.getAddress(config.Escrow),
+			this.signer,
+			Number(this.config.chainId)
+		);
+
+		const authorizations = await escrow.getAuthorizations(tokenAddress, payerAddress, payeeAddress);
+		const authorization = authorizations[0]
+		if (!authorization || authorization.length === 0) {
+			console.log('No authorizations found');
+			return;
+		}
+
+		const currentLockedAmount = await unitsToAmount(this.signer, token, authorization.currentLockedAmount.toString(), decimals);
+		const maxLockedAmount = await unitsToAmount(this.signer, token, authorization.maxLockedAmount.toString(), decimals);
+
+		console.log('Authorizations found:')
+		console.log(`- Current Locked Amount: ${Number(currentLockedAmount)}`)
+		console.log(`- Current Locks: ${authorization.currentLocks}`)
+		console.log(`- Max locked amount: ${Number(maxLockedAmount)}`)
+		console.log(`- Max lock seconds: ${authorization.maxLockSeconds}`)
+		console.log(`- Max lock counts: ${authorization.maxLockCounts}`)
+
+		return authorizations;
+	}
 }

@@ -2,7 +2,7 @@ import { expect } from "chai";
 import { homedir } from 'os';
 import { runCommand } from "./util.js";
 import { getConfigByChainId } from "../src/helpers.js";
-import { ethers } from "ethers";
+import { JsonRpcProvider, ethers, formatEther, getAddress } from "ethers";
 import { EscrowContract } from "@oceanprotocol/lib";
 
 describe("Ocean CLI Escrow", function () {
@@ -25,7 +25,7 @@ describe("Ocean CLI Escrow", function () {
         tokenAddress = chainConfig.Ocean;
         escrowAddress = chainConfig.Escrow;
 
-        const provider = new ethers.providers.JsonRpcProvider(process.env.RPC);
+        const provider = new JsonRpcProvider(process.env.RPC);
         payer = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
         payee = new ethers.Wallet('0xef4b441145c1d0f3b4bc6d61d29f5c6e502359481152f869247c7a4244d45209', provider);
 
@@ -82,7 +82,7 @@ describe("Ocean CLI Escrow", function () {
         );
 
         const escrow = new EscrowContract(
-            ethers.utils.getAddress(escrowAddress),
+            getAddress(escrowAddress),
             payer,
             chainConfig.chainId
         );
@@ -94,7 +94,7 @@ describe("Ocean CLI Escrow", function () {
         );
 
         const maxLockedAmountFromEscrowBN = authorizations[0].maxLockedAmount;
-        const maxLockedAmountFromEscrow = ethers.utils.formatEther(maxLockedAmountFromEscrowBN);
+        const maxLockedAmountFromEscrow = formatEther(maxLockedAmountFromEscrowBN);
 
         expect(Number(maxLockedAmountFromEscrow)).to.equal(Number(maxLockedAmount));
 

@@ -1,6 +1,6 @@
 import { ethers, hexlify, Signer } from "ethers";
 import fetch from "cross-fetch";
-import { promises as fs } from "fs";
+import { promises as fs, readFileSync } from "fs";
 import * as path from "path";
 import * as sapphire from '@oasisprotocol/sapphire-paratime';
 import { Asset, DDO } from '@oceanprotocol/ddo-js';
@@ -26,7 +26,7 @@ import {
 } from "@oceanprotocol/lib";
 import { homedir } from "os";
 
-import ERC20Template from '@oceanprotocol/contracts/artifacts/contracts/templates/ERC20Template.sol/ERC20Template.json';
+const ERC20Template = readFileSync('./node_modules/@oceanprotocol/contracts/artifacts/contracts/templates/ERC20Template.sol/ERC20Template.json', 'utf8') as any;
 
 export async function downloadFile(
 	url: string,

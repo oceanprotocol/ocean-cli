@@ -728,6 +728,7 @@ export class Commands {
 			this.signer
 		)
 		console.log("Verifying payment...");
+		await new Promise(resolve => setTimeout(resolve, 3000))
 		const validationEscrow = await escrow.verifyFundsForEscrowPayment(
 			paymentToken,
 			computeEnv.consumerAddress,

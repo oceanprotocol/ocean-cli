@@ -1,4 +1,4 @@
-import { ethers, Signer } from "ethers";
+import { ethers, hexlify, Signer, toBeHex } from "ethers";
 import fetch from "cross-fetch";
 import { promises as fs, readFileSync } from "fs";
 import * as path from "path";
@@ -26,7 +26,7 @@ import {
 } from "@oceanprotocol/lib";
 import { homedir } from "os";
 
-const ERC20Template = readFileSync('./node_modules/@oceanprotocol/contracts/artifacts/@openzeppelin/contracts/token/ERC20/ERC20.sol/ERC20.json', 'utf8') as any;
+const ERC20Template = readFileSync('./node_modules/@oceanprotocol/contracts/artifacts/contracts/templates/ERC20Template.sol/ERC20Template.json', 'utf8') as any;
 
 export async function downloadFile(
 	url: string,
@@ -83,7 +83,7 @@ export async function calculateActiveTemplateIndex(
 
 		// check for ID
 		if (isTemplateID) {
-			const id = await erc20Template.connect(owner).getId()
+			const id = await (erc20Template as ethers.Contract & { getId(): Promise<number> }).getId()
 			if (tokenTemplate.isActive && id.toString() === template.toString()) {
 				return i
 			}
@@ -131,7 +131,7 @@ export async function createAssetUtil(
 
 	if (config.sdk === 'oasis') {
 		// Create Access List Factory
-		const accessListFactoryObj = new AccesslistFactory(config.accessListFactory, signer, chainId);
+		const accessListFactoryObj = new AccesslistFactory(config.accessListFactory, signer, Number(chainId));
 
 		// Create Allow List
 		await accessListFactoryObj.deployAccessListContract(
@@ -156,7 +156,7 @@ export async function updateAssetMetadata(
 	aquariusInstance: Aquarius,
 	encryptDDO: boolean = true
 ): Promise<any> {
-	const nft = new Nft(owner, (await owner.provider.getNetwork()).chainId);
+	const nft = new Nft(owner, Number((await owner.provider.getNetwork()).chainId));
 	let flags;
 	let metadata;
 	const validateResult = await aquariusInstance.validate(updatedDdo, owner, oceanNodeUrl);
@@ -172,7 +172,7 @@ export async function updateAssetMetadata(
 	else {
 		const stringDDO = JSON.stringify(updatedDdo);
 		const bytes = Buffer.from(stringDDO);
-		metadata = ethers.utils.hexlify(bytes);
+		metadata = hexlify(bytes);
 		flags = 0
 	}
 
@@ -182,7 +182,7 @@ export async function updateAssetMetadata(
 		0,
 		oceanNodeUrl,
 		"",
-		ethers.utils.hexlify(flags),
+		toBeHex(flags),
 		metadata,
 		validateResult.hash
 	);

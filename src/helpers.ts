@@ -1,4 +1,4 @@
-import { ethers, hexlify, Signer } from "ethers";
+import { ethers, hexlify, Signer, toBeHex } from "ethers";
 import fetch from "cross-fetch";
 import { promises as fs, readFileSync } from "fs";
 import * as path from "path";
@@ -182,7 +182,7 @@ export async function updateAssetMetadata(
 		0,
 		oceanNodeUrl,
 		"",
-		hexlify(flags),
+		toBeHex(flags),
 		metadata,
 		validateResult.hash
 	);

@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import { Commands } from './commands.js';
-import { ethers } from 'ethers';
+import { JsonRpcProvider, Signer, ethers } from 'ethers';
 import chalk from 'chalk';
 import { stdin as input, stdout as output } from 'node:process';
 import { createInterface } from 'readline/promises';
@@ -9,18 +9,17 @@ import { toBoolean } from './helpers.js';
 
 async function initializeSigner() {
 
-  const provider = new ethers.providers.JsonRpcProvider(process.env.RPC);
-  let signer;
+  const provider = new JsonRpcProvider(process.env.RPC);
+  let signer: Signer;
 
   if (process.env.PRIVATE_KEY) {
     signer = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
   } else {
-    signer = ethers.Wallet.fromMnemonic(process.env.MNEMONIC);
-    signer = await signer.connect(provider);
+    signer = ethers.Wallet.fromPhrase(process.env.MNEMONIC, provider);
   }
 
   const { chainId } = await signer.provider.getNetwork();
-  return { signer, chainId };
+  return { signer, chainId: Number(chainId) };
 }
 
 export async function createCLI() {

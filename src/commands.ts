@@ -30,7 +30,7 @@ import {
 	getTokenDecimals
 } from "@oceanprotocol/lib";
 import { Asset } from '@oceanprotocol/ddo-js';
-import { Signer, ethers } from "ethers";
+import { Signer, ethers, getAddress } from "ethers";
 import { interactiveFlow } from "./interactiveFlow.js";
 import { publishAsset } from "./publishAsset.js";
 import chalk from 'chalk';
@@ -231,7 +231,7 @@ export class Commands {
 			dataDdo.id,
 			dataDdo.services[0].id,
 			0,
-			orderTx.transactionHash,
+			orderTx.hash,
 			this.oceanNodeUrl,
 			this.signer
 		);
@@ -400,7 +400,7 @@ export class Commands {
 			);
 			return;
 		}
-		const chainId = await this.signer.getChainId()
+		const { chainId } = await this.signer.provider.getNetwork()
 		if (!Object.keys(computeEnv.fees).includes(chainId.toString())) {
 			console.error(
 				"Error starting paid compute using dataset DID " +
@@ -453,7 +453,8 @@ export class Commands {
 				supportedMaxJobDuration,
 				providerURI,
 				this.signer, // V1 was this.signer.getAddress()
-				parsedResources
+				parsedResources,
+				Number(chainId)
 			);
 		if (
 			!providerInitializeComputeJob ||
@@ -596,7 +597,7 @@ export class Commands {
 		console.log("Ordering algorithm: ", args[2]);
 		const datatoken = new Datatoken(
 			this.signer,
-			(await this.signer.provider.getNetwork()).chainId,
+			(await this.signer.provider.getNetwork()).chainId.toString(),
 			this.config
 		);
 		algo.transferTxId = await handleComputeOrder(
@@ -667,7 +668,7 @@ export class Commands {
 		if (maxJobDuration > computeEnv.maxJobDuration) {
 			supportedMaxJobDuration = computeEnv.maxJobDuration;
 		}
-		const chainId = await this.signer.getChainId()
+		const { chainId } = await this.signer.provider.getNetwork()
 		const paymentToken = args[6]
 		if (!paymentToken) {
 			console.error(
@@ -723,10 +724,11 @@ export class Commands {
 		}
 
 		const escrow = new EscrowContract(
-			ethers.utils.getAddress(parsedProviderInitializeComputeJob.payment.escrowAddress),
+			getAddress(parsedProviderInitializeComputeJob.payment.escrowAddress),
 			this.signer
 		)
 		console.log("Verifying payment...");
+		await new Promise(resolve => setTimeout(resolve, 3000))
 		const validationEscrow = await escrow.verifyFundsForEscrowPayment(
 			paymentToken,
 			computeEnv.consumerAddress,
@@ -785,7 +787,9 @@ export class Commands {
 			supportedMaxJobDuration,
 			paymentToken,
 			JSON.parse(resources),
-			await this.signer.getChainId(),
+			Number((await this.signer.provider.getNetwork()).chainId),
+			null,
+			null,
 			// additionalDatasets, only c2d v1
 			output,
 		);
@@ -964,6 +968,8 @@ export class Commands {
 			assets, // assets[0] // only c2d v1,
 			algo,
 			null,
+			null,
+			null,
 			output
 		);
 
@@ -991,20 +997,12 @@ export class Commands {
 			);
 			return;
 		}
-		const hasAgreementId = args.length === 4;
 
 		const jobId = args[2];
-		let agreementId = null;
-		if (hasAgreementId) {
-			agreementId = args[3];
-		}
 		const jobStatus = await ProviderInstance.computeStop(
-			args[1],
-			await this.signer.getAddress(),
 			jobId,
 			this.oceanNodeUrl,
 			this.signer,
-			agreementId
 		);
 		console.log(jobStatus);
 	}
@@ -1275,7 +1273,7 @@ export class Commands {
 				minAbi,
 				this.signer
 			);
-			const estGasPublisher = await tokenContract.estimateGas.mint(
+			const estGasPublisher = await tokenContract.mint.estimateGas(
 				await this.signer.getAddress(),
 				await amountToUnits(null, null, "1000", 18)
 			);
@@ -1319,7 +1317,7 @@ export class Commands {
 	public async getEscrowBalance(token: string): Promise<number> {
 		const config = await getConfigByChainId(Number(this.config.chainId));
 		const escrow = new EscrowContract(
-			ethers.utils.getAddress(config.Escrow),
+			getAddress(config.Escrow),
 			this.signer,
 			Number(this.config.chainId)
 		);
@@ -1339,7 +1337,7 @@ export class Commands {
 	public async withdrawFromEscrow(token: string, amount: string): Promise<void> {
 		const config = await getConfigByChainId(Number(this.config.chainId));
 		const escrow = new EscrowContract(
-			ethers.utils.getAddress(config.Escrow),
+			getAddress(config.Escrow),
 			this.signer,
 			Number(this.config.chainId)
 		);
@@ -1368,7 +1366,7 @@ export class Commands {
 			);
 
 			const escrow = new EscrowContract(
-				ethers.utils.getAddress(escrowAddress),
+				getAddress(escrowAddress),
 				signer,
 				chainId
 			);
@@ -1402,14 +1400,14 @@ export class Commands {
 			const escrowAddress = config.Escrow;
 
 			const escrow = new EscrowContract(
-				ethers.utils.getAddress(escrowAddress),
+				getAddress(escrowAddress),
 				this.signer
 			);
 
 			console.log("Authorizing payee...");
 			const authorizeTx = await escrow.authorize(
-				ethers.utils.getAddress(token),
-				ethers.utils.getAddress(payee),
+				getAddress(token),
+				getAddress(payee),
 				maxLockedAmount,
 				maxLockSeconds,
 				maxLockCounts
@@ -1427,12 +1425,12 @@ export class Commands {
 	public async getAuthorizationsEscrow(token: string, payee: string) {
 		const config = await getConfigByChainId(Number(this.config.chainId));
 		const payer = await this.signer.getAddress();
-		const tokenAddress = ethers.utils.getAddress(token);
-		const payerAddress = ethers.utils.getAddress(payer);
-		const payeeAddress = ethers.utils.getAddress(payee);
+		const tokenAddress = getAddress(token);
+		const payerAddress = getAddress(payer);
+		const payeeAddress = getAddress(payee);
 		const decimals = await getTokenDecimals(this.signer, token);
 		const escrow = new EscrowContract(
-			ethers.utils.getAddress(config.Escrow),
+			getAddress(config.Escrow),
 			this.signer,
 			Number(this.config.chainId)
 		);

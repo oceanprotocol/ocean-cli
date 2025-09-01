@@ -29,7 +29,7 @@ import {
 	EscrowContract,
 	getTokenDecimals
 } from "@oceanprotocol/lib";
-import { Asset } from '@oceanprotocol/ddo-js';
+import { Asset, DDOManager } from '@oceanprotocol/ddo-js';
 import { Signer, ethers, getAddress } from "ethers";
 import { interactiveFlow } from "./interactiveFlow.js";
 import { publishAsset } from "./publishAsset.js";
@@ -79,12 +79,15 @@ export class Commands {
 		}
 		const encryptDDO = args[2] === "false" ? false : true;
 		try {
+			const ddoInstance = DDOManager.getDDOClass(asset);
+			const { indexedMetadata } = ddoInstance.getAssetFields();
+			const { services } = ddoInstance.getDDOFields();
 			// add some more checks
 			const urlAssetId = await createAssetUtil(
-				asset.indexedMetadata.nft.name,
-				asset.indexedMetadata.nft.symbol,
+				indexedMetadata.nft.name,
+				indexedMetadata.nft.symbol,
 				this.signer,
-				asset.services[0].files,
+				services[0].files,
 				asset,
 				this.oceanNodeUrl,
 				this.config,

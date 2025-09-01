@@ -8,7 +8,7 @@
   "additionalDdos": [],
   "credentialSubject": {
     "id": "did:ope",
-    "chainId": 8996,
+    "chainId": 11155111,
     "metadata": {
       "created": "2025-02-19T10:23:59Z",
       "updated": "2025-02-19T10:23:59Z",
@@ -60,6 +60,7 @@
             }
           ]
         },
+        "state": 0,
         "datatokenAddress": "",
         "serviceEndpoint": "https://ocean-node-vm3.oceanenterprise.io",
         "timeout": 0,
@@ -80,7 +81,7 @@
         }
       }
     ],
-     "credentials": {
+    "credentials": {
       "allow": [
         {
           "type": "SSIpolicy",
@@ -130,7 +131,7 @@
       "match_deny": "any"
     }
   },
-   "indexedMetadata": {
+  "indexedMetadata": {
       "stats": [
         {
           "datatokenAddress": "",
@@ -162,5 +163,6 @@
       "purgatory": {
         "state": false
       }
-    }
+  },
+  "issuer": "did:jwk:eyJrdHkiOiJPS1AiLCJjcnYiOiJFZDI1NTE5Iiwia2lkIjoibUJjZDJXbGQ0YVNCaHpJR0RKNTVPc1NHWUY4R2h6Vmt2MkVkTC1KYko5MCIsIngiOiJJT1R2UWRqQlRxMzZMbTFuTXdkaTYzN00zdXMycUR3blN5MC13djVkNFRBIn0"
 }

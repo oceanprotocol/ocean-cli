@@ -34,6 +34,7 @@ import { Signer, ethers, getAddress } from "ethers";
 import { interactiveFlow } from "./interactiveFlow.js";
 import { publishAsset } from "./publishAsset.js";
 import chalk from 'chalk';
+import { getPolicyServerOBJ } from "./policyServerhELPER.js";
 
 export class Commands {
 	public signer: Signer;
@@ -193,8 +194,9 @@ export class Commands {
 	}
 
 	public async download(args: string[]) {
+		const did = args[1];
 		const dataDdo = await this.aquarius.waitForIndexer(
-			args[1],
+			did,
 			null,
 			null,
 			this.indexingParams.retryInterval,
@@ -202,17 +204,27 @@ export class Commands {
 		);
 		if (!dataDdo) {
 			console.error(
-				"Error fetching DDO " + args[1] + ".  Does this asset exists?"
+				"Error fetching DDO " + did + ".  Does this asset exists?"
 			);
 			return;
 		}
 
+		const ddoInstance = DDOManager.getDDOClass(dataDdo);
+		const { services, version } = ddoInstance.getDDOFields();
+		const serviceId = args[3] ? args[3] : services[0].id;
+		let policyServer = null
+		try {
+			if (version >= '5.0.0') {
+				policyServer = await getPolicyServerOBJ(dataDdo, serviceId, this.signer, this.oceanNodeUrl);
+			}
+		} catch (error) {
+			throw new Error('Error getting Policy Server Object: ' + error.message)
+		}
 		const datatoken = new Datatoken(
 			this.signer,
 			this.config.chainId,
 			this.config
 		);
-
 		const tx = await orderAsset(
 			dataDdo,
 			this.signer,
@@ -223,7 +235,7 @@ export class Commands {
 
 		if (!tx) {
 			console.error(
-				"Error ordering access for " + args[1] + ".  Do you have enough tokens?"
+				"Error ordering access for " + did + ".  Do you have enough tokens?"
 			);
 			return;
 		}
@@ -232,11 +244,12 @@ export class Commands {
 
 		const urlDownloadUrl = await ProviderInstance.getDownloadUrl(
 			dataDdo.id,
-			dataDdo.services[0].id,
+			serviceId,
 			0,
 			orderTx.hash,
 			this.oceanNodeUrl,
-			this.signer
+			this.signer,
+			policyServer
 		);
 		try {
 			const path = args[2] ? args[2] : ".";

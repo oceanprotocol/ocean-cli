@@ -202,9 +202,9 @@ export async function handleComputeOrder(
 	consumeMarkerFee?: ConsumeMarketFee
 ) {
 	/* We do have 3 possible situations:
-	   - have validOrder and no providerFees -> then order is valid, providerFees are valid, just use it in startCompute
-	   - have validOrder and providerFees -> then order is valid but providerFees are not valid, we need to call reuseOrder and pay only providerFees
-	   - no validOrder -> we need to call startOrder, to pay 1 DT & providerFees
+		 - have validOrder and no providerFees -> then order is valid, providerFees are valid, just use it in startCompute
+		 - have validOrder and providerFees -> then order is valid but providerFees are not valid, we need to call reuseOrder and pay only providerFees
+		 - no validOrder -> we need to call startOrder, to pay 1 DT & providerFees
 	*/
 	const hasProviderFees = order.providerFee && order.providerFee.providerFeeAmount
 	// no need to approve if it is 0

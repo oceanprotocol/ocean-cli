@@ -141,11 +141,14 @@ export async function createCLI() {
     .description('Downloads an asset into specified folder')
     .argument('<did>', 'The asset DID')
     .argument('[folder]', 'Destination folder', '.')
+    .argument('[serviceId]', 'Service ID (optional)')
     .option('-d, --did <did>', 'The asset DID')
     .option('-f, --folder [folder]', 'Destination folder', '.')
-    .action(async (did, folder, options) => {
+    .option('-s, --service <serviceId>', 'Service ID')
+    .action(async (did, folder, serviceId, options) => {
       const assetDid = options.did || did;
       const destFolder = options.folder || folder || '.';
+      const svcId = options.service || serviceId;
       if (!assetDid) {
         console.error(chalk.red('DID is required'));
         // process.exit(1);
@@ -153,7 +156,7 @@ export async function createCLI() {
       }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
-      await commands.download([null, assetDid, destFolder]);
+      await commands.download([null, assetDid, destFolder, svcId]);
     });
 
   // allowAlgo command

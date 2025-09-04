@@ -5,7 +5,7 @@
   "id": "did:op",
   "nftAddress": "",
   "version": "4.1.0",
-  "chainId": 8996,
+  "chainId": 11155111,
   "metadata": {
     "created": "2021-12-20T14:35:20Z",
     "updated": "2021-12-20T14:35:20Z",
@@ -37,7 +37,7 @@
         ]
       },
       "datatokenAddress": "",
-      "serviceEndpoint": "https://v4.provider.oceanprotocol.com",
+      "serviceEndpoint": "https://ocean-node-vm3.oceanenterprise.io",
       "timeout": 86400
     }
   ],

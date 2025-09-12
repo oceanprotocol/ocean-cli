@@ -305,10 +305,11 @@ export class Commands {
 			return;
 		}
 		let providerURI = this.oceanNodeUrl;
+		const ddoInstance = DDOManager.getDDOClass(ddos[0]);
+		const { services } = ddoInstance.getDDOFields();
 		if (ddos.length > 0) {
-			providerURI = ddos[0].services[0].serviceEndpoint;
+			providerURI = services[0].serviceEndpoint;
 		}
-
 		const algoDdo = await this.aquarius.waitForIndexer(
 			args[2],
 			null,
@@ -338,7 +339,7 @@ export class Commands {
 		// NO chainId needed anymore (is not part of ComputeEnvironment spec anymore)
 		// const chainComputeEnvs = computeEnvs[computeEnvID]; // was algoDdo.chainId
 		let computeEnv = null; // chainComputeEnvs[0];
-
+		console.log('computeEnvs: ', computeEnvs);
 		if (computeEnvID && computeEnvID.length > 1) {
 			for (const index in computeEnvs) {
 				if (computeEnvID == computeEnvs[index].id) {
@@ -354,18 +355,32 @@ export class Commands {
 			);
 			return;
 		}
-
+		const ddoAlgoInstance = DDOManager.getDDOClass(algoDdo);
+		const { services: servicesAlgo, metadata: metadataAlgo, version: versionAlgo } = ddoAlgoInstance.getDDOFields();
 		const algo: ComputeAlgorithm = {
 			documentId: algoDdo.id,
-			serviceId: algoDdo.services[0].id,
-			meta: algoDdo.metadata.algorithm,
+			serviceId: servicesAlgo[0].id,
+			meta: metadataAlgo.algorithm,
 		};
 
+		const assetAlgo: {
+			documentId: string;
+			serviceId: string;
+			asset: Asset;
+			version?: string;
+		} = {
+			documentId: algoDdo.id,
+			serviceId: servicesAlgo[0].id,
+			asset: algoDdo,
+			version: versionAlgo
+		};
 		const assets = [];
 		for (const dataDdo in ddos) {
+			const ddoInstanceDdo = DDOManager.getDDOClass(ddos[dataDdo]);
+			const { services: servicesDdo, version: versionDdo } = ddoInstanceDdo.getDDOFields();
 			const canStartCompute = isOrderable(
 				ddos[dataDdo],
-				ddos[dataDdo].services[0].id,
+				servicesDdo[0].id,
 				algo,
 				algoDdo
 			);
@@ -377,7 +392,9 @@ export class Commands {
 			}
 			assets.push({
 				documentId: ddos[dataDdo].id,
-				serviceId: ddos[dataDdo].services[0].id,
+				serviceId: servicesDdo[0].id,
+				asset: ddos[dataDdo],
+				version: versionDdo
 			});
 		}
 		const maxJobDuration = Number(args[4])
@@ -459,6 +476,7 @@ export class Commands {
 			);
 			return;
 		}
+		const policiesServer = await getPolicyServerOBJs(assets, assetAlgo, this.signer, this.oceanNodeUrl);
 		const parsedResources = JSON.parse(resources);
 		const providerInitializeComputeJob =
 			await ProviderInstance.initializeCompute(
@@ -470,7 +488,8 @@ export class Commands {
 				providerURI,
 				this.signer, // V1 was this.signer.getAddress()
 				parsedResources,
-				Number(chainId)
+				Number(chainId),
+				policiesServer
 			);
 		if (
 			!providerInitializeComputeJob ||
@@ -535,8 +554,10 @@ export class Commands {
 			return;
 		}
 		let providerURI = this.oceanNodeUrl;
+		const ddoInstance = DDOManager.getDDOClass(ddos[0]);
+		const { services } = ddoInstance.getDDOFields();
 		if (ddos.length > 0) {
-			providerURI = ddos[0].services[0].serviceEndpoint;
+			providerURI = services[0].serviceEndpoint;
 		}
 		const algoDdo = await this.aquarius.waitForIndexer(
 			args[2],
@@ -582,18 +603,34 @@ export class Commands {
 			);
 			return;
 		}
-
+		const ddoInstanceAlgo = DDOManager.getDDOClass(algoDdo);
+		const { services: servicesAlgo, metadata: metadataAlgo, version: versionAlgo } = ddoInstanceAlgo.getDDOFields();
 		const algo: ComputeAlgorithm = {
 			documentId: algoDdo.id,
-			serviceId: algoDdo.services[0].id,
-			meta: algoDdo.metadata.algorithm,
+			serviceId: servicesAlgo[0].id,
+			meta: metadataAlgo.algorithm,
+		};
+
+		const assetAlgo: {
+			documentId: string;
+			serviceId: string;
+			asset: Asset;
+			version?: string;
+		} = {
+			documentId: algoDdo.id,
+			serviceId: servicesAlgo[0].id,
+			asset: algoDdo,
+			version: versionAlgo
 		};
 
 		const assets = [];
 		for (const dataDdo in ddos) {
+			const ddoInstanceDdo = DDOManager.getDDOClass(ddos[dataDdo]);
+			const { services: servicesDdo, version: versionDdo } = ddoInstanceDdo.getDDOFields();
+
 			const canStartCompute = isOrderable(
 				ddos[dataDdo],
-				ddos[dataDdo].services[0].id,
+				servicesDdo[0].id,
 				algo,
 				algoDdo
 			);
@@ -605,7 +642,9 @@ export class Commands {
 			}
 			assets.push({
 				documentId: ddos[dataDdo].id,
-				serviceId: ddos[dataDdo].services[0].id,
+				serviceId: servicesDdo[0].id,
+				asset: ddos[dataDdo],
+				version: versionDdo
 			});
 		}
 		const providerInitializeComputeJob = args[4]; // provider fees + payment
@@ -793,6 +832,7 @@ export class Commands {
 		const output: ComputeOutput = {
 			metadataUri: await getMetadataURI(),
 		};
+		const policiesServer = await getPolicyServerOBJs(assets, assetAlgo, this.signer, this.oceanNodeUrl);
 
 		const computeJobs = await ProviderInstance.computeStart(
 			providerURI,
@@ -808,6 +848,7 @@ export class Commands {
 			null,
 			// additionalDatasets, only c2d v1
 			output,
+			policiesServer
 		);
 
 		console.log("compute jobs: ", computeJobs);

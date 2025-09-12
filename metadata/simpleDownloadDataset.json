@@ -37,7 +37,7 @@
         ]
       },
       "datatokenAddress": "",
-      "serviceEndpoint": "https://ocean-node-vm3.oceanenterprise.io",
+      "serviceEndpoint": "https://v4.provider.oceanprotocol.com",
       "timeout": 86400
     }
   ],

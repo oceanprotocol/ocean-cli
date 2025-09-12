@@ -52,6 +52,13 @@ export interface PolicyServerInitiateComputeActionData
   serviceId: string
 }
 
+
+export interface PolicyServerInitiateComputeActionData
+  extends PolicyServerInitiateActionData {
+  documentId: string
+  serviceId: string
+}
+
 export interface PolicyServerInitiateAction {
   action: PolicyServerActions.INITIATE
   ddo: any

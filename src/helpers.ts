@@ -3,7 +3,7 @@ import fetch from "cross-fetch";
 import { promises as fs, readFileSync } from "fs";
 import * as path from "path";
 import * as sapphire from '@oasisprotocol/sapphire-paratime';
-import { Asset, DDO } from '@oceanprotocol/ddo-js';
+import { Asset, DDO, DDOManager } from '@oceanprotocol/ddo-js';
 import {
 	AccesslistFactory,
 	Aquarius,
@@ -257,7 +257,9 @@ export async function isOrderable(
 	algorithm: ComputeAlgorithm,
 	algorithmDDO: Asset | DDO
 ): Promise<boolean> {
-	const datasetService = asset.services.find((s) => s.id === serviceId);
+	const ddoInstanceAsset = DDOManager.getDDOClass(asset);
+	const { services: servicesAsset } = ddoInstanceAsset.getDDOFields();
+	const datasetService = servicesAsset.find((s) => s.id === serviceId);
 	if (!datasetService) return false;
 
 	if (datasetService.type === "compute") {

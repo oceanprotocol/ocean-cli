@@ -328,7 +328,7 @@ export async function createCLI() {
     .description('Displays the compute job status')
     .argument('<datasetDid>', 'Dataset DID')
     .argument('<jobId>', 'Job ID')
-    .argument('<agreementId>', 'Agreement ID')
+    .argument('[agreementId]', 'Agreement ID')
     .option('-d, --dataset <datasetDid>', 'Dataset DID')
     .option('-j, --job <jobId>', 'Job ID')
     .option('-a, --agreement [agreementId]', 'Agreement ID')

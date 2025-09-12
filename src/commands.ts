@@ -34,7 +34,7 @@ import { Signer, ethers, getAddress } from "ethers";
 import { interactiveFlow } from "./interactiveFlow.js";
 import { publishAsset } from "./publishAsset.js";
 import chalk from 'chalk';
-import { getPolicyServerOBJ } from "./policyServerhELPER.js";
+import { getPolicyServerOBJ, getPolicyServerOBJs } from "./policyServerHelper.js";
 
 export class Commands {
 	public signer: Signer;
@@ -867,8 +867,10 @@ export class Commands {
 			return;
 		}
 		let providerURI = this.oceanNodeUrl;
+		const ddoInstance = DDOManager.getDDOClass(ddos[0]);
+		const { services } = ddoInstance.getDDOFields();
 		if (ddos.length > 0) {
-			providerURI = ddos[0].services[0].serviceEndpoint;
+			providerURI = services[0].serviceEndpoint;
 		}
 
 		const algoDdo = await this.aquarius.waitForIndexer(
@@ -888,7 +890,6 @@ export class Commands {
 		const computeEnvs = await ProviderInstance.getComputeEnvironments(
 			this.oceanNodeUrl
 		);
-
 		if (!computeEnvs || computeEnvs.length < 1) {
 			console.error(
 				"Error fetching compute environments. No compute environments available."
@@ -904,7 +905,6 @@ export class Commands {
 		// NO chainId needed anymore (is not part of ComputeEnvironment spec anymore)
 		// const chainComputeEnvs = computeEnvs[computeEnvID]; // was algoDdo.chainId
 		let computeEnv = null; // chainComputeEnvs[0];
-
 		if (computeEnvID && computeEnvID.length > 1) {
 			for (const env of computeEnvs) {
 				if (computeEnvID == env.id && env.free) {
@@ -921,18 +921,33 @@ export class Commands {
 			);
 			return;
 		}
-
+		const ddoInstanceAlgo = DDOManager.getDDOClass(algoDdo);
+		const { services: servicesAlgo, metadata: metadataAlgo, version: versionAlgo } = ddoInstanceAlgo.getDDOFields();
 		const algo: ComputeAlgorithm = {
 			documentId: algoDdo.id,
-			serviceId: algoDdo.services[0].id,
-			meta: algoDdo.metadata.algorithm,
+			serviceId: servicesAlgo[0].id,
+			meta: metadataAlgo.algorithm,
+		};
+
+		const assetAlgo: {
+			documentId: string;
+			serviceId: string;
+			asset: Asset;
+			version?: string;
+		} = {
+			documentId: algoDdo.id,
+			serviceId: servicesAlgo[0].id,
+			asset: algoDdo,
+			version: versionAlgo
 		};
 
 		const assets = [];
 		for (const dataDdo in ddos) {
+			const ddoInstanceDdo = DDOManager.getDDOClass(ddos[dataDdo]);
+			const { services: servicesDdo, version: versionDdo } = ddoInstanceDdo.getDDOFields();
 			const canStartCompute = isOrderable(
 				ddos[dataDdo],
-				ddos[dataDdo].services[0].id,
+				servicesDdo[0].id,
 				algo,
 				algoDdo
 			);
@@ -944,7 +959,9 @@ export class Commands {
 			}
 			assets.push({
 				documentId: ddos[dataDdo].id,
-				serviceId: ddos[dataDdo].services[0].id,
+				serviceId: servicesDdo[0].id,
+				asset: ddos[dataDdo],
+				version: versionDdo
 			});
 		}
 
@@ -977,6 +994,7 @@ export class Commands {
 			metadataUri: await getMetadataURI(),
 		};
 
+		const policiesServer = await getPolicyServerOBJs(assets, assetAlgo, this.signer, this.oceanNodeUrl);
 		const computeJobs = await ProviderInstance.freeComputeStart(
 			providerURI,
 			this.signer,
@@ -986,7 +1004,8 @@ export class Commands {
 			null,
 			null,
 			null,
-			output
+			output,
+			policiesServer
 		);
 
 		console.log("compute jobs: ", computeJobs);

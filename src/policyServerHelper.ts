@@ -1,5 +1,5 @@
 import { Asset } from "@oceanprotocol/ddo-js"
-import { PolicyServerActions, PolicyServerGetPdAction, PolicyServerInitiateAction, PolicyServerInitiateActionData, PolicyServerPresentationDefinition, SsiVerifiableCredential, SsiWalletDid, SsiWalletSession } from "./policyServerInterfaces"
+import { PolicyServerActions, PolicyServerGetPdAction, PolicyServerInitiateAction, PolicyServerInitiateActionData, PolicyServerInitiateComputeActionData, PolicyServerPresentationDefinition, SsiVerifiableCredential, SsiWalletDid, SsiWalletSession } from "./policyServerInterfaces"
 import axios from "axios"
 import { Signer } from "ethers"
 
@@ -333,3 +333,67 @@ export async function getPolicyServerOBJ(
   }
 }
 
+export async function getPolicyServerOBJs(
+  ddos: {
+    documentId: string
+    serviceId: string
+    asset: Asset
+    version?: string
+  }[],
+  algo: {
+    documentId: string
+    serviceId: string
+    asset: Asset
+    version?: string
+  },
+  signer: Signer,
+  providerUrl: string
+): Promise<PolicyServerInitiateComputeActionData[] | null> {
+  try {
+    const results: PolicyServerInitiateComputeActionData[] = []
+
+    // --- datasets
+    for (const ddo of ddos) {
+      if (!ddo.version || ddo.version < '5.0.0') {
+        return null
+      }
+      const result = await getPolicyServerOBJ(
+        ddo.asset,
+        ddo.serviceId,
+        signer,
+        providerUrl
+      )
+      results.push({
+        ...result,
+        documentId: ddo.documentId,
+        serviceId: ddo.serviceId
+      })
+    }
+
+    // --- algo
+    if (!algo?.version || algo.version < '5.0.0') {
+      return null
+    }
+    if (algo.serviceId) {
+      const algoResult = await getPolicyServerOBJ(
+        algo.asset,
+        algo.serviceId,
+        signer,
+        providerUrl
+      )
+      results.push({
+        ...algoResult,
+        documentId: algo.documentId,
+        serviceId: algo.serviceId
+      })
+    }
+
+    return results
+  } catch (error: any) {
+    console.error('getPolicyServerOBJs error:', error)
+    if (error?.message) {
+      throw new Error(`getPolicyServerOBJs failed: ${error.message}`)
+    }
+    throw new Error('getPolicyServerOBJs failed')
+  }
+}

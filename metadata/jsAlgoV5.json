@@ -1,0 +1,199 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/credentials/v2"
+  ],
+  "id": "did:ope",
+  "version": "5.0.0",
+  "credentialSubject": {
+    "chainId": 11155111,
+    "metadata": {
+      "created": "2025-09-09T11:57:52Z",
+      "updated": "2025-09-09T11:57:52Z",
+      "type": "algorithm",
+      "name": "cli algo test",
+      "description": {
+        "@value": "testing algo",
+        "@direction": "",
+        "@language": ""
+      },
+      "tags": [
+        "test"
+      ],
+      "author": "",
+      "license": {
+        "name": "https://raw.githubusercontent.com/oceanprotocol/c2d-examples/main/branin_and_gpr/branin.arff",
+        "licenseDocuments": [
+          {
+            "sha256": "71a828f4ddc3fee436d80fc5b02535fc5e13ae8f19eae87ec02734bb01126c5b",
+            "mirrors": [
+              {
+                "method": "get",
+                "type": "url",
+                "url": "https://raw.githubusercontent.com/oceanprotocol/c2d-examples/main/branin_and_gpr/branin.arff"
+              }
+            ],
+            "name": "https://raw.githubusercontent.com/oceanprotocol/c2d-examples/main/branin_and_gpr/branin.arff",
+            "fileType": "text/plain; charset=utf-8"
+          }
+        ]
+      },
+      "links": {},
+      "additionalInformation": {
+        "termsAndConditions": true
+      },
+      "algorithm": {
+        "language": "arff",
+        "version": "0.1",
+        "container": {
+          "entrypoint": "node $ALGO",
+          "image": "node",
+          "tag": "latest",
+          "checksum": "sha256:c3688c7b5cc3b159ddf4f744594de62461df7ef43124378f118cb470e4f72bcb"
+        }
+      },
+      "copyrightHolder": "",
+      "providedBy": ""
+    },
+    "services": [
+      {
+        "compute": {
+          "publisherTrustedAlgorithms": [],
+          "publisherTrustedAlgorithmPublishers": [
+            "*"
+          ],
+          "allowRawAlgorithm": false,
+          "allowNetworkAccess": true
+        },
+        "credentials": {
+          "allow": [
+            {
+              "values": [
+                {
+                  "request_credentials": [
+                    {
+                      "format": "jwt_vc_json",
+                      "policies": [],
+                      "type": "UniversityDegree"
+                    }
+                  ],
+                  "vc_policies": [
+                    "not-before",
+                    "revoked-status-list",
+                    "signature"
+                  ]
+                }
+              ],
+              "type": "SSIpolicy"
+            },
+            {
+              "values": [
+                {
+                  "address": "*"
+                }
+              ],
+              "type": "address"
+            }
+          ],
+          "match_deny": "any",
+          "deny": []
+        },
+        "name": "test service",
+        "files": {
+          "datatokenAddress": "0x0",
+          "nftAddress": "0x0",
+          "files": [
+            {
+              "type": "url",
+              "url": "https://raw.githubusercontent.com/oceanprotocol/c2d-examples/main/branin_and_gpr/branin.arff",
+              "method": "GET"
+            }
+          ]
+        },
+        "description": {
+          "@value": "testing new service",
+          "@direction": "ltr",
+          "@language": "en"
+        },
+        "id": "23033c06ea9adc6ff5dff42938417c7750e75efbdfbfecf5d6d544705450df24",
+        "datatokenAddress": "0x0",
+        "serviceEndpoint": "https://ocean-node-vm3.oceanenterprise.io",
+        "state": 0,
+        "type": "compute",
+        "timeout": 31556952
+      }
+    ],
+    "nftAddress": "0x0",
+    "credentials": {
+      "allow": [
+        {
+          "values": [
+            {
+              "request_credentials": [
+                {
+                  "format": "jwt_vc_json",
+                  "policies": [],
+                  "type": "UniversityDegree"
+                }
+              ],
+              "vc_policies": [
+                "not-before",
+                "revoked-status-list",
+                "signature"
+              ]
+            }
+          ],
+          "type": "SSIpolicy"
+        },
+        {
+          "values": [
+            {
+              "address": "*"
+            }
+          ],
+          "type": "address"
+        }
+      ],
+      "deny": [],
+      "match_deny": "any"
+    }
+  },
+  "additionalDdos": [],
+  "type": [
+    "VerifiableCredential"
+  ],
+  "issuer": "did:jwk:eyJrdHkiOiJPS1AiLCJjcnYiOiJFZDI1NTE5Iiwia2lkIjoiekxlRGh1UG15QndrampiV1pRZTBPeHdEMjMxYmx3aXFTMGQ0VTJETnZFbyIsIngiOiJta3NvaEladWlsblJWWmhTbmwxNGRpdTZZWDF3UUFFX0ozbWJoWDNDOFRjIn0",
+  "indexedMetadata": {
+    "stats": [
+      {
+        "symbol": "OEAT",
+        "name": "Access Token",
+        "orders": 0,
+        "datatokenAddress": "",
+        "serviceId": "23033c06ea9adc6ff5dff42938417c7750e75efbdfbfecf5d6d544705450df24",
+        "prices": [
+          {
+            "exchangeId": "",
+            "price": "2.0",
+            "contract": "",
+            "type": "fixedrate",
+            "token": ""
+          }
+        ]
+      }
+    ],
+    "nft": {
+      "state": 0,
+      "address": "",
+      "name": "Data NFT",
+      "symbol": "OEC-NFT",
+      "owner": "",
+      "created": "",
+      "tokenURI": ""
+    },
+    "event": {
+    },
+    "purgatory": {
+      "state": false
+    }
+  }
+}

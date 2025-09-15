@@ -8,7 +8,7 @@
   "additionalDdos": [],
   "credentialSubject": {
     "id": "did:ope",
-    "chainId": 8996,
+    "chainId": 11155111,
     "metadata": {
       "created": "2025-02-19T10:23:59Z",
       "updated": "2025-02-19T10:23:59Z",

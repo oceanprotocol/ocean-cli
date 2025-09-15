@@ -119,7 +119,6 @@ export async function createAssetUtil(
 	accessListFactory?: string,
 	allowAccessList?: string,
 	denyAccessList?: string,
-
 ) {
 	const isAddress = typeof templateIDorAddress === 'string'
 	const isTemplateIndex = typeof templateIDorAddress === 'number'

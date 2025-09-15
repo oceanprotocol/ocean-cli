@@ -160,10 +160,12 @@ export async function updateAssetMetadata(
 	let flags;
 	let metadata;
 	const validateResult = await aquariusInstance.validate(updatedDdo, owner, oceanNodeUrl);
+	const ddoInstance = DDOManager.getDDOClass(updatedDdo);
+	const { chainId, nftAddress } = ddoInstance.getDDOFields();
 	if (encryptDDO) {
 		const providerResponse = await ProviderInstance.encrypt(
 			updatedDdo,
-			updatedDdo.chainId,
+			chainId,
 			oceanNodeUrl
 		);
 		metadata = await providerResponse;
@@ -177,7 +179,7 @@ export async function updateAssetMetadata(
 	}
 
 	const updateDdoTX = await nft.setMetadata(
-		updatedDdo.nftAddress,
+		nftAddress,
 		await owner.getAddress(),
 		0,
 		oceanNodeUrl,

@@ -115,11 +115,14 @@ export class Commands {
 		const encryptDDO = args[2] === "false" ? false : true;
 		// add some more checks
 		try {
+			const ddoInstance = DDOManager.getDDOClass(algoAsset);
+			const { indexedMetadata } = ddoInstance.getAssetFields();
+			const { services } = ddoInstance.getDDOFields();
 			const algoDid = await createAssetUtil(
-				algoAsset.indexedMetadata.nft.name,
-				algoAsset.indexedMetadata.nft.symbol,
+				indexedMetadata.nft.name,
+				indexedMetadata.nft.symbol,
 				this.signer,
-				algoAsset.services[0].files,
+				services[0].files,
 				algoAsset,
 				this.oceanNodeUrl,
 				this.config,
@@ -1132,21 +1135,24 @@ export class Commands {
 			this.indexingParams.retryInterval,
 			this.indexingParams.maxRetries
 		);
+
 		if (!asset) {
 			console.error(
 				"Error fetching DDO " + args[1] + ".  Does this asset exists?"
 			);
 			return;
 		}
-
-		if (asset.indexedMetadata.nft.owner !== (await this.signer.getAddress())) {
+		const ddoInstance = DDOManager.getDDOClass(asset);
+		const { indexedMetadata } = ddoInstance.getAssetFields();
+		const { services } = ddoInstance.getDDOFields();
+		if (indexedMetadata.nft.owner !== (await this.signer.getAddress())) {
 			console.error(
 				"You are not the owner of this asset, and there for you cannot update it."
 			);
 			return;
 		}
 
-		if (asset.services[0].type !== "compute") {
+		if (services[0].type !== "compute") {
 			console.error(
 				"Error getting computeService for " +
 				args[1] +
@@ -1167,13 +1173,15 @@ export class Commands {
 			);
 			return;
 		}
+		const algoInstance = DDOManager.getDDOClass(algoAsset);
+		const { services: servicesAlgo, metadata: metadataAlgo } = algoInstance.getDDOFields();
 		const encryptDDO = args[3] === "false" ? false : true;
 		let filesChecksum;
 		try {
 			filesChecksum = await ProviderInstance.checkDidFiles(
 				algoAsset.id,
-				algoAsset.services[0].id,
-				algoAsset.services[0].serviceEndpoint,
+				servicesAlgo[0].id,
+				servicesAlgo[0].serviceEndpoint,
 				true
 			);
 		} catch (e) {
@@ -1182,14 +1190,15 @@ export class Commands {
 		}
 
 		const containerChecksum =
-			algoAsset.metadata.algorithm.container.entrypoint +
-			algoAsset.metadata.algorithm.container.checksum;
+			metadataAlgo.algorithm.container.entrypoint +
+			metadataAlgo.algorithm.container.checksum;
 		const trustedAlgorithm = {
 			did: algoAsset.id,
 			containerSectionChecksum: getHash(containerChecksum),
 			filesChecksum: filesChecksum?.[0]?.checksum,
+			serviceId: servicesAlgo[0].id,
 		};
-		asset.services[0].compute.publisherTrustedAlgorithms.push(trustedAlgorithm);
+		services[0].compute.publisherTrustedAlgorithms.push(trustedAlgorithm);
 		try {
 			const txid = await updateAssetMetadata(
 				this.signer,
@@ -1219,13 +1228,16 @@ export class Commands {
 			);
 			return;
 		}
-		if (asset.indexedMetadata.nft.owner !== (await this.signer.getAddress())) {
+		const ddoInstance = DDOManager.getDDOClass(asset);
+		const { indexedMetadata } = ddoInstance.getAssetFields();
+		const { services } = ddoInstance.getDDOFields();
+		if (indexedMetadata.nft.owner !== (await this.signer.getAddress())) {
 			console.error(
 				"You are not the owner of this asset, and there for you cannot update it."
 			);
 			return;
 		}
-		if (asset.services[0].type !== "compute") {
+		if (services[0].type !== "compute") {
 			console.error(
 				"Error getting computeService for " +
 				args[1] +
@@ -1233,7 +1245,7 @@ export class Commands {
 			);
 			return;
 		}
-		if (asset.services[0].compute.publisherTrustedAlgorithms) {
+		if (services[0].compute.publisherTrustedAlgorithms) {
 			console.error(
 				" " + args[1] + ".  Does this asset has an computeService?"
 			);
@@ -1241,12 +1253,12 @@ export class Commands {
 		}
 		const encryptDDO = args[3] === "false" ? false : true;
 		const indexToDelete =
-			asset.services[0].compute.publisherTrustedAlgorithms.findIndex(
+			services[0].compute.publisherTrustedAlgorithms.findIndex(
 				(item) => item.did === args[2]
 			);
 
 		if (indexToDelete !== -1) {
-			asset.services[0].compute.publisherTrustedAlgorithms.splice(
+			services[0].compute.publisherTrustedAlgorithms.splice(
 				indexToDelete,
 				1
 			);

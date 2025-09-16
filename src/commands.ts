@@ -267,18 +267,19 @@ export class Commands {
 		const inputDatasetsString = args[1];
 		let inputDatasets = [];
 
-		if (
-			inputDatasetsString.includes("[") &&
-			inputDatasetsString.includes("]")
-		) {
-			const processedInput = inputDatasetsString
-				.replaceAll("]", "")
-				.replaceAll("[", "");
-			if (processedInput.indexOf(",") > -1) {
-				inputDatasets = processedInput.split(",");
-			}
+		if (!inputDatasetsString || inputDatasetsString.trim() === '[]') {
+			inputDatasets = [];
 		} else {
-			inputDatasets.push(inputDatasetsString);
+			const cleaned = inputDatasetsString.replaceAll('[', '').replaceAll(']', '');
+			inputDatasets = cleaned.split(',').map(s => s.trim()).filter(Boolean);
+		}
+
+		const inputServicesString = args[7];
+		let inputServices: string[] = [];
+		if (typeof inputServicesString === 'string' && inputServicesString.trim().length > 0) {
+			inputServices = inputServicesString.split(',').map(s => s.trim()).filter(Boolean);
+		} else if (Array.isArray(inputServicesString)) {
+			inputServices = inputServicesString.map(String).map(s => s.trim()).filter(Boolean);
 		}
 
 		const ddos = [];
@@ -342,7 +343,6 @@ export class Commands {
 		// NO chainId needed anymore (is not part of ComputeEnvironment spec anymore)
 		// const chainComputeEnvs = computeEnvs[computeEnvID]; // was algoDdo.chainId
 		let computeEnv = null; // chainComputeEnvs[0];
-		console.log('computeEnvs: ', computeEnvs);
 		if (computeEnvID && computeEnvID.length > 1) {
 			for (const index in computeEnvs) {
 				if (computeEnvID == computeEnvs[index].id) {
@@ -360,9 +360,23 @@ export class Commands {
 		}
 		const ddoAlgoInstance = DDOManager.getDDOClass(algoDdo);
 		const { services: servicesAlgo, metadata: metadataAlgo, version: versionAlgo } = ddoAlgoInstance.getDDOFields();
+		const algoServiceIdInput = args[8] as string | undefined;
+		let chosenAlgoServiceId = servicesAlgo[0].id;
+		if (typeof algoServiceIdInput === 'string' && algoServiceIdInput.trim().length > 0) {
+			const expectedAlgoServiceId = algoServiceIdInput.trim();
+			const matchAlgoSvc = servicesAlgo.find((s: any) => s.id === expectedAlgoServiceId);
+			if (!matchAlgoSvc) {
+				console.error(
+					`Algorithm Service ID "${expectedAlgoServiceId}" not found in algo DDO ${algoDdo.id}. ` +
+					'Provide a valid service.id from the algorithm asset or omit the argument to use the default (services[0]).'
+				);
+				return;
+			}
+			chosenAlgoServiceId = expectedAlgoServiceId;
+		}
 		const algo: ComputeAlgorithm = {
 			documentId: algoDdo.id,
-			serviceId: servicesAlgo[0].id,
+			serviceId: chosenAlgoServiceId,
 			meta: metadataAlgo.algorithm,
 		};
 
@@ -373,7 +387,7 @@ export class Commands {
 			version?: string;
 		} = {
 			documentId: algoDdo.id,
-			serviceId: servicesAlgo[0].id,
+			serviceId: chosenAlgoServiceId,
 			asset: algoDdo,
 			version: versionAlgo
 		};
@@ -381,9 +395,29 @@ export class Commands {
 		for (const dataDdo in ddos) {
 			const ddoInstanceDdo = DDOManager.getDDOClass(ddos[dataDdo]);
 			const { services: servicesDdo, version: versionDdo } = ddoInstanceDdo.getDDOFields();
+			let chosenServiceId = servicesDdo[0].id;
+			if (inputServices.length > 0) {
+				const expectedServiceId = inputServices[Number(dataDdo)];
+				const match = servicesDdo.find((s: any) => s.id === expectedServiceId);
+				if (!match) {
+					console.error(
+						`Service ID "${expectedServiceId}" not found in dataset ${inputDatasets[Number(dataDdo)]}. ` +
+						'Ensure serviceIds[i] exists in the corresponding dataset services.'
+					);
+					return;
+				}
+				chosenServiceId = expectedServiceId;
+				if (Number(dataDdo) === 0 && match.serviceEndpoint) {
+					providerURI = match.serviceEndpoint;
+				}
+			} else {
+				if (Number(dataDdo) === 0 && servicesDdo[0]?.serviceEndpoint) {
+					providerURI = servicesDdo[0].serviceEndpoint;
+				}
+			}
 			const canStartCompute = isOrderable(
 				ddos[dataDdo],
-				servicesDdo[0].id,
+				chosenServiceId,
 				algo,
 				algoDdo
 			);
@@ -395,7 +429,7 @@ export class Commands {
 			}
 			assets.push({
 				documentId: ddos[dataDdo].id,
-				serviceId: servicesDdo[0].id,
+				serviceId: chosenServiceId,
 				asset: ddos[dataDdo],
 				version: versionDdo
 			});
@@ -516,19 +550,21 @@ export class Commands {
 		const inputDatasetsString = args[1];
 		let inputDatasets = [];
 
-		if (
-			inputDatasetsString.includes("[") &&
-			inputDatasetsString.includes("]")
-		) {
-			const processedInput = inputDatasetsString
-				.replaceAll("]", "")
-				.replaceAll("[", "");
-			if (processedInput.indexOf(",") > -1) {
-				inputDatasets = processedInput.split(",");
-			}
+		if (!inputDatasetsString || inputDatasetsString.trim() === '[]') {
+			inputDatasets = [];
 		} else {
-			inputDatasets.push(inputDatasetsString);
+			const cleaned = inputDatasetsString.replaceAll('[', '').replaceAll(']', '');
+			inputDatasets = cleaned.split(',').map(s => s.trim()).filter(Boolean);
 		}
+
+		const inputServicesString = args[8];
+		let inputServices: string[] = [];
+		if (typeof inputServicesString === 'string' && inputServicesString.trim().length > 0) {
+			inputServices = inputServicesString.split(',').map(s => s.trim()).filter(Boolean);
+		} else if (Array.isArray(inputServicesString)) {
+			inputServices = inputServicesString.map(String).map(s => s.trim()).filter(Boolean);
+		}
+
 
 		const ddos = [];
 
@@ -608,9 +644,28 @@ export class Commands {
 		}
 		const ddoInstanceAlgo = DDOManager.getDDOClass(algoDdo);
 		const { services: servicesAlgo, metadata: metadataAlgo, version: versionAlgo } = ddoInstanceAlgo.getDDOFields();
+		const algoServiceIdInput = args[9] as string | undefined;
+		let chosenAlgoServiceId = servicesAlgo[0].id;
+		if (typeof algoServiceIdInput === 'string' && algoServiceIdInput.trim().length > 0) {
+			const expectedAlgoServiceId = algoServiceIdInput.trim();
+			const matchAlgoSvc = servicesAlgo.find((s: any) => s.id === expectedAlgoServiceId);
+			if (!matchAlgoSvc) {
+				console.error(
+					`Algorithm Service ID "${expectedAlgoServiceId}" not found in algo DDO ${algoDdo.id}. ` +
+					'Provide a valid service.id from the algorithm asset or omit the argument to use the default (services[0]).'
+				);
+				return;
+			}
+			chosenAlgoServiceId = expectedAlgoServiceId;
+		}
+		const algoServiceIndex = servicesAlgo.findIndex((s: any) => s.id === chosenAlgoServiceId);
+		if (algoServiceIndex < 0) {
+			console.error(`Could not resolve serviceIndex for algorithm serviceId ${chosenAlgoServiceId}`);
+			return;
+		}
 		const algo: ComputeAlgorithm = {
 			documentId: algoDdo.id,
-			serviceId: servicesAlgo[0].id,
+			serviceId: chosenAlgoServiceId,
 			meta: metadataAlgo.algorithm,
 		};
 
@@ -621,19 +676,47 @@ export class Commands {
 			version?: string;
 		} = {
 			documentId: algoDdo.id,
-			serviceId: servicesAlgo[0].id,
+			serviceId: chosenAlgoServiceId,
 			asset: algoDdo,
 			version: versionAlgo
 		};
 
 		const assets = [];
+		const datasetServiceIndex: number[] = [];
 		for (const dataDdo in ddos) {
 			const ddoInstanceDdo = DDOManager.getDDOClass(ddos[dataDdo]);
 			const { services: servicesDdo, version: versionDdo } = ddoInstanceDdo.getDDOFields();
-
+			let chosenServiceId = servicesDdo[0].id;
+			if (inputServices.length > 0) {
+				const expectedServiceId = inputServices[Number(dataDdo)];
+				const match = servicesDdo.find((s: any) => s.id === expectedServiceId);
+				if (!match) {
+					console.error(
+						`Service ID "${expectedServiceId}" not found in dataset ${inputDatasets[Number(dataDdo)]}. ` +
+						'Ensure serviceIds[i] exists in the corresponding dataset services.'
+					);
+					return;
+				}
+				chosenServiceId = expectedServiceId;
+				if (Number(dataDdo) === 0 && match.serviceEndpoint) {
+					providerURI = match.serviceEndpoint;
+				}
+			} else {
+				if (Number(dataDdo) === 0 && servicesDdo[0]?.serviceEndpoint) {
+					providerURI = servicesDdo[0].serviceEndpoint;
+				}
+			}
+			const chosenServiceIndex = servicesDdo.findIndex((s: any) => s.id === chosenServiceId);
+			if (chosenServiceIndex < 0) {
+				console.error(
+					`Could not resolve serviceIndex for dataset ${ddos[dataDdo].id} with serviceId ${chosenServiceId}`
+				);
+				return;
+			}
+			datasetServiceIndex.push(chosenServiceIndex);
 			const canStartCompute = isOrderable(
 				ddos[dataDdo],
-				servicesDdo[0].id,
+				chosenServiceId,
 				algo,
 				algoDdo
 			);
@@ -645,7 +728,7 @@ export class Commands {
 			}
 			assets.push({
 				documentId: ddos[dataDdo].id,
-				serviceId: servicesDdo[0].id,
+				serviceId: chosenServiceId,
 				asset: ddos[dataDdo],
 				version: versionDdo
 			});
@@ -663,7 +746,7 @@ export class Commands {
 			algoDdo,
 			this.signer,
 			computeEnv.consumerAddress,
-			0,
+			algoServiceIndex,
 			datatoken,
 			this.config,
 			parsedProviderInitializeComputeJob?.algorithm?.providerFee,
@@ -685,7 +768,7 @@ export class Commands {
 				ddos[i],
 				this.signer,
 				computeEnv.consumerAddress,
-				0,
+				datasetServiceIndex[i],
 				datatoken,
 				this.config,
 				parsedProviderInitializeComputeJob?.datasets[i].providerFee,
@@ -809,29 +892,6 @@ export class Commands {
 
 		console.log("Starting compute job using provider: ", providerURI);
 
-		const additionalDatasets = assets.length > 1 ? assets.slice(1) : null;
-		if (assets.length > 0) {
-			console.log(
-				"Starting compute job on " +
-				assets[0].documentId +
-				" with additional datasets:" +
-				(!additionalDatasets ? "none" : additionalDatasets[0].documentId)
-			);
-		} else {
-			console.log(
-				"Starting compute job on " +
-				algo.documentId +
-				" with additional datasets:" +
-				(!additionalDatasets ? "none" : additionalDatasets[0].documentId)
-			);
-		}
-		if (additionalDatasets !== null) {
-			console.log(
-				"Adding additional datasets to dataset, according to C2D V2 specs"
-			);
-			assets.push(additionalDatasets);
-		}
-
 		const output: ComputeOutput = {
 			metadataUri: await getMetadataURI(),
 		};
@@ -869,20 +929,19 @@ export class Commands {
 		const inputDatasetsString = args[1];
 		let inputDatasets = [];
 
-		if (
-			inputDatasetsString.includes("[") &&
-			inputDatasetsString.includes("]")
-		) {
-			const processedInput = inputDatasetsString
-				.replaceAll("]", "")
-				.replaceAll("[", "");
-			if (processedInput.indexOf(",") > -1) {
-				inputDatasets = processedInput.split(",");
-			}
+		if (!inputDatasetsString || inputDatasetsString.trim() === '[]') {
+			inputDatasets = [];
 		} else {
-			inputDatasets.push(inputDatasetsString);
+			const cleaned = inputDatasetsString.replaceAll('[', '').replaceAll(']', '');
+			inputDatasets = cleaned.split(',').map(s => s.trim()).filter(Boolean);
 		}
-
+		const inputServicesString = args[4];
+		let inputServices: string[] = [];
+		if (typeof inputServicesString === 'string' && inputServicesString.trim().length > 0) {
+			inputServices = inputServicesString.split(',').map(s => s.trim()).filter(Boolean);
+		} else if (Array.isArray(inputServicesString)) {
+			inputServices = inputServicesString.map(String).map(s => s.trim()).filter(Boolean);
+		}
 		const ddos = [];
 
 		for (const dataset in inputDatasets) {
@@ -967,9 +1026,24 @@ export class Commands {
 		}
 		const ddoInstanceAlgo = DDOManager.getDDOClass(algoDdo);
 		const { services: servicesAlgo, metadata: metadataAlgo, version: versionAlgo } = ddoInstanceAlgo.getDDOFields();
+
+		const algoServiceIdInput = args[5] as string | undefined;
+		let chosenAlgoServiceId = servicesAlgo[0].id;
+		if (typeof algoServiceIdInput === 'string' && algoServiceIdInput.trim().length > 0) {
+			const expectedAlgoServiceId = algoServiceIdInput.trim();
+			const matchAlgoSvc = servicesAlgo.find((s: any) => s.id === expectedAlgoServiceId);
+			if (!matchAlgoSvc) {
+				console.error(
+					`Algorithm Service ID "${expectedAlgoServiceId}" not found in algo DDO ${algoDdo.id}. ` +
+					'Provide a valid service.id from the algorithm asset or omit the argument to use the default (services[0]).'
+				);
+				return;
+			}
+			chosenAlgoServiceId = expectedAlgoServiceId;
+		}
 		const algo: ComputeAlgorithm = {
 			documentId: algoDdo.id,
-			serviceId: servicesAlgo[0].id,
+			serviceId: chosenAlgoServiceId,
 			meta: metadataAlgo.algorithm,
 		};
 
@@ -980,7 +1054,7 @@ export class Commands {
 			version?: string;
 		} = {
 			documentId: algoDdo.id,
-			serviceId: servicesAlgo[0].id,
+			serviceId: chosenAlgoServiceId,
 			asset: algoDdo,
 			version: versionAlgo
 		};
@@ -989,9 +1063,29 @@ export class Commands {
 		for (const dataDdo in ddos) {
 			const ddoInstanceDdo = DDOManager.getDDOClass(ddos[dataDdo]);
 			const { services: servicesDdo, version: versionDdo } = ddoInstanceDdo.getDDOFields();
+			let chosenServiceId = servicesDdo[0].id;
+			if (inputServices.length > 0) {
+				const expectedServiceId = inputServices[Number(dataDdo)];
+				const match = servicesDdo.find((s: any) => s.id === expectedServiceId);
+				if (!match) {
+					console.error(
+						`Service ID "${expectedServiceId}" not found in dataset ${inputDatasets[Number(dataDdo)]}. ` +
+						'Ensure serviceIds[i] exists in the corresponding dataset services.'
+					);
+					return;
+				}
+				chosenServiceId = expectedServiceId;
+				if (Number(dataDdo) === 0 && match.serviceEndpoint) {
+					providerURI = match.serviceEndpoint;
+				}
+			} else {
+				if (Number(dataDdo) === 0 && servicesDdo[0]?.serviceEndpoint) {
+					providerURI = servicesDdo[0].serviceEndpoint;
+				}
+			}
 			const canStartCompute = isOrderable(
 				ddos[dataDdo],
-				servicesDdo[0].id,
+				chosenServiceId,
 				algo,
 				algoDdo
 			);
@@ -1003,35 +1097,10 @@ export class Commands {
 			}
 			assets.push({
 				documentId: ddos[dataDdo].id,
-				serviceId: servicesDdo[0].id,
+				serviceId: chosenServiceId,
 				asset: ddos[dataDdo],
 				version: versionDdo
 			});
-		}
-
-		console.log("Starting compute job using provider: ", providerURI);
-		const additionalDatasets = assets.length > 1 ? assets.slice(1) : null;
-		if (assets.length > 0) {
-			console.log(
-				"Starting compute job on " +
-				assets[0].documentId +
-				" with additional datasets:" +
-				(!additionalDatasets ? "none" : additionalDatasets[0].documentId)
-			);
-		} else {
-			console.log(
-				"Starting compute job on " +
-				algo.documentId +
-				" with additional datasets:" +
-				(!additionalDatasets ? "none" : additionalDatasets[0].documentId)
-			);
-		}
-
-		if (additionalDatasets !== null) {
-			console.log(
-				"Adding additional datasets to dataset, according to C2D V2 specs"
-			);
-			assets.push(additionalDatasets);
 		}
 
 		const output: ComputeOutput = {
@@ -1052,7 +1121,6 @@ export class Commands {
 			policiesServer
 		);
 
-		console.log("compute jobs: ", computeJobs);
 
 		if (computeJobs && computeJobs[0]) {
 			const { jobId } = computeJobs[0];

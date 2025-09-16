@@ -191,29 +191,55 @@ export async function createCLI() {
     .argument('<maxJobDuration>', 'maxJobDuration for compute job')
     .argument('<paymentToken>', 'Payment token for compute')
     .argument('<resources>', 'Resources of compute environment stringified')
+    .argument('[serviceIds]', 'Service IDs (comma-separated; positional mapping with datasetDIDs)')
+    .argument('[algoServiceId]', 'Algorithm Service ID (optional)')
     .option('-d, --datasets <datasetDids>', 'Dataset DIDs (comma-separated) OR (empty array for none)')
     .option('-a, --algo <algoDid>', 'Algorithm DID')
     .option('-e, --env <computeEnvId>', 'Compute environment ID')
     .option('--maxJobDuration <maxJobDuration>', 'Compute maxJobDuration')
     .option('-t, --token <paymentToken>', 'Compute payment token')
+    .option('-s, --services [serviceIds]', 'Service IDs (comma-separated; positional mapping with datasetDIDs)')
+    .option('-x, --algo-service [algoServiceId]', 'Algorithm Service ID (optional)')
     .option('--resources <resources>', 'Compute resources')
     .option('--accept [boolean]', 'Auto-confirm payment for compute job (true/false)', toBoolean)
-    .action(async (datasetDids, algoDid, computeEnvId, maxJobDuration, paymentToken, resources, options) => {
+    .action(async (datasetDids, algoDid, computeEnvId, maxJobDuration, paymentToken, resources, serviceIds, algoServiceId, options) => {
       const dsDids = options.datasets || datasetDids;
       const aDid = options.algo || algoDid;
       const envId = options.env || computeEnvId;
       const jobDuration = options.maxJobDuration || maxJobDuration;
       const token = options.token || paymentToken;
       const res = options.resources || resources;
+      const svcIds = options.services ?? serviceIds ?? '';
+      const algoSvcId = options.algoService ?? algoServiceId ?? '';
       if (!dsDids || !aDid || !envId || !jobDuration || !token || !res) {
         console.error(chalk.red('Missing required arguments'));
         // process.exit(1);
         return
       }
+
+      const dsArr =
+        dsDids === '[]'
+          ? []
+          : dsDids.split(',').map(s => s.trim()).filter(Boolean);
+
+      const svArr = svcIds
+        ? svcIds.split(',').map(s => s.trim()).filter(Boolean)
+        : undefined;
+
+      // Optional check: serviceIds must match length if provided
+      if (svArr && svArr.length !== dsArr.length) {
+        console.error(
+          chalk.red(
+            `Length mismatch: datasetDids=${dsArr.length} vs serviceIds=${svArr.length}. ` +
+            'If serviceIds is provided, it must match datasetDids length (positional 1–1).'
+          )
+        );
+        return;
+      }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
 
-      const initArgs = [null, dsDids, aDid, envId, jobDuration, token, res];
+      const initArgs = [null, dsDids, aDid, envId, jobDuration, token, res, svcIds, algoSvcId];
       const initResp = await commands.initializeCompute(initArgs);
 
       if (!initResp) {
@@ -242,7 +268,7 @@ export async function createCLI() {
         console.log(chalk.cyan('Auto-confirm enabled with --yes flag.'));
       }
 
-      const computeArgs = [null, dsDids, aDid, envId, JSON.stringify(initResp), jobDuration, token, res];
+      const computeArgs = [null, dsDids, aDid, envId, JSON.stringify(initResp), jobDuration, token, res, svcIds, algoSvcId];
 
       await commands.computeStart(computeArgs);
       console.log(chalk.green('Compute job started successfully.'));
@@ -255,21 +281,48 @@ export async function createCLI() {
     .argument('<datasetDids>', 'Dataset DIDs (comma-separated) OR (empty array for none)')
     .argument('<algoDid>', 'Algorithm DID')
     .argument('<computeEnvId>', 'Compute environment ID')
+    .argument('[serviceIds]', 'Service IDs (comma-separated; positional mapping with datasetDIDs)')
+    .argument('[algoServiceId]', 'Algorithm Service ID (optional)')
     .option('-d, --datasets <datasetDids>', 'Dataset DIDs (comma-separated) OR (empty array for none)')
     .option('-a, --algo <algoDid>', 'Algorithm DID')
     .option('-e, --env <computeEnvId>', 'Compute environment ID')
-    .action(async (datasetDids, algoDid, computeEnvId, options) => {
+    .option('-s, --services [serviceIds]', 'Service IDs (comma-separated; positional mapping with datasetDIDs)')
+    .option('-x, --algo-service [algoServiceId]', 'Algorithm Service ID (optional)')
+    .action(async (datasetDids, algoDid, computeEnvId, serviceIds, algoServiceId, options) => {
       const dsDids = options.datasets || datasetDids;
       const aDid = options.algo || algoDid;
       const envId = options.env || computeEnvId;
+      const svcIds = options.services ?? serviceIds ?? '';
+      const algoSvcId = options.algoService ?? algoServiceId ?? '';
+
       if (!dsDids || !aDid || !envId) {
         console.error(chalk.red('Missing required arguments'));
         // process.exit(1);
         return
       }
+
+      const dsArr =
+        dsDids === '[]'
+          ? []
+          : dsDids.split(',').map(s => s.trim()).filter(Boolean);
+
+      const svArr = svcIds
+        ? svcIds.split(',').map(s => s.trim()).filter(Boolean)
+        : undefined;
+
+      // Optional check: serviceIds must match length if provided
+      if (svArr && svArr.length !== dsArr.length) {
+        console.error(
+          chalk.red(
+            `Length mismatch: datasetDids=${dsArr.length} vs serviceIds=${svArr.length}. ` +
+            'If serviceIds is provided, it must match datasetDids length (positional 1–1).'
+          )
+        );
+        return;
+      }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
-      await commands.freeComputeStart([null, dsDids, aDid, envId]);
+      await commands.freeComputeStart([null, dsDids, aDid, envId, svcIds, algoSvcId]);
     });
 
   // getComputeEnvironments command

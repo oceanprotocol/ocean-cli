@@ -87,6 +87,13 @@ export INDEXING_RETRY_INTERVAL='3000'
 export AVOID_LOOP_RUN='true/false'
 ```
 
+- Optional, set SSI_WALLET_API and SSI_WALLET_ID to support v5 DDOs (assets using credentialSubject and SSI policy flows).
+
+```
+export SSI_WALLET_API="https://your-ssi-wallet.example/api"
+export SSI_WALLET_ID="did:example:your-wallet-did-or-id"
+```
+
 
 
 ### Build the TypeScript code
@@ -183,22 +190,28 @@ npm run cli <command> [options] <arguments>
 **Download:**
 
 - **Positional:**  
-  `npm run cli download did:op:123 ./custom-folder`
+  `npm run cli download did:op:123 ./custom-folder serviceId`
 
 - **Named Options:**  
-  `npm run cli download --did did:op:123 --folder ./custom-folder`  
+  `npm run cli download --did did:op:123 --folder ./custom-folder --service serviceId`  
   (Order of `--did` and `--folder` does not matter.)
 
+- **Rules:**  
+  serviceId is optional. If omitted, the CLI defaults to the first available download service.
+  
 ---
 
 **Start Compute:**
 
 - **Positional:**  
-  `npm run cli startCompute -- did1,did2 algoDid env1 maxJobDuration paymentToken resources --accept true`
+  `npm run cli startCompute -- did1,did2 algoDid env1 maxJobDuration paymentToken resources svc1,svc2 algoServiceId`
 
 - **Named Options:**  
-  `npm run cli startCompute --datasets did1,did2 --algo algoDid --env env1 --maxJobDuration maxJobDuration --token paymentToken --resources resources --accept true`  
+  `npm run cli startCompute --datasets did1,did2 --algo algoDid --env env1 --maxJobDuration maxJobDuration --token paymentToken --resources resources --accept true --services svc1,svc2 ----algo-service algoServiceId`  
   (Options can be provided in any order.)
+
+- **Rules:**  
+  serviceIds and algoServiceId are optional. If omitted, the CLI defaults to the first available service.
 
 
 - `maxJobDuration` is a required parameter an represents the time measured in seconds for job maximum execution, the payment is based on this maxJobDuration value, user needs to provide this.
@@ -215,7 +228,11 @@ e.g.: `'[{"id":"cpu","amount":3},{"id":"ram","amount":16772672536},{"id":"disk",
   `npm run cli startFreeCompute did1,did2 algoDid env1`
 
 - **Named Options:**  
-  `npm run cli startFreeCompute --datasets did1,did2 --algo algoDid --env env1`  
+  `npm run cli startFreeCompute --datasets did1,did2 --algo algoDid --env env1 --services svc1,svc2 ----algo-service algoServiceId`  
+  (Options can be provided in any order.)
+
+- **Rules:**  
+  serviceIds and algoServiceId are optional. If omitted, the CLI defaults to the first available service.`  
   (Options can be provided in any order.)
 
 ---
@@ -293,6 +310,8 @@ e.g.: `'[{"id":"cpu","amount":3},{"id":"ram","amount":16772672536},{"id":"disk",
 - **download:**  
   `-d, --did <did>`  
   `-f, --folder [destinationFolder]` (Default: `.`)
+  `-s, --service <serviceId>` (Optional, target a specific service)
+
 
 - **startCompute:**  
   `-d, --datasets <datasetDids>`  
@@ -303,11 +322,15 @@ e.g.: `'[{"id":"cpu","amount":3},{"id":"ram","amount":16772672536},{"id":"disk",
   `-t, --token <paymentToken>`
   `--resources <resources>`
   `--amountToDeposit <amountToDeposit>` (Id `''`, it will fallback to initialize compute payment amount.)
+  `-s, --services [serviceIds]` (Optional, comma-separated; must match datasetDids length, positional 1–1)  
+  `-x, --algo-service [algoServiceId]` (Optional, override algorithm service)
 
 - **startFreeCompute:**  
   `-d, --datasets <datasetDids>`  
   `-a, --algo <algoDid>`  
   `-e, --env <computeEnvId>`
+  `-s, --services [serviceIds]` (Optional, comma-separated; must match datasetDids length, positional 1–1)  
+  `-x, --algo-service [algoServiceId]` (Optional, override algorithm service)
 
 - **getComputeEnvironments:**  
 

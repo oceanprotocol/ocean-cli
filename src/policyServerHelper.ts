@@ -258,7 +258,6 @@ export async function getPolicyServerOBJ(
       serviceId,
       providerUrl
     )
-    console.log('Presentation Result', presentationResult)
 
     if (
       !presentationResult.openid4vc ||
@@ -289,49 +288,40 @@ export async function getPolicyServerOBJ(
     const verifierSessionId = presentationResult.policyServerData.sessionId
 
     const presentationDefinition = await getPd(verifierSessionId, providerUrl)
-    console.log('Presentation Definition', presentationDefinition)
     const ssiApi = process.env.SSI_WALLET_API
     if (!ssiApi) {
       throw new Error('No SSI_WALLET_API configured')
     }
     const sessionToken = await connectToSSIWallet(signer, ssiApi)
-    console.log('Connected to SSI Wallet', sessionToken)
     const walletId = process.env.SSI_WALLET_ID
     if (!walletId) {
       throw new Error('No SSI_WALLET_ID configured')
     }
-    console.log('Using wallet ID', walletId)
     const verifiableCredentials = await matchCredentialForPresentationDefinition(
       ssiApi,
       walletId,
       presentationDefinition,
       sessionToken.token
     )
-    console.log('Found VCs for presentation', verifiableCredentials)
     const dids = await getWalletDids(
       walletId,
       sessionToken.token,
       ssiApi
     )
-    console.log('Wallet DIDs', dids)
     if (!dids || dids.length === 0) {
       throw new Error('No DIDs found in wallet')
     }
-    console.log('Calling resolvePresentationRequest')
     const resolvedPresentationRequest = await resolvePresentationRequest(
       walletId,
       presentationResult.openid4vc,
       sessionToken.token,
       ssiApi
     )
-    console.log('Resolved Presentation Request', resolvedPresentationRequest)
     const myDid = process.env.SSI_WALLET_DID
     if (myDid && !dids.find((d) => d.did === myDid)) {
       throw new Error(`DID ${myDid} not found in wallet`)
     }
     const did = myDid ? myDid : dids[0].did
-    console.log('Using DID', did)
-    console.log('Sending presentation request', resolvedPresentationRequest, verifiableCredentials.map((vc) => vc.id))
     const result = await sendPresentationRequest(
       walletId,
       did,
@@ -340,7 +330,6 @@ export async function getPolicyServerOBJ(
       sessionToken.token,
       ssiApi
     )
-    console.log('Presentation request result', result)
     if (
       'errorMessage' in result ||
       (result.redirectUri && result.redirectUri.includes('error'))

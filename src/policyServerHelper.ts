@@ -313,20 +313,25 @@ export async function getPolicyServerOBJ(
       sessionToken.token,
       ssiApi
     )
+    console.log('Wallet DIDs', dids)
     if (!dids || dids.length === 0) {
       throw new Error('No DIDs found in wallet')
     }
+    console.log('Calling resolvePresentationRequest')
     const resolvedPresentationRequest = await resolvePresentationRequest(
       walletId,
       presentationResult.openid4vc,
       sessionToken.token,
       ssiApi
     )
+    console.log('Resolved Presentation Request', resolvedPresentationRequest)
     const myDid = process.env.SSI_WALLET_DID
     if (myDid && !dids.find((d) => d.did === myDid)) {
       throw new Error(`DID ${myDid} not found in wallet`)
     }
     const did = myDid ? myDid : dids[0].did
+    console.log('Using DID', did)
+    console.log('Sending presentation request', resolvedPresentationRequest, verifiableCredentials.map((vc) => vc.id))
     const result = await sendPresentationRequest(
       walletId,
       did,
@@ -335,6 +340,7 @@ export async function getPolicyServerOBJ(
       sessionToken.token,
       ssiApi
     )
+    console.log('Presentation request result', result)
     if (
       'errorMessage' in result ||
       (result.redirectUri && result.redirectUri.includes('error'))

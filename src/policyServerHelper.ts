@@ -266,6 +266,25 @@ export async function getPolicyServerOBJ(
     ) {
       throw new Error('No valid openid4vc url found')
     }
+    if (
+      presentationResult.openid4vc &&
+      typeof presentationResult.openid4vc === 'object' &&
+      (presentationResult.openid4vc as any).redirectUri &&
+      (presentationResult.openid4vc as any).redirectUri.includes(
+        'success'
+      )
+    ) {
+      const { id } = extractURLSearchParams(
+        (presentationResult.openid4vc as any).redirectUri
+      )
+      return {
+        sessionId: id,
+        successRedirectUri: '',
+        errorRedirectUri: '',
+        responseRedirectUri: '',
+        presentationDefinitionUri: ''
+      }
+    }
     const verifierSessionId = presentationResult.policyServerData.sessionId
 
     const presentationDefinition = await getPd(verifierSessionId, providerUrl)

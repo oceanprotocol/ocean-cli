@@ -87,11 +87,12 @@ export INDEXING_RETRY_INTERVAL='3000'
 export AVOID_LOOP_RUN='true/false'
 ```
 
-- Optional, set SSI_WALLET_API and SSI_WALLET_ID to support v5 DDOs (assets using credentialSubject and SSI policy flows).
+- Optional, set SSI_WALLET_API, SSI_WALLET_ID, SSI_WALLET_DID to support v5 DDOs (assets using credentialSubject and SSI policy flows).
 
 ```
 export SSI_WALLET_API="https://your-ssi-wallet.example/api"
 export SSI_WALLET_ID="did:example:your-wallet-did-or-id"
+export export SSI_WALLET_DID="did:example"
 ```
 
 

@@ -10,10 +10,8 @@ describe("Ocean CLI Publishing", function () {
     this.timeout(200000); // Set a longer timeout to allow the command to execute
 
     let downloadDatasetDid: string;
-    let downloadDatasetV5Did: string;
     let computeDatasetDid: string;
     let jsAlgoDid: string;
-    let jsAlgoV5Did: string;
     let pythonAlgoDid: string;
 
 
@@ -91,14 +89,6 @@ describe("Ocean CLI Publishing", function () {
             console.error("Raw output:", output);
             throw new Error("Could not find did in the output");
         }
-
-        try {
-            downloadDatasetV5Did = jsonMatch[0];
-        } catch (error) {
-            console.error("Extracted output:", jsonMatch[0]);
-            throw new Error("Failed to parse the extracted output:\n" + error);
-        }
-
     });
 
     it("should publish a compute dataset using 'npm run cli publish'", async function () {
@@ -161,13 +151,6 @@ describe("Ocean CLI Publishing", function () {
             console.error("Raw output:", output);
             throw new Error("Could not find did in the output");
         }
-
-        try {
-            jsAlgoV5Did = jsonMatch[0];
-        } catch (error) {
-            console.error("Extracted output:", jsonMatch[0]);
-            throw new Error("Failed to parse the extracted output:\n" + error);
-        }
     });
 
     it("should publish a python Algorithm using 'npm run cli publishAlgo'", async function () {
@@ -211,24 +194,6 @@ describe("Ocean CLI Publishing", function () {
         }
     });
 
-    it("should get DDO V5 using 'npm run cli getDDO' for download dataset", async function () {
-
-        const output = await runCommand(`npm run cli getDDO ${downloadDatasetV5Did}`);
-
-        const jsonMatch = output.match(/s*([\s\S]*)/);
-        if (!jsonMatch) {
-            console.error("Raw output:", output);
-            throw new Error("Could not find ddo in the output");
-        }
-
-        try {
-            expect(output).to.contain(`Resolving Asset with DID: ${downloadDatasetV5Did}`)
-        } catch (error) {
-            console.error("Extracted output:", jsonMatch[0]);
-            throw new Error("Failed to parse the extracted output:\n" + error);
-        }
-    });
-
     it("should get DDO using 'npm run cli getDDO' for compute dataset", async function () {
         const output = await runCommand(`npm run cli getDDO ${computeDatasetDid}`);
 
@@ -257,24 +222,6 @@ describe("Ocean CLI Publishing", function () {
 
         try {
             expect(output).to.contain(`Resolving Asset with DID: ${jsAlgoDid}`)
-        } catch (error) {
-            console.error("Extracted output:", jsonMatch[0]);
-            throw new Error("Failed to parse the extracted output:\n" + error);
-        }
-    });
-
-
-    it("should get DDO using 'npm run cli getDDO' for JS algorithm V5", async function () {
-        const output = await runCommand(`npm run cli getDDO ${jsAlgoV5Did}`);
-
-        const jsonMatch = output.match(/s*([\s\S]*)/);
-        if (!jsonMatch) {
-            console.error("Raw output:", output);
-            throw new Error("Could not find ddo in the output");
-        }
-
-        try {
-            expect(output).to.contain(`Resolving Asset with DID: ${jsAlgoV5Did}`)
         } catch (error) {
             console.error("Extracted output:", jsonMatch[0]);
             throw new Error("Failed to parse the extracted output:\n" + error);

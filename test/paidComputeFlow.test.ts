@@ -152,14 +152,21 @@ describe("Ocean CLI Paid Compute", function () {
         const env = computeEnvs[0];
         expect(env).to.be.an('object').and.to.not.be.null.and.to.not.be.undefined;
 
+        if (!env.resources || !Array.isArray(env.resources) || env.resources.length < 2) {
+            throw new Error("Compute environment resources are not available or invalid.");
+        }
         resources = [
             {
                 id: 'cpu',
-                amount: env.resources[0].max - env.resources[0].inUse - 1
+                amount: env.resources[0]?.max !== undefined && env.resources[0]?.inUse !== undefined
+                    ? env.resources[0].max - env.resources[0].inUse - 1
+                    : 0
             },
             {
                 id: 'ram',
-                amount: env.resources[1].max - env.resources[1].inUse - 1000
+                amount: env.resources[1]?.max !== undefined && env.resources[1]?.inUse !== undefined
+                    ? env.resources[1].max - env.resources[1].inUse - 1000
+                    : 0
             },
             {
                 id: 'disk',

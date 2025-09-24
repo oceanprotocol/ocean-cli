@@ -147,60 +147,6 @@ describe("Ocean CLI Paid Compute", function () {
         console.log(`Fetched Compute Env ID: ${computeEnvId}`);
     });
 
-    it("should start paid compute on compute dataset and algorithm", async function () {
-        const computeEnvs = await ProviderInstance.getComputeEnvironments('http://127.0.0.1:8001');
-        const env = computeEnvs[0];
-        expect(env).to.be.an('object').and.to.not.be.null.and.to.not.be.undefined;
-
-        resources = [
-            {
-                id: 'cpu',
-                amount: env.resources[0].max - env.resources[0].inUse - 1
-            },
-            {
-                id: 'ram',
-                amount: env.resources[1].max - env.resources[1].inUse - 1000
-            },
-            {
-                id: 'disk',
-                amount: 0
-            }
-        ]
-        const paymentToken = getAddresses().Ocean
-        const output = await runCommand(`npm run cli -- startCompute ${computeDatasetDid} ${jsAlgoDid} ${computeEnvId} 900 ${paymentToken} '${JSON.stringify(resources)}' --accept true`);
-        const jobIdMatch = output.match(/JobID:\s*([^\s]+)/);
-        const agreementIdMatch = output.match(/Agreement ID:\s*([^\s]+)/);
-
-        if (!jobIdMatch) {
-            console.error("Raw output:", output);
-            throw new Error("Could not find Job ID in the output");
-        }
-
-        if (!agreementIdMatch) {
-            console.error("Raw output for finding agreement:", output);
-            throw new Error("Could not find Agreement ID in the output");
-        }
-
-        computeJobId = jobIdMatch[1];
-        agreementId = agreementIdMatch[1];
-
-        expect(computeJobId).to.be.a("string");
-        expect(agreementId).to.be.a("string");
-
-        console.log(`jobId: ${computeJobId}`);
-        console.log(`agreementId: ${agreementId}`);
-
-        if (!computeJobId) {
-            console.error("Job ID was empty:", output);
-            throw new Error("Job ID is missing");
-        }
-
-        if (!agreementId) {
-            console.error("Agreement ID was empty:", output);
-            throw new Error("Agreement ID is missing");
-        }
-    });
-
     it("should start paid compute on compute dataset and algorithm with services id for dataset and algorithm", async function () {
         const computeEnvs = await ProviderInstance.getComputeEnvironments('http://127.0.0.1:8001');
         const env = computeEnvs[0];

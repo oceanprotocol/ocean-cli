@@ -183,21 +183,21 @@ describe("Ocean CLI Paid Compute", function () {
             throw new Error("Could not find Agreement ID in the output");
         }
 
-        const _computeJobId = jobIdMatch[1];
-        const _agreementId_ = agreementIdMatch[1];
+        computeJobId = jobIdMatch[1];
+        agreementId = agreementIdMatch[1];
 
-        expect(_computeJobId).to.be.a("string");
-        expect(_agreementId_).to.be.a("string");
+        expect(computeJobId).to.be.a("string");
+        expect(agreementId).to.be.a("string");
 
-        console.log(`jobId: ${_computeJobId}`);
-        console.log(`agreementId: ${_agreementId_}`);
+        console.log(`jobId: ${computeJobId}`);
+        console.log(`agreementId: ${agreementId}`);
 
-        if (!_computeJobId) {
+        if (!computeJobId) {
             console.error("Job ID was empty:", output);
             throw new Error("Job ID is missing");
         }
 
-        if (!_agreementId_) {
+        if (!agreementId) {
             console.error("Agreement ID was empty:", output);
             throw new Error("Agreement ID is missing");
         }

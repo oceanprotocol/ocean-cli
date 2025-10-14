@@ -11,7 +11,7 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --parser typescript --ignore-path .gitignore --write '**/*.{js,jsx,ts,tsx}'",
     "cli": "npx tsx src/index.ts",
-    "test:system": "npm run mocha 'test/**/.test.ts'",
+    "test:system": "npm run mocha 'test/**/*.test.ts'",
     "test": "npm run lint && npm run test:system",
     "mocha": "mocha --config=test/.mocharc.json --node-env=test --exit"
   },

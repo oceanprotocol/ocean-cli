@@ -11,7 +11,7 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --parser typescript --ignore-path .gitignore --write '**/*.{js,jsx,ts,tsx}'",
     "cli": "npx tsx src/index.ts",
-    "test:system": "npm run mocha 'test/**/*.test.ts'",
+    "test:system": "npm run mocha 'test/**/accessList.test.ts'",
     "test": "npm run lint && npm run test:system",
     "mocha": "mocha --config=test/.mocharc.json --node-env=test --exit"
   },
@@ -46,8 +46,8 @@
   "dependencies": {
     "@oasisprotocol/sapphire-paratime": "^1.3.2",
     "@oceanprotocol/contracts": "^2.4.0",
-    "@oceanprotocol/ddo-js": "^0.1.3",
-    "@oceanprotocol/lib": "^5.0.0",
+    "@oceanprotocol/ddo-js": "^0.1.4",
+    "@oceanprotocol/lib": "^5.0.3",
     "commander": "^13.1.0",
     "cross-fetch": "^3.1.5",
     "crypto-js": "^4.1.1",

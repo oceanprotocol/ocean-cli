@@ -490,5 +490,76 @@ export async function createCLI() {
       await commands.getAuthorizationsEscrow(token || options.token, payee || options.payee);
     });
 
+  program
+    .command('createAccessList')
+    .description('Create a new access list contract')
+    .argument('<name>', 'Name for the access list')
+    .argument('<symbol>', 'Symbol for the access list')
+    .argument('[transferable]', 'Whether tokens are transferable (true/false)', 'false')
+    .argument('[initialUsers]', 'Comma-separated list of initial user addresses', '')
+    .option('-n, --name <name>', 'Name for the access list')
+    .option('-s, --symbol <symbol>', 'Symbol for the access list')
+    .option('-t, --transferable [transferable]', 'Whether tokens are transferable (true/false)', 'false')
+    .option('-u, --users [initialUsers]', 'Comma-separated list of initial user addresses', '')
+    .action(async (name, symbol, transferable, initialUsers, options) => {
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
+      await commands.createAccessList([
+        options.name || name,
+        options.symbol || symbol,
+        options.transferable || transferable,
+        options.users || initialUsers
+      ]);
+    });
+
+  program
+    .command('addToAccessList')
+    .description('Add user(s) to an access list')
+    .argument('<accessListAddress>', 'Address of the access list contract')
+    .argument('<users>', 'Comma-separated list of user addresses to add')
+    .option('-a, --address <accessListAddress>', 'Address of the access list contract')
+    .option('-u, --users <users>', 'Comma-separated list of user addresses to add')
+    .action(async (accessListAddress, users, options) => {
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
+      await commands.addToAccessList([
+        options.address || accessListAddress,
+        options.users || users
+      ]);
+    });
+
+  program
+    .command('checkAccessList')
+    .description('Check if user(s) are on an access list')
+    .argument('<accessListAddress>', 'Address of the access list contract')
+    .argument('<users>', 'Comma-separated list of user addresses to check')
+    .option('-a, --address <accessListAddress>', 'Address of the access list contract')
+    .option('-u, --users <users>', 'Comma-separated list of user addresses to check')
+    .action(async (accessListAddress, users, options) => {
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
+      await commands.checkAccessList([
+        options.address || accessListAddress,
+        options.users || users
+      ]);
+    });
+
+  program
+    .command('removeFromAccessList')
+    .description('Remove user(s) from an access list')
+    .argument('<accessListAddress>', 'Address of the access list contract')
+    .argument('<users>', 'Comma-separated list of user addresses to remove')
+    .option('-a, --address <accessListAddress>', 'Address of the access list contract')
+    .option('-u, --users <users>', 'Comma-separated list of user addresses to remove')
+    .action(async (accessListAddress, users, options) => {
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
+      await commands.removeFromAccessList([
+        options.address || accessListAddress,
+        options.users || users
+      ]);
+    });
+
+
   return program;
 }

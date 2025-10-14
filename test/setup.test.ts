@@ -51,7 +51,17 @@ describe("Ocean CLI Setup", function() {
                 expect(stdout).to.contain("Gets the existing compute environments");
                 expect(stdout).to.contain("computeStreamableLogs");
                 expect(stdout).to.contain("Gets the existing compute streamable logs");
-                
+                expect(stdout).to.contain("createAccessList");
+                expect(stdout).to.contain("Create a new access list contract");
+                expect(stdout).to.contain("addToAccessList");
+                expect(stdout).to.contain("Add user(s) to an access list");
+                expect(stdout).to.contain("checkAccessList");
+                expect(stdout).to.contain("Check if user(s) are on an access list");
+                expect(stdout).to.contain("removeFromAccessList");
+                expect(stdout).to.contain("Remove user(s) from an access list");
+                expect(stdout).to.contain("getAccessListInfo");
+                expect(stdout).to.contain("Get information about an access list");
+
                 done();
             } catch (assertionError) {
                 done(assertionError);

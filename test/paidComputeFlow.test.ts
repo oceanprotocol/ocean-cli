@@ -18,6 +18,7 @@ describe("Ocean CLI Paid Compute", function() {
     let resources: any;
     let computeJobId: string;
     let agreementId: string;
+    process.env.AVOID_LOOP_RUN = "true";
 
     const getAddresses = () => {
         const data = JSON.parse(
@@ -155,15 +156,15 @@ describe("Ocean CLI Paid Compute", function() {
         resources = [
             {
                 id: 'cpu',
-                amount: env.resources[0].max - env.resources[0].inUse - 1 
+                amount: 1
             },
             {
                 id: 'ram',
-                amount: env.resources[1].max - env.resources[1].inUse - 1000
+                amount: 1
             },
             {
                 id: 'disk',
-                amount: 0
+                amount: 1
             }
         ]
         const paymentToken = getAddresses().Ocean

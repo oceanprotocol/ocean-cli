@@ -733,7 +733,7 @@ export class Commands {
 		await new Promise(resolve => setTimeout(resolve, 3000))
 		const validationEscrow = await escrow.verifyFundsForEscrowPayment(
 			paymentToken,
-			computeEnv.consumerAddress,
+			await this.signer.getAddress(),
 			await unitsToAmount(this.signer, paymentToken, parsedProviderInitializeComputeJob.payment.amount),
 			parsedProviderInitializeComputeJob.payment.amount.toString(),
 			parsedProviderInitializeComputeJob.payment.minLockSeconds.toString(),

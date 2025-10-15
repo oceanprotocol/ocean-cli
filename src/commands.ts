@@ -813,23 +813,27 @@ export class Commands {
 			metadataUri: await getMetadataURI(),
 		};
 
-		const computeJobs = await ProviderInstance.computeStart(
-			providerURI,
-			this.signer,
-			computeEnv.id,
-			assets, // assets[0] // only c2d v1,
-			algo,
-			supportedMaxJobDuration,
-			paymentToken,
-			JSON.parse(resources),
-			Number((await this.signer.provider.getNetwork()).chainId),
-			null,
-			null,
-			// additionalDatasets, only c2d v1
-			output,
-		);
-
-		console.log("compute jobs: ", computeJobs);
+		let computeJobs = null;
+		try {
+			computeJobs = await ProviderInstance.computeStart(
+				providerURI,
+				this.signer,
+				computeEnv.id,
+				assets, // assets[0] // only c2d v1,
+				algo,
+				supportedMaxJobDuration,
+				paymentToken,
+				JSON.parse(resources),
+				Number((await this.signer.provider.getNetwork()).chainId),
+				null,
+				null,
+				// additionalDatasets, only c2d v1
+				output
+			);
+		} catch (error) {
+			console.error("Error while starting the compute job: ", error);
+			throw new Error("Error while starting the compute job");
+		}
 
 		if (computeJobs && computeJobs[0]) {
 			const { jobId, payment } = computeJobs[0];

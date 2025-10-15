@@ -14,6 +14,7 @@ export const __dirname = dirname(__filename)
 
 export const projectRoot = path.resolve(__dirname, "..");
 export const runCommand = async (command: string): Promise<string> => {
+    console.log(`\n[CMD]: ${command}`);
     try {
         const { stdout } = await execPromise(command, { cwd: projectRoot });
         console.log(`[OUTPUT]:\n${stdout}`);

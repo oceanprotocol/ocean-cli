@@ -1413,12 +1413,14 @@ export class Commands {
 			console.log('Approving token transfer...')
 			const approveTx = await tokenContract.approve(escrowAddress, amountInUnits);
 			await approveTx.wait();
+			await new Promise(resolve => setTimeout(resolve, 3000));
 			console.log(`Successfully approved ${amount} ${token} to escrow`);
 
 
 			console.log('Depositing to escrow...')
 			const depositTx = await escrow.deposit(token, amount);
 			await depositTx.wait();
+			await new Promise(resolve => setTimeout(resolve, 3000));
 			return true;
 
 		} catch (error) {

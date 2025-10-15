@@ -139,4 +139,4 @@ jobs:
         if: ${{ failure() }}
         run: |
           echo "========== Ocean Node Logs =========="
-          docker logs ocean-node-1 2>&1 || echo "Ocean Node container logs not available"
+          docker logs --tail 1000 ocean-node-1 2>&1 | tac || echo "Ocean Node container logs not available"

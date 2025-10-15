@@ -781,27 +781,23 @@ export class Commands {
 			metadataUri: await getMetadataURI(),
 		};
 
-		let computeJobs = null;
-		try {
-			computeJobs = await ProviderInstance.computeStart(
-				providerURI,
-				this.signer,
-				computeEnv.id,
-				assets, // assets[0] // only c2d v1,
-				algo,
-				supportedMaxJobDuration,
-				paymentToken,
-				JSON.parse(resources),
-				Number((await this.signer.provider.getNetwork()).chainId),
-				null,
-				null,
-				// additionalDatasets, only c2d v1
-				output
-			);
-		} catch (error) {
-			console.error("Error while starting the compute job: ", error);
-			throw new Error("Error while starting the compute job");
-		}
+		const computeJobs = await ProviderInstance.computeStart(
+			providerURI,
+			this.signer,
+			computeEnv.id,
+			assets, // assets[0] // only c2d v1,
+			algo,
+			supportedMaxJobDuration,
+			paymentToken,
+			JSON.parse(resources),
+			Number((await this.signer.provider.getNetwork()).chainId),
+			null,
+			null,
+			// additionalDatasets, only c2d v1
+			output
+		);
+
+		console.log("computeJobs: ", computeJobs);
 
 		if (computeJobs && computeJobs[0]) {
 			const { jobId, payment } = computeJobs[0];
@@ -1381,14 +1377,12 @@ export class Commands {
 			console.log('Approving token transfer...')
 			const approveTx = await tokenContract.approve(escrowAddress, amountInUnits);
 			await approveTx.wait();
-			await new Promise(resolve => setTimeout(resolve, 3000));
 			console.log(`Successfully approved ${amount} ${token} to escrow`);
 
 
 			console.log('Depositing to escrow...')
 			const depositTx = await escrow.deposit(token, amount);
 			await depositTx.wait();
-			await new Promise(resolve => setTimeout(resolve, 3000));
 			return true;
 
 		} catch (error) {

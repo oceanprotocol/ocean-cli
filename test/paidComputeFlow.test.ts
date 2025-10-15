@@ -153,22 +153,10 @@ describe("Ocean CLI Paid Compute", function() {
         const env = computeEnvs[0];
         expect(env).to.be.an('object').and.to.not.be.null.and.to.not.be.undefined;
 
-        resources = [
-            {
-                id: 'cpu',
-                amount: 1
-            },
-            {
-                id: 'ram',
-                amount: 1
-            },
-            {
-                id: 'disk',
-                amount: 1
-            }
-        ]
+        resources = []
         const paymentToken = getAddresses().Ocean
         const output = await runCommand(`npm run cli -- startCompute ${computeDatasetDid} ${jsAlgoDid} ${computeEnvId} 900 ${paymentToken} '${JSON.stringify(resources)}' --accept true`);
+        console.log({ output: JSON.stringify(output, null, 2) })
         const jobIdMatch = output.match(/JobID:\s*([^\s]+)/);
         const agreementIdMatch = output.match(/Agreement ID:\s*([^\s]+)/);
 

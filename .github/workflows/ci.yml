@@ -66,9 +66,6 @@ jobs:
       - name: Set ADDRESS_FILE
         run: echo "ADDRESS_FILE=${HOME}/.ocean/ocean-contracts/artifacts/address.json" >> $GITHUB_ENV
 
-      - name: Set up node env
-        run: |
-          echo "NODE_VERSION=pr-1073" >> $GITHUB_ENV
       - name: Checkout Barge
         uses: actions/checkout@v3
         with:

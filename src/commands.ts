@@ -731,24 +731,57 @@ export class Commands {
 		)
 		console.log("Verifying payment...");
 		await new Promise(resolve => setTimeout(resolve, 3000))
-		const validationEscrow = await escrow.verifyFundsForEscrowPayment(
+
+		const payerAddress = await this.signer.getAddress();
+		const payeeAddress = computeEnv.consumerAddress;
+
+		const authorizations = await escrow.getAuthorizations(
 			paymentToken,
-			await this.signer.getAddress(),
-			await unitsToAmount(this.signer, paymentToken, parsedProviderInitializeComputeJob.payment.amount),
-			parsedProviderInitializeComputeJob.payment.amount.toString(),
-			parsedProviderInitializeComputeJob.payment.minLockSeconds.toString(),
-			'10'
-		)
-		if (validationEscrow.isValid === false) {
-			console.error(
-				"Error starting compute job dataset DID " +
-				args[1] +
-				" and algorithm DID " +
-				args[2] +
-				" because escrow funds check failed: "
-				+ validationEscrow.message
+			payerAddress,
+			payeeAddress
+		);
+
+		// If no authorization exists, create one
+		if (!authorizations || authorizations.length === 0) {
+			console.log(`Creating authorization for provider ${payeeAddress}...`);
+			const authorizeTx = await escrow.authorize(
+				getAddress(paymentToken),
+				getAddress(payeeAddress),
+				parsedProviderInitializeComputeJob.payment.amount.toString(),
+				parsedProviderInitializeComputeJob.payment.minLockSeconds.toString(),
+				'10'
 			);
-			return;
+			await authorizeTx.wait();
+			console.log(`Successfully authorized provider ${payeeAddress}`);
+		} else {
+			console.log(`Provider ${payeeAddress} is already authorized`);
+		}
+
+		// Check escrow balance and deposit if needed
+		const paymentAmount = await unitsToAmount(this.signer, paymentToken, parsedProviderInitializeComputeJob.payment.amount);
+		const escrowBalance = await escrow.getUserFunds(payerAddress, paymentToken);
+		const currentBalance = await unitsToAmount(this.signer, paymentToken, escrowBalance.available);
+
+		console.log(`Current escrow balance: ${currentBalance}, Required: ${paymentAmount}`);
+
+		if (Number(currentBalance) < Number(paymentAmount)) {
+			console.log(`Depositing ${paymentAmount} to escrow...`);
+			const depositSuccess = await this.depositToEscrow(
+				this.signer,
+				paymentToken,
+				paymentAmount,
+				Number((await this.signer.provider.getNetwork()).chainId)
+			);
+
+			if (!depositSuccess) {
+				console.error(
+					"Error starting compute job - escrow deposit failed for dataset DID " +
+					args[1] +
+					" and algorithm DID " +
+					args[2]
+				);
+				return;
+			}
 		}
 
 		console.log("Starting compute job using provider: ", providerURI);

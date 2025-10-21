@@ -8,6 +8,7 @@ import { fileURLToPath } from 'url'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 describe("Ocean CLI Setup", function() {
+    process.env.AVOID_LOOP_RUN = "true";
     this.timeout(20000); // Set a longer timeout to allow the command to execute
 
     it("should return a valid response for 'npm run cli h'", function(done) {
@@ -51,7 +52,15 @@ describe("Ocean CLI Setup", function() {
                 expect(stdout).to.contain("Gets the existing compute environments");
                 expect(stdout).to.contain("computeStreamableLogs");
                 expect(stdout).to.contain("Gets the existing compute streamable logs");
-                
+                expect(stdout).to.contain("createAccessList");
+                expect(stdout).to.contain("Create a new access list contract");
+                expect(stdout).to.contain("addToAccessList");
+                expect(stdout).to.contain("Add user(s) to an access list");
+                expect(stdout).to.contain("checkAccessList");
+                expect(stdout).to.contain("Check if user(s) are on an access list");
+                expect(stdout).to.contain("removeFromAccessList");
+                expect(stdout).to.contain("Remove user(s) from an access list");
+
                 done();
             } catch (assertionError) {
                 done(assertionError);

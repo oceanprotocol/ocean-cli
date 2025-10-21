@@ -5,8 +5,7 @@ import * as path from "path";
 import * as sapphire from '@oasisprotocol/sapphire-paratime';
 import { Asset, DDO } from '@oceanprotocol/ddo-js';
 import {
-	AccesslistFactory,
-	Aquarius,
+	AccesslistFactory, Aquarius,
 	Nft,
 	NftFactory,
 	ProviderInstance,

@@ -18,6 +18,7 @@ describe("Ocean CLI Paid Compute", function() {
     let resources: any;
     let computeJobId: string;
     let agreementId: string;
+    process.env.AVOID_LOOP_RUN = "true";
 
     const getAddresses = () => {
         const data = JSON.parse(
@@ -37,10 +38,10 @@ describe("Ocean CLI Paid Compute", function() {
             throw new Error("Metadata file not found: " + metadataFile);
         }
 
-        process.env.PRIVATE_KEY = "0x1d751ded5a32226054cd2e71261039b65afb9ee1c746d055dd699b1150a5befc";
-        // Using this account: 0x529043886F21D9bc1AE0feDb751e34265a246e47
-        process.env.RPC = "http://127.0.0.1:8545";
-        process.env.NODE_URL = "http://127.0.0.1:8001";
+        process.env.PRIVATE_KEY = "0xc594c6e5def4bab63ac29eed19a134c130388f74f019bc74b8f4389df2837a58";
+        // Using this account: 0xe2DD09d719Da89e5a3D0F2549c7E24566e947260
+        process.env.RPC = "http://localhost:8545";
+        process.env.NODE_URL = "http://localhost:8001";
         process.env.ADDRESS_FILE = path.join(process.env.HOME || "", ".ocean/ocean-contracts/artifacts/address.json");
 
         const output = await runCommand(`npm run cli publish ${metadataFile}`);
@@ -152,20 +153,7 @@ describe("Ocean CLI Paid Compute", function() {
         const env = computeEnvs[0];
         expect(env).to.be.an('object').and.to.not.be.null.and.to.not.be.undefined;
 
-        resources = [
-            {
-                id: 'cpu',
-                amount: env.resources[0].max - env.resources[0].inUse - 1 
-            },
-            {
-                id: 'ram',
-                amount: env.resources[1].max - env.resources[1].inUse - 1000
-            },
-            {
-                id: 'disk',
-                amount: 0
-            }
-        ]
+        resources = []
         const paymentToken = getAddresses().Ocean
         const output = await runCommand(`npm run cli -- startCompute ${computeDatasetDid} ${jsAlgoDid} ${computeEnvId} 900 ${paymentToken} '${JSON.stringify(resources)}' --accept true`);
         const jobIdMatch = output.match(/JobID:\s*([^\s]+)/);

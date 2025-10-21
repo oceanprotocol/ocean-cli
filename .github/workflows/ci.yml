@@ -136,4 +136,4 @@ jobs:
         if: ${{ failure() }}
         run: |
           echo "========== Ocean Node Logs =========="
-          tac ${{ github.workspace }}/ocean-node/ocean-node.log || echo "Log file not found"
+          docker logs --tail 1000 ocean-node-1 2>&1 | tac || echo "Ocean Node container logs not available"

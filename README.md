@@ -18,7 +18,7 @@ With the Ocean CLI tool you can:
 - **Handle escrow payments** for compute jobs with deposit, withdrawal, and authorization.
 - **Manage authentication** with token generation and invalidation.
 
-Ocean CLI is using ocean.js Javascripti library which is part of the [Ocean Protocol](https://oceanprotocol.com) toolset.
+Ocean CLI is using ocean.js JavaScript library which is part of the [Ocean Protocol](https://oceanprotocol.com) toolset.
 
 If you run into problems, please open up a [new issue](https://github.com/oceanprotocol/ocean-cli/issues/new?assignees=&labels=Type%3A+Bug&projects=&template=bug_report.md&title=).
 
@@ -511,7 +511,7 @@ This flexible approach lets you use the style that best suits your workflow whil
 ## 🏛 License
 
 ```
-Copyright ((C)) 2023 Ocean Protocol Foundation
+Copyright ((C)) 2025 Ocean Protocol Foundation
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

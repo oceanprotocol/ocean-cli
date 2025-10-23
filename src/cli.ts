@@ -484,6 +484,7 @@ export async function createCLI() {
     .argument('<token>', 'Address of the token to check')
     .argument('<payee>', 'Address of the payee to check')
     .option('-t, --token <token>', 'Address of the token to check')
+    .option('-p, --payee <payee>', 'Address of the payee to check')
     .action(async (token, payee, options) => {
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);

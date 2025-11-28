@@ -27,7 +27,9 @@ import {
 	sendTx,
 	unitsToAmount,
 	EscrowContract,
-	getTokenDecimals
+	getTokenDecimals,
+	AccesslistFactory,
+	AccessListContract
 } from "@oceanprotocol/lib";
 import { Asset, DDOManager } from '@oceanprotocol/ddo-js';
 import { Signer, ethers, getAddress } from "ethers";
@@ -870,6 +872,7 @@ export class Commands {
 		)
 		console.log("Verifying payment...");
 		await new Promise(resolve => setTimeout(resolve, 3000))
+
 		const validationEscrow = await escrow.verifyFundsForEscrowPayment(
 			paymentToken,
 			computeEnv.consumerAddress,
@@ -914,7 +917,7 @@ export class Commands {
 			policiesServer
 		);
 
-		console.log("compute jobs: ", computeJobs);
+		console.log("computeJobs: ", computeJobs);
 
 		if (computeJobs && computeJobs[0]) {
 			const { jobId, payment } = computeJobs[0];
@@ -1609,5 +1612,177 @@ export class Commands {
 		console.log(`- Max lock counts: ${authorization.maxLockCounts}`)
 
 		return authorizations;
+	}
+
+	public async createAccessList(args: string[]): Promise<void> {
+		try {
+			const name = args[0];
+			const symbol = args[1];
+			const transferable = args[2] === 'true';
+			const initialUsers = args[3] ? args[3].split(',').map(u => u.trim()) : [];
+
+			if (!name || !symbol) {
+				console.error(chalk.red('Name and symbol are required'));
+				return;
+			}
+
+			const config = await getConfigByChainId(Number(this.config.chainId));
+			if (!config.AccessListFactory) {
+				console.error(chalk.red('Access list factory not found. Check local address.json file'));
+				return;
+			}
+			const accessListFactory = new AccesslistFactory(
+				config.AccessListFactory,
+				this.signer,
+				Number(this.config.chainId)
+			);
+
+			const owner = await this.signer.getAddress();
+			const tokenURIs = initialUsers.map(() => 'https://oceanprotocol.com/nft/');
+
+			console.log(chalk.cyan('Creating new access list...'));
+			console.log(`Name: ${name}`);
+			console.log(`Symbol: ${symbol}`);
+			console.log(`Transferable: ${transferable}`);
+			console.log(`Owner: ${owner}`);
+			console.log(`Initial users: ${initialUsers.length > 0 ? initialUsers.join(', ') : 'none'}`);
+
+			const accessListAddress = await accessListFactory.deployAccessListContract(
+				name,
+				symbol,
+				tokenURIs,
+				transferable,
+				owner,
+				initialUsers
+			);
+
+			console.log(chalk.green(`\nAccess list created successfully!`));
+			console.log(chalk.green(`Contract address: ${accessListAddress}`));
+		} catch (error) {
+			console.error(chalk.red('Error creating access list:'), error);
+		}
+	}
+
+	public async addToAccessList(args: string[]): Promise<void> {
+		try {
+			const accessListAddress = args[0];
+			const users = args[1].split(',').map(u => u.trim());
+
+			if (!accessListAddress || users.length === 0) {
+				console.error(chalk.red('Access list address and at least one user are required'));
+				return;
+			}
+
+			const accessList = new AccessListContract(
+				accessListAddress,
+				this.signer,
+				Number(this.config.chainId)
+			);
+
+			console.log(chalk.cyan(`Adding ${users.length} user(s) to access list...`));
+
+			if (users.length === 1) {
+				const tx = await accessList.mint(users[0], 'https://oceanprotocol.com/nft/');
+				await tx.wait();
+				console.log(chalk.green(`Successfully added user ${users[0]} to access list`));
+				return;
+			}
+
+			const tokenURIs = users.map(() => 'https://oceanprotocol.com/nft/');
+			const tx = await accessList.batchMint(users, tokenURIs);
+			await tx.wait();
+			console.log(chalk.green(`Successfully added ${users.length} users to access list:`));
+			users.forEach(user => console.log(`  - ${user}`));
+		} catch (error) {
+			console.error(chalk.red('Error adding users to access list:'), error);
+		}
+	}
+
+
+	public async checkAccessList(args: string[]): Promise<void> {
+		try {
+			const accessListAddress = args[0];
+			const users = args[1].split(',').map(u => u.trim());
+
+			if (!accessListAddress || users.length === 0) {
+				console.error(chalk.red('Access list address and at least one user are required'));
+				return;
+			}
+
+			const accessList = new AccessListContract(
+				accessListAddress,
+				this.signer,
+				Number(this.config.chainId)
+			);
+
+			console.log(chalk.cyan(`Checking access list for ${users.length} user(s)...\n`));
+
+			for (const user of users) {
+				const balance = await accessList.balance(user);
+				const hasAccess = Number(balance) > 0;
+
+				if (hasAccess) {
+					console.log(chalk.green(`✓ ${user}: Has access (balance: ${balance})`));
+				} else {
+					console.log(chalk.red(`✗ ${user}: No access`));
+				}
+			}
+		} catch (error) {
+			console.error(chalk.red('Error checking access list:'), error);
+		}
+	}
+
+
+	public async removeFromAccessList(args: string[]): Promise<void> {
+		try {
+			const accessListAddress = args[0];
+			const users = args[1].split(',').map(u => u.trim());
+
+			if (!accessListAddress || users.length === 0) {
+				console.error(chalk.red('Access list address and at least one user address are required'));
+				return;
+			}
+
+			const accessList = new AccessListContract(
+				accessListAddress,
+				this.signer,
+				Number(this.config.chainId)
+			);
+
+			console.log(chalk.cyan(`Removing ${users.length} user(s) from access list...`));
+			for (const user of users) {
+				const balance = await accessList.balance(user);
+
+				if (Number(balance) === 0) {
+					console.log(chalk.yellow(`⚠ User ${user} is not on the access list, skipping...`));
+					continue;
+				}
+
+				const balanceNum = Number(balance);
+				const contract = accessList.contract;
+
+				let removedCount = 0;
+				for (let index = 0; index < balanceNum; index++) {
+					try {
+						const tokenId = await contract.tokenOfOwnerByIndex(user, index);
+						const tx = await accessList.burn(Number(tokenId));
+						await tx.wait();
+
+						console.log(chalk.green(`✓ Successfully removed user ${user} (token ID: ${tokenId})`));
+						removedCount++;
+					} catch (e: any) {
+						console.log(chalk.yellow(`⚠ Could not remove token at index ${index} for user ${user}: ${e.message}`));
+					}
+				}
+
+				if (removedCount === 0) {
+					console.log(chalk.yellow(`⚠ Could not remove any tokens for user ${user}`));
+				} else if (removedCount < balanceNum) {
+					console.log(chalk.yellow(`⚠ Only removed ${removedCount} of ${balanceNum} tokens for user ${user}`));
+				}
+			}
+		} catch (error) {
+			console.error(chalk.red('Error removing users from access list:'), error);
+		}
 	}
 }

@@ -14,8 +14,11 @@ With the Ocean CLI tool you can:
 - **Edit** existing assets.
 - **Consume** data services, ordering datatokens and downloading data.
 - **Compute to data** on public available datasets using a published algorithm.
+- **Manage access control** with access lists for restricting dataset/algorithm access.
+- **Handle escrow payments** for compute jobs with deposit, withdrawal, and authorization.
+- **Manage authentication** with token generation and invalidation.
 
-Ocean CLI is using ocean.js Javascripti library which is part of the [Ocean Protocol](https://oceanprotocol.com) toolset.
+Ocean CLI is using ocean.js JavaScript library which is part of the [Ocean Protocol](https://oceanprotocol.com) toolset.
 
 If you run into problems, please open up a [new issue](https://github.com/oceanprotocol/ocean-cli/issues/new?assignees=&labels=Type%3A+Bug&projects=&template=bug_report.md&title=).
 
@@ -290,6 +293,126 @@ e.g.: `'[{"id":"cpu","amount":3},{"id":"ram","amount":16772672536},{"id":"disk",
 
 ---
 
+**Generate Auth Token:**
+
+  `npm run cli generateAuthToken`  
+  (No arguments are required for this command.)
+
+---
+
+**Invalidate Auth Token:**
+
+- **Positional:**  
+  `npm run cli invalidateAuthToken myAuthToken123`
+
+- **Named Option:**  
+  `npm run cli invalidateAuthToken --token myAuthToken123`
+
+---
+
+**Deposit to Escrow:**
+
+- **Positional:**  
+  `npm run cli depositEscrow 0x1234...tokenAddress 100`
+
+- **Named Options:**  
+  `npm run cli depositEscrow --token 0x1234...tokenAddress --amount 100`
+
+---
+
+**Get User Funds in Escrow:**
+
+- **Positional:**  
+  `npm run cli getUserFundsEscrow 0x1234...tokenAddress`
+
+- **Named Option:**  
+  `npm run cli getUserFundsEscrow --token 0x1234...tokenAddress`
+
+---
+
+**Withdraw from Escrow:**
+
+- **Positional:**  
+  `npm run cli withdrawFromEscrow 0x1234...tokenAddress 50`
+
+- **Named Options:**  
+  `npm run cli withdrawFromEscrow --token 0x1234...tokenAddress --amount 50`
+
+---
+
+**Authorize Escrow Payee:**
+
+- **Positional:**  
+  `npm run cli authorizeEscrow 0x1234...tokenAddress 0x5678...payeeAddress 1000 3600 10`
+
+- **Named Options:**  
+  `npm run cli authorizeEscrow --token 0x1234...tokenAddress --payee 0x5678...payeeAddress --maxLockedAmount 1000 --maxLockSeconds 3600 --maxLockCounts 10`
+
+- Arguments:
+  - `token`: Address of the token to authorize
+  - `payee`: Address of the payee to authorize
+  - `maxLockedAmount`: Maximum amount that can be locked by payee
+  - `maxLockSeconds`: Maximum lock duration in seconds
+  - `maxLockCounts`: Maximum number of locks allowed
+
+---
+
+**Get Escrow Authorizations:**
+
+- **Positional:**  
+  `npm run cli getAuthorizationsEscrow 0x1234...tokenAddress 0x5678...payeeAddress`
+
+- **Named Options:**  
+  `npm run cli getAuthorizationsEscrow --token 0x1234...tokenAddress --payee 0x5678...payeeAddress`
+
+---
+
+**Create Access List:**
+
+- **Positional:**  
+  `npm run cli createAccessList "My Access List" "MAL" false "0xUser1,0xUser2"`
+
+- **Named Options:**  
+  `npm run cli createAccessList --name "My Access List" --symbol "MAL" --transferable false --users "0xUser1,0xUser2"`
+
+- Arguments:
+  - `name`: Name for the access list
+  - `symbol`: Symbol for the access list
+  - `transferable`: Whether tokens are transferable (true/false)
+  - `initialUsers`: Comma-separated list of initial user addresses (optional)
+
+---
+
+**Add to Access List:**
+
+- **Positional:**  
+  `npm run cli addToAccessList 0x1234...accessListAddress "0xUser1,0xUser2"`
+
+- **Named Options:**  
+  `npm run cli addToAccessList --address 0x1234...accessListAddress --users "0xUser1,0xUser2"`
+
+---
+
+**Check Access List:**
+
+- **Positional:**  
+  `npm run cli checkAccessList 0x1234...accessListAddress "0xUser1,0xUser2"`
+
+- **Named Options:**  
+  `npm run cli checkAccessList --address 0x1234...accessListAddress --users "0xUser1,0xUser2"`
+
+---
+
+**Remove from Access List:**
+
+- **Positional:**  
+  `npm run cli removeFromAccessList 0x1234...accessListAddress "0xUser1,0xUser2"`
+
+- **Named Options:**  
+  `npm run cli removeFromAccessList --address 0x1234...accessListAddress --users "0xUser1,0xUser2"`
+
+---
+
 #### Available Named Options Per Command
 
 - **getDDO:**  
@@ -355,6 +478,52 @@ e.g.: `'[{"id":"cpu","amount":3},{"id":"ram","amount":16772672536},{"id":"disk",
 - **mintOcean:**  
   No options/arguments required.
 
+- **generateAuthToken:**  
+  No options/arguments required.
+
+- **invalidateAuthToken:**  
+  `-t, --token <token>`
+
+- **depositEscrow:**  
+  `-t, --token <token>`  
+  `-a, --amount <amount>`
+
+- **getUserFundsEscrow:**  
+  `-t, --token <token>`
+
+- **withdrawFromEscrow:**  
+  `-t, --token <token>`  
+  `-a, --amount <amount>`
+
+- **authorizeEscrow:**  
+  `-t, --token <token>`  
+  `-p, --payee <payee>`  
+  `-m, --maxLockedAmount <maxLockedAmount>`  
+  `-s, --maxLockSeconds <maxLockSeconds>`  
+  `-c, --maxLockCounts <maxLockCounts>`
+
+- **getAuthorizationsEscrow:**  
+  `-t, --token <token>`  
+  `-p, --payee <payee>`
+
+- **createAccessList:**  
+  `-n, --name <name>`  
+  `-s, --symbol <symbol>`  
+  `-t, --transferable [transferable]` (Default: `false`)  
+  `-u, --users [initialUsers]` (Default: `''`)
+
+- **addToAccessList:**  
+  `-a, --address <accessListAddress>`  
+  `-u, --users <users>`
+
+- **checkAccessList:**  
+  `-a, --address <accessListAddress>`  
+  `-u, --users <users>`
+
+- **removeFromAccessList:**  
+  `-a, --address <accessListAddress>`  
+  `-u, --users <users>`
+
 ---
 
 **Note:**  
@@ -366,7 +535,7 @@ This flexible approach lets you use the style that best suits your workflow whil
 ## 🏛 License
 
 ```
-Copyright ((C)) 2023 Ocean Protocol Foundation
+Copyright ((C)) 2025 Ocean Protocol Foundation
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

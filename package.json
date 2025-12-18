@@ -13,7 +13,7 @@
     "cli": "npx tsx src/index.ts",
     "test:system": "npm run mocha 'test/**/*.test.ts'",
     "test": "npm run lint && npm run test:system",
-    "mocha": "mocha --config=test/.mocharc.json --node-env=test --exit"
+    "mocha": "NODE_OPTIONS='--experimental-require-module' mocha --config=test/.mocharc.json --node-env=test --exit"
   },
   "author": "Ocean Protocol <devops@oceanprotocol.com>",
   "license": "Apache-2.0",

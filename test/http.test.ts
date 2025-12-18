@@ -1,3 +1,4 @@
+import 'ts-node/register';
 import fetch from 'cross-fetch';
 import { expect, assert } from 'chai';
 
@@ -15,7 +16,7 @@ describe('Ocean Node Root Endpoint', () => {
 
     // You can also check the values of the properties
     expect(responseBody.software).to.equal('Ocean-Node');
-
+    
     // Check if version is "0.0.1" or greater
     const [major, minor, patch] = responseBody.version.split('.').map(Number);
     expect(major).to.be.at.least(0);
@@ -40,7 +41,7 @@ describe('Direct Command Endpoint', () => {
       body: JSON.stringify({ command: 'status' })
     });
     const responseBody = await response.json();
-
+  
     expect(response.status).to.equal(200);
     expect(responseBody).to.have.property('id');
     expect(responseBody).to.have.property('publicKey');
@@ -55,7 +56,7 @@ describe('Direct Command Endpoint', () => {
     expect(responseBody).to.have.property('platform');
     expect(responseBody).to.have.property('codeHash');
     expect(responseBody).to.have.property('allowedAdmins');
-
+  
     // Check the values of some of the properties
     expect(responseBody.http).to.be.true;
     expect(responseBody.p2p).to.be.true;
@@ -84,7 +85,7 @@ describe('Direct Command Endpoint', () => {
       }
     });
     const responseBody = await response.text();
-
+  
     expect(response.status).to.equal(400);
     assert(responseBody === "Missing signature")
   });

@@ -16,7 +16,10 @@ export const projectRoot = path.resolve(__dirname, "..");
 export const runCommand = async (command: string): Promise<string> => {
     console.log(`\n[CMD]: ${command}`);
     try {
-        const { stdout } = await execPromise(command, { cwd: projectRoot });
+        const { stdout, stderr } = await execPromise(command, { cwd: projectRoot });
+        if (stderr) {
+            console.error(`[STDERR]:\n${stderr}`);
+        }
         console.log(`[OUTPUT]:\n${stdout}`);
         return stdout;
     } catch (error: any) {

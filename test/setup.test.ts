@@ -7,11 +7,11 @@ import { fileURLToPath } from 'url'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
-describe("Ocean CLI Setup", function() {
+describe("Ocean CLI Setup", function () {
     process.env.AVOID_LOOP_RUN = "true";
     this.timeout(20000); // Set a longer timeout to allow the command to execute
 
-    it("should return a valid response for 'npm run cli h'", function(done) {
+    it("should return a valid response for 'npm run cli h'", function (done) {
         // Ensure the command is run from the project root directory
         const projectRoot = path.resolve(__dirname, "..");
 
@@ -19,7 +19,10 @@ describe("Ocean CLI Setup", function() {
         process.env.PRIVATE_KEY = "0x1d751ded5a32226054cd2e71261039b65afb9ee1c746d055dd699b1150a5befc";
         process.env.RPC = "http://127.0.0.1:8545";
 
-        exec("npm run cli h", { cwd: projectRoot }, (error, stdout) => {
+        exec("npm run cli h", { cwd: projectRoot }, (error, stdout, stderr) => {
+            if (stderr) {
+                console.error(stderr);
+            }
             // Check the stdout for the expected response
             try {
                 expect(stdout).to.contain("help|h");
@@ -69,7 +72,7 @@ describe("Ocean CLI Setup", function() {
     });
 
     // Additional comprehensive tests
-    it("should return an error message when only MNEMONIC is set", function(done) {
+    it("should return an error message when only MNEMONIC is set", function (done) {
         const projectRoot = path.resolve(__dirname, "..");
         process.env.MNEMONIC = "your-valid-mnemonic-here";
         delete process.env.PRIVATE_KEY;
@@ -85,7 +88,7 @@ describe("Ocean CLI Setup", function() {
         });
     });
 
-    it("should return an error message when only PRIVATE_KEY is set", function(done) {
+    it("should return an error message when only PRIVATE_KEY is set", function (done) {
         const projectRoot = path.resolve(__dirname, "..");
         delete process.env.MNEMONIC;
         process.env.PRIVATE_KEY = "0x1d751ded5a32226054cd2e71261039b65afb9ee1c746d055dd699b1150a5befc";
@@ -101,7 +104,7 @@ describe("Ocean CLI Setup", function() {
         });
     });
 
-    it("should return an error message when only RPC is set", function(done) {
+    it("should return an error message when only RPC is set", function (done) {
         const projectRoot = path.resolve(__dirname, "..");
         delete process.env.MNEMONIC;
         delete process.env.PRIVATE_KEY;

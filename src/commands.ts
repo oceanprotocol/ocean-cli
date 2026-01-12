@@ -246,6 +246,7 @@ export class Commands {
 		}
 	}
 
+
 	public async initializeCompute(args: string[]) {
 		const inputDatasetsString = args[1];
 		let inputDatasets = [];
@@ -294,7 +295,6 @@ export class Commands {
 		if (ddos.length > 0) {
 			providerURI = ddos[0].services[0].serviceEndpoint;
 		}
-
 		const algoDdo = await this.aquarius.waitForIndexer(
 			args[2],
 			null,
@@ -517,7 +517,7 @@ export class Commands {
 			inputDatasets.length > 0 &&
 			(ddos.length <= 0 || ddos.length != inputDatasets.length)
 		) {
-			console.error("Not all the data ddos are available.");
+			console.error(`DDO count mismatch. Expected: ${inputDatasets.length}, Got: ${ddos.length}`);
 			return;
 		}
 		let providerURI = this.oceanNodeUrl;
@@ -532,8 +532,7 @@ export class Commands {
 			this.indexingParams.maxRetries
 		);
 		if (!algoDdo) {
-			console.error(
-				"Error fetching DDO " + args[1] + ".  Does this asset exists?"
+			console.error(				"FAILED to fetch algorithm DDO " + args[2] + ".  Does this asset exists?"
 			);
 			return;
 		}
@@ -544,10 +543,11 @@ export class Commands {
 
 		if (!computeEnvs || computeEnvs.length < 1) {
 			console.error(
-				"Error fetching compute environments. No compute environments available."
+				"FAILED - No compute environments available from provider"
 			);
 			return;
 		}
+
 		const computeEnvID = args[3];
 		// NO chainId needed anymore (is not part of ComputeEnvironment spec anymore)
 		// const chainComputeEnvs = computeEnvs[computeEnvID]; // was algoDdo.chainId
@@ -563,9 +563,9 @@ export class Commands {
 		}
 		if (!computeEnv || !computeEnvID) {
 			console.error(
-				"Error fetching compute environment. No compute environment matches id: ",
-				computeEnvID
+				"FAILED - No compute environment matches id: " + computeEnvID
 			);
+			console.error("Available environment IDs: ", computeEnvs.map(e => e.id));
 			return;
 		}
 
@@ -615,7 +615,7 @@ export class Commands {
 		);
 		if (!algo.transferTxId) {
 			console.error(
-				"Error ordering compute for algorithm with DID: " +
+				"FAILED - Error ordering compute for algorithm with DID: " +
 				args[2] +
 				".  Do you have enough tokens?"
 			);
@@ -637,8 +637,8 @@ export class Commands {
 			);
 			if (!assets[i].transferTxId) {
 				console.error(
-					"Error ordering dataset with DID: " +
-					assets[i] +
+					"FAILED - Error ordering dataset with DID: " +
+					ddos[i].id +
 					".  Do you have enough tokens?"
 				);
 				return;
@@ -729,7 +729,7 @@ export class Commands {
 			getAddress(parsedProviderInitializeComputeJob.payment.escrowAddress),
 			this.signer
 		)
-		console.log("Verifying payment...");
+		console.log("Verifying escrow payment...");
 		await new Promise(resolve => setTimeout(resolve, 3000))
 
 		const validationEscrow = await escrow.verifyFundsForEscrowPayment(
@@ -742,16 +742,15 @@ export class Commands {
 		)
 		if (validationEscrow.isValid === false) {
 			console.error(
-				"Error starting compute job dataset DID " +
+				"FAILED - Escrow funds check failed for dataset DID " +
 				args[1] +
 				" and algorithm DID " +
 				args[2] +
-				" because escrow funds check failed: "
+				" because: "
 				+ validationEscrow.message
 			);
 			return;
 		}
-
 		console.log("Starting compute job using provider: ", providerURI);
 
 		const additionalDatasets = assets.length > 1 ? assets.slice(1) : null;
@@ -781,23 +780,37 @@ export class Commands {
 			metadataUri: await getMetadataURI(),
 		};
 
-		const computeJobs = await ProviderInstance.computeStart(
-			providerURI,
-			this.signer,
-			computeEnv.id,
-			assets, // assets[0] // only c2d v1,
-			algo,
-			supportedMaxJobDuration,
-			paymentToken,
-			JSON.parse(resources),
-			Number((await this.signer.provider.getNetwork()).chainId),
-			null,
-			null,
-			// additionalDatasets, only c2d v1
-			output
-		);
+		let computeJobs;
+		try {
+			computeJobs = await ProviderInstance.computeStart(
+				providerURI,
+				this.signer,
+				computeEnv.id,
+				assets, // assets[0] // only c2d v1,
+				algo,
+				supportedMaxJobDuration,
+				paymentToken,
+				JSON.parse(resources),
+				Number((await this.signer.provider.getNetwork()).chainId),
+				null,
+				null,
+				// additionalDatasets, only c2d v1
+				output
+			);
+		} catch (error) {
+			// Check for specific error types
+			if ((error as any)?.code === 'ECONNREFUSED') {
+				console.log("DEBUG: ⚠️  CONNECTION REFUSED - Ocean node may not be running at: ", providerURI);
+			} else if ((error as any)?.code === 'ETIMEDOUT') {
+				console.log("DEBUG: ⚠️  TIMEOUT - Ocean node did not respond in time");
+			} else if (error?.message?.includes('fetch')) {
+				console.log("DEBUG: ⚠️  NETWORK ERROR - Failed to make HTTP request");
+			}
 
-		console.log("computeJobs: ", computeJobs);
+			console.log("Error calling ProviderInstance.computeStart: ", error);
+			return;
+		}
+		console.log("DEBUG: Full response: ", JSON.stringify(computeJobs, null, 2));
 
 		if (computeJobs && computeJobs[0]) {
 			const { jobId, payment } = computeJobs[0];
@@ -1466,13 +1479,13 @@ export class Commands {
 			const initialUsers = args[3] ? args[3].split(',').map(u => u.trim()) : [];
 
 			if (!name || !symbol) {
-				console.error(chalk.red('Name and symbol are required'));
+				console.error('Name and symbol are required');
 				return;
 			}
 
 			const config = await getConfigByChainId(Number(this.config.chainId));
 			if (!config.AccessListFactory) {
-				console.error(chalk.red('Access list factory not found. Check local address.json file'));
+				console.error('Access list factory not found. Check local address.json file');
 				return;
 			}
 			const accessListFactory = new AccesslistFactory(

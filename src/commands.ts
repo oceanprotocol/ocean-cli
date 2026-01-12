@@ -532,8 +532,7 @@ export class Commands {
 			this.indexingParams.maxRetries
 		);
 		if (!algoDdo) {
-			console.error(				"FAILED to fetch algorithm DDO " + args[2] + ".  Does this asset exists?"
-			);
+			console.error("FAILED to fetch algorithm DDO " + args[2] + ".  Does this asset exists?");
 			return;
 		}
 
@@ -810,7 +809,6 @@ export class Commands {
 			console.log("Error calling ProviderInstance.computeStart: ", error);
 			return;
 		}
-		console.log("DEBUG: Full response: ", JSON.stringify(computeJobs, null, 2));
 
 		if (computeJobs && computeJobs[0]) {
 			const { jobId, payment } = computeJobs[0];

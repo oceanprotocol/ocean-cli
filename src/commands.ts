@@ -80,6 +80,8 @@ export class Commands {
 			return;
 		}
 		const encryptDDO = args[2] === "false" ? false : true;
+		const baseTokenAddress = args[3];
+		const baseTokenDecimals = args[4] !== undefined ? parseInt(args[4]) : undefined;
 		try {
 			// add some more checks
 			const urlAssetId = await createAssetUtil(
@@ -91,7 +93,9 @@ export class Commands {
 				this.oceanNodeUrl,
 				this.config,
 				this.aquarius,
-				encryptDDO
+				encryptDDO,
+				baseTokenAddress,
+				baseTokenDecimals
 			);
 			console.log("Asset published. ID:  " + urlAssetId);
 		} catch (e) {

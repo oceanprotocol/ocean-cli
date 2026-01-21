@@ -113,6 +113,8 @@ export async function createAssetUtil(
 	config: Config,
 	aquariusInstance: Aquarius,
 	encryptDDO: boolean = true,
+	baseTokenAddress: string,
+	baseTokenDecimals: number,
 	templateIDorAddress: string | number = 1, // If string, it's template address , otherwise, it's templateId,
 	providerFeeToken: string = ZERO_ADDRESS,
 	accessListFactory?: string,

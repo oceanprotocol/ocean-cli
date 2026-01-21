@@ -76,17 +76,19 @@ export async function createCLI() {
 
   // publish command
   program
-    .command('publish')
-    .description('Publishes a new asset with access service or compute service')
-    .argument('<metadataFile>', 'Path to metadata file')
-    .option('-f, --file <metadataFile>', 'Path to metadata file')
-    .option('-e, --encrypt [boolean]', 'Encrypt DDO', true)
+    .command("publish")
+    .description("Publishes a new asset with access service or compute service")
+    .argument("<metadataFile>", "Path to metadata file")
+    .option("-f, --file <metadataFile>", "Path to metadata file")
+    .option("-e, --encrypt [boolean]", "Encrypt DDO", true)
+    .option("-bta, --baseTokenAddress <address>", "Base token address")
+    .option("-btd, --baseTokenDecimals <number>", "Base token decimals")
     .action(async (metadataFile, options) => {
       const file = options.file || metadataFile;
       if (!file) {
-        console.error(chalk.red('Metadata file is required'));
+        console.error(chalk.red("Metadata file is required"));
         // process.exit(1);
-        return
+        return;
       }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);

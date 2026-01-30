@@ -749,17 +749,12 @@ export class Commands {
 				'10'
 			)
             } catch (error) {
-                console.log({error, msg: 'Error verifying funs for escrow payment' })
+                console.log({error, msg: 'Error verifying funds for escrow payment' })
                     return
             }
 			if (validationEscrow.isValid === false) {
 				console.log(
-					"Error starting compute job dataset DID " +
-					args[1] +
-					" and algorithm DID " +
-					args[2] +
-					" because escrow funds check failed: "
-					+ validationEscrow.message
+					`Error starting compute job dataset DID ${args[1]} and algorithm DID ${args[2]} because escrow funds check failed: ${validationEscrow.message}. Consumer address: ${computeEnv.consumerAddress}`
 				);
 				return;
 			}

@@ -738,7 +738,9 @@ export class Commands {
 			await new Promise(resolve => setTimeout(resolve, 3000))
 
 			console.log('DEBUG: calling verifyFundsForEscrowPayment');
-			const validationEscrow = await escrow.verifyFundsForEscrowPayment(
+            let validationEscrow = { isValid: false, message: null }
+            try {
+			validationEscrow = await escrow.verifyFundsForEscrowPayment(
 				paymentToken,
 				computeEnv.consumerAddress,
 				await unitsToAmount(this.signer, paymentToken, parsedProviderInitializeComputeJob.payment.amount),
@@ -746,8 +748,12 @@ export class Commands {
 				parsedProviderInitializeComputeJob.payment.minLockSeconds.toString(),
 				'10'
 			)
+            } catch (error) {
+                console.log({error, msg: 'Error verifying funs for escrow payment' })
+                    return
+            }
 			if (validationEscrow.isValid === false) {
-				console.error(
+				console.log(
 					"Error starting compute job dataset DID " +
 					args[1] +
 					" and algorithm DID " +

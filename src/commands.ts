@@ -477,334 +477,344 @@ export class Commands {
 	}
 
 	public async computeStart(args: string[]) {
-		const inputDatasetsString = args[1];
-		let inputDatasets = [];
+		try {
+			console.log('DEBUG: computeStart args', JSON.stringify(args));
+			const inputDatasetsString = args[1];
+			let inputDatasets = [];
 
-		if (
-			inputDatasetsString.includes("[") &&
-			inputDatasetsString.includes("]")
-		) {
-			const processedInput = inputDatasetsString
-				.replaceAll("]", "")
-				.replaceAll("[", "");
-			if (processedInput.indexOf(",") > -1) {
-				inputDatasets = processedInput.split(",");
+			if (
+				inputDatasetsString.includes("[") &&
+				inputDatasetsString.includes("]")
+			) {
+				const processedInput = inputDatasetsString
+					.replaceAll("]", "")
+					.replaceAll("[", "");
+				if (processedInput.indexOf(",") > -1) {
+					inputDatasets = processedInput.split(",");
+				}
+			} else {
+				inputDatasets.push(inputDatasetsString);
 			}
-		} else {
-			inputDatasets.push(inputDatasetsString);
-		}
 
-		const ddos = [];
+			const ddos = [];
 
-		for (const dataset in inputDatasets) {
-			const dataDdo = await this.aquarius.waitForIndexer(
-				inputDatasets[dataset],
+			for (const dataset in inputDatasets) {
+				const dataDdo = await this.aquarius.waitForIndexer(
+					inputDatasets[dataset],
+					null,
+					null,
+					this.indexingParams.retryInterval,
+					this.indexingParams.maxRetries
+				);
+				if (!dataDdo) {
+					console.error(
+						"Error fetching DDO " + dataset[1] + ".  Does this asset exists?"
+					);
+					return;
+				} else {
+					ddos.push(dataDdo);
+				}
+			}
+			if (
+				inputDatasets.length > 0 &&
+				(ddos.length <= 0 || ddos.length != inputDatasets.length)
+			) {
+				console.error("Not all the data ddos are available.");
+				return;
+			}
+			let providerURI = this.oceanNodeUrl;
+			if (ddos.length > 0) {
+				providerURI = ddos[0].services[0].serviceEndpoint;
+			}
+			const algoDdo = await this.aquarius.waitForIndexer(
+				args[2],
 				null,
 				null,
 				this.indexingParams.retryInterval,
 				this.indexingParams.maxRetries
 			);
-			if (!dataDdo) {
+			if (!algoDdo) {
 				console.error(
-					"Error fetching DDO " + dataset[1] + ".  Does this asset exists?"
+					"Error fetching DDO " + args[1] + ".  Does this asset exists?"
 				);
 				return;
-			} else {
-				ddos.push(dataDdo);
 			}
-		}
-		if (
-			inputDatasets.length > 0 &&
-			(ddos.length <= 0 || ddos.length != inputDatasets.length)
-		) {
-			console.error("Not all the data ddos are available.");
-			return;
-		}
-		let providerURI = this.oceanNodeUrl;
-		if (ddos.length > 0) {
-			providerURI = ddos[0].services[0].serviceEndpoint;
-		}
-		const algoDdo = await this.aquarius.waitForIndexer(
-			args[2],
-			null,
-			null,
-			this.indexingParams.retryInterval,
-			this.indexingParams.maxRetries
-		);
-		if (!algoDdo) {
-			console.error(
-				"Error fetching DDO " + args[1] + ".  Does this asset exists?"
+
+			const computeEnvs = await ProviderInstance.getComputeEnvironments(
+				this.oceanNodeUrl
 			);
-			return;
-		}
 
-		const computeEnvs = await ProviderInstance.getComputeEnvironments(
-			this.oceanNodeUrl
-		);
+			if (!computeEnvs || computeEnvs.length < 1) {
+				console.error(
+					"Error fetching compute environments. No compute environments available."
+				);
+				return;
+			}
+			const computeEnvID = args[3];
+			// NO chainId needed anymore (is not part of ComputeEnvironment spec anymore)
+			// const chainComputeEnvs = computeEnvs[computeEnvID]; // was algoDdo.chainId
+			let computeEnv = null; // chainComputeEnvs[0];
 
-		if (!computeEnvs || computeEnvs.length < 1) {
-			console.error(
-				"Error fetching compute environments. No compute environments available."
-			);
-			return;
-		}
-		const computeEnvID = args[3];
-		// NO chainId needed anymore (is not part of ComputeEnvironment spec anymore)
-		// const chainComputeEnvs = computeEnvs[computeEnvID]; // was algoDdo.chainId
-		let computeEnv = null; // chainComputeEnvs[0];
-
-		if (computeEnvID && computeEnvID.length > 1) {
-			for (const index in computeEnvs) {
-				if (computeEnvID == computeEnvs[index].id) {
-					computeEnv = computeEnvs[index];
-					break;
+			if (computeEnvID && computeEnvID.length > 1) {
+				for (const index in computeEnvs) {
+					if (computeEnvID == computeEnvs[index].id) {
+						computeEnv = computeEnvs[index];
+						break;
+					}
 				}
 			}
-		}
-		if (!computeEnv || !computeEnvID) {
-			console.error(
-				"Error fetching compute environment. No compute environment matches id: ",
-				computeEnvID
-			);
-			return;
-		}
-
-		const algo: ComputeAlgorithm = {
-			documentId: algoDdo.id,
-			serviceId: algoDdo.services[0].id,
-			meta: algoDdo.metadata.algorithm,
-		};
-
-		const assets = [];
-		for (const dataDdo in ddos) {
-			const canStartCompute = isOrderable(
-				ddos[dataDdo],
-				ddos[dataDdo].services[0].id,
-				algo,
-				algoDdo
-			);
-			if (!canStartCompute) {
+			if (!computeEnv || !computeEnvID) {
 				console.error(
-					"Error Cannot start compute job using the datasets DIDs & algorithm DID provided"
+					"Error fetching compute environment. No compute environment matches id: ",
+					computeEnvID
 				);
 				return;
 			}
-			assets.push({
-				documentId: ddos[dataDdo].id,
-				serviceId: ddos[dataDdo].services[0].id,
-			});
-		}
-		const providerInitializeComputeJob = args[4]; // provider fees + payment
-		const parsedProviderInitializeComputeJob = fixAndParseProviderFees(providerInitializeComputeJob)
-		console.log("Ordering algorithm: ", args[2]);
-		const datatoken = new Datatoken(
-			this.signer,
-			(await this.signer.provider.getNetwork()).chainId.toString(),
-			this.config
-		);
-		algo.transferTxId = await handleComputeOrder(
-			parsedProviderInitializeComputeJob?.algorithm,
-			algoDdo,
-			this.signer,
-			computeEnv.consumerAddress,
-			0,
-			datatoken,
-			this.config,
-			parsedProviderInitializeComputeJob?.algorithm?.providerFee,
-			providerURI
-		);
-		if (!algo.transferTxId) {
-			console.error(
-				"Error ordering compute for algorithm with DID: " +
-				args[2] +
-				".  Do you have enough tokens?"
-			);
-			return;
-		}
-		console.log("Ordering assets: ", args[1]);
 
-		for (let i = 0; i < ddos.length; i++) {
-			assets[i].transferTxId = await handleComputeOrder(
-				parsedProviderInitializeComputeJob?.datasets[i],
-				ddos[i],
+			const algo: ComputeAlgorithm = {
+				documentId: algoDdo.id,
+				serviceId: algoDdo.services[0].id,
+				meta: algoDdo.metadata.algorithm,
+			};
+
+			const assets = [];
+			for (const dataDdo in ddos) {
+				const canStartCompute = isOrderable(
+					ddos[dataDdo],
+					ddos[dataDdo].services[0].id,
+					algo,
+					algoDdo
+				);
+				if (!canStartCompute) {
+					console.error(
+						"Error Cannot start compute job using the datasets DIDs & algorithm DID provided"
+					);
+					return;
+				}
+				assets.push({
+					documentId: ddos[dataDdo].id,
+					serviceId: ddos[dataDdo].services[0].id,
+				});
+			}
+			const providerInitializeComputeJob = args[4]; // provider fees + payment
+			console.log('DEBUG: calling fixAndParseProviderFees');
+			const parsedProviderInitializeComputeJob = fixAndParseProviderFees(providerInitializeComputeJob)
+			console.log("Ordering algorithm: ", args[2]);
+			const datatoken = new Datatoken(
+				this.signer,
+				(await this.signer.provider.getNetwork()).chainId.toString(),
+				this.config
+			);
+			console.log('DEBUG: calling handleComputeOrder for algorithm');
+			algo.transferTxId = await handleComputeOrder(
+				parsedProviderInitializeComputeJob?.algorithm,
+				algoDdo,
 				this.signer,
 				computeEnv.consumerAddress,
 				0,
 				datatoken,
 				this.config,
-				parsedProviderInitializeComputeJob?.datasets[i].providerFee,
+				parsedProviderInitializeComputeJob?.algorithm?.providerFee,
 				providerURI
 			);
-			if (!assets[i].transferTxId) {
+			if (!algo.transferTxId) {
 				console.error(
-					"Error ordering dataset with DID: " +
-					assets[i] +
+					"Error ordering compute for algorithm with DID: " +
+					args[2] +
 					".  Do you have enough tokens?"
 				);
 				return;
 			}
-		}
-		// payment check
-		const maxJobDuration = Number(args[5])
-		if (!maxJobDuration) {
-			console.error(
-				"Error initializing Provider for the compute job using dataset DID " +
-				args[1] +
-				" and algorithm DID " +
-				args[2] +
-				" because maxJobDuration was not provided."
-			);
-			return;
-		}
-		if (maxJobDuration < 0) {
-			console.error(
-				"Error starting paid compute using dataset DID " +
-				args[1] +
-				" and algorithm DID " +
-				args[2] +
-				" because maxJobDuration is less than 0. It should be in seconds."
-			);
-			return;
-		}
-		let supportedMaxJobDuration: number = maxJobDuration;
-		if (maxJobDuration > computeEnv.maxJobDuration) {
-			supportedMaxJobDuration = computeEnv.maxJobDuration;
-		}
-		const { chainId } = await this.signer.provider.getNetwork()
-		const paymentToken = args[6]
-		if (!paymentToken) {
-			console.error(
-				"Error starting paid compute using dataset DID " +
-				args[1] +
-				" and algorithm DID " +
-				args[2] +
-				" because paymentToken was not provided."
-			);
-			return;
-		}
-		if (!Object.keys(computeEnv.fees).includes(chainId.toString())) {
-			console.error(
-				"Error starting paid compute using dataset DID " +
-				args[1] +
-				" and algorithm DID " +
-				args[2] +
-				" because chainId is not supported by compute environment. " +
-				args[3] +
-				". Supported chain IDs: " +
-				computeEnv.fees.keys()
-			);
-			return;
-		}
-		let found: boolean = false;
-		for (const fee of computeEnv.fees[chainId.toString()]) {
-			if (fee.feeToken.toLowerCase() === paymentToken.toLowerCase()) {
-				found = true;
-				break;
+			console.log("Ordering assets: ", args[1]);
+
+			for (let i = 0; i < ddos.length; i++) {
+				console.log('DEBUG: calling handleComputeOrder for dataset ' + i);
+				assets[i].transferTxId = await handleComputeOrder(
+					parsedProviderInitializeComputeJob?.datasets[i],
+					ddos[i],
+					this.signer,
+					computeEnv.consumerAddress,
+					0,
+					datatoken,
+					this.config,
+					parsedProviderInitializeComputeJob?.datasets[i].providerFee,
+					providerURI
+				);
+				if (!assets[i].transferTxId) {
+					console.error(
+						"Error ordering dataset with DID: " +
+						assets[i] +
+						".  Do you have enough tokens?"
+					);
+					return;
+				}
 			}
-		}
-		if (found === false) {
-			console.error(
-				"Error starting paid compute using dataset DID " +
-				args[1] +
-				" and algorithm DID " +
-				args[2] +
-				" because paymentToken is not supported by this environment " +
-				args[3]
+			// payment check
+			const maxJobDuration = Number(args[5])
+			if (!maxJobDuration) {
+				console.error(
+					"Error initializing Provider for the compute job using dataset DID " +
+					args[1] +
+					" and algorithm DID " +
+					args[2] +
+					" because maxJobDuration was not provided."
+				);
+				return;
+			}
+			if (maxJobDuration < 0) {
+				console.error(
+					"Error starting paid compute using dataset DID " +
+					args[1] +
+					" and algorithm DID " +
+					args[2] +
+					" because maxJobDuration is less than 0. It should be in seconds."
+				);
+				return;
+			}
+			let supportedMaxJobDuration: number = maxJobDuration;
+			if (maxJobDuration > computeEnv.maxJobDuration) {
+				supportedMaxJobDuration = computeEnv.maxJobDuration;
+			}
+			const { chainId } = await this.signer.provider.getNetwork()
+			const paymentToken = args[6]
+			if (!paymentToken) {
+				console.error(
+					"Error starting paid compute using dataset DID " +
+					args[1] +
+					" and algorithm DID " +
+					args[2] +
+					" because paymentToken was not provided."
+				);
+				return;
+			}
+			if (!Object.keys(computeEnv.fees).includes(chainId.toString())) {
+				console.error(
+					"Error starting paid compute using dataset DID " +
+					args[1] +
+					" and algorithm DID " +
+					args[2] +
+					" because chainId is not supported by compute environment. " +
+					args[3] +
+					". Supported chain IDs: " +
+					computeEnv.fees.keys()
+				);
+				return;
+			}
+			let found: boolean = false;
+			for (const fee of computeEnv.fees[chainId.toString()]) {
+				if (fee.feeToken.toLowerCase() === paymentToken.toLowerCase()) {
+					found = true;
+					break;
+				}
+			}
+			if (found === false) {
+				console.error(
+					"Error starting paid compute using dataset DID " +
+					args[1] +
+					" and algorithm DID " +
+					args[2] +
+					" because paymentToken is not supported by this environment " +
+					args[3]
+				);
+				return;
+			}
+			const resources = args[7] // resources object should be stringified in cli when calling initializeCompute
+			if (!resources) {
+				console.error(
+					"Error starting paid compute using dataset DID " +
+					args[1] +
+					" and algorithm DID " +
+					args[2] +
+					" because resources for compute were not provided."
+				);
+				return;
+			}
+
+			const escrow = new EscrowContract(
+				getAddress(parsedProviderInitializeComputeJob.payment.escrowAddress),
+				this.signer
+			)
+			console.log("Verifying payment...");
+			await new Promise(resolve => setTimeout(resolve, 3000))
+
+			console.log('DEBUG: calling verifyFundsForEscrowPayment');
+			const validationEscrow = await escrow.verifyFundsForEscrowPayment(
+				paymentToken,
+				computeEnv.consumerAddress,
+				await unitsToAmount(this.signer, paymentToken, parsedProviderInitializeComputeJob.payment.amount),
+				parsedProviderInitializeComputeJob.payment.amount.toString(),
+				parsedProviderInitializeComputeJob.payment.minLockSeconds.toString(),
+				'10'
+			)
+			if (validationEscrow.isValid === false) {
+				console.error(
+					"Error starting compute job dataset DID " +
+					args[1] +
+					" and algorithm DID " +
+					args[2] +
+					" because escrow funds check failed: "
+					+ validationEscrow.message
+				);
+				return;
+			}
+
+			console.log("Starting compute job using provider: ", providerURI);
+
+			const additionalDatasets = assets.length > 1 ? assets.slice(1) : null;
+			if (assets.length > 0) {
+				console.log(
+					"Starting compute job on " +
+					assets[0].documentId +
+					" with additional datasets:" +
+					(!additionalDatasets ? "none" : additionalDatasets[0].documentId)
+				);
+			} else {
+				console.log(
+					"Starting compute job on " +
+					algo.documentId +
+					" with additional datasets:" +
+					(!additionalDatasets ? "none" : additionalDatasets[0].documentId)
+				);
+			}
+			if (additionalDatasets !== null) {
+				console.log(
+					"Adding additional datasets to dataset, according to C2D V2 specs"
+				);
+				assets.push(additionalDatasets);
+			}
+
+			const output: ComputeOutput = {
+				metadataUri: await getMetadataURI(),
+			};
+
+			console.log('DEBUG: calling ProviderInstance.computeStart');
+			const computeJobs = await ProviderInstance.computeStart(
+				providerURI,
+				this.signer,
+				computeEnv.id,
+				assets, // assets[0] // only c2d v1,
+				algo,
+				supportedMaxJobDuration,
+				paymentToken,
+				JSON.parse(resources),
+				Number((await this.signer.provider.getNetwork()).chainId),
+				null,
+				null,
+				// additionalDatasets, only c2d v1
+				output
 			);
-			return;
-		}
-		const resources = args[7] // resources object should be stringified in cli when calling initializeCompute
-		if (!resources) {
-			console.error(
-				"Error starting paid compute using dataset DID " +
-				args[1] +
-				" and algorithm DID " +
-				args[2] +
-				" because resources for compute were not provided."
-			);
-			return;
-		}
 
-		const escrow = new EscrowContract(
-			getAddress(parsedProviderInitializeComputeJob.payment.escrowAddress),
-			this.signer
-		)
-		console.log("Verifying payment...");
-		await new Promise(resolve => setTimeout(resolve, 3000))
+			console.log("computeJobs: ", computeJobs);
 
-		const validationEscrow = await escrow.verifyFundsForEscrowPayment(
-			paymentToken,
-			computeEnv.consumerAddress,
-			await unitsToAmount(this.signer, paymentToken, parsedProviderInitializeComputeJob.payment.amount),
-			parsedProviderInitializeComputeJob.payment.amount.toString(),
-			parsedProviderInitializeComputeJob.payment.minLockSeconds.toString(),
-			'10'
-		)
-		if (validationEscrow.isValid === false) {
-			console.error(
-				"Error starting compute job dataset DID " +
-				args[1] +
-				" and algorithm DID " +
-				args[2] +
-				" because escrow funds check failed: "
-				+ validationEscrow.message
-			);
-			return;
-		}
-
-		console.log("Starting compute job using provider: ", providerURI);
-
-		const additionalDatasets = assets.length > 1 ? assets.slice(1) : null;
-		if (assets.length > 0) {
-			console.log(
-				"Starting compute job on " +
-				assets[0].documentId +
-				" with additional datasets:" +
-				(!additionalDatasets ? "none" : additionalDatasets[0].documentId)
-			);
-		} else {
-			console.log(
-				"Starting compute job on " +
-				algo.documentId +
-				" with additional datasets:" +
-				(!additionalDatasets ? "none" : additionalDatasets[0].documentId)
-			);
-		}
-		if (additionalDatasets !== null) {
-			console.log(
-				"Adding additional datasets to dataset, according to C2D V2 specs"
-			);
-			assets.push(additionalDatasets);
-		}
-
-		const output: ComputeOutput = {
-			metadataUri: await getMetadataURI(),
-		};
-
-		const computeJobs = await ProviderInstance.computeStart(
-			providerURI,
-			this.signer,
-			computeEnv.id,
-			assets, // assets[0] // only c2d v1,
-			algo,
-			supportedMaxJobDuration,
-			paymentToken,
-			JSON.parse(resources),
-			Number((await this.signer.provider.getNetwork()).chainId),
-			null,
-			null,
-			// additionalDatasets, only c2d v1
-			output
-		);
-
-		console.log("computeJobs: ", computeJobs);
-
-		if (computeJobs && computeJobs[0]) {
-			const { jobId, payment } = computeJobs[0];
-			console.log("Compute started.  JobID: " + jobId);
-			console.log("Agreement ID: " + payment.lockTx);
-		} else {
-			console.log("Error while starting the compute job: ", computeJobs);
+			if (computeJobs && computeJobs[0]) {
+				const { jobId, payment } = computeJobs[0];
+				console.log("Compute started.  JobID: " + jobId);
+				console.log("Agreement ID: " + payment.lockTx);
+			} else {
+				console.log("Error while starting the compute job: ", computeJobs);
+			}
+		} catch (e) {
+			console.error("DEBUG FATAL ERROR:", e);
 		}
 	}
 

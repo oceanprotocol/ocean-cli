@@ -738,20 +738,22 @@ export class Commands {
 			await new Promise(resolve => setTimeout(resolve, 3000))
 
 			console.log('DEBUG: calling verifyFundsForEscrowPayment');
-            let validationEscrow = { isValid: false, message: null }
-            try {
-			validationEscrow = await escrow.verifyFundsForEscrowPayment(
-				paymentToken,
-				computeEnv.consumerAddress,
-				await unitsToAmount(this.signer, paymentToken, parsedProviderInitializeComputeJob.payment.amount),
-				parsedProviderInitializeComputeJob.payment.amount.toString(),
-				parsedProviderInitializeComputeJob.payment.minLockSeconds.toString(),
-				'10'
-			)
-            } catch (error) {
-                console.log({error, msg: 'Error verifying funds for escrow payment' })
-                    return
-            }
+			const balance = await this.signer.provider.getBalance(computeEnv.consumerAddress);
+			console.log('DEBUG: Consumer Native Balance:', balance.toString());
+			let validationEscrow = { isValid: false, message: null }
+			try {
+				validationEscrow = await escrow.verifyFundsForEscrowPayment(
+					paymentToken,
+					computeEnv.consumerAddress,
+					await unitsToAmount(this.signer, paymentToken, parsedProviderInitializeComputeJob.payment.amount),
+					parsedProviderInitializeComputeJob.payment.amount.toString(),
+					parsedProviderInitializeComputeJob.payment.minLockSeconds.toString(),
+					'10'
+				)
+			} catch (error) {
+				console.log({ error, msg: 'Error verifying funds for escrow payment' })
+				return
+			}
 			if (validationEscrow.isValid === false) {
 				console.log(
 					`Error starting compute job dataset DID ${args[1]} and algorithm DID ${args[2]} because escrow funds check failed: ${validationEscrow.message}. Consumer address: ${computeEnv.consumerAddress}`

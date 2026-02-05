@@ -164,7 +164,8 @@ export async function updateAssetMetadata(
 		const providerResponse = await ProviderInstance.encrypt(
 			updatedDdo,
 			chainId,
-			oceanNodeUrl
+			oceanNodeUrl,
+			owner
 		);
 		metadata = await providerResponse;
 		flags = 2

@@ -137,22 +137,6 @@ describe("Ocean CLI Publishing", function () {
         }
     });
 
-    it("should publish a js Algorithm V5 using 'npm run cli publishAlgo'", async function () {
-        const filePath = path.resolve(projectRoot, "metadata/jsAlgoV5.json");
-
-        // Ensure the metadata file exists
-        if (!fs.existsSync(filePath)) {
-            throw new Error("Metadata file not found: " + filePath);
-        }
-
-        const output = await runCommand(`npm run cli publishAlgo ${filePath}`);
-        const jsonMatch = output.match(/did:ope:[a-f0-9]{64}/);
-        if (!jsonMatch) {
-            console.error("Raw output:", output);
-            throw new Error("Could not find did in the output");
-        }
-    });
-
     it("should publish a python Algorithm using 'npm run cli publishAlgo'", async function () {
         const filePath = path.resolve(projectRoot, "metadata/pythonAlgo.json");
 

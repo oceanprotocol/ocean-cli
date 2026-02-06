@@ -143,7 +143,8 @@ export async function requestCredentialPresentation(
       ddo: asset,
       policyServer,
       serviceId,
-      consumerAddress
+      consumerAddress,
+      documentId: asset.id
     }
     const response = await axios.post(
       `${providerUrl}/api/services/PolicyServerPassthrough`,
@@ -258,7 +259,6 @@ export async function getPolicyServerOBJ(
       serviceId,
       providerUrl
     )
-
     if (
       !presentationResult.openid4vc ||
       !presentationResult.success ||

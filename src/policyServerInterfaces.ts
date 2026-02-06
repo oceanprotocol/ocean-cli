@@ -65,6 +65,7 @@ export interface PolicyServerInitiateAction {
   policyServer: PolicyServerInitiateActionData
   serviceId: string
   consumerAddress: string
+  documentId: string
 }
 
 export interface PolicyServerGetPdAction {

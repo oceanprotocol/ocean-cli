@@ -1,5 +1,5 @@
 import fetch from 'cross-fetch';
-import { expect, assert } from 'chai';
+import { expect } from 'chai';
 
 describe('Ocean Node Root Endpoint', () => {
   it('should return 200 OK', async () => {

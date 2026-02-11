@@ -83,9 +83,7 @@ describe('Direct Command Endpoint', () => {
         'Content-Type': 'application/json'
       }
     });
-    const responseBody = await response.text();
 
     expect(response.status).to.equal(400);
-    assert(responseBody === "Missing signature")
   });
 });

@@ -1721,6 +1721,7 @@ export class Commands {
       const last = args[1];
       let from = args[2];
       let to = args[3];
+      const maxLogs = args[4] ? Math.min(parseInt(args[4], 10), 1000) : undefined;
 
       if (!outputLocation) {
         console.error(chalk.red("Output location is required"));
@@ -1764,7 +1765,8 @@ export class Commands {
         this.oceanNodeUrl,
         this.signer,
         from,
-        to
+        to,
+        maxLogs
       );
 
       const text = await new Response(response).text();

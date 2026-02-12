@@ -681,10 +681,12 @@ export async function createCLI() {
     )
     .argument("[from]", "Start time (epoch ms) to get logs from")
     .argument("[to]", "End time (epoch ms) to get logs to")
+    .argument("[maxLogs]", "Maximum number of logs to retrieve (default: 100, max: 1000)")
     .option("-o, --output <output>", "Output directory to save the logs")
     .option("-l, --last [last]", "Period of time to get logs from now (in hours)")
     .option("-f, --from [from]", "Start time (epoch ms) to get logs from")
     .option("-t, --to [to]", "End time (epoch ms) to get logs to")
+    .option("-m, --maxLogs [maxLogs]", "Maximum number of logs to retrieve (default: 100, max: 1000)")
     .action(async (output, last, from, to, options) => {
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
@@ -693,6 +695,7 @@ export async function createCLI() {
         options.last || last,
         options.from || from,
         options.to || to,
+        options.maxLogs,
       ]);
     });
 

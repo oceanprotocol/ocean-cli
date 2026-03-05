@@ -10,7 +10,7 @@ import {
 	getIndexingWaitSettings,
 	IndexerWaitParams,
 	fixAndParseProviderFees,
-	getConfigByChainId
+	getConfigByChainId,
 } from "./helpers.js";
 import {
 	Aquarius,
@@ -29,7 +29,7 @@ import {
 	EscrowContract,
 	getTokenDecimals,
 	AccesslistFactory,
-	AccessListContract
+	AccessListContract,
 } from "@oceanprotocol/lib";
 import { Asset, DDOManager } from '@oceanprotocol/ddo-js';
 import { Signer, ethers, getAddress } from "ethers";
@@ -869,26 +869,30 @@ export class Commands {
 		const escrow = new EscrowContract(
 			getAddress(parsedProviderInitializeComputeJob.payment.escrowAddress),
 			this.signer
-		)
+		);
 		console.log("Verifying payment...");
-		await new Promise(resolve => setTimeout(resolve, 3000))
+		await new Promise((resolve) => setTimeout(resolve, 3000));
 
 		const validationEscrow = await escrow.verifyFundsForEscrowPayment(
 			paymentToken,
 			computeEnv.consumerAddress,
-			await unitsToAmount(this.signer, paymentToken, parsedProviderInitializeComputeJob.payment.amount),
+			await unitsToAmount(
+				this.signer,
+				paymentToken,
+				parsedProviderInitializeComputeJob.payment.amount
+			),
 			parsedProviderInitializeComputeJob.payment.amount.toString(),
 			parsedProviderInitializeComputeJob.payment.minLockSeconds.toString(),
-			'10'
-		)
+			"10"
+		);
 		if (validationEscrow.isValid === false) {
 			console.error(
 				"Error starting compute job dataset DID " +
 				args[1] +
 				" and algorithm DID " +
 				args[2] +
-				" because escrow funds check failed: "
-				+ validationEscrow.message
+				" because escrow funds check failed: " +
+				validationEscrow.message
 			);
 			return;
 		}
@@ -1152,7 +1156,7 @@ export class Commands {
 		const jobStatus = await ProviderInstance.computeStop(
 			jobId,
 			this.oceanNodeUrl,
-			this.signer,
+			this.signer
 		);
 		console.log(jobStatus);
 	}
@@ -1453,7 +1457,7 @@ export class Commands {
 	public async generateAuthToken() {
 		const authToken = await ProviderInstance.generateAuthToken(
 			this.signer,
-			this.oceanNodeUrl,
+			this.oceanNodeUrl
 		);
 		console.log(`Auth token successfully generated: ${authToken}`);
 	}
@@ -1463,10 +1467,10 @@ export class Commands {
 		const result = await ProviderInstance.invalidateAuthToken(
 			this.signer,
 			authToken,
-			this.oceanNodeUrl,
+			this.oceanNodeUrl
 		);
 		if (!result.success) {
-			console.log('Auth token could not be invalidated');
+			console.log("Auth token could not be invalidated");
 			return;
 		}
 
@@ -1482,10 +1486,18 @@ export class Commands {
 		);
 
 		try {
-			const balance = await escrow.getUserFunds(await this.signer.getAddress(), token);
+			const balance = await escrow.getUserFunds(
+				await this.signer.getAddress(),
+				token
+			);
 			const decimals = await getTokenDecimals(this.signer, token);
 			const available = balance.available;
-			const amount = await unitsToAmount(this.signer, token, available, decimals);
+			const amount = await unitsToAmount(
+				this.signer,
+				token,
+				available,
+				decimals
+			);
 			console.log(`Escrow user funds for token ${token}: ${amount}`);
 			return Number(amount);
 		} catch (error) {
@@ -1493,7 +1505,10 @@ export class Commands {
 		}
 	}
 
-	public async withdrawFromEscrow(token: string, amount: string): Promise<void> {
+	public async withdrawFromEscrow(
+		token: string,
+		amount: string
+	): Promise<void> {
 		const config = await getConfigByChainId(Number(this.config.chainId));
 		const escrow = new EscrowContract(
 			getAddress(config.Escrow),
@@ -1512,7 +1527,12 @@ export class Commands {
 		console.log(`Successfully withdrawn ${amount} ${token} from escrow`);
 	}
 
-	public async depositToEscrow(signer: Signer, token: string, amount: string, chainId: number) {
+	public async depositToEscrow(
+		signer: Signer,
+		token: string,
+		amount: string,
+		chainId: number
+	) {
 		try {
 			const amountInUnits = await amountToUnits(signer, token, amount, 18);
 			const config = await getConfigByChainId(chainId);
@@ -1520,7 +1540,7 @@ export class Commands {
 
 			const tokenContract = new ethers.Contract(
 				token,
-				['function approve(address spender, uint256 amount) returns (bool)'],
+				["function approve(address spender, uint256 amount) returns (bool)"],
 				signer
 			);
 
@@ -1530,17 +1550,18 @@ export class Commands {
 				chainId
 			);
 
-			console.log('Approving token transfer...')
-			const approveTx = await tokenContract.approve(escrowAddress, amountInUnits);
+			console.log("Approving token transfer...");
+			const approveTx = await tokenContract.approve(
+				escrowAddress,
+				amountInUnits
+			);
 			await approveTx.wait();
 			console.log(`Successfully approved ${amount} ${token} to escrow`);
 
-
-			console.log('Depositing to escrow...')
+			console.log("Depositing to escrow...");
 			const depositTx = await escrow.deposit(token, amount);
 			await depositTx.wait();
 			return true;
-
 		} catch (error) {
 			console.error("Error depositing to escrow:", error);
 			return false;
@@ -1558,10 +1579,7 @@ export class Commands {
 			const config = await getConfigByChainId(Number(this.config.chainId));
 			const escrowAddress = config.Escrow;
 
-			const escrow = new EscrowContract(
-				getAddress(escrowAddress),
-				this.signer
-			);
+			const escrow = new EscrowContract(getAddress(escrowAddress), this.signer);
 
 			console.log("Authorizing payee...");
 			const authorizeTx = await escrow.authorize(
@@ -1594,22 +1612,36 @@ export class Commands {
 			Number(this.config.chainId)
 		);
 
-		const authorizations = await escrow.getAuthorizations(tokenAddress, payerAddress, payeeAddress);
-		const authorization = authorizations[0]
+		const authorizations = await escrow.getAuthorizations(
+			tokenAddress,
+			payerAddress,
+			payeeAddress
+		);
+		const authorization = authorizations[0];
 		if (!authorization || authorization.length === 0) {
-			console.log('No authorizations found');
+			console.log("No authorizations found");
 			return;
 		}
 
-		const currentLockedAmount = await unitsToAmount(this.signer, token, authorization.currentLockedAmount.toString(), decimals);
-		const maxLockedAmount = await unitsToAmount(this.signer, token, authorization.maxLockedAmount.toString(), decimals);
+		const currentLockedAmount = await unitsToAmount(
+			this.signer,
+			token,
+			authorization.currentLockedAmount.toString(),
+			decimals
+		);
+		const maxLockedAmount = await unitsToAmount(
+			this.signer,
+			token,
+			authorization.maxLockedAmount.toString(),
+			decimals
+		);
 
-		console.log('Authorizations found:')
-		console.log(`- Current Locked Amount: ${Number(currentLockedAmount)}`)
-		console.log(`- Current Locks: ${authorization.currentLocks}`)
-		console.log(`- Max locked amount: ${Number(maxLockedAmount)}`)
-		console.log(`- Max lock seconds: ${authorization.maxLockSeconds}`)
-		console.log(`- Max lock counts: ${authorization.maxLockCounts}`)
+		console.log("Authorizations found:");
+		console.log(`- Current Locked Amount: ${Number(currentLockedAmount)}`);
+		console.log(`- Current Locks: ${authorization.currentLocks}`);
+		console.log(`- Max locked amount: ${Number(maxLockedAmount)}`);
+		console.log(`- Max lock seconds: ${authorization.maxLockSeconds}`);
+		console.log(`- Max lock counts: ${authorization.maxLockCounts}`);
 
 		return authorizations;
 	}
@@ -1618,17 +1650,23 @@ export class Commands {
 		try {
 			const name = args[0];
 			const symbol = args[1];
-			const transferable = args[2] === 'true';
-			const initialUsers = args[3] ? args[3].split(',').map(u => u.trim()) : [];
+			const transferable = args[2] === "true";
+			const initialUsers = args[3]
+				? args[3].split(",").map((u) => u.trim())
+				: [];
 
 			if (!name || !symbol) {
-				console.error(chalk.red('Name and symbol are required'));
+				console.error(chalk.red("Name and symbol are required"));
 				return;
 			}
 
 			const config = await getConfigByChainId(Number(this.config.chainId));
 			if (!config.AccessListFactory) {
-				console.error(chalk.red('Access list factory not found. Check local address.json file'));
+				console.error(
+					chalk.red(
+						"Access list factory not found. Check local address.json file"
+					)
+				);
 				return;
 			}
 			const accessListFactory = new AccesslistFactory(
@@ -1638,38 +1676,46 @@ export class Commands {
 			);
 
 			const owner = await this.signer.getAddress();
-			const tokenURIs = initialUsers.map(() => 'https://oceanprotocol.com/nft/');
+			const tokenURIs = initialUsers.map(
+				() => "https://oceanprotocol.com/nft/"
+			);
 
-			console.log(chalk.cyan('Creating new access list...'));
+			console.log(chalk.cyan("Creating new access list..."));
 			console.log(`Name: ${name}`);
 			console.log(`Symbol: ${symbol}`);
 			console.log(`Transferable: ${transferable}`);
 			console.log(`Owner: ${owner}`);
-			console.log(`Initial users: ${initialUsers.length > 0 ? initialUsers.join(', ') : 'none'}`);
-
-			const accessListAddress = await accessListFactory.deployAccessListContract(
-				name,
-				symbol,
-				tokenURIs,
-				transferable,
-				owner,
-				initialUsers
+			console.log(
+				`Initial users: ${initialUsers.length > 0 ? initialUsers.join(", ") : "none"
+				}`
 			);
+
+			const accessListAddress =
+				await accessListFactory.deployAccessListContract(
+					name,
+					symbol,
+					tokenURIs,
+					transferable,
+					owner,
+					initialUsers
+				);
 
 			console.log(chalk.green(`\nAccess list created successfully!`));
 			console.log(chalk.green(`Contract address: ${accessListAddress}`));
 		} catch (error) {
-			console.error(chalk.red('Error creating access list:'), error);
+			console.error(chalk.red("Error creating access list:"), error);
 		}
 	}
 
 	public async addToAccessList(args: string[]): Promise<void> {
 		try {
 			const accessListAddress = args[0];
-			const users = args[1].split(',').map(u => u.trim());
+			const users = args[1].split(",").map((u) => u.trim());
 
 			if (!accessListAddress || users.length === 0) {
-				console.error(chalk.red('Access list address and at least one user are required'));
+				console.error(
+					chalk.red("Access list address and at least one user are required")
+				);
 				return;
 			}
 
@@ -1679,33 +1725,43 @@ export class Commands {
 				Number(this.config.chainId)
 			);
 
-			console.log(chalk.cyan(`Adding ${users.length} user(s) to access list...`));
+			console.log(
+				chalk.cyan(`Adding ${users.length} user(s) to access list...`)
+			);
 
 			if (users.length === 1) {
-				const tx = await accessList.mint(users[0], 'https://oceanprotocol.com/nft/');
+				const tx = await accessList.mint(
+					users[0],
+					"https://oceanprotocol.com/nft/"
+				);
 				await tx.wait();
-				console.log(chalk.green(`Successfully added user ${users[0]} to access list`));
+				console.log(
+					chalk.green(`Successfully added user ${users[0]} to access list`)
+				);
 				return;
 			}
 
-			const tokenURIs = users.map(() => 'https://oceanprotocol.com/nft/');
+			const tokenURIs = users.map(() => "https://oceanprotocol.com/nft/");
 			const tx = await accessList.batchMint(users, tokenURIs);
 			await tx.wait();
-			console.log(chalk.green(`Successfully added ${users.length} users to access list:`));
-			users.forEach(user => console.log(`  - ${user}`));
+			console.log(
+				chalk.green(`Successfully added ${users.length} users to access list:`)
+			);
+			users.forEach((user) => console.log(`  - ${user}`));
 		} catch (error) {
-			console.error(chalk.red('Error adding users to access list:'), error);
+			console.error(chalk.red("Error adding users to access list:"), error);
 		}
 	}
-
 
 	public async checkAccessList(args: string[]): Promise<void> {
 		try {
 			const accessListAddress = args[0];
-			const users = args[1].split(',').map(u => u.trim());
+			const users = args[1].split(",").map((u) => u.trim());
 
 			if (!accessListAddress || users.length === 0) {
-				console.error(chalk.red('Access list address and at least one user are required'));
+				console.error(
+					chalk.red("Access list address and at least one user are required")
+				);
 				return;
 			}
 
@@ -1715,31 +1771,38 @@ export class Commands {
 				Number(this.config.chainId)
 			);
 
-			console.log(chalk.cyan(`Checking access list for ${users.length} user(s)...\n`));
+			console.log(
+				chalk.cyan(`Checking access list for ${users.length} user(s)...\n`)
+			);
 
 			for (const user of users) {
 				const balance = await accessList.balance(user);
 				const hasAccess = Number(balance) > 0;
 
 				if (hasAccess) {
-					console.log(chalk.green(`✓ ${user}: Has access (balance: ${balance})`));
+					console.log(
+						chalk.green(`✓ ${user}: Has access (balance: ${balance})`)
+					);
 				} else {
 					console.log(chalk.red(`✗ ${user}: No access`));
 				}
 			}
 		} catch (error) {
-			console.error(chalk.red('Error checking access list:'), error);
+			console.error(chalk.red("Error checking access list:"), error);
 		}
 	}
-
 
 	public async removeFromAccessList(args: string[]): Promise<void> {
 		try {
 			const accessListAddress = args[0];
-			const users = args[1].split(',').map(u => u.trim());
+			const users = args[1].split(",").map((u) => u.trim());
 
 			if (!accessListAddress || users.length === 0) {
-				console.error(chalk.red('Access list address and at least one user address are required'));
+				console.error(
+					chalk.red(
+						"Access list address and at least one user address are required"
+					)
+				);
 				return;
 			}
 
@@ -1749,12 +1812,18 @@ export class Commands {
 				Number(this.config.chainId)
 			);
 
-			console.log(chalk.cyan(`Removing ${users.length} user(s) from access list...`));
+			console.log(
+				chalk.cyan(`Removing ${users.length} user(s) from access list...`)
+			);
 			for (const user of users) {
 				const balance = await accessList.balance(user);
 
 				if (Number(balance) === 0) {
-					console.log(chalk.yellow(`⚠ User ${user} is not on the access list, skipping...`));
+					console.log(
+						chalk.yellow(
+							`⚠ User ${user} is not on the access list, skipping...`
+						)
+					);
 					continue;
 				}
 
@@ -1768,21 +1837,98 @@ export class Commands {
 						const tx = await accessList.burn(Number(tokenId));
 						await tx.wait();
 
-						console.log(chalk.green(`✓ Successfully removed user ${user} (token ID: ${tokenId})`));
+						console.log(
+							chalk.green(
+								`✓ Successfully removed user ${user} (token ID: ${tokenId})`
+							)
+						);
 						removedCount++;
 					} catch (e: any) {
-						console.log(chalk.yellow(`⚠ Could not remove token at index ${index} for user ${user}: ${e.message}`));
+						console.log(
+							chalk.yellow(
+								`⚠ Could not remove token at index ${index} for user ${user}: ${e.message}`
+							)
+						);
 					}
 				}
 
 				if (removedCount === 0) {
-					console.log(chalk.yellow(`⚠ Could not remove any tokens for user ${user}`));
+					console.log(
+						chalk.yellow(`⚠ Could not remove any tokens for user ${user}`)
+					);
 				} else if (removedCount < balanceNum) {
-					console.log(chalk.yellow(`⚠ Only removed ${removedCount} of ${balanceNum} tokens for user ${user}`));
+					console.log(
+						chalk.yellow(
+							`⚠ Only removed ${removedCount} of ${balanceNum} tokens for user ${user}`
+						)
+					);
 				}
 			}
 		} catch (error) {
-			console.error(chalk.red('Error removing users from access list:'), error);
+			console.error(chalk.red("Error removing users from access list:"), error);
+		}
+	}
+
+	public async downloadNodeLogs(args: string[]): Promise<void> {
+		try {
+			const outputLocation = args[0];
+			const last = args[1];
+			let from = args[2];
+			let to = args[3];
+			const maxLogs = args[4] ? Math.min(parseInt(args[4], 10), 1000) : undefined;
+
+			if (!outputLocation) {
+				console.error(chalk.red("Output location is required"));
+				return;
+			}
+
+			if (!fs.existsSync(outputLocation)) {
+				console.error(
+					chalk.red(`Output directory does not exist: ${outputLocation}`)
+				);
+				return;
+			}
+
+			if (last && (from || to)) {
+				console.error(
+					chalk.red("Use either --last or --from/--to, not both")
+				);
+				return;
+			}
+
+			if ((from && !to) || (!from && to)) {
+				console.error(
+					chalk.red(
+						"Both --from and --to are required when specifying a time range"
+					)
+				);
+				return;
+			}
+
+			if (!last && !from && !to) {
+				to = `${Date.now()}`;
+				from = `${Date.now() - 60 * 60 * 1000}`; // default: last 1 hour
+			}
+
+			if (last) {
+				to = `${Date.now()}`;
+				from = `${Date.now() - parseInt(last, 10) * 60 * 60 * 1000}`;
+			}
+
+			const response = await ProviderInstance.downloadNodeLogs(
+				this.oceanNodeUrl,
+				this.signer,
+				from,
+				to,
+				maxLogs
+			);
+
+			const text = await new Response(response).text();
+			const outputPath = `${outputLocation}/logs.json`;
+			fs.writeFileSync(outputPath, text);
+			console.log(chalk.green(`Logs saved to ${outputPath}`));
+		} catch (error) {
+			console.error(chalk.red("Error downloading node logs: "), error);
 		}
 	}
 }

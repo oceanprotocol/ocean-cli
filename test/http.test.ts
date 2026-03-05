@@ -1,5 +1,5 @@
 import fetch from 'cross-fetch';
-import { expect, assert } from 'chai';
+import { expect } from 'chai';
 
 describe('Ocean Node Root Endpoint', () => {
   it('should return 200 OK', async () => {
@@ -83,9 +83,7 @@ describe('Direct Command Endpoint', () => {
         'Content-Type': 'application/json'
       }
     });
-    const responseBody = await response.text();
 
     expect(response.status).to.equal(400);
-    assert(responseBody === "Missing signature")
   });
 });

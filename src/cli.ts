@@ -135,14 +135,14 @@ export async function createCLI() {
 
   // download command
   program
-    .command('download')
-    .description('Downloads an asset into specified folder')
-    .argument('<did>', 'The asset DID')
-    .argument('[folder]', 'Destination folder', '.')
-    .argument('[serviceId]', 'Service ID (optional)')
-    .option('-d, --did <did>', 'The asset DID')
-    .option('-f, --folder [folder]', 'Destination folder', '.')
-    .option('-s, --service <serviceId>', 'Service ID')
+    .command("download")
+    .description("Downloads an asset into specified folder")
+    .argument("<did>", "The asset DID")
+    .argument("[folder]", "Destination folder", ".")
+    .argument("[serviceId]", "Service ID (optional)")
+    .option("-d, --did <did>", "The asset DID")
+    .option("-f, --folder [folder]", "Destination folder", ".")
+    .option("-s, --service <serviceId>", "Service ID")
     .action(async (did, folder, serviceId, options) => {
       const assetDid = options.did || did;
       const destFolder = options.folder || folder || '.';
@@ -181,25 +181,25 @@ export async function createCLI() {
 
   // startCompute command
   program
-    .command('startCompute')
-    .description('Starts a compute job')
-    .argument('<datasetDids>', 'Dataset DIDs (comma-separated) OR (empty array for none)')
-    .argument('<algoDid>', 'Algorithm DID')
-    .argument('<computeEnvId>', 'Compute environment ID')
-    .argument('<maxJobDuration>', 'maxJobDuration for compute job')
-    .argument('<paymentToken>', 'Payment token for compute')
-    .argument('<resources>', 'Resources of compute environment stringified')
-    .argument('[serviceIds]', 'Service IDs (comma-separated; positional mapping with datasetDIDs)')
-    .argument('[algoServiceId]', 'Algorithm Service ID (optional)')
-    .option('-d, --datasets <datasetDids>', 'Dataset DIDs (comma-separated) OR (empty array for none)')
-    .option('-a, --algo <algoDid>', 'Algorithm DID')
-    .option('-e, --env <computeEnvId>', 'Compute environment ID')
-    .option('--maxJobDuration <maxJobDuration>', 'Compute maxJobDuration')
-    .option('-t, --token <paymentToken>', 'Compute payment token')
-    .option('-s, --services [serviceIds]', 'Service IDs (comma-separated; positional mapping with datasetDIDs)')
-    .option('-x, --algo-service [algoServiceId]', 'Algorithm Service ID (optional)')
-    .option('--resources <resources>', 'Compute resources')
-    .option('--accept [boolean]', 'Auto-confirm payment for compute job (true/false)', toBoolean)
+    .command("startCompute")
+    .description("Starts a compute job")
+    .argument("<datasetDids>", "Dataset DIDs (comma-separated) OR (empty array for none)")
+    .argument("<algoDid>", "Algorithm DID")
+    .argument("<computeEnvId>", "Compute environment ID")
+    .argument("<maxJobDuration>", "maxJobDuration for compute job")
+    .argument("<paymentToken>", "Payment token for compute")
+    .argument("<resources>", "Resources of compute environment stringified")
+    .argument("[serviceIds]", "Service IDs (comma-separated; positional mapping with datasetDIDs)")
+    .argument("[algoServiceId]", "Algorithm Service ID (optional)")
+    .option("-d, --datasets <datasetDids>", "Dataset DIDs (comma-separated) OR (empty array for none)")
+    .option("-a, --algo <algoDid>", "Algorithm DID")
+    .option("-e, --env <computeEnvId>", "Compute environment ID")
+    .option("--maxJobDuration <maxJobDuration>", "Compute maxJobDuration")
+    .option("-t, --token <paymentToken>", "Compute payment token")
+    .option("-s, --services [serviceIds]", "Service IDs (comma-separated; positional mapping with datasetDIDs)")
+    .option("-x, --algo-service [algoServiceId]", "Algorithm Service ID (optional)")
+    .option("--resources <resources>", "Compute resources")
+    .option("--accept [boolean]", "Auto-confirm payment for compute job (true/false)", toBoolean)
     .action(async (datasetDids, algoDid, computeEnvId, maxJobDuration, paymentToken, resources, serviceIds, algoServiceId, options) => {
       const dsDids = options.datasets || datasetDids;
       const aDid = options.algo || algoDid;
@@ -288,18 +288,18 @@ export async function createCLI() {
 
   // startFreeCompute command
   program
-    .command('startFreeCompute')
-    .description('Starts a FREE compute job')
-    .argument('<datasetDids>', 'Dataset DIDs (comma-separated) OR (empty array for none)')
-    .argument('<algoDid>', 'Algorithm DID')
-    .argument('<computeEnvId>', 'Compute environment ID')
-    .argument('[serviceIds]', 'Service IDs (comma-separated; positional mapping with datasetDIDs)')
-    .argument('[algoServiceId]', 'Algorithm Service ID (optional)')
-    .option('-d, --datasets <datasetDids>', 'Dataset DIDs (comma-separated) OR (empty array for none)')
-    .option('-a, --algo <algoDid>', 'Algorithm DID')
-    .option('-e, --env <computeEnvId>', 'Compute environment ID')
-    .option('-s, --services [serviceIds]', 'Service IDs (comma-separated; positional mapping with datasetDIDs)')
-    .option('-x, --algo-service [algoServiceId]', 'Algorithm Service ID (optional)')
+    .command("startFreeCompute")
+    .description("Starts a FREE compute job")
+    .argument("<datasetDids>", "Dataset DIDs (comma-separated) OR (empty array for none)")
+    .argument("<algoDid>", "Algorithm DID")
+    .argument("<computeEnvId>", "Compute environment ID")
+    .argument("[serviceIds]", "Service IDs (comma-separated; positional mapping with datasetDIDs)")
+    .argument("[algoServiceId]", "Algorithm Service ID (optional)")
+    .option("-d, --datasets <datasetDids>", "Dataset DIDs (comma-separated) OR (empty array for none)")
+    .option("-a, --algo <algoDid>", "Algorithm DID")
+    .option("-e, --env <computeEnvId>", "Compute environment ID")
+    .option("-s, --services [serviceIds]", "Service IDs (comma-separated; positional mapping with datasetDIDs)")
+    .option("-x, --algo-service [algoServiceId]", "Algorithm Service ID (optional)")
     .action(async (datasetDids, algoDid, computeEnvId, serviceIds, algoServiceId, options) => {
       const dsDids = options.datasets || datasetDids;
       const aDid = options.algo || algoDid;
@@ -389,14 +389,14 @@ export async function createCLI() {
 
   // getJobStatus command
   program
-    .command('getJobStatus')
-    .description('Displays the compute job status')
-    .argument('<datasetDid>', 'Dataset DID')
-    .argument('<jobId>', 'Job ID')
-    .argument('[agreementId]', 'Agreement ID')
-    .option('-d, --dataset <datasetDid>', 'Dataset DID')
-    .option('-j, --job <jobId>', 'Job ID')
-    .option('-a, --agreement [agreementId]', 'Agreement ID')
+    .command("getJobStatus")
+    .description("Displays the compute job status")
+    .argument("<datasetDid>", "Dataset DID")
+    .argument("<jobId>", "Job ID")
+    .argument("[agreementId]", "Agreement ID")
+    .option("-d, --dataset <datasetDid>", "Dataset DID")
+    .option("-j, --job <jobId>", "Job ID")
+    .option("-a, --agreement [agreementId]", "Agreement ID")
     .action(async (datasetDid, jobId, agreementId, options) => {
       const dsDid = options.dataset || datasetDid;
       const jId = options.job || jobId;

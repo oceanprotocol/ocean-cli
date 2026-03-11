@@ -782,9 +782,7 @@ export class Commands {
       assets.push(additionalDatasets);
     }
 
-    const output: ComputeOutput = {
-      metadataUri: await getMetadataURI(),
-    };
+    const output=null
 
     const computeJobs = await ProviderInstance.computeStart(
       providerURI,
@@ -965,9 +963,7 @@ export class Commands {
       assets.push(additionalDatasets);
     }
 
-    const output: ComputeOutput = {
-      metadataUri: await getMetadataURI(),
-    };
+    const output=null
 
     const computeJobs = await ProviderInstance.freeComputeStart(
       providerURI,

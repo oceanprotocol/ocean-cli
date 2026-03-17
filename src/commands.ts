@@ -100,7 +100,7 @@ export class Commands {
   }
 
   public async publishAlgo(args: string[]) {
-    let algoAsset: Asset;
+    let algoAsset;
     try {
       algoAsset = JSON.parse(fs.readFileSync(args[1], "utf8"));
     } catch (e) {
@@ -115,7 +115,7 @@ export class Commands {
         algoAsset.indexedMetadata.nft.name,
         algoAsset.indexedMetadata.nft.symbol,
         this.signer,
-        algoAsset.services[0].files,
+        algoAsset.services[0].files.files,
         algoAsset,
         this.oceanNodeUrl,
         this.config,

@@ -29,7 +29,6 @@ import {
   AccesslistFactory,
   AccessListContract,
 } from "@oceanprotocol/lib";
-import { Asset } from "@oceanprotocol/ddo-js";
 import { Signer, ethers, getAddress } from "ethers";
 import { interactiveFlow } from "./interactiveFlow.js";
 import { publishAsset } from "./publishAsset.js";

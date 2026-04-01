@@ -189,6 +189,10 @@ export async function createCLI() {
     .argument("<maxJobDuration>", "maxJobDuration for compute job")
     .argument("<paymentToken>", "Payment token for compute")
     .argument("<resources>", "Resources of compute environment stringified")
+    .argument(
+      "[output]",
+      "Output backend to save job results to. Supported types include S3, FTP, URL, Arweave, etc. Defaults to node local disk if omitted."
+    )
     .option(
       "-d, --datasets <datasetDids>",
       "Dataset DIDs (comma-separated) OR (empty array for none)"
@@ -203,6 +207,10 @@ export async function createCLI() {
       "Auto-confirm payment for compute job (true/false)",
       toBoolean
     )
+    .option(
+      "-o, --output [output]",
+      "Output backend to save job results to. Supported types include S3, FTP, URL, Arweave, etc. Defaults to node local disk if omitted."
+    )
     .action(
       async (
         datasetDids,
@@ -211,6 +219,7 @@ export async function createCLI() {
         maxJobDuration,
         paymentToken,
         resources,
+        output,
         options
       ) => {
         const dsDids = options.datasets || datasetDids;
@@ -219,6 +228,7 @@ export async function createCLI() {
         const jobDuration = options.maxJobDuration || maxJobDuration;
         const token = options.token || paymentToken;
         const res = options.resources || resources;
+        const outputLocation = options.output || output;
         if (!dsDids || !aDid || !envId || !jobDuration || !token || !res) {
           console.error(chalk.red("Missing required arguments"));
           // process.exit(1);
@@ -278,6 +288,7 @@ export async function createCLI() {
           jobDuration,
           token,
           res,
+          outputLocation,
         ];
 
         await commands.computeStart(computeArgs);
@@ -295,16 +306,25 @@ export async function createCLI() {
     )
     .argument("<algoDid>", "Algorithm DID")
     .argument("<computeEnvId>", "Compute environment ID")
+    .argument(
+      "[output]",
+      "Output backend to save job results to. Supported types include S3, FTP, URL, Arweave, etc. Defaults to node local disk if omitted."
+    )
     .option(
       "-d, --datasets <datasetDids>",
       "Dataset DIDs (comma-separated) OR (empty array for none)"
     )
     .option("-a, --algo <algoDid>", "Algorithm DID")
     .option("-e, --env <computeEnvId>", "Compute environment ID")
-    .action(async (datasetDids, algoDid, computeEnvId, options) => {
+    .option(
+      "-o, --output [output]",
+      "Output backend to save job results to. Supported types include S3, FTP, URL, Arweave, etc. Defaults to node local disk if omitted."
+    )
+    .action(async (datasetDids, algoDid, computeEnvId, output, options) => {
       const dsDids = options.datasets || datasetDids;
       const aDid = options.algo || algoDid;
       const envId = options.env || computeEnvId;
+      const outputLocation = options.output || output;
       if (!dsDids || !aDid || !envId) {
         console.error(chalk.red("Missing required arguments"));
         // process.exit(1);
@@ -312,7 +332,13 @@ export async function createCLI() {
       }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
-      await commands.freeComputeStart([null, dsDids, aDid, envId]);
+      await commands.freeComputeStart([
+        null,
+        dsDids,
+        aDid,
+        envId,
+        outputLocation,
+      ]);
     });
 
   // getComputeEnvironments command
@@ -326,7 +352,7 @@ export async function createCLI() {
       await commands.getComputeEnvironments();
     });
 
-  // startFreeCompute command
+  // computeStreamableLogs command
   program
     .command("computeStreamableLogs")
     .description("Gets the existing compute streamable logs")

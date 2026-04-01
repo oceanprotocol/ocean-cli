@@ -779,7 +779,15 @@ export class Commands {
       assets.push(additionalDatasets);
     }
 
-    const output=null
+    let output = null;
+    if (args[8]) {
+      try {
+        output = JSON.parse(args[8]);
+      } catch (error: unknown) {
+        console.error(chalk.red("Compute output argument must be valid JSON"));
+        return;
+      }
+    }
 
     const computeJobs = await ProviderInstance.computeStart(
       providerURI,
@@ -960,7 +968,15 @@ export class Commands {
       assets.push(additionalDatasets);
     }
 
-    const output=null
+    let output = null;
+    if (args[4]) {
+      try {
+        output = JSON.parse(args[4]);
+      } catch (error: unknown) {
+        console.error(chalk.red("Compute output argument must be valid JSON"));
+        return;
+      }
+    }
 
     const computeJobs = await ProviderInstance.freeComputeStart(
       providerURI,

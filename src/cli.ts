@@ -2,7 +2,7 @@ import { Command } from "commander";
 import { Commands } from "./commands.js";
 import { JsonRpcProvider, Signer, ethers } from "ethers";
 import chalk from "chalk";
-import { stdin as input, stdout as output } from "node:process";
+import { stdin as input, stdout } from "node:process";
 import { createInterface } from "readline/promises";
 import { unitsToAmount } from "@oceanprotocol/lib";
 import { toBoolean } from "./helpers.js";
@@ -263,7 +263,7 @@ export async function createCLI() {
             );
             process.exit(1);
           }
-          const rl = createInterface({ input, output });
+          const rl = createInterface({ input, output: stdout });
           const confirmation = await rl.question(
             `\nProceed with payment for starting compute job at price ${amount} in tokens from address ${initResp.payment.token}? (y/n): `
           );

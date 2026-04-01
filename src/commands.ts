@@ -783,7 +783,7 @@ export class Commands {
     if (args[8]) {
       try {
         output = JSON.parse(args[8]);
-      } catch (error: unknown) {
+      } catch {
         console.error(chalk.red("Compute output argument must be valid JSON"));
         return;
       }
@@ -972,7 +972,7 @@ export class Commands {
     if (args[4]) {
       try {
         output = JSON.parse(args[4]);
-      } catch (error: unknown) {
+      } catch {
         console.error(chalk.red("Compute output argument must be valid JSON"));
         return;
       }

@@ -242,6 +242,8 @@ e.g.: `'[{"id":"cpu","amount":3},{"id":"ram","amount":16772672536},{"id":"disk",
   serviceIds and algoServiceId are optional. If omitted, the CLI defaults to the first available service.`  
   (Options can be provided in any order.)
 
+- `output` is an optional stringified JSON object specifying a remote storage backend where job results will be uploaded. Same format as `startCompute`.
+
 ---
 
 **Stop Compute:**

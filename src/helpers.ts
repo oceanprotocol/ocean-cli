@@ -322,6 +322,9 @@ export async function getPublicIP(): Promise<string> {
 
 export async function getMetadataURI() {
 	const metadataURI = process.env.NODE_URL
+	if (!metadataURI.startsWith('http')) {
+		return metadataURI
+	}
 	const parsed = new URL(metadataURI);
 	let ip = metadataURI // by default
 	// has port number?

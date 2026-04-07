@@ -139,11 +139,14 @@ export async function createCLI() {
     .description("Downloads an asset into specified folder")
     .argument("<did>", "The asset DID")
     .argument("[folder]", "Destination folder", ".")
+    .argument("[serviceId]", "Service ID (optional)")
     .option("-d, --did <did>", "The asset DID")
     .option("-f, --folder [folder]", "Destination folder", ".")
-    .action(async (did, folder, options) => {
+    .option("-s, --service <serviceId>", "Service ID")
+    .action(async (did, folder, serviceId, options) => {
       const assetDid = options.did || did;
-      const destFolder = options.folder || folder || ".";
+      const destFolder = options.folder || folder || '.';
+      const svcId = options.service || serviceId;
       if (!assetDid) {
         console.error(chalk.red("DID is required"));
         // process.exit(1);
@@ -151,7 +154,7 @@ export async function createCLI() {
       }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
-      await commands.download([null, assetDid, destFolder]);
+      await commands.download([null, assetDid, destFolder, svcId]);
     });
 
   // allowAlgo command
@@ -180,10 +183,7 @@ export async function createCLI() {
   program
     .command("startCompute")
     .description("Starts a compute job")
-    .argument(
-      "<datasetDids>",
-      "Dataset DIDs (comma-separated) OR (empty array for none)"
-    )
+    .argument("<datasetDids>", "Dataset DIDs (comma-separated) OR (empty array for none)")
     .argument("<algoDid>", "Algorithm DID")
     .argument("<computeEnvId>", "Compute environment ID")
     .argument("<maxJobDuration>", "maxJobDuration for compute job")
@@ -193,152 +193,167 @@ export async function createCLI() {
       "[output]",
       "Output backend to save job results to. Supported types include S3, FTP, URL, Arweave, etc. Defaults to node local disk if omitted."
     )
-    .option(
-      "-d, --datasets <datasetDids>",
-      "Dataset DIDs (comma-separated) OR (empty array for none)"
-    )
+    .argument("[serviceIds]", "Service IDs (comma-separated; positional mapping with datasetDIDs)")
+    .argument("[algoServiceId]", "Algorithm Service ID (optional)")
+    .option("-d, --datasets <datasetDids>", "Dataset DIDs (comma-separated) OR (empty array for none)")
     .option("-a, --algo <algoDid>", "Algorithm DID")
     .option("-e, --env <computeEnvId>", "Compute environment ID")
     .option("--maxJobDuration <maxJobDuration>", "Compute maxJobDuration")
     .option("-t, --token <paymentToken>", "Compute payment token")
+    .option("-s, --services [serviceIds]", "Service IDs (comma-separated; positional mapping with datasetDIDs)")
+    .option("-x, --algo-service [algoServiceId]", "Algorithm Service ID (optional)")
     .option("--resources <resources>", "Compute resources")
-    .option(
-      "--accept [boolean]",
-      "Auto-confirm payment for compute job (true/false)",
-      toBoolean
-    )
+    .option("--accept [boolean]", "Auto-confirm payment for compute job (true/false)", toBoolean)
     .option(
       "-o, --output [output]",
       "Output backend to save job results to. Supported types include S3, FTP, URL, Arweave, etc. Defaults to node local disk if omitted."
     )
-    .action(
-      async (
-        datasetDids,
-        algoDid,
-        computeEnvId,
-        maxJobDuration,
-        paymentToken,
-        resources,
-        output,
-        options
-      ) => {
-        const dsDids = options.datasets || datasetDids;
-        const aDid = options.algo || algoDid;
-        const envId = options.env || computeEnvId;
-        const jobDuration = options.maxJobDuration || maxJobDuration;
-        const token = options.token || paymentToken;
-        const res = options.resources || resources;
-        const outputLocation = options.output || output;
-        if (!dsDids || !aDid || !envId || !jobDuration || !token || !res) {
-          console.error(chalk.red("Missing required arguments"));
-          // process.exit(1);
-          return;
-        }
-        const { signer, chainId } = await initializeSigner();
-        const commands = new Commands(signer, chainId);
-
-        const initArgs = [null, dsDids, aDid, envId, jobDuration, token, res];
-        const initResp = await commands.initializeCompute(initArgs);
-
-        if (!initResp) {
-          console.error(chalk.red("Initialization failed. Aborting."));
-          return;
-        }
-
-        console.log(chalk.yellow("\n--- Payment Details ---"));
-        console.log(JSON.stringify(initResp, null, 2));
-        const amount = await unitsToAmount(
-          signer,
-          initResp.payment.token,
-          initResp.payment.amount.toString()
-        );
-
-        const proceed = options.accept;
-        if (!proceed) {
-          if (!process.stdin.isTTY) {
-            console.error(
-              chalk.red(
-                'Cannot prompt for confirmation (non-TTY). Use "--accept true" to skip.'
-              )
-            );
-            process.exit(1);
-          }
-          const rl = createInterface({ input, output: stdout });
-          const confirmation = await rl.question(
-            `\nProceed with payment for starting compute job at price ${amount} in tokens from address ${initResp.payment.token}? (y/n): `
-          );
-          rl.close();
-          if (
-            confirmation.toLowerCase() !== "y" &&
-            confirmation.toLowerCase() !== "yes"
-          ) {
-            console.log(chalk.red("Compute job canceled by user."));
-            return;
-          }
-        } else {
-          console.log(chalk.cyan("Auto-confirm enabled with --yes flag."));
-        }
-
-        const computeArgs = [
-          null,
-          dsDids,
-          aDid,
-          envId,
-          JSON.stringify(initResp),
-          jobDuration,
-          token,
-          res,
-          outputLocation,
-        ];
-
-        await commands.computeStart(computeArgs);
-        console.log(chalk.green("Compute job started successfully."));
+    .action(async (datasetDids, algoDid, computeEnvId, maxJobDuration, paymentToken, resources, output, serviceIds, algoServiceId, options) => {
+      const dsDids = options.datasets || datasetDids;
+      const aDid = options.algo || algoDid;
+      const envId = options.env || computeEnvId;
+      const jobDuration = options.maxJobDuration || maxJobDuration;
+      const token = options.token || paymentToken;
+      const res = options.resources || resources;
+      const outputLocation = options.output || output;
+      const svcIds = options.services ?? serviceIds ?? '';
+      const algoSvcId = options.algoService ?? algoServiceId ?? '';
+      if (!dsDids || !aDid || !envId || !jobDuration || !token || !res) {
+        console.error(chalk.red('Missing required arguments'));
+        // process.exit(1);
+        return
       }
+
+      const dsArr =
+        dsDids === '[]'
+          ? []
+          : dsDids.split(',').map(s => s.trim()).filter(Boolean);
+
+      const svArr = svcIds
+        ? svcIds.split(',').map(s => s.trim()).filter(Boolean)
+        : undefined;
+
+      // Optional check: serviceIds must match length if provided
+      if (svArr && svArr.length !== dsArr.length) {
+        console.error(
+          chalk.red(
+            `Length mismatch: datasetDids=${dsArr.length} vs serviceIds=${svArr.length}. ` +
+            'If serviceIds is provided, it must match datasetDids length (positional 1–1).'
+          )
+        );
+        return;
+      }
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
+
+      const initArgs = [null, dsDids, aDid, envId, jobDuration, token, res, output, svcIds, algoSvcId];
+      console.log('initArgs:', initArgs);
+      const initResp = await commands.initializeCompute(initArgs);
+
+      if (!initResp) {
+        console.error(chalk.red("Initialization failed. Aborting."));
+        return;
+      }
+
+      console.log(chalk.yellow("\n--- Payment Details ---"));
+      console.log(JSON.stringify(initResp, null, 2));
+      const amount = await unitsToAmount(
+        signer,
+        initResp.payment.token,
+        initResp.payment.amount.toString()
+      );
+
+      const proceed = options.accept;
+      if (!proceed) {
+        if (!process.stdin.isTTY) {
+          console.error(
+            chalk.red(
+              'Cannot prompt for confirmation (non-TTY). Use "--accept true" to skip.'
+            )
+          );
+          process.exit(1);
+        }
+        const rl = createInterface({ input, output: stdout });
+        const confirmation = await rl.question(
+          `\nProceed with payment for starting compute job at price ${amount} in tokens from address ${initResp.payment.token}? (y/n): `
+        );
+        rl.close();
+        if (
+          confirmation.toLowerCase() !== "y" &&
+          confirmation.toLowerCase() !== "yes"
+        ) {
+          console.log(chalk.red("Compute job canceled by user."));
+          return;
+        }
+      } else {
+        console.log(chalk.cyan("Auto-confirm enabled with --yes flag."));
+      }
+
+      const computeArgs = [null, dsDids, aDid, envId, JSON.stringify(initResp), jobDuration, token, res, outputLocation, svcIds, algoSvcId];
+
+      await commands.computeStart(computeArgs);
+      console.log(chalk.green("Compute job started successfully."));
+    }
     );
 
   // startFreeCompute command
   program
     .command("startFreeCompute")
     .description("Starts a FREE compute job")
-    .argument(
-      "<datasetDids>",
-      "Dataset DIDs (comma-separated) OR (empty array for none)"
-    )
+    .argument("<datasetDids>", "Dataset DIDs (comma-separated) OR (empty array for none)")
     .argument("<algoDid>", "Algorithm DID")
     .argument("<computeEnvId>", "Compute environment ID")
     .argument(
       "[output]",
       "Output backend to save job results to. Supported types include S3, FTP, URL, Arweave, etc. Defaults to node local disk if omitted."
     )
-    .option(
-      "-d, --datasets <datasetDids>",
-      "Dataset DIDs (comma-separated) OR (empty array for none)"
-    )
+    .argument("[serviceIds]", "Service IDs (comma-separated; positional mapping with datasetDIDs)")
+    .argument("[algoServiceId]", "Algorithm Service ID (optional)")
+    .option("-d, --datasets <datasetDids>", "Dataset DIDs (comma-separated) OR (empty array for none)")
     .option("-a, --algo <algoDid>", "Algorithm DID")
     .option("-e, --env <computeEnvId>", "Compute environment ID")
     .option(
       "-o, --output [output]",
       "Output backend to save job results to. Supported types include S3, FTP, URL, Arweave, etc. Defaults to node local disk if omitted."
     )
-    .action(async (datasetDids, algoDid, computeEnvId, output, options) => {
+    .option("-s, --services [serviceIds]", "Service IDs (comma-separated; positional mapping with datasetDIDs)")
+    .option("-x, --algo-service [algoServiceId]", "Algorithm Service ID (optional)")
+    .action(async (datasetDids, algoDid, computeEnvId, output, serviceIds, algoServiceId, options) => {
       const dsDids = options.datasets || datasetDids;
       const aDid = options.algo || algoDid;
       const envId = options.env || computeEnvId;
       const outputLocation = options.output || output;
+      const svcIds = options.services ?? serviceIds ?? '';
+      const algoSvcId = options.algoService ?? algoServiceId ?? '';
+
       if (!dsDids || !aDid || !envId) {
         console.error(chalk.red("Missing required arguments"));
         // process.exit(1);
+        return
+      }
+
+      const dsArr =
+        dsDids === '[]'
+          ? []
+          : dsDids.split(',').map(s => s.trim()).filter(Boolean);
+
+      const svArr = svcIds
+        ? svcIds.split(',').map(s => s.trim()).filter(Boolean)
+        : undefined;
+
+      // Optional check: serviceIds must match length if provided
+      if (svArr && svArr.length !== dsArr.length) {
+        console.error(
+          chalk.red(
+            `Length mismatch: datasetDids=${dsArr.length} vs serviceIds=${svArr.length}. ` +
+            'If serviceIds is provided, it must match datasetDids length (positional 1–1).'
+          )
+        );
         return;
       }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
-      await commands.freeComputeStart([
-        null,
-        dsDids,
-        aDid,
-        envId,
-        outputLocation,
-      ]);
+      await commands.freeComputeStart([null, dsDids, aDid, envId, outputLocation, svcIds, algoSvcId]);
     });
 
   // getComputeEnvironments command
@@ -397,7 +412,7 @@ export async function createCLI() {
     .description("Displays the compute job status")
     .argument("<datasetDid>", "Dataset DID")
     .argument("<jobId>", "Job ID")
-    .argument("<agreementId>", "Agreement ID")
+    .argument("[agreementId]", "Agreement ID")
     .option("-d, --dataset <datasetDid>", "Dataset DID")
     .option("-j, --job <jobId>", "Job ID")
     .option("-a, --agreement [agreementId]", "Agreement ID")

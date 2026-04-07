@@ -223,6 +223,7 @@ npm run cli <command> [options] <arguments>
 - `resources` is required and represents a stringified JSON object obtained from `getComputeEnvironments` command output. `getComputeEnvironments` command shows the available resources and the selected resources by the user need to be within the available limits.
 e.g.: `'[{"id":"cpu","amount":3},{"id":"ram","amount":16772672536},{"id":"disk","amount":0}]'`
 -  `--accept` option can be set to `true` or `false`. If it is set to `false` a prompt will be displayed to the user for manual accepting the payment before starting a compute job. If it is set to `true`, the compute job starts automatically, without user input.
+- `output` is an optional stringified JSON object specifying a remote storage backend where job results will be uploaded. Supported types include S3, FTP, URL, Arweave, and IPFS. If omitted, results are stored on the node's local disk. e.g.: `'{"remoteStorage":{"type":"s3","s3Access":{"endpoint":"https://s3.amazonaws.com","region":"us-east-1","bucket":"my-results","objectKey":"jobs/result.tar","accessKeyId":"AKIA...","secretAccessKey":"..."}}}'`
 
 ---
 
@@ -234,6 +235,8 @@ e.g.: `'[{"id":"cpu","amount":3},{"id":"ram","amount":16772672536},{"id":"disk",
 - **Named Options:**  
   `npm run cli startFreeCompute --datasets did1,did2 --algo algoDid --env env1 --services svc1,svc2 ----algo-service algoServiceId`  
   (Options can be provided in any order.)
+
+  - `output` is an optional stringified JSON object specifying a remote storage backend where job results will be uploaded. Same format as `startCompute`.
 
 - **Rules:**  
   serviceIds and algoServiceId are optional. If omitted, the CLI defaults to the first available service.`  
@@ -446,6 +449,7 @@ e.g.: `'[{"id":"cpu","amount":3},{"id":"ram","amount":16772672536},{"id":"disk",
   `-t, --token <paymentToken>`
   `--resources <resources>`
   `--amountToDeposit <amountToDeposit>` (Id `''`, it will fallback to initialize compute payment amount.)
+  `-o, --output [output]` (Optional. Stringified JSON object specifying a remote storage backend for job results.)
   `-s, --services [serviceIds]` (Optional, comma-separated; must match datasetDids length, positional 1–1)  
   `-x, --algo-service [algoServiceId]` (Optional, override algorithm service)
 
@@ -453,6 +457,7 @@ e.g.: `'[{"id":"cpu","amount":3},{"id":"ram","amount":16772672536},{"id":"disk",
   `-d, --datasets <datasetDids>`  
   `-a, --algo <algoDid>`  
   `-e, --env <computeEnvId>`
+  `-o, --output [output]` (Optional. Stringified JSON object specifying a remote storage backend for job results.)
   `-s, --services [serviceIds]` (Optional, comma-separated; must match datasetDids length, positional 1–1)  
   `-x, --algo-service [algoServiceId]` (Optional, override algorithm service)
 

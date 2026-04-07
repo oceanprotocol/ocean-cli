@@ -2,7 +2,7 @@ import { Command } from "commander";
 import { Commands } from "./commands.js";
 import { JsonRpcProvider, Signer, ethers } from "ethers";
 import chalk from "chalk";
-import { stdin as input, stdout as output } from "node:process";
+import { stdin as input, stdout } from "node:process";
 import { createInterface } from "readline/promises";
 import { unitsToAmount } from "@oceanprotocol/lib";
 import { toBoolean } from "./helpers.js";
@@ -189,6 +189,10 @@ export async function createCLI() {
     .argument("<maxJobDuration>", "maxJobDuration for compute job")
     .argument("<paymentToken>", "Payment token for compute")
     .argument("<resources>", "Resources of compute environment stringified")
+    .argument(
+      "[output]",
+      "Output backend to save job results to. Supported types include S3, FTP, URL, Arweave, etc. Defaults to node local disk if omitted."
+    )
     .argument("[serviceIds]", "Service IDs (comma-separated; positional mapping with datasetDIDs)")
     .argument("[algoServiceId]", "Algorithm Service ID (optional)")
     .option("-d, --datasets <datasetDids>", "Dataset DIDs (comma-separated) OR (empty array for none)")
@@ -200,13 +204,18 @@ export async function createCLI() {
     .option("-x, --algo-service [algoServiceId]", "Algorithm Service ID (optional)")
     .option("--resources <resources>", "Compute resources")
     .option("--accept [boolean]", "Auto-confirm payment for compute job (true/false)", toBoolean)
-    .action(async (datasetDids, algoDid, computeEnvId, maxJobDuration, paymentToken, resources, serviceIds, algoServiceId, options) => {
+    .option(
+      "-o, --output [output]",
+      "Output backend to save job results to. Supported types include S3, FTP, URL, Arweave, etc. Defaults to node local disk if omitted."
+    )
+    .action(async (datasetDids, algoDid, computeEnvId, maxJobDuration, paymentToken, resources, output, serviceIds, algoServiceId, options) => {
       const dsDids = options.datasets || datasetDids;
       const aDid = options.algo || algoDid;
       const envId = options.env || computeEnvId;
       const jobDuration = options.maxJobDuration || maxJobDuration;
       const token = options.token || paymentToken;
       const res = options.resources || resources;
+      const outputLocation = options.output || output;
       const svcIds = options.services ?? serviceIds ?? '';
       const algoSvcId = options.algoService ?? algoServiceId ?? '';
       if (!dsDids || !aDid || !envId || !jobDuration || !token || !res) {
@@ -263,7 +272,7 @@ export async function createCLI() {
           );
           process.exit(1);
         }
-        const rl = createInterface({ input, output });
+        const rl = createInterface({ input, output: stdout });
         const confirmation = await rl.question(
           `\nProceed with payment for starting compute job at price ${amount} in tokens from address ${initResp.payment.token}? (y/n): `
         );
@@ -279,7 +288,7 @@ export async function createCLI() {
         console.log(chalk.cyan("Auto-confirm enabled with --yes flag."));
       }
 
-      const computeArgs = [null, dsDids, aDid, envId, JSON.stringify(initResp), jobDuration, token, res, svcIds, algoSvcId];
+      const computeArgs = [null, dsDids, aDid, envId, JSON.stringify(initResp), jobDuration, token, res, outputLocation, svcIds, algoSvcId];
 
       await commands.computeStart(computeArgs);
       console.log(chalk.green("Compute job started successfully."));
@@ -293,17 +302,26 @@ export async function createCLI() {
     .argument("<datasetDids>", "Dataset DIDs (comma-separated) OR (empty array for none)")
     .argument("<algoDid>", "Algorithm DID")
     .argument("<computeEnvId>", "Compute environment ID")
+    .argument(
+      "[output]",
+      "Output backend to save job results to. Supported types include S3, FTP, URL, Arweave, etc. Defaults to node local disk if omitted."
+    )
     .argument("[serviceIds]", "Service IDs (comma-separated; positional mapping with datasetDIDs)")
     .argument("[algoServiceId]", "Algorithm Service ID (optional)")
     .option("-d, --datasets <datasetDids>", "Dataset DIDs (comma-separated) OR (empty array for none)")
     .option("-a, --algo <algoDid>", "Algorithm DID")
     .option("-e, --env <computeEnvId>", "Compute environment ID")
+    .option(
+      "-o, --output [output]",
+      "Output backend to save job results to. Supported types include S3, FTP, URL, Arweave, etc. Defaults to node local disk if omitted."
+    )
     .option("-s, --services [serviceIds]", "Service IDs (comma-separated; positional mapping with datasetDIDs)")
     .option("-x, --algo-service [algoServiceId]", "Algorithm Service ID (optional)")
-    .action(async (datasetDids, algoDid, computeEnvId, serviceIds, algoServiceId, options) => {
+    .action(async (datasetDids, algoDid, computeEnvId, output, serviceIds, algoServiceId, options) => {
       const dsDids = options.datasets || datasetDids;
       const aDid = options.algo || algoDid;
       const envId = options.env || computeEnvId;
+      const outputLocation = options.output || output;
       const svcIds = options.services ?? serviceIds ?? '';
       const algoSvcId = options.algoService ?? algoServiceId ?? '';
 
@@ -334,7 +352,7 @@ export async function createCLI() {
       }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
-      await commands.freeComputeStart([null, dsDids, aDid, envId, svcIds, algoSvcId]);
+      await commands.freeComputeStart([null, dsDids, aDid, envId, outputLocation, svcIds, algoSvcId]);
     });
 
   // getComputeEnvironments command
@@ -348,7 +366,7 @@ export async function createCLI() {
       await commands.getComputeEnvironments();
     });
 
-  // startFreeCompute command
+  // computeStreamableLogs command
   program
     .command("computeStreamableLogs")
     .description("Gets the existing compute streamable logs")

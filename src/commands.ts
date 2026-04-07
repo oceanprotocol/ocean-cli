@@ -6,7 +6,6 @@ import {
 	updateAssetMetadata,
 	downloadFile,
 	isOrderable,
-	getMetadataURI,
 	getIndexingWaitSettings,
 	IndexerWaitParams,
 	fixAndParseProviderFees,
@@ -16,7 +15,6 @@ import {
 	Aquarius,
 	ComputeAlgorithm,
 	ComputeJob,
-	ComputeOutput,
 	Config,
 	ConfigHelper,
 	Datatoken,
@@ -106,7 +104,7 @@ export class Commands {
 	}
 
 	public async publishAlgo(args: string[]) {
-		let algoAsset: Asset;
+		let algoAsset;
 		try {
 			algoAsset = JSON.parse(fs.readFileSync(args[1], "utf8"));
 		} catch (e) {
@@ -276,7 +274,7 @@ export class Commands {
 			inputDatasets = cleaned.split(',').map(s => s.trim()).filter(Boolean);
 		}
 
-		const inputServicesString = args[7];
+		const inputServicesString = args[8];
 		let inputServices: string[] = [];
 		if (typeof inputServicesString === 'string' && inputServicesString.trim().length > 0) {
 			inputServices = inputServicesString.split(',').map(s => s.trim()).filter(Boolean);
@@ -362,7 +360,7 @@ export class Commands {
 		}
 		const ddoAlgoInstance = DDOManager.getDDOClass(algoDdo);
 		const { services: servicesAlgo, metadata: metadataAlgo, version: versionAlgo } = ddoAlgoInstance.getDDOFields();
-		const algoServiceIdInput = args[8] as string | undefined;
+		const algoServiceIdInput = args[9] as string | undefined;
 		let chosenAlgoServiceId = servicesAlgo[0].id;
 		if (typeof algoServiceIdInput === 'string' && algoServiceIdInput.trim().length > 0) {
 			const expectedAlgoServiceId = algoServiceIdInput.trim();
@@ -559,7 +557,7 @@ export class Commands {
 			inputDatasets = cleaned.split(',').map(s => s.trim()).filter(Boolean);
 		}
 
-		const inputServicesString = args[8];
+		const inputServicesString = args[9];
 		let inputServices: string[] = [];
 		if (typeof inputServicesString === 'string' && inputServicesString.trim().length > 0) {
 			inputServices = inputServicesString.split(',').map(s => s.trim()).filter(Boolean);
@@ -646,7 +644,7 @@ export class Commands {
 		}
 		const ddoInstanceAlgo = DDOManager.getDDOClass(algoDdo);
 		const { services: servicesAlgo, metadata: metadataAlgo, version: versionAlgo } = ddoInstanceAlgo.getDDOFields();
-		const algoServiceIdInput = args[9] as string | undefined;
+		const algoServiceIdInput = args[10] as string | undefined;
 		let chosenAlgoServiceId = servicesAlgo[0].id;
 		if (typeof algoServiceIdInput === 'string' && algoServiceIdInput.trim().length > 0) {
 			const expectedAlgoServiceId = algoServiceIdInput.trim();
@@ -899,9 +897,15 @@ export class Commands {
 
 		console.log("Starting compute job using provider: ", providerURI);
 
-		const output: ComputeOutput = {
-			metadataUri: await getMetadataURI(),
-		};
+		let output = null;
+		if (args[8]) {
+			try {
+				output = JSON.parse(args[8]);
+			} catch {
+				console.error(chalk.red("Compute output argument must be valid JSON"));
+				return;
+			}
+		}
 		const policiesServer = await getPolicyServerOBJs(assets, assetAlgo, this.signer, this.oceanNodeUrl);
 
 		const computeJobs = await ProviderInstance.computeStart(
@@ -942,7 +946,7 @@ export class Commands {
 			const cleaned = inputDatasetsString.replaceAll('[', '').replaceAll(']', '');
 			inputDatasets = cleaned.split(',').map(s => s.trim()).filter(Boolean);
 		}
-		const inputServicesString = args[4];
+		const inputServicesString = args[5];
 		let inputServices: string[] = [];
 		if (typeof inputServicesString === 'string' && inputServicesString.trim().length > 0) {
 			inputServices = inputServicesString.split(',').map(s => s.trim()).filter(Boolean);
@@ -1034,7 +1038,7 @@ export class Commands {
 		const ddoInstanceAlgo = DDOManager.getDDOClass(algoDdo);
 		const { services: servicesAlgo, metadata: metadataAlgo, version: versionAlgo } = ddoInstanceAlgo.getDDOFields();
 
-		const algoServiceIdInput = args[5] as string | undefined;
+		const algoServiceIdInput = args[6] as string | undefined;
 		let chosenAlgoServiceId = servicesAlgo[0].id;
 		if (typeof algoServiceIdInput === 'string' && algoServiceIdInput.trim().length > 0) {
 			const expectedAlgoServiceId = algoServiceIdInput.trim();
@@ -1110,9 +1114,15 @@ export class Commands {
 			});
 		}
 
-		const output: ComputeOutput = {
-			metadataUri: await getMetadataURI(),
-		};
+		let output = null;
+		if (args[4]) {
+			try {
+				output = JSON.parse(args[4]);
+			} catch {
+				console.error(chalk.red("Compute output argument must be valid JSON"));
+				return;
+			}
+		}
 
 		const policiesServer = await getPolicyServerOBJs(assets, assetAlgo, this.signer, this.oceanNodeUrl);
 		const computeJobs = await ProviderInstance.freeComputeStart(

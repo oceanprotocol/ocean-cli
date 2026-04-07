@@ -53,7 +53,6 @@ describe("Ocean CLI Publishing", function () {
         process.env.ADDRESS_FILE = path.join(process.env.HOME || "", ".ocean/ocean-contracts/artifacts/address.json");
 
         const output = await runCommand(`npm run cli publish ${metadataFile}`);
-
         const jsonMatch = output.match(/did:op:[a-f0-9]{64}/);
         if (!jsonMatch) {
             console.error("Raw output:", output);

@@ -1779,7 +1779,7 @@ export class Commands {
         from = `${Date.now() - parseInt(last, 10) * 60 * 60 * 1000}`;
       }
 
-      const response = await ProviderInstance.downloadNodeLogs(
+      const logs = await ProviderInstance.downloadNodeLogs(
         this.oceanNodeUrl,
         this.signer,
         from,
@@ -1787,16 +1787,7 @@ export class Commands {
         maxLogs
       );
 
-      let text: string;
-      if (response[Symbol.asyncIterator]) {
-        const chunks: Uint8Array[] = [];
-        for await (const chunk of response) {
-          chunks.push(chunk);
-        }
-        text = Buffer.concat(chunks).toString("utf-8");
-      } else {
-        text = await new Response(response).text();
-      }
+      const text = JSON.stringify(logs, null, 2);
       const outputPath = `${outputLocation}/logs.json`;
       fs.writeFileSync(outputPath, text);
       console.log(chalk.green(`Logs saved to ${outputPath}`));

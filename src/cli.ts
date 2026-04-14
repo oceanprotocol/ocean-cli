@@ -4,7 +4,7 @@ import { JsonRpcProvider, Signer, ethers } from "ethers";
 import chalk from "chalk";
 import { stdin as input, stdout } from "node:process";
 import { createInterface } from "readline/promises";
-import { unitsToAmount } from "@oceanprotocol/lib";
+import { unitsToAmount, ProviderInstance, isP2pUri } from "@oceanprotocol/lib";
 import { toBoolean } from "./helpers.js";
 
 async function initializeSigner() {
@@ -34,6 +34,74 @@ export async function createCLI() {
   if (!process.env.NODE_URL) {
     console.error(chalk.red("Have you forgot to set env NODE_URL?"));
     process.exit(1);
+  }
+
+  if (isP2pUri(process.env.NODE_URL)) {
+    const extra = process.env.BOOTSTRAP_PEERS?.split(",").filter(Boolean) || [];
+
+    // Default Ocean bootstrap nodes (must be included explicitly since passing
+    // bootstrapPeers to setupP2P replaces the built-in defaults)
+    const oceanDefaults = [
+      "/dns4/bootstrap1.oncompute.ai/tcp/9001/ws/p2p/16Uiu2HAmLhRDqfufZiQnxvQs2XHhd6hwkLSPfjAQg1gH8wgRixiP",
+      "/dns4/bootstrap2.oncompute.ai/tcp/9001/ws/p2p/16Uiu2HAmHwzeVw7RpGopjZe6qNBJbzDDBdqtrSk7Gcx1emYsfgL4",
+      "/dns4/bootstrap3.oncompute.ai/tcp/9001/ws/p2p/16Uiu2HAmBKSeEP3v4tYEPsZsZv9VELinyMCsrVTJW9BvQeFXx28U",
+      "/dns4/bootstrap4.oncompute.ai/tcp/9001/ws/p2p/16Uiu2HAmSTVTArioKm2wVcyeASHYEsnx2ZNq467Z4GMDU4ErEPom",
+    ];
+
+    const nodeUrl = process.env.NODE_URL;
+    const isFullMultiaddr =
+      nodeUrl.startsWith("/") && nodeUrl.includes("/p2p/");
+    const localPeer = isFullMultiaddr
+      ? [nodeUrl]
+      : [`/ip4/127.0.0.1/tcp/9001/ws/p2p/${nodeUrl}`];
+    const bootstrapPeers = [...localPeer, ...extra, ...oceanDefaults];
+    console.log(chalk.cyan("P2P mode detected. Initializing libp2p..."));
+    console.log(chalk.cyan(`Bootstrap peers: ${bootstrapPeers.length}`));
+
+    for (const peer of localPeer) {
+      console.log(chalk.cyan(`  Local: ${peer}`));
+    }
+    // Allow localhost connections / local nodes
+    await ProviderInstance.setupP2P({
+      bootstrapPeers,
+      libp2p: {
+        connectionGater: {
+          denyDialMultiaddr: () => false,
+        },
+      },
+    } as any);
+    console.log(
+      chalk.cyan("libp2p node started. Waiting for peer connections...")
+    );
+
+    // Wait for at least one active P2P connection before running commands
+    const maxWait = 20_000;
+    const interval = 500;
+    let waited = 0;
+    const libp2p = (ProviderInstance as any).p2pProvider?.libp2pNode;
+    while (waited < maxWait) {
+      const conns = libp2p?.getConnections()?.length ?? 0;
+      if (conns > 0) {
+        console.log(
+          chalk.green(`Connected to ${conns} peer(s) in ${waited}ms`)
+        );
+        break;
+      }
+      await new Promise((r) => setTimeout(r, interval));
+      waited += interval;
+      if (waited % 3000 === 0) {
+        console.log(
+          chalk.yellow(`  Still waiting for peers... (${waited / 1000}s)`)
+        );
+      }
+    }
+    if ((libp2p?.getConnections()?.length ?? 0) === 0) {
+      console.error(
+        chalk.red(
+          `No P2P peers connected after ${maxWait / 1000}s. Commands may fail.`
+        )
+      );
+    }
   }
 
   const program = new Command();
@@ -707,12 +775,21 @@ export async function createCLI() {
     )
     .argument("[from]", "Start time (epoch ms) to get logs from")
     .argument("[to]", "End time (epoch ms) to get logs to")
-    .argument("[maxLogs]", "Maximum number of logs to retrieve (default: 100, max: 1000)")
+    .argument(
+      "[maxLogs]",
+      "Maximum number of logs to retrieve (default: 100, max: 1000)"
+    )
     .option("-o, --output <output>", "Output directory to save the logs")
-    .option("-l, --last [last]", "Period of time to get logs from now (in hours)")
+    .option(
+      "-l, --last [last]",
+      "Period of time to get logs from now (in hours)"
+    )
     .option("-f, --from [from]", "Start time (epoch ms) to get logs from")
     .option("-t, --to [to]", "End time (epoch ms) to get logs to")
-    .option("-m, --maxLogs [maxLogs]", "Maximum number of logs to retrieve (default: 100, max: 1000)")
+    .option(
+      "-m, --maxLogs [maxLogs]",
+      "Maximum number of logs to retrieve (default: 100, max: 1000)"
+    )
     .action(async (output, last, from, to, options) => {
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);

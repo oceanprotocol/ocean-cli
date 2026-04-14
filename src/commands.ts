@@ -1,4 +1,5 @@
 import fs from "fs";
+import path from "path";
 import util from "util";
 import {
   createAssetUtil,
@@ -226,7 +227,7 @@ export class Commands {
 
     const orderTx = await tx.wait();
 
-    const urlDownloadUrl = await ProviderInstance.getDownloadUrl(
+    const downloadResult = await ProviderInstance.getDownloadUrl(
       dataDdo.id,
       dataDdo.services[0].id,
       0,
@@ -235,9 +236,16 @@ export class Commands {
       this.signer
     );
     try {
-      const path = args[2] ? args[2] : ".";
-      const { filename } = await downloadFile(urlDownloadUrl, path);
-      console.log("File downloaded successfully:", path + "/" + filename);
+      const destPath = args[2] ? args[2] : ".";
+      if (typeof downloadResult === "string") {
+        const { filename } = await downloadFile(downloadResult, destPath);
+        console.log("File downloaded successfully:", destPath + "/" + filename);
+      } else {
+        const filename = downloadResult.filename || "file.out";
+        const filePath = path.join(destPath, filename);
+        fs.writeFileSync(filePath, Buffer.from(downloadResult.data));
+        console.log("File downloaded successfully:", filePath);
+      }
     } catch (e) {
       console.log(`Download url dataset failed: ${e}`);
     }
@@ -451,7 +459,7 @@ export class Commands {
         paymentToken,
         supportedMaxJobDuration,
         providerURI,
-        this.signer, // V1 was this.signer.getAddress()
+        await this.signer.getAddress(),
         parsedResources,
         Number(chainId)
       );
@@ -1046,23 +1054,24 @@ export class Commands {
       this.signer,
       jobId
     );
-    console.log("response: ", logsResponse);
 
     if (!logsResponse) {
       console.error("Error fetching streamable logs. No logs available.");
       return;
-    } else {
-      const stream = logsResponse as ReadableStream;
-      console.log("stream: ", stream);
-      const text = await new Response(stream).text();
-      console.log("Streamable Logs: ");
-      console.log(text);
-      // for await (const value of stream) {
-      // 	// just print it to the console
-      // 	console.log(value);
-      // }
     }
-    console.log("Exiting computeStreamableLogs: ", logsResponse);
+
+    let text: string;
+    if (logsResponse[Symbol.asyncIterator]) {
+      const chunks: Uint8Array[] = [];
+      for await (const chunk of logsResponse) {
+        chunks.push(chunk);
+      }
+      text = Buffer.concat(chunks).toString("utf-8");
+    } else {
+      text = await new Response(logsResponse).text();
+    }
+    console.log("Streamable Logs:");
+    console.log(text);
   }
 
   public async allowAlgo(args: string[]) {
@@ -1238,7 +1247,7 @@ export class Commands {
 
     const jobStatus = (await ProviderInstance.computeStatus(
       this.oceanNodeUrl,
-      await this.signer.getAddress(),
+      this.signer,
       jobId,
       agreementId
     )) as ComputeJob;
@@ -1246,24 +1255,24 @@ export class Commands {
   }
 
   public async downloadJobResults(args: string[]) {
-    const jobResult = await ProviderInstance.getComputeResultUrl(
-      this.oceanNodeUrl,
-      this.signer,
-      args[1],
-      parseInt(args[2])
-    );
-    console.log("jobResult ", jobResult);
-
     try {
-      const path = args[3] ? args[3] : ".";
-      const { filename } = await downloadFile(
-        jobResult,
-        path,
+      const stream = await ProviderInstance.getComputeResult(
+        this.oceanNodeUrl,
+        this.signer,
+        args[1],
         parseInt(args[2])
       );
-      console.log("File downloaded successfully:", path + "/" + filename);
+      const chunks: Uint8Array[] = [];
+      for await (const chunk of stream) {
+        chunks.push(chunk);
+      }
+      const destPath = args[3] || ".";
+      const filename = `file_${args[2]}.out`;
+      const filePath = path.join(destPath, filename);
+      fs.writeFileSync(filePath, Buffer.concat(chunks));
+      console.log("File downloaded successfully:", filePath);
     } catch (e) {
-      console.log(`Download url dataset failed: ${e}`);
+      console.log(`Download compute result failed: ${e}`);
     }
   }
 
@@ -1770,7 +1779,7 @@ export class Commands {
         from = `${Date.now() - parseInt(last, 10) * 60 * 60 * 1000}`;
       }
 
-      const response = await ProviderInstance.downloadNodeLogs(
+      const logs = await ProviderInstance.downloadNodeLogs(
         this.oceanNodeUrl,
         this.signer,
         from,
@@ -1778,7 +1787,7 @@ export class Commands {
         maxLogs
       );
 
-      const text = await new Response(response).text();
+      const text = JSON.stringify(logs, null, 2);
       const outputPath = `${outputLocation}/logs.json`;
       fs.writeFileSync(outputPath, text);
       console.log(chalk.green(`Logs saved to ${outputPath}`));

@@ -74,31 +74,45 @@ export async function createCLI() {
       chalk.cyan("libp2p node started. Waiting for peer connections...")
     );
 
-    // Wait for at least one active P2P connection before running commands
+    // Wait for the TARGET peer (the one in NODE_URL) to be connected,
+    // not just any bootstrap peer — otherwise signed commands fail with
+    // "Cannot reach peer ...".
+    const targetPeerId = isFullMultiaddr
+      ? nodeUrl.split("/p2p/").pop()!
+      : nodeUrl;
     const maxWait = 20_000;
     const interval = 500;
     let waited = 0;
     const libp2p = (ProviderInstance as any).p2pProvider?.libp2pNode;
+    const isTargetConnected = () =>
+      (libp2p?.getPeers() ?? []).some(
+        (p: { toString(): string }) => p.toString() === targetPeerId
+      );
     while (waited < maxWait) {
-      const conns = libp2p?.getConnections()?.length ?? 0;
-      if (conns > 0) {
+      if (isTargetConnected()) {
+        const total = libp2p?.getConnections()?.length ?? 0;
         console.log(
-          chalk.green(`Connected to ${conns} peer(s) in ${waited}ms`)
+          chalk.green(
+            `Connected to target peer ${targetPeerId.slice(0, 12)}… in ${waited}ms (total peers: ${total})`
+          )
         );
         break;
       }
       await new Promise((r) => setTimeout(r, interval));
       waited += interval;
       if (waited % 3000 === 0) {
+        const total = libp2p?.getConnections()?.length ?? 0;
         console.log(
-          chalk.yellow(`  Still waiting for peers... (${waited / 1000}s)`)
+          chalk.yellow(
+            `  Waiting for target peer ${targetPeerId.slice(0, 12)}… (${waited / 1000}s, ${total} other peer(s))`
+          )
         );
       }
     }
-    if ((libp2p?.getConnections()?.length ?? 0) === 0) {
+    if (!isTargetConnected()) {
       console.error(
         chalk.red(
-          `No P2P peers connected after ${maxWait / 1000}s. Commands may fail.`
+          `Target peer ${targetPeerId} not reachable after ${maxWait / 1000}s. Commands will fail.`
         )
       );
     }
@@ -800,6 +814,59 @@ export async function createCLI() {
         options.to || to,
         options.maxLogs,
       ]);
+    });
+
+  program
+    .command("createBucket")
+    .description("Create a new persistent-storage bucket gated by a single access list (chain inferred from RPC)")
+    .argument("<accessListAddress>", "Access list contract address (0x…)")
+    .action(async (accessListAddress) => {
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
+      await commands.createBucket([null, accessListAddress]);
+    });
+
+  program
+    .command("addFileToBucket")
+    .description("Upload a local file into a bucket")
+    .argument("<bucketId>", "Bucket id")
+    .argument("<filePath>", "Path to local file")
+    .argument("[fileName]", "Name under which to store the file (defaults to basename)")
+    .action(async (bucketId, filePath, fileName) => {
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
+      await commands.addFileToBucket([null, bucketId, filePath, fileName]);
+    });
+
+  program
+    .command("listBuckets")
+    .description("List buckets owned by an address (defaults to signer)")
+    .option("-o, --owner <address>", "Owner address")
+    .action(async (options) => {
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
+      await commands.listBuckets([null, options.owner]);
+    });
+
+  program
+    .command("listFilesInBucket")
+    .description("List files in a bucket")
+    .argument("<bucketId>", "Bucket id")
+    .action(async (bucketId) => {
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
+      await commands.listFilesInBucket([null, bucketId]);
+    });
+
+  program
+    .command("getFileObject")
+    .description("Get the file-object descriptor for a file in a bucket")
+    .argument("<bucketId>", "Bucket id")
+    .argument("<fileName>", "File name")
+    .action(async (bucketId, fileName) => {
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
+      await commands.getFileObject([null, bucketId, fileName]);
     });
 
   return program;

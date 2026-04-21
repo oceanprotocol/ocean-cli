@@ -1904,4 +1904,25 @@ export class Commands {
       console.error(chalk.red("Error getting file object: "), error);
     }
   }
+
+  public async deleteFile(args: string[]): Promise<void> {
+    try {
+      const bucketId = args[1];
+      const fileName = args[2];
+      if (!bucketId || !fileName) {
+        console.error(chalk.red("bucketId and fileName are required"));
+        return;
+      }
+      const result = await ProviderInstance.deletePersistentStorageFile(
+        this.oceanNodeUrl,
+        this.signer,
+        bucketId,
+        fileName
+      );
+      console.log(chalk.green(`File '${fileName}' deleted from bucket ${bucketId}.`));
+      console.log(util.inspect(result, false, null, true));
+    } catch (error) {
+      console.error(chalk.red("Error deleting file: "), error);
+    }
+  }
 }

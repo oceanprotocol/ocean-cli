@@ -108,4 +108,16 @@ describe("Ocean CLI Persistent Storage", function () {
         );
         expect(output).to.include(fileName);
     });
+
+    it("Alice should delete the file from the bucket", async function () {
+        const output = await runCommand(
+            `npm run cli deleteFile ${bucketId} ${fileName}`
+        );
+        expect(output).to.match(/deleted|success/i);
+
+        const listOutput = await runCommand(
+            `npm run cli listFilesInBucket ${bucketId}`
+        );
+        expect(listOutput).to.not.include(fileName);
+    });
 });

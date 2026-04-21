@@ -869,5 +869,16 @@ export async function createCLI() {
       await commands.getFileObject([null, bucketId, fileName]);
     });
 
+  program
+    .command("deleteFile")
+    .description("Delete a file from a bucket")
+    .argument("<bucketId>", "Bucket id")
+    .argument("<fileName>", "File name")
+    .action(async (bucketId, fileName) => {
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
+      await commands.deleteFile([null, bucketId, fileName]);
+    });
+
   return program;
 }

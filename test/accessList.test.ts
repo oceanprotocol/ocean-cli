@@ -33,10 +33,9 @@ describe("Ocean CLI Access List", function () {
         it("should create a new access list contract", async function () {
             const name = "TestAccessList";
             const symbol = "TAL";
-            const transferable = "false";
 
             const output = await runCommand(
-                `npm run cli createAccessList ${name} ${symbol} ${transferable}`
+                `npm run cli createAccessList ${name} ${symbol}`
             );
 
             expect(output).to.include("Access list created successfully");
@@ -58,7 +57,7 @@ describe("Ocean CLI Access List", function () {
             const initialUsers = `${testUser1.address},${testUser2.address}`;
 
             const output = await runCommand(
-                `npm run cli createAccessList ${name} ${symbol} ${transferable} ${initialUsers}`
+                `npm run cli createAccessList ${name} ${symbol} ${initialUsers} ${transferable}`
             );
 
             expect(output).to.include("Access list created successfully");
@@ -238,7 +237,7 @@ describe("Ocean CLI Access List", function () {
     describe("Edge Cases", function () {
         it("should handle empty initial users list", async function () {
             const output = await runCommand(
-                `npm run cli createAccessList EmptyList EL false ""`
+                `npm run cli createAccessList EmptyList EL "" false`
             );
 
             expect(output).to.include("Access list created successfully");
@@ -263,7 +262,7 @@ describe("Ocean CLI Access List", function () {
     describe("E2E Workflow", function () {
         it("should complete a full access list workflow", async function () {
             const createOutput = await runCommand(
-                `npm run cli createAccessList WorkflowTest WT false`
+                `npm run cli createAccessList WorkflowTest WT`
             );
             expect(createOutput).to.include("Access list created successfully");
 

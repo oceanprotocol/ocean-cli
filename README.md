@@ -355,16 +355,16 @@ e.g.: `'[{"id":"cpu","amount":3},{"id":"ram","amount":16772672536},{"id":"disk",
 **Create Access List:**
 
 - **Positional:**  
-  `npm run cli createAccessList "My Access List" "MAL" false "0xUser1,0xUser2"`
+  `npm run cli createAccessList "My Access List" "MAL" "0xUser1,0xUser2" false`
 
 - **Named Options:**  
-  `npm run cli createAccessList --name "My Access List" --symbol "MAL" --transferable false --users "0xUser1,0xUser2"`
+  `npm run cli createAccessList --name "My Access List" --symbol "MAL" --initial-users "0xUser1,0xUser2" --transferable false`
 
 - Arguments:
   - `name`: Name for the access list
   - `symbol`: Symbol for the access list
-  - `transferable`: Whether tokens are transferable (true/false)
   - `initialUsers`: Comma-separated list of initial user addresses (optional)
+  - `transferable`: Whether tokens are transferable (true/false, optional, default: `false`)
 
 ---
 
@@ -490,8 +490,8 @@ e.g.: `'[{"id":"cpu","amount":3},{"id":"ram","amount":16772672536},{"id":"disk",
 - **createAccessList:**  
   `-n, --name <name>`  
   `-s, --symbol <symbol>`  
-  `-t, --transferable [transferable]` (Default: `false`)  
-  `-u, --users [initialUsers]` (Default: `''`)
+  `-u, --initial-users [initialUsers]` (Default: `''`)  
+  `-t, --transferable [transferable]` (Default: `false`)
 
 - **addToAccessList:**  
   `-a, --address <accessListAddress>`  

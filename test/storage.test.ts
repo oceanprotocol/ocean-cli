@@ -41,7 +41,7 @@ describe("Ocean CLI Persistent Storage", function () {
 
   it("should create an access list and add Alice and Bob", async function () {
     const createOutput = await runCommand(
-      `npm run cli createAccessList StorageTestACL STACL false`
+      `npm run cli createAccessList StorageTestACL STACL`
     );
     expect(createOutput).to.include("Access list created successfully");
     const addressMatch = createOutput.match(

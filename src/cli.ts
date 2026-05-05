@@ -681,35 +681,35 @@ export async function createCLI() {
     .argument("<name>", "Name for the access list")
     .argument("<symbol>", "Symbol for the access list")
     .argument(
-      "[transferable]",
-      "Whether tokens are transferable (true/false)",
-      "false"
-    )
-    .argument(
       "[initialUsers]",
       "Comma-separated list of initial user addresses",
       ""
     )
+    .argument(
+      "[transferable]",
+      "Whether tokens are transferable (true/false)",
+      "false"
+    )
     .option("-n, --name <name>", "Name for the access list")
     .option("-s, --symbol <symbol>", "Symbol for the access list")
+    .option(
+      "-u, --initial-users [initialUsers]",
+      "Comma-separated list of initial user addresses",
+      ""
+    )
     .option(
       "-t, --transferable [transferable]",
       "Whether tokens are transferable (true/false)",
       "false"
     )
-    .option(
-      "-u, --users [initialUsers]",
-      "Comma-separated list of initial user addresses",
-      ""
-    )
-    .action(async (name, symbol, transferable, initialUsers, options) => {
+    .action(async (name, symbol, initialUsers, transferable, options) => {
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
       await commands.createAccessList([
         options.name || name,
         options.symbol || symbol,
         options.transferable || transferable,
-        options.users || initialUsers,
+        options.initialUsers || initialUsers,
       ]);
     });
 
@@ -818,8 +818,8 @@ export async function createCLI() {
 
   program
     .command("createBucket")
-    .description("Create a new persistent-storage bucket gated by a single access list (chain inferred from RPC)")
-    .argument("<accessListAddress>", "Access list contract address (0x…)")
+    .description("Create a new persistent-storage bucket. Pass an access list to gate it; omit for owner-only access (chain inferred from RPC)")
+    .argument("[accessListAddress]", "Access list contract address (0x…); omit for owner-only access")
     .action(async (accessListAddress) => {
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);

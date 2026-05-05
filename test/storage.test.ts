@@ -122,4 +122,43 @@ describe("Ocean CLI Persistent Storage", function () {
     );
     expect(listOutput).to.not.include(fileName);
   });
+
+  describe("Owner-only bucket (no ACL)", function () {
+    let ownerOnlyBucketId: string;
+
+    it("Alice should create a bucket without an access list", async function () {
+      const output = await runCommand(`npm run cli createBucket`);
+      expect(output).to.include("Bucket created.");
+      const idMatch = output.match(
+        /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/
+      );
+      if (!idMatch) {
+        throw new Error("Could not extract bucketId from output");
+      }
+      ownerOnlyBucketId = idMatch[0];
+      expect(output.toLowerCase()).to.include(alice.address.toLowerCase());
+    });
+
+    it("Alice (owner) should upload and list files in the no-ACL bucket", async function () {
+      const uploadOutput = await runCommand(
+        `npm run cli addFileToBucket ${ownerOnlyBucketId} ${tempFilePath}`
+      );
+      expect(uploadOutput).to.include(fileName);
+
+      const listOutput = await runCommand(
+        `npm run cli listFilesInBucket ${ownerOnlyBucketId}`
+      );
+      expect(listOutput).to.include(fileName);
+      expect(listOutput).to.not.match(/Error listing files/i);
+    });
+
+    it("Bob (not the owner) should be denied access to the no-ACL bucket", async function () {
+      const bobOutput = await runCommandAs(
+        BOB_KEY,
+        `npm run cli listFilesInBucket ${ownerOnlyBucketId}`
+      );
+      expect(bobOutput).to.not.include(fileName);
+      expect(bobOutput).to.match(/Error listing files|forbidden|unauthor|denied|not allowed/i);
+    });
+  });
 });

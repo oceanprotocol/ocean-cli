@@ -1799,17 +1799,17 @@ export class Commands {
   public async createBucket(args: string[]): Promise<void> {
     try {
       const accessListAddress = args[1];
-      if (!accessListAddress) {
-        console.error(chalk.red("accessListAddress is required"));
-        return;
-      }
-      if (!/^0x[a-fA-F0-9]{40}$/.test(accessListAddress)) {
-        console.error(chalk.red(`Invalid access list address: ${accessListAddress}`));
-        return;
+      let accessLists: Array<{ [chainId: string]: string[] }> = [];
+
+      if (accessListAddress) {
+        if (!/^0x[a-fA-F0-9]{40}$/.test(accessListAddress)) {
+          console.error(chalk.red(`Invalid access list address: ${accessListAddress}`));
+          return;
+        }
+        const { chainId } = await this.signer.provider.getNetwork();
+        accessLists = [{ [String(chainId)]: [accessListAddress] }];
       }
 
-      const { chainId } = await this.signer.provider.getNetwork();
-      const accessLists = [{ [String(chainId)]: [accessListAddress] }];
       const result = await ProviderInstance.createPersistentStorageBucket(
         this.oceanNodeUrl,
         this.signer,

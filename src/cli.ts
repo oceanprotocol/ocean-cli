@@ -818,8 +818,8 @@ export async function createCLI() {
 
   program
     .command("createBucket")
-    .description("Create a new persistent-storage bucket gated by a single access list (chain inferred from RPC)")
-    .argument("<accessListAddress>", "Access list contract address (0x…)")
+    .description("Create a new persistent-storage bucket. Pass an access list to gate it; omit for owner-only access (chain inferred from RPC)")
+    .argument("[accessListAddress]", "Access list contract address (0x…); omit for owner-only access")
     .action(async (accessListAddress) => {
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);

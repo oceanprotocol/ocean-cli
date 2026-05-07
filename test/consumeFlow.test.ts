@@ -36,7 +36,7 @@ describe("Ocean CLI Publishing", function() {
             });
         });
     };
-
+    
 
     it("should publish a dataset using 'npm run cli publish'", async function() {
         const metadataFile = path.resolve(projectRoot, "metadata/simpleDownloadDataset.json");
@@ -53,7 +53,7 @@ describe("Ocean CLI Publishing", function() {
         process.env.ADDRESS_FILE = path.join(process.env.HOME || "", ".ocean/ocean-contracts/artifacts/address.json");
 
         const output = await runCommand(`npm run cli publish ${metadataFile}`);
-		const jsonMatch = output.match(/did:op:[a-f0-9]{64}/);
+        const jsonMatch = output.match(/did:op:[a-f0-9]{64}/);
         if (!jsonMatch) {
 			console.error("Raw output:", output);
 			throw new Error("Could not find did in the output");
@@ -120,7 +120,7 @@ describe("Ocean CLI Publishing", function() {
         if (!fs.existsSync(filePath)) {
             throw new Error("Metadata file not found: " + filePath);
         }
-
+         
         const output = await runCommand(`npm run cli publishAlgo ${filePath}`);
         const jsonMatch = output.match(/did:op:[a-f0-9]{64}/);
         if (!jsonMatch) {
@@ -231,7 +231,7 @@ describe("Ocean CLI Publishing", function() {
     it("should download the download dataset", async function() {
         this.timeout(10000); // Increase timeout if needed
         const output = await runCommand(`npm run cli download ${downloadDatasetDid} .`);
-
+    
         expect(output).to.contain("File downloaded successfully");
 
         // Path to the downloaded file
@@ -248,6 +248,6 @@ describe("Ocean CLI Publishing", function() {
 
         // Clean up downloaded original file
         fs.unlinkSync(originalFilePath);
-
+    
     });
 });

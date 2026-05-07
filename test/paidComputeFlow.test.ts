@@ -126,7 +126,7 @@ describe("Ocean CLI Paid Compute", function() {
 			console.error("Raw output:", output);
 			throw new Error("Could not find compute environments in the output");
 		}
-
+    
 		let environments;
 		try {
 			environments = eval(jsonMatch[1]);
@@ -144,7 +144,7 @@ describe("Ocean CLI Paid Compute", function() {
 		expect(firstEnv).to.have.property("resources").that.is.an("array");
 
 		computeEnvId = firstEnv.id;
-
+        
 		console.log(`Fetched Compute Env ID: ${computeEnvId}`);
     });
 
@@ -215,5 +215,5 @@ describe("Ocean CLI Paid Compute", function() {
 		console.log(`Downloaded results to: ${destFolder}`);
         fs.rmSync(path.join(projectRoot, "test-results"), { recursive: true })
 	});
-
+    
 });

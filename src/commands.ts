@@ -2,33 +2,33 @@ import fs from "fs";
 import path from "path";
 import util from "util";
 import {
-	createAssetUtil,
-	handleComputeOrder,
-	updateAssetMetadata,
-	downloadFile,
-	isOrderable,
-	getIndexingWaitSettings,
-	IndexerWaitParams,
-	fixAndParseProviderFees,
-	getConfigByChainId,
+  createAssetUtil,
+  handleComputeOrder,
+  updateAssetMetadata,
+  downloadFile,
+  isOrderable,
+  getIndexingWaitSettings,
+  IndexerWaitParams,
+  fixAndParseProviderFees,
+  getConfigByChainId,
 } from "./helpers.js";
 import {
-	Aquarius,
-	ComputeAlgorithm,
-	ComputeJob,
-	Config,
-	ConfigHelper,
-	Datatoken,
-	ProviderInstance,
-	amountToUnits,
-	getHash,
-	orderAsset,
-	sendTx,
-	unitsToAmount,
-	EscrowContract,
-	getTokenDecimals,
-	AccesslistFactory,
-	AccessListContract,
+  Aquarius,
+  ComputeAlgorithm,
+  ComputeJob,
+  Config,
+  ConfigHelper,
+  Datatoken,
+  ProviderInstance,
+  amountToUnits,
+  getHash,
+  orderAsset,
+  sendTx,
+  unitsToAmount,
+  EscrowContract,
+  getTokenDecimals,
+  AccesslistFactory,
+  AccessListContract,
 } from "@oceanprotocol/lib";
 import { Asset, DDOManager } from '@oceanprotocol/ddo-js';
 import { Signer, ethers, getAddress } from "ethers";
@@ -38,180 +38,180 @@ import chalk from 'chalk';
 import { getPolicyServerOBJ, getPolicyServerOBJs } from "./policyServerHelper.js";
 
 export class Commands {
-	public signer: Signer;
-	public config: Config;
-	public aquarius: Aquarius;
-	public oceanNodeUrl: string;
-	// optional settings for indexing wait time
-	private indexingParams: IndexerWaitParams;
+  public signer: Signer;
+  public config: Config;
+  public aquarius: Aquarius;
+  public oceanNodeUrl: string;
+  // optional settings for indexing wait time
+  private indexingParams: IndexerWaitParams;
 
-	constructor(signer: Signer, network: string | number, config?: Config) {
-		this.signer = signer;
-		this.config = config || new ConfigHelper().getConfig(network);
-		this.oceanNodeUrl = process.env.NODE_URL;
-		this.indexingParams = getIndexingWaitSettings();
-		console.log("Using Ocean Node URL :", this.oceanNodeUrl);
-		this.config.nodeUri = this.oceanNodeUrl;
-		this.aquarius = new Aquarius(this.oceanNodeUrl);
-	}
+  constructor(signer: Signer, network: string | number, config?: Config) {
+    this.signer = signer;
+    this.config = config || new ConfigHelper().getConfig(network);
+    this.oceanNodeUrl = process.env.NODE_URL;
+    this.indexingParams = getIndexingWaitSettings();
+    console.log("Using Ocean Node URL :", this.oceanNodeUrl);
+    this.config.nodeUri = this.oceanNodeUrl;
+    this.aquarius = new Aquarius(this.oceanNodeUrl);
+  }
 
-	public async start() {
-		console.log("Starting the interactive CLI flow...\n\n");
-		const data = await interactiveFlow(this.oceanNodeUrl); // Collect data via CLI
-		await publishAsset(this.aquarius, data, this.signer, this.config); // Publish asset with collected data
-	}
+  public async start() {
+    console.log("Starting the interactive CLI flow...\n\n");
+    const data = await interactiveFlow(this.oceanNodeUrl); // Collect data via CLI
+    await publishAsset(this.aquarius, data, this.signer, this.config); // Publish asset with collected data
+  }
 
-	// utils
-	public async sleep(ms: number) {
-		return new Promise((resolve) => {
-			setTimeout(resolve, ms);
-		});
-	}
+  // utils
+  public async sleep(ms: number) {
+    return new Promise((resolve) => {
+      setTimeout(resolve, ms);
+    });
+  }
 
-	// commands
-	public async publish(args: string[]) {
-		console.log("start publishing");
-		let asset;
-		try {
-			asset = JSON.parse(fs.readFileSync(args[1], "utf8"));
-		} catch (e) {
-			console.error("Cannot read metadata from " + args[1]);
-			console.error(e);
-			return;
-		}
-		const encryptDDO = args[2] === "false" ? false : true;
-		try {
+  // commands
+  public async publish(args: string[]) {
+    console.log("start publishing");
+    let asset;
+    try {
+      asset = JSON.parse(fs.readFileSync(args[1], "utf8"));
+    } catch (e) {
+      console.error("Cannot read metadata from " + args[1]);
+      console.error(e);
+      return;
+    }
+    const encryptDDO = args[2] === "false" ? false : true;
+    try {
 			const ddoInstance = DDOManager.getDDOClass(asset);
 			const { indexedMetadata } = ddoInstance.getAssetFields();
 			const { services } = ddoInstance.getDDOFields();
-			// add some more checks
-			const urlAssetId = await createAssetUtil(
+      // add some more checks
+      const urlAssetId = await createAssetUtil(
 				indexedMetadata.nft.name,
 				indexedMetadata.nft.symbol,
-				this.signer,
+        this.signer,
 				(services[0].files as any).files ?? services[0].files,
-				asset,
-				this.oceanNodeUrl,
-				this.config,
-				this.aquarius,
-				encryptDDO
-			);
-			console.log("Asset published. ID:  " + urlAssetId);
-		} catch (e) {
-			console.error("Error when publishing dataset from file: " + args[1]);
-			console.error(e);
-			return;
-		}
-	}
+        asset,
+        this.oceanNodeUrl,
+        this.config,
+        this.aquarius,
+        encryptDDO
+      );
+      console.log("Asset published. ID:  " + urlAssetId);
+    } catch (e) {
+      console.error("Error when publishing dataset from file: " + args[1]);
+      console.error(e);
+      return;
+    }
+  }
 
-	public async publishAlgo(args: string[]) {
-		let algoAsset;
-		try {
-			algoAsset = JSON.parse(fs.readFileSync(args[1], "utf8"));
-		} catch (e) {
-			console.error("Cannot read metadata from " + args[1]);
-			console.error(e);
-			return;
-		}
-		const encryptDDO = args[2] === "false" ? false : true;
-		// add some more checks
-		try {
+  public async publishAlgo(args: string[]) {
+    let algoAsset;
+    try {
+      algoAsset = JSON.parse(fs.readFileSync(args[1], "utf8"));
+    } catch (e) {
+      console.error("Cannot read metadata from " + args[1]);
+      console.error(e);
+      return;
+    }
+    const encryptDDO = args[2] === "false" ? false : true;
+    // add some more checks
+    try {
 			const ddoInstance = DDOManager.getDDOClass(algoAsset);
 			const { indexedMetadata } = ddoInstance.getAssetFields();
 			const { services } = ddoInstance.getDDOFields();
-			const algoDid = await createAssetUtil(
+      const algoDid = await createAssetUtil(
 				indexedMetadata.nft.name,
 				indexedMetadata.nft.symbol,
-				this.signer,
+        this.signer,
 				(services[0].files as any).files ?? services[0].files,
-				algoAsset,
-				this.oceanNodeUrl,
-				this.config,
-				this.aquarius,
-				encryptDDO
-			);
-			// add some more checks
-			console.log("Algorithm published. DID:  " + algoDid);
-		} catch (e) {
-			console.error("Error when publishing dataset from file: " + args[1]);
-			console.error(e);
-			return;
-		}
-	}
+        algoAsset,
+        this.oceanNodeUrl,
+        this.config,
+        this.aquarius,
+        encryptDDO
+      );
+      // add some more checks
+      console.log("Algorithm published. DID:  " + algoDid);
+    } catch (e) {
+      console.error("Error when publishing dataset from file: " + args[1]);
+      console.error(e);
+      return;
+    }
+  }
 
-	public async editAsset(args: string[]) {
-		const asset = await this.aquarius.waitForIndexer(
-			args[1],
-			null,
-			null,
-			this.indexingParams.retryInterval,
-			this.indexingParams.maxRetries
-		);
-		if (!asset) {
-			console.error(
-				"Error fetching DDO " + args[1] + ".  Does this asset exists?"
-			);
-			return;
-		}
-		const encryptDDO = args[3] === "false" ? false : true;
-		let updateJson;
-		try {
-			updateJson = JSON.parse(fs.readFileSync(args[2], "utf8"));
-		} catch (e) {
-			console.error("Cannot read metadata from " + args[2]);
-			console.error(e);
-			return;
-		}
-		// Get keys and values
-		const keys = Object.keys(updateJson);
+  public async editAsset(args: string[]) {
+    const asset = await this.aquarius.waitForIndexer(
+      args[1],
+      null,
+      null,
+      this.indexingParams.retryInterval,
+      this.indexingParams.maxRetries
+    );
+    if (!asset) {
+      console.error(
+        "Error fetching DDO " + args[1] + ".  Does this asset exists?"
+      );
+      return;
+    }
+    const encryptDDO = args[3] === "false" ? false : true;
+    let updateJson;
+    try {
+      updateJson = JSON.parse(fs.readFileSync(args[2], "utf8"));
+    } catch (e) {
+      console.error("Cannot read metadata from " + args[2]);
+      console.error(e);
+      return;
+    }
+    // Get keys and values
+    const keys = Object.keys(updateJson);
 
-		for (const key of keys) {
-			asset[key] = updateJson[key];
-		}
+    for (const key of keys) {
+      asset[key] = updateJson[key];
+    }
 
-		const updateAssetTx = await updateAssetMetadata(
-			this.signer,
-			asset,
-			this.oceanNodeUrl,
-			this.aquarius,
-			encryptDDO
-		);
-		console.log("Asset updated. Tx: " + JSON.stringify(updateAssetTx, null, 2));
-	}
+    const updateAssetTx = await updateAssetMetadata(
+      this.signer,
+      asset,
+      this.oceanNodeUrl,
+      this.aquarius,
+      encryptDDO
+    );
+    console.log("Asset updated. Tx: " + JSON.stringify(updateAssetTx, null, 2));
+  }
 
-	public async getDDO(args: string[]) {
-		console.log("Resolving Asset with DID: " + args[1]);
-		const resolvedDDO = await this.aquarius.waitForIndexer(
-			args[1],
-			null,
-			null,
-			this.indexingParams.retryInterval,
-			this.indexingParams.maxRetries
-		);
-		if (!resolvedDDO) {
-			console.error(
-				"Error fetching Asset with DID: " +
-				args[1] +
-				".  Does this asset exists?"
-			);
-		} else console.log(util.inspect(resolvedDDO, false, null, true));
-	}
+  public async getDDO(args: string[]) {
+    console.log("Resolving Asset with DID: " + args[1]);
+    const resolvedDDO = await this.aquarius.waitForIndexer(
+      args[1],
+      null,
+      null,
+      this.indexingParams.retryInterval,
+      this.indexingParams.maxRetries
+    );
+    if (!resolvedDDO) {
+      console.error(
+        "Error fetching Asset with DID: " +
+          args[1] +
+          ".  Does this asset exists?"
+      );
+    } else console.log(util.inspect(resolvedDDO, false, null, true));
+  }
 
-	public async download(args: string[]) {
+  public async download(args: string[]) {
 		const did = args[1];
-		const dataDdo = await this.aquarius.waitForIndexer(
+    const dataDdo = await this.aquarius.waitForIndexer(
 			did,
-			null,
-			null,
-			this.indexingParams.retryInterval,
-			this.indexingParams.maxRetries
-		);
-		if (!dataDdo) {
-			console.error(
+      null,
+      null,
+      this.indexingParams.retryInterval,
+      this.indexingParams.maxRetries
+    );
+    if (!dataDdo) {
+      console.error(
 				"Error fetching DDO " + did + ".  Does this asset exists?"
-			);
-			return;
-		}
+      );
+      return;
+    }
 
 		const ddoInstance = DDOManager.getDDOClass(dataDdo);
 		const { services, version } = ddoInstance.getDDOFields();
@@ -224,63 +224,63 @@ export class Commands {
 		} catch (error) {
 			throw new Error('Error getting Policy Server Object: ' + error.message)
 		}
-		const datatoken = new Datatoken(
-			this.signer,
-			this.config.chainId,
-			this.config
-		);
-		const tx = await orderAsset(
-			dataDdo,
-			this.signer,
-			this.config,
-			datatoken,
-			this.oceanNodeUrl
-		);
+    const datatoken = new Datatoken(
+      this.signer,
+      this.config.chainId,
+      this.config
+    );
+    const tx = await orderAsset(
+      dataDdo,
+      this.signer,
+      this.config,
+      datatoken,
+      this.oceanNodeUrl
+    );
 
-		if (!tx) {
-			console.error(
+    if (!tx) {
+      console.error(
 				"Error ordering access for " + did + ".  Do you have enough tokens?"
-			);
-			return;
-		}
+      );
+      return;
+    }
 
-		const orderTx = await tx.wait();
+    const orderTx = await tx.wait();
 
-		const downloadResult = await ProviderInstance.getDownloadUrl(
-			dataDdo.id,
+    const downloadResult = await ProviderInstance.getDownloadUrl(
+      dataDdo.id,
 			serviceId,
-			0,
-			orderTx.hash,
-			this.oceanNodeUrl,
+      0,
+      orderTx.hash,
+      this.oceanNodeUrl,
 			this.signer,
 			policyServer
-		);
-		try {
-			const destPath = args[2] ? args[2] : ".";
-			if (typeof downloadResult === "string") {
-				const { filename } = await downloadFile(downloadResult, destPath);
-				console.log("File downloaded successfully:", destPath + "/" + filename);
-			} else {
-				const filename = downloadResult.filename || "file.out";
-				const filePath = path.join(destPath, filename);
-				fs.writeFileSync(filePath, Buffer.from(downloadResult.data));
-				console.log("File downloaded successfully:", filePath);
-			}
-		} catch (e) {
-			console.log(`Download url dataset failed: ${e}`);
-		}
-	}
+    );
+    try {
+      const destPath = args[2] ? args[2] : ".";
+      if (typeof downloadResult === "string") {
+        const { filename } = await downloadFile(downloadResult, destPath);
+        console.log("File downloaded successfully:", destPath + "/" + filename);
+      } else {
+        const filename = downloadResult.filename || "file.out";
+        const filePath = path.join(destPath, filename);
+        fs.writeFileSync(filePath, Buffer.from(downloadResult.data));
+        console.log("File downloaded successfully:", filePath);
+      }
+    } catch (e) {
+      console.log(`Download url dataset failed: ${e}`);
+    }
+  }
 
-	public async initializeCompute(args: string[]) {
-		const inputDatasetsString = args[1];
-		let inputDatasets = [];
+  public async initializeCompute(args: string[]) {
+    const inputDatasetsString = args[1];
+    let inputDatasets = [];
 
 		if (!inputDatasetsString || inputDatasetsString.trim() === '[]') {
 			inputDatasets = [];
-		} else {
+    } else {
 			const cleaned = inputDatasetsString.replaceAll('[', '').replaceAll(']', '');
 			inputDatasets = cleaned.split(',').map(s => s.trim()).filter(Boolean);
-		}
+    }
 
 		const inputServicesString = args[8];
 		let inputServices: string[] = [];
@@ -290,82 +290,82 @@ export class Commands {
 			inputServices = inputServicesString.map(String).map(s => s.trim()).filter(Boolean);
 		}
 
-		const ddos = [];
+    const ddos = [];
 
-		for (const dataset in inputDatasets) {
-			const dataDdo = await this.aquarius.waitForIndexer(
-				inputDatasets[dataset],
-				null,
-				null,
-				this.indexingParams.retryInterval,
-				this.indexingParams.maxRetries
-			);
-			if (!dataDdo) {
-				console.error(
-					"Error fetching DDO " + dataset[1] + ".  Does this asset exists?"
-				);
-				return;
-			} else {
-				ddos.push(dataDdo);
-			}
-		}
-		if (
-			inputDatasets.length > 0 &&
-			(ddos.length <= 0 || ddos.length != inputDatasets.length)
-		) {
-			console.error("Not all the data ddos are available.");
-			return;
-		}
-		let providerURI = this.oceanNodeUrl;
+    for (const dataset in inputDatasets) {
+      const dataDdo = await this.aquarius.waitForIndexer(
+        inputDatasets[dataset],
+        null,
+        null,
+        this.indexingParams.retryInterval,
+        this.indexingParams.maxRetries
+      );
+      if (!dataDdo) {
+        console.error(
+          "Error fetching DDO " + dataset[1] + ".  Does this asset exists?"
+        );
+        return;
+      } else {
+        ddos.push(dataDdo);
+      }
+    }
+    if (
+      inputDatasets.length > 0 &&
+      (ddos.length <= 0 || ddos.length != inputDatasets.length)
+    ) {
+      console.error("Not all the data ddos are available.");
+      return;
+    }
+    let providerURI = this.oceanNodeUrl;
 		const ddoInstance = DDOManager.getDDOClass(ddos[0]);
 		const { services } = ddoInstance.getDDOFields();
-		if (ddos.length > 0) {
+    if (ddos.length > 0) {
 			providerURI = services[0].serviceEndpoint;
-		}
-		const algoDdo = await this.aquarius.waitForIndexer(
-			args[2],
-			null,
-			null,
-			this.indexingParams.retryInterval,
-			this.indexingParams.maxRetries
-		);
-		if (!algoDdo) {
-			console.error(
-				"Error fetching DDO " + args[1] + ".  Does this asset exists?"
-			);
-			return;
-		}
+    }
+    const algoDdo = await this.aquarius.waitForIndexer(
+      args[2],
+      null,
+      null,
+      this.indexingParams.retryInterval,
+      this.indexingParams.maxRetries
+    );
+    if (!algoDdo) {
+      console.error(
+        "Error fetching DDO " + args[1] + ".  Does this asset exists?"
+      );
+      return;
+    }
 
-		const computeEnvs = await ProviderInstance.getComputeEnvironments(
-			this.oceanNodeUrl
-		);
+    const computeEnvs = await ProviderInstance.getComputeEnvironments(
+      this.oceanNodeUrl
+    );
 
-		if (!computeEnvs || computeEnvs.length < 1) {
-			console.error(
-				"Error fetching compute environments. No compute environments available."
-			);
-			return;
-		}
+    if (!computeEnvs || computeEnvs.length < 1) {
+      console.error(
+        "Error fetching compute environments. No compute environments available."
+      );
+      return;
+    }
 
-		const computeEnvID = args[3];
-		// NO chainId needed anymore (is not part of ComputeEnvironment spec anymore)
-		// const chainComputeEnvs = computeEnvs[computeEnvID]; // was algoDdo.chainId
-		let computeEnv = null; // chainComputeEnvs[0];
-		if (computeEnvID && computeEnvID.length > 1) {
-			for (const index in computeEnvs) {
-				if (computeEnvID == computeEnvs[index].id) {
-					computeEnv = computeEnvs[index];
-					break;
-				}
-			}
-		}
-		if (!computeEnv || !computeEnvID) {
-			console.error(
-				"Error fetching compute environment. No compute environment matches id: ",
-				computeEnvID
-			);
-			return;
-		}
+    const computeEnvID = args[3];
+    // NO chainId needed anymore (is not part of ComputeEnvironment spec anymore)
+    // const chainComputeEnvs = computeEnvs[computeEnvID]; // was algoDdo.chainId
+    let computeEnv = null; // chainComputeEnvs[0];
+    if (computeEnvID && computeEnvID.length > 1) {
+      for (const index in computeEnvs) {
+        if (computeEnvID == computeEnvs[index].id) {
+          computeEnv = computeEnvs[index];
+          break;
+        }
+      }
+    }
+    if (!computeEnv || !computeEnvID) {
+      console.error(
+        "Error fetching compute environment. No compute environment matches id: ",
+        computeEnvID
+      );
+      return;
+    }
 		const ddoAlgoInstance = DDOManager.getDDOClass(algoDdo);
 		const { services: servicesAlgo, metadata: metadataAlgo, version: versionAlgo } = ddoAlgoInstance.getDDOFields();
 		const algoServiceIdInput = args[9] as string | undefined;
@@ -382,11 +382,11 @@ export class Commands {
 			}
 			chosenAlgoServiceId = expectedAlgoServiceId;
 		}
-		const algo: ComputeAlgorithm = {
-			documentId: algoDdo.id,
+    const algo: ComputeAlgorithm = {
+      documentId: algoDdo.id,
 			serviceId: chosenAlgoServiceId,
 			meta: metadataAlgo.algorithm,
-		};
+    };
 
 		const assetAlgo: {
 			documentId: string;
@@ -399,8 +399,8 @@ export class Commands {
 			asset: algoDdo,
 			version: versionAlgo
 		};
-		const assets = [];
-		for (const dataDdo in ddos) {
+    const assets = [];
+    for (const dataDdo in ddos) {
 			const ddoInstanceDdo = DDOManager.getDDOClass(ddos[dataDdo]);
 			const { services: servicesDdo, version: versionDdo } = ddoInstanceDdo.getDDOFields();
 			let chosenServiceId = servicesDdo[0].id;
@@ -423,147 +423,147 @@ export class Commands {
 					providerURI = servicesDdo[0].serviceEndpoint;
 				}
 			}
-			const canStartCompute = isOrderable(
-				ddos[dataDdo],
+      const canStartCompute = isOrderable(
+        ddos[dataDdo],
 				chosenServiceId,
-				algo,
-				algoDdo
-			);
-			if (!canStartCompute) {
-				console.error(
-					"Error Cannot start compute job using the datasets DIDs & algorithm DID provided"
-				);
-				return;
-			}
-			assets.push({
-				documentId: ddos[dataDdo].id,
+        algo,
+        algoDdo
+      );
+      if (!canStartCompute) {
+        console.error(
+          "Error Cannot start compute job using the datasets DIDs & algorithm DID provided"
+        );
+        return;
+      }
+      assets.push({
+        documentId: ddos[dataDdo].id,
 				serviceId: chosenServiceId,
 				asset: ddos[dataDdo],
 				version: versionDdo
-			});
-		}
+      });
+    }
 		const maxJobDuration = Number(args[4])
-		if (!maxJobDuration) {
-			console.error(
-				"Error initializing Provider for the compute job using dataset DID " +
-				args[1] +
-				" and algorithm DID " +
-				args[2] +
-				" because maxJobDuration was not provided."
-			);
-			return;
-		}
-		if (maxJobDuration < 0) {
-			console.error(
-				"Error initializing Provider for the compute job using dataset DID " +
-				args[1] +
-				" and algorithm DID " +
-				args[2] +
-				" because maxJobDuration is less than 0. It should be in seconds."
-			);
-			return;
-		}
-		let supportedMaxJobDuration: number = maxJobDuration;
-		if (maxJobDuration > computeEnv.maxJobDuration) {
-			supportedMaxJobDuration = computeEnv.maxJobDuration;
-		}
+    if (!maxJobDuration) {
+      console.error(
+        "Error initializing Provider for the compute job using dataset DID " +
+          args[1] +
+          " and algorithm DID " +
+          args[2] +
+          " because maxJobDuration was not provided."
+      );
+      return;
+    }
+    if (maxJobDuration < 0) {
+      console.error(
+        "Error initializing Provider for the compute job using dataset DID " +
+          args[1] +
+          " and algorithm DID " +
+          args[2] +
+          " because maxJobDuration is less than 0. It should be in seconds."
+      );
+      return;
+    }
+    let supportedMaxJobDuration: number = maxJobDuration;
+    if (maxJobDuration > computeEnv.maxJobDuration) {
+      supportedMaxJobDuration = computeEnv.maxJobDuration;
+    }
 		const paymentToken = args[5]
-		if (!paymentToken) {
-			console.error(
-				"Error initializing Provider for the compute job using dataset DID " +
-				args[1] +
-				" and algorithm DID " +
-				args[2] +
-				" because paymentToken was not provided."
-			);
-			return;
-		}
+    if (!paymentToken) {
+      console.error(
+        "Error initializing Provider for the compute job using dataset DID " +
+          args[1] +
+          " and algorithm DID " +
+          args[2] +
+          " because paymentToken was not provided."
+      );
+      return;
+    }
 		const { chainId } = await this.signer.provider.getNetwork()
-		if (!Object.keys(computeEnv.fees).includes(chainId.toString())) {
-			console.error(
-				"Error starting paid compute using dataset DID " +
-				args[1] +
-				" and algorithm DID " +
-				args[2] +
-				" because chainId is not supported by compute environment. " +
-				args[3] +
-				". Supported chain IDs: " +
-				computeEnv.fees.keys()
-			);
-			return;
-		}
-		let found: boolean = false;
-		for (const fee of computeEnv.fees[chainId.toString()]) {
-			if (fee.feeToken.toLowerCase() === paymentToken.toLowerCase()) {
-				found = true;
-				break;
-			}
-		}
-		if (found === false) {
-			console.error(
-				"Error initializing Provider for the compute job using dataset DID " +
-				args[1] +
-				" and algorithm DID " +
-				args[2] +
-				" because paymentToken is not supported by this environment " +
-				args[3]
-			);
-			return;
-		}
+    if (!Object.keys(computeEnv.fees).includes(chainId.toString())) {
+      console.error(
+        "Error starting paid compute using dataset DID " +
+          args[1] +
+          " and algorithm DID " +
+          args[2] +
+          " because chainId is not supported by compute environment. " +
+          args[3] +
+          ". Supported chain IDs: " +
+          computeEnv.fees.keys()
+      );
+      return;
+    }
+    let found: boolean = false;
+    for (const fee of computeEnv.fees[chainId.toString()]) {
+      if (fee.feeToken.toLowerCase() === paymentToken.toLowerCase()) {
+        found = true;
+        break;
+      }
+    }
+    if (found === false) {
+      console.error(
+        "Error initializing Provider for the compute job using dataset DID " +
+          args[1] +
+          " and algorithm DID " +
+          args[2] +
+          " because paymentToken is not supported by this environment " +
+          args[3]
+      );
+      return;
+    }
 		const resources = args[6] // resources object should be stringified in cli when calling initializeCompute
-		if (!resources) {
-			console.error(
-				"Error initializing Provider for the compute job using dataset DID " +
-				args[1] +
-				" and algorithm DID " +
-				args[2] +
-				" because resources for compute were not provided."
-			);
-			return;
-		}
+    if (!resources) {
+      console.error(
+        "Error initializing Provider for the compute job using dataset DID " +
+          args[1] +
+          " and algorithm DID " +
+          args[2] +
+          " because resources for compute were not provided."
+      );
+      return;
+    }
 		const policiesServer = await getPolicyServerOBJs(assets, assetAlgo, this.signer, this.oceanNodeUrl);
-		const parsedResources = JSON.parse(resources);
-		const providerInitializeComputeJob =
-			await ProviderInstance.initializeCompute(
-				assets,
-				algo,
-				computeEnv.id,
-				paymentToken,
-				supportedMaxJobDuration,
-				providerURI,
-				await this.signer.getAddress(),
-				parsedResources,
+    const parsedResources = JSON.parse(resources);
+    const providerInitializeComputeJob =
+      await ProviderInstance.initializeCompute(
+        assets,
+        algo,
+        computeEnv.id,
+        paymentToken,
+        supportedMaxJobDuration,
+        providerURI,
+        await this.signer.getAddress(),
+        parsedResources,
 				Number(chainId),
 				policiesServer
-			);
-		if (
-			!providerInitializeComputeJob ||
-			"error" in providerInitializeComputeJob.algorithm
-		) {
-			console.error(
-				"Error initializing Provider for the compute job using dataset DID " +
-				args[1] +
-				" and algorithm DID " +
-				args[2]
-			);
-			return;
-		}
+      );
+    if (
+      !providerInitializeComputeJob ||
+      "error" in providerInitializeComputeJob.algorithm
+    ) {
+      console.error(
+        "Error initializing Provider for the compute job using dataset DID " +
+          args[1] +
+          " and algorithm DID " +
+          args[2]
+      );
+      return;
+    }
 		console.log(chalk.yellow('\n--- Payment Details ---'));
-		console.log(JSON.stringify(providerInitializeComputeJob, null, 2));
-		return providerInitializeComputeJob;
+    console.log(JSON.stringify(providerInitializeComputeJob, null, 2));
+    return providerInitializeComputeJob;
 
-	}
+  }
 
-	public async computeStart(args: string[]) {
-		const inputDatasetsString = args[1];
-		let inputDatasets = [];
+  public async computeStart(args: string[]) {
+    const inputDatasetsString = args[1];
+    let inputDatasets = [];
 
 		if (!inputDatasetsString || inputDatasetsString.trim() === '[]') {
 			inputDatasets = [];
-		} else {
+    } else {
 			const cleaned = inputDatasetsString.replaceAll('[', '').replaceAll(']', '');
 			inputDatasets = cleaned.split(',').map(s => s.trim()).filter(Boolean);
-		}
+    }
 
 		const inputServicesString = args[9];
 		let inputServices: string[] = [];
@@ -574,82 +574,82 @@ export class Commands {
 		}
 
 
-		const ddos = [];
+    const ddos = [];
 
-		for (const dataset in inputDatasets) {
-			const dataDdo = await this.aquarius.waitForIndexer(
-				inputDatasets[dataset],
-				null,
-				null,
-				this.indexingParams.retryInterval,
-				this.indexingParams.maxRetries
-			);
-			if (!dataDdo) {
-				console.error(
-					"Error fetching DDO " + dataset[1] + ".  Does this asset exists?"
-				);
-				return;
-			} else {
-				ddos.push(dataDdo);
-			}
-		}
-		if (
-			inputDatasets.length > 0 &&
-			(ddos.length <= 0 || ddos.length != inputDatasets.length)
-		) {
-			console.error("Not all the data ddos are available.");
-			return;
-		}
-		let providerURI = this.oceanNodeUrl;
+    for (const dataset in inputDatasets) {
+      const dataDdo = await this.aquarius.waitForIndexer(
+        inputDatasets[dataset],
+        null,
+        null,
+        this.indexingParams.retryInterval,
+        this.indexingParams.maxRetries
+      );
+      if (!dataDdo) {
+        console.error(
+          "Error fetching DDO " + dataset[1] + ".  Does this asset exists?"
+        );
+        return;
+      } else {
+        ddos.push(dataDdo);
+      }
+    }
+    if (
+      inputDatasets.length > 0 &&
+      (ddos.length <= 0 || ddos.length != inputDatasets.length)
+    ) {
+      console.error("Not all the data ddos are available.");
+      return;
+    }
+    let providerURI = this.oceanNodeUrl;
 		const ddoInstance = DDOManager.getDDOClass(ddos[0]);
 		const { services } = ddoInstance.getDDOFields();
-		if (ddos.length > 0) {
+    if (ddos.length > 0) {
 			providerURI = services[0].serviceEndpoint;
-		}
-		const algoDdo = await this.aquarius.waitForIndexer(
-			args[2],
-			null,
-			null,
-			this.indexingParams.retryInterval,
-			this.indexingParams.maxRetries
-		);
-		if (!algoDdo) {
-			console.error(
-				"Error fetching DDO " + args[1] + ".  Does this asset exists?"
-			);
-			return;
-		}
+    }
+    const algoDdo = await this.aquarius.waitForIndexer(
+      args[2],
+      null,
+      null,
+      this.indexingParams.retryInterval,
+      this.indexingParams.maxRetries
+    );
+    if (!algoDdo) {
+      console.error(
+        "Error fetching DDO " + args[1] + ".  Does this asset exists?"
+      );
+      return;
+    }
 
-		const computeEnvs = await ProviderInstance.getComputeEnvironments(
-			this.oceanNodeUrl
-		);
+    const computeEnvs = await ProviderInstance.getComputeEnvironments(
+      this.oceanNodeUrl
+    );
 
-		if (!computeEnvs || computeEnvs.length < 1) {
-			console.error(
-				"Error fetching compute environments. No compute environments available."
-			);
-			return;
-		}
-		const computeEnvID = args[3];
-		// NO chainId needed anymore (is not part of ComputeEnvironment spec anymore)
-		// const chainComputeEnvs = computeEnvs[computeEnvID]; // was algoDdo.chainId
-		let computeEnv = null; // chainComputeEnvs[0];
+    if (!computeEnvs || computeEnvs.length < 1) {
+      console.error(
+        "Error fetching compute environments. No compute environments available."
+      );
+      return;
+    }
+    const computeEnvID = args[3];
+    // NO chainId needed anymore (is not part of ComputeEnvironment spec anymore)
+    // const chainComputeEnvs = computeEnvs[computeEnvID]; // was algoDdo.chainId
+    let computeEnv = null; // chainComputeEnvs[0];
 
-		if (computeEnvID && computeEnvID.length > 1) {
-			for (const index in computeEnvs) {
-				if (computeEnvID == computeEnvs[index].id) {
-					computeEnv = computeEnvs[index];
-					break;
-				}
-			}
-		}
-		if (!computeEnv || !computeEnvID) {
-			console.error(
-				"Error fetching compute environment. No compute environment matches id: ",
-				computeEnvID
-			);
-			return;
-		}
+    if (computeEnvID && computeEnvID.length > 1) {
+      for (const index in computeEnvs) {
+        if (computeEnvID == computeEnvs[index].id) {
+          computeEnv = computeEnvs[index];
+          break;
+        }
+      }
+    }
+    if (!computeEnv || !computeEnvID) {
+      console.error(
+        "Error fetching compute environment. No compute environment matches id: ",
+        computeEnvID
+      );
+      return;
+    }
 		const ddoInstanceAlgo = DDOManager.getDDOClass(algoDdo);
 		const { services: servicesAlgo, metadata: metadataAlgo, version: versionAlgo } = ddoInstanceAlgo.getDDOFields();
 		const algoServiceIdInput = args[10] as string | undefined;
@@ -671,11 +671,11 @@ export class Commands {
 			console.error(`Could not resolve serviceIndex for algorithm serviceId ${chosenAlgoServiceId}`);
 			return;
 		}
-		const algo: ComputeAlgorithm = {
-			documentId: algoDdo.id,
+    const algo: ComputeAlgorithm = {
+      documentId: algoDdo.id,
 			serviceId: chosenAlgoServiceId,
 			meta: metadataAlgo.algorithm,
-		};
+    };
 
 		const assetAlgo: {
 			documentId: string;
@@ -689,9 +689,9 @@ export class Commands {
 			version: versionAlgo
 		};
 
-		const assets = [];
+    const assets = [];
 		const datasetServiceIndex: number[] = [];
-		for (const dataDdo in ddos) {
+    for (const dataDdo in ddos) {
 			const ddoInstanceDdo = DDOManager.getDDOClass(ddos[dataDdo]);
 			const { services: servicesDdo, version: versionDdo } = ddoInstanceDdo.getDDOFields();
 			let chosenServiceId = servicesDdo[0].id;
@@ -722,238 +722,238 @@ export class Commands {
 				return;
 			}
 			datasetServiceIndex.push(chosenServiceIndex);
-			const canStartCompute = isOrderable(
-				ddos[dataDdo],
+      const canStartCompute = isOrderable(
+        ddos[dataDdo],
 				chosenServiceId,
-				algo,
-				algoDdo
-			);
-			if (!canStartCompute) {
-				console.error(
-					"Error Cannot start compute job using the datasets DIDs & algorithm DID provided"
-				);
-				return;
-			}
-			assets.push({
-				documentId: ddos[dataDdo].id,
+        algo,
+        algoDdo
+      );
+      if (!canStartCompute) {
+        console.error(
+          "Error Cannot start compute job using the datasets DIDs & algorithm DID provided"
+        );
+        return;
+      }
+      assets.push({
+        documentId: ddos[dataDdo].id,
 				serviceId: chosenServiceId,
 				asset: ddos[dataDdo],
 				version: versionDdo
-			});
-		}
-		const providerInitializeComputeJob = args[4]; // provider fees + payment
+      });
+    }
+    const providerInitializeComputeJob = args[4]; // provider fees + payment
 		const parsedProviderInitializeComputeJob = fixAndParseProviderFees(providerInitializeComputeJob)
-		console.log("Ordering algorithm: ", args[2]);
-		const datatoken = new Datatoken(
-			this.signer,
-			(await this.signer.provider.getNetwork()).chainId.toString(),
-			this.config
-		);
-		algo.transferTxId = await handleComputeOrder(
-			parsedProviderInitializeComputeJob?.algorithm,
-			algoDdo,
-			this.signer,
-			computeEnv.consumerAddress,
+    console.log("Ordering algorithm: ", args[2]);
+    const datatoken = new Datatoken(
+      this.signer,
+      (await this.signer.provider.getNetwork()).chainId.toString(),
+      this.config
+    );
+    algo.transferTxId = await handleComputeOrder(
+      parsedProviderInitializeComputeJob?.algorithm,
+      algoDdo,
+      this.signer,
+      computeEnv.consumerAddress,
 			algoServiceIndex,
-			datatoken,
-			this.config,
-			parsedProviderInitializeComputeJob?.algorithm?.providerFee,
-			providerURI
-		);
-		if (!algo.transferTxId) {
-			console.error(
-				"Error ordering compute for algorithm with DID: " +
-				args[2] +
-				".  Do you have enough tokens?"
-			);
-			return;
-		}
-		console.log("Ordering assets: ", args[1]);
+      datatoken,
+      this.config,
+      parsedProviderInitializeComputeJob?.algorithm?.providerFee,
+      providerURI
+    );
+    if (!algo.transferTxId) {
+      console.error(
+        "Error ordering compute for algorithm with DID: " +
+          args[2] +
+          ".  Do you have enough tokens?"
+      );
+      return;
+    }
+    console.log("Ordering assets: ", args[1]);
 
-		for (let i = 0; i < ddos.length; i++) {
-			assets[i].transferTxId = await handleComputeOrder(
-				parsedProviderInitializeComputeJob?.datasets[i],
-				ddos[i],
-				this.signer,
-				computeEnv.consumerAddress,
+    for (let i = 0; i < ddos.length; i++) {
+      assets[i].transferTxId = await handleComputeOrder(
+        parsedProviderInitializeComputeJob?.datasets[i],
+        ddos[i],
+        this.signer,
+        computeEnv.consumerAddress,
 				datasetServiceIndex[i],
-				datatoken,
-				this.config,
-				parsedProviderInitializeComputeJob?.datasets[i].providerFee,
-				providerURI
-			);
-			if (!assets[i].transferTxId) {
-				console.error(
-					"Error ordering dataset with DID: " +
-					assets[i] +
-					".  Do you have enough tokens?"
-				);
-				return;
-			}
-		}
-		// payment check
+        datatoken,
+        this.config,
+        parsedProviderInitializeComputeJob?.datasets[i].providerFee,
+        providerURI
+      );
+      if (!assets[i].transferTxId) {
+        console.error(
+          "Error ordering dataset with DID: " +
+            assets[i] +
+            ".  Do you have enough tokens?"
+        );
+        return;
+      }
+    }
+    // payment check
 		const maxJobDuration = Number(args[5])
-		if (!maxJobDuration) {
-			console.error(
-				"Error initializing Provider for the compute job using dataset DID " +
-				args[1] +
-				" and algorithm DID " +
-				args[2] +
-				" because maxJobDuration was not provided."
-			);
-			return;
-		}
-		if (maxJobDuration < 0) {
-			console.error(
-				"Error starting paid compute using dataset DID " +
-				args[1] +
-				" and algorithm DID " +
-				args[2] +
-				" because maxJobDuration is less than 0. It should be in seconds."
-			);
-			return;
-		}
-		let supportedMaxJobDuration: number = maxJobDuration;
-		if (maxJobDuration > computeEnv.maxJobDuration) {
-			supportedMaxJobDuration = computeEnv.maxJobDuration;
-		}
+    if (!maxJobDuration) {
+      console.error(
+        "Error initializing Provider for the compute job using dataset DID " +
+          args[1] +
+          " and algorithm DID " +
+          args[2] +
+          " because maxJobDuration was not provided."
+      );
+      return;
+    }
+    if (maxJobDuration < 0) {
+      console.error(
+        "Error starting paid compute using dataset DID " +
+          args[1] +
+          " and algorithm DID " +
+          args[2] +
+          " because maxJobDuration is less than 0. It should be in seconds."
+      );
+      return;
+    }
+    let supportedMaxJobDuration: number = maxJobDuration;
+    if (maxJobDuration > computeEnv.maxJobDuration) {
+      supportedMaxJobDuration = computeEnv.maxJobDuration;
+    }
 		const { chainId } = await this.signer.provider.getNetwork()
 		const paymentToken = args[6]
-		if (!paymentToken) {
-			console.error(
-				"Error starting paid compute using dataset DID " +
-				args[1] +
-				" and algorithm DID " +
-				args[2] +
-				" because paymentToken was not provided."
-			);
-			return;
-		}
-		if (!Object.keys(computeEnv.fees).includes(chainId.toString())) {
-			console.error(
-				"Error starting paid compute using dataset DID " +
-				args[1] +
-				" and algorithm DID " +
-				args[2] +
-				" because chainId is not supported by compute environment. " +
-				args[3] +
-				". Supported chain IDs: " +
-				computeEnv.fees.keys()
-			);
-			return;
-		}
-		let found: boolean = false;
-		for (const fee of computeEnv.fees[chainId.toString()]) {
-			if (fee.feeToken.toLowerCase() === paymentToken.toLowerCase()) {
-				found = true;
-				break;
-			}
-		}
-		if (found === false) {
-			console.error(
-				"Error starting paid compute using dataset DID " +
-				args[1] +
-				" and algorithm DID " +
-				args[2] +
-				" because paymentToken is not supported by this environment " +
-				args[3]
-			);
-			return;
-		}
+    if (!paymentToken) {
+      console.error(
+        "Error starting paid compute using dataset DID " +
+          args[1] +
+          " and algorithm DID " +
+          args[2] +
+          " because paymentToken was not provided."
+      );
+      return;
+    }
+    if (!Object.keys(computeEnv.fees).includes(chainId.toString())) {
+      console.error(
+        "Error starting paid compute using dataset DID " +
+          args[1] +
+          " and algorithm DID " +
+          args[2] +
+          " because chainId is not supported by compute environment. " +
+          args[3] +
+          ". Supported chain IDs: " +
+          computeEnv.fees.keys()
+      );
+      return;
+    }
+    let found: boolean = false;
+    for (const fee of computeEnv.fees[chainId.toString()]) {
+      if (fee.feeToken.toLowerCase() === paymentToken.toLowerCase()) {
+        found = true;
+        break;
+      }
+    }
+    if (found === false) {
+      console.error(
+        "Error starting paid compute using dataset DID " +
+          args[1] +
+          " and algorithm DID " +
+          args[2] +
+          " because paymentToken is not supported by this environment " +
+          args[3]
+      );
+      return;
+    }
 		const resources = args[7] // resources object should be stringified in cli when calling initializeCompute
-		if (!resources) {
-			console.error(
-				"Error starting paid compute using dataset DID " +
-				args[1] +
-				" and algorithm DID " +
-				args[2] +
-				" because resources for compute were not provided."
-			);
-			return;
-		}
+    if (!resources) {
+      console.error(
+        "Error starting paid compute using dataset DID " +
+          args[1] +
+          " and algorithm DID " +
+          args[2] +
+          " because resources for compute were not provided."
+      );
+      return;
+    }
 
-		const escrow = new EscrowContract(
-			getAddress(parsedProviderInitializeComputeJob.payment.escrowAddress),
-			this.signer
-		);
-		console.log("Verifying payment...");
-		await new Promise((resolve) => setTimeout(resolve, 3000));
+    const escrow = new EscrowContract(
+      getAddress(parsedProviderInitializeComputeJob.payment.escrowAddress),
+      this.signer
+    );
+    console.log("Verifying payment...");
+    await new Promise((resolve) => setTimeout(resolve, 3000));
 
-		const validationEscrow = await escrow.verifyFundsForEscrowPayment(
-			paymentToken,
-			computeEnv.consumerAddress,
-			await unitsToAmount(
-				this.signer,
-				paymentToken,
-				parsedProviderInitializeComputeJob.payment.amount
-			),
-			parsedProviderInitializeComputeJob.payment.amount.toString(),
-			parsedProviderInitializeComputeJob.payment.minLockSeconds.toString(),
-			"10"
-		);
-		if (validationEscrow.isValid === false) {
-			console.error(
-				"Error starting compute job dataset DID " +
-				args[1] +
-				" and algorithm DID " +
-				args[2] +
-				" because escrow funds check failed: " +
-				validationEscrow.message
-			);
-			return;
-		}
+    const validationEscrow = await escrow.verifyFundsForEscrowPayment(
+      paymentToken,
+      computeEnv.consumerAddress,
+      await unitsToAmount(
+        this.signer,
+        paymentToken,
+        parsedProviderInitializeComputeJob.payment.amount
+      ),
+      parsedProviderInitializeComputeJob.payment.amount.toString(),
+      parsedProviderInitializeComputeJob.payment.minLockSeconds.toString(),
+      "10"
+    );
+    if (validationEscrow.isValid === false) {
+      console.error(
+        "Error starting compute job dataset DID " +
+          args[1] +
+          " and algorithm DID " +
+          args[2] +
+          " because escrow funds check failed: " +
+          validationEscrow.message
+      );
+      return;
+    }
 
-		console.log("Starting compute job using provider: ", providerURI);
+    console.log("Starting compute job using provider: ", providerURI);
 
-		let output = null;
-		if (args[8]) {
-			try {
-				output = JSON.parse(args[8]);
-			} catch {
-				console.error(chalk.red("Compute output argument must be valid JSON"));
-				return;
-			}
-		}
+    let output = null;
+    if (args[8]) {
+      try {
+        output = JSON.parse(args[8]);
+      } catch {
+        console.error(chalk.red("Compute output argument must be valid JSON"));
+        return;
+      }
+    }
 		const policiesServer = await getPolicyServerOBJs(assets, assetAlgo, this.signer, this.oceanNodeUrl);
 
-		const computeJobs = await ProviderInstance.computeStart(
-			providerURI,
-			this.signer,
-			computeEnv.id,
-			assets, // assets[0] // only c2d v1,
-			algo,
-			supportedMaxJobDuration,
-			paymentToken,
-			JSON.parse(resources),
-			Number((await this.signer.provider.getNetwork()).chainId),
-			null,
-			null,
-			// additionalDatasets, only c2d v1
+    const computeJobs = await ProviderInstance.computeStart(
+      providerURI,
+      this.signer,
+      computeEnv.id,
+      assets, // assets[0] // only c2d v1,
+      algo,
+      supportedMaxJobDuration,
+      paymentToken,
+      JSON.parse(resources),
+      Number((await this.signer.provider.getNetwork()).chainId),
+      null,
+      null,
+      // additionalDatasets, only c2d v1
 			output,
 			policiesServer
-		);
+    );
 
-		console.log("computeJobs: ", computeJobs);
+    console.log("computeJobs: ", computeJobs);
 
-		if (computeJobs && computeJobs[0]) {
-			const { jobId, payment } = computeJobs[0];
-			console.log("Compute started.  JobID: " + jobId);
-			console.log("Agreement ID: " + payment.lockTx);
-		} else {
-			console.log("Error while starting the compute job: ", computeJobs);
-		}
-	}
+    if (computeJobs && computeJobs[0]) {
+      const { jobId, payment } = computeJobs[0];
+      console.log("Compute started.  JobID: " + jobId);
+      console.log("Agreement ID: " + payment.lockTx);
+    } else {
+      console.log("Error while starting the compute job: ", computeJobs);
+    }
+  }
 
-	public async freeComputeStart(args: string[]) {
-		const inputDatasetsString = args[1];
-		let inputDatasets = [];
+  public async freeComputeStart(args: string[]) {
+    const inputDatasetsString = args[1];
+    let inputDatasets = [];
 
 		if (!inputDatasetsString || inputDatasetsString.trim() === '[]') {
 			inputDatasets = [];
-		} else {
+    } else {
 			const cleaned = inputDatasetsString.replaceAll('[', '').replaceAll(']', '');
 			inputDatasets = cleaned.split(',').map(s => s.trim()).filter(Boolean);
-		}
+    }
 		const inputServicesString = args[5];
 		let inputServices: string[] = [];
 		if (typeof inputServicesString === 'string' && inputServicesString.trim().length > 0) {
@@ -961,88 +961,88 @@ export class Commands {
 		} else if (Array.isArray(inputServicesString)) {
 			inputServices = inputServicesString.map(String).map(s => s.trim()).filter(Boolean);
 		}
-		const ddos = [];
+    const ddos = [];
 
-		for (const dataset in inputDatasets) {
-			const dataDdo = await this.aquarius.waitForIndexer(
-				inputDatasets[dataset],
-				null,
-				null,
-				this.indexingParams.retryInterval,
-				this.indexingParams.maxRetries
-			);
-			if (!dataDdo) {
-				console.error(
-					"Error fetching DDO " + dataset[1] + ".  Does this asset exists?"
-				);
-				return;
-			} else {
-				ddos.push(dataDdo);
-			}
-		}
+    for (const dataset in inputDatasets) {
+      const dataDdo = await this.aquarius.waitForIndexer(
+        inputDatasets[dataset],
+        null,
+        null,
+        this.indexingParams.retryInterval,
+        this.indexingParams.maxRetries
+      );
+      if (!dataDdo) {
+        console.error(
+          "Error fetching DDO " + dataset[1] + ".  Does this asset exists?"
+        );
+        return;
+      } else {
+        ddos.push(dataDdo);
+      }
+    }
 
-		if (
-			inputDatasets.length > 0 &&
-			(ddos.length <= 0 || ddos.length != inputDatasets.length)
-		) {
-			console.error("Not all the data ddos are available.");
-			return;
-		}
-		let providerURI = this.oceanNodeUrl;
+    if (
+      inputDatasets.length > 0 &&
+      (ddos.length <= 0 || ddos.length != inputDatasets.length)
+    ) {
+      console.error("Not all the data ddos are available.");
+      return;
+    }
+    let providerURI = this.oceanNodeUrl;
 		const ddoInstance = DDOManager.getDDOClass(ddos[0]);
 		const { services } = ddoInstance.getDDOFields();
-		if (ddos.length > 0) {
+    if (ddos.length > 0) {
 			providerURI = services[0].serviceEndpoint;
-		}
+    }
 
-		const algoDdo = await this.aquarius.waitForIndexer(
-			args[2],
-			null,
-			null,
-			this.indexingParams.retryInterval,
-			this.indexingParams.maxRetries
-		);
-		if (!algoDdo) {
-			console.error(
-				"Error fetching DDO " + args[1] + ".  Does this asset exists?"
-			);
-			return;
-		}
+    const algoDdo = await this.aquarius.waitForIndexer(
+      args[2],
+      null,
+      null,
+      this.indexingParams.retryInterval,
+      this.indexingParams.maxRetries
+    );
+    if (!algoDdo) {
+      console.error(
+        "Error fetching DDO " + args[1] + ".  Does this asset exists?"
+      );
+      return;
+    }
 
-		const computeEnvs = await ProviderInstance.getComputeEnvironments(
-			this.oceanNodeUrl
-		);
-		if (!computeEnvs || computeEnvs.length < 1) {
-			console.error(
-				"Error fetching compute environments. No compute environments available."
-			);
-			return;
-		}
+    const computeEnvs = await ProviderInstance.getComputeEnvironments(
+      this.oceanNodeUrl
+    );
+    if (!computeEnvs || computeEnvs.length < 1) {
+      console.error(
+        "Error fetching compute environments. No compute environments available."
+      );
+      return;
+    }
 
-		const mytime = new Date();
-		const computeMinutes = 5;
-		mytime.setMinutes(mytime.getMinutes() + computeMinutes);
+    const mytime = new Date();
+    const computeMinutes = 5;
+    mytime.setMinutes(mytime.getMinutes() + computeMinutes);
 
-		const computeEnvID = args[3];
-		// NO chainId needed anymore (is not part of ComputeEnvironment spec anymore)
-		// const chainComputeEnvs = computeEnvs[computeEnvID]; // was algoDdo.chainId
-		let computeEnv = null; // chainComputeEnvs[0];
-		if (computeEnvID && computeEnvID.length > 1) {
-			for (const env of computeEnvs) {
-				if (computeEnvID == env.id && env.free) {
-					computeEnv = env;
-					break;
-				}
-			}
-		}
+    const computeEnvID = args[3];
+    // NO chainId needed anymore (is not part of ComputeEnvironment spec anymore)
+    // const chainComputeEnvs = computeEnvs[computeEnvID]; // was algoDdo.chainId
+    let computeEnv = null; // chainComputeEnvs[0];
+    if (computeEnvID && computeEnvID.length > 1) {
+      for (const env of computeEnvs) {
+        if (computeEnvID == env.id && env.free) {
+          computeEnv = env;
+          break;
+        }
+      }
+    }
 
-		if (!computeEnv || !computeEnvID) {
-			console.error(
-				"Error fetching free compute environment. No free compute environment matches id: ",
-				computeEnvID
-			);
-			return;
-		}
+    if (!computeEnv || !computeEnvID) {
+      console.error(
+        "Error fetching free compute environment. No free compute environment matches id: ",
+        computeEnvID
+      );
+      return;
+    }
 		const ddoInstanceAlgo = DDOManager.getDDOClass(algoDdo);
 		const { services: servicesAlgo, metadata: metadataAlgo, version: versionAlgo } = ddoInstanceAlgo.getDDOFields();
 
@@ -1060,11 +1060,11 @@ export class Commands {
 			}
 			chosenAlgoServiceId = expectedAlgoServiceId;
 		}
-		const algo: ComputeAlgorithm = {
-			documentId: algoDdo.id,
+    const algo: ComputeAlgorithm = {
+      documentId: algoDdo.id,
 			serviceId: chosenAlgoServiceId,
 			meta: metadataAlgo.algorithm,
-		};
+    };
 
 		const assetAlgo: {
 			documentId: string;
@@ -1078,8 +1078,8 @@ export class Commands {
 			version: versionAlgo
 		};
 
-		const assets = [];
-		for (const dataDdo in ddos) {
+    const assets = [];
+    for (const dataDdo in ddos) {
 			const ddoInstanceDdo = DDOManager.getDDOClass(ddos[dataDdo]);
 			const { services: servicesDdo, version: versionDdo } = ddoInstanceDdo.getDDOFields();
 			let chosenServiceId = servicesDdo[0].id;
@@ -1102,982 +1102,982 @@ export class Commands {
 					providerURI = servicesDdo[0].serviceEndpoint;
 				}
 			}
-			const canStartCompute = isOrderable(
-				ddos[dataDdo],
+      const canStartCompute = isOrderable(
+        ddos[dataDdo],
 				chosenServiceId,
-				algo,
-				algoDdo
-			);
-			if (!canStartCompute) {
-				console.error(
-					"Error Cannot start compute job using the datasets DIDs & algorithm DID provided"
-				);
-				return;
-			}
-			assets.push({
-				documentId: ddos[dataDdo].id,
+        algo,
+        algoDdo
+      );
+      if (!canStartCompute) {
+        console.error(
+          "Error Cannot start compute job using the datasets DIDs & algorithm DID provided"
+        );
+        return;
+      }
+      assets.push({
+        documentId: ddos[dataDdo].id,
 				serviceId: chosenServiceId,
 				asset: ddos[dataDdo],
 				version: versionDdo
-			});
-		}
+      });
+    }
 
-		let output = null;
-		if (args[4]) {
-			try {
-				output = JSON.parse(args[4]);
-			} catch {
-				console.error(chalk.red("Compute output argument must be valid JSON"));
-				return;
-			}
-		}
+    let output = null;
+    if (args[4]) {
+      try {
+        output = JSON.parse(args[4]);
+      } catch {
+        console.error(chalk.red("Compute output argument must be valid JSON"));
+        return;
+      }
+    }
 
 		const policiesServer = await getPolicyServerOBJs(assets, assetAlgo, this.signer, this.oceanNodeUrl);
-		const computeJobs = await ProviderInstance.freeComputeStart(
-			providerURI,
-			this.signer,
-			computeEnv.id,
-			assets, // assets[0] // only c2d v1,
-			algo,
-			null,
-			null,
-			null,
+    const computeJobs = await ProviderInstance.freeComputeStart(
+      providerURI,
+      this.signer,
+      computeEnv.id,
+      assets, // assets[0] // only c2d v1,
+      algo,
+      null,
+      null,
+      null,
 			output,
 			policiesServer
-		);
+    );
 
 
-		if (computeJobs && computeJobs[0]) {
-			const { jobId } = computeJobs[0];
-			console.log("Compute started.  JobID: " + jobId);
-		} else {
-			console.log("Error while starting the compute job: ", computeJobs);
-		}
-	}
+    if (computeJobs && computeJobs[0]) {
+      const { jobId } = computeJobs[0];
+      console.log("Compute started.  JobID: " + jobId);
+    } else {
+      console.log("Error while starting the compute job: ", computeJobs);
+    }
+  }
 
-	public async computeStop(args: string[]) {
-		const dataDdo = await this.aquarius.waitForIndexer(
-			args[1],
-			null,
-			null,
-			this.indexingParams.retryInterval,
-			this.indexingParams.maxRetries
-		);
-		if (!dataDdo) {
-			console.error(
-				"Error fetching DDO " + args[1] + ".  Does this asset exists?"
-			);
-			return;
-		}
+  public async computeStop(args: string[]) {
+    const dataDdo = await this.aquarius.waitForIndexer(
+      args[1],
+      null,
+      null,
+      this.indexingParams.retryInterval,
+      this.indexingParams.maxRetries
+    );
+    if (!dataDdo) {
+      console.error(
+        "Error fetching DDO " + args[1] + ".  Does this asset exists?"
+      );
+      return;
+    }
 
-		const jobId = args[2];
-		const jobStatus = await ProviderInstance.computeStop(
-			jobId,
-			this.oceanNodeUrl,
-			this.signer
-		);
-		console.log(jobStatus);
-	}
+    const jobId = args[2];
+    const jobStatus = await ProviderInstance.computeStop(
+      jobId,
+      this.oceanNodeUrl,
+      this.signer
+    );
+    console.log(jobStatus);
+  }
 
-	public async getComputeEnvironments() {
-		const computeEnvs = await ProviderInstance.getComputeEnvironments(
-			this.oceanNodeUrl
-		);
+  public async getComputeEnvironments() {
+    const computeEnvs = await ProviderInstance.getComputeEnvironments(
+      this.oceanNodeUrl
+    );
 
-		if (!computeEnvs || computeEnvs.length < 1) {
-			console.error(
-				"Error fetching compute environments. No compute environments available."
-			);
-			return;
-		}
+    if (!computeEnvs || computeEnvs.length < 1) {
+      console.error(
+        "Error fetching compute environments. No compute environments available."
+      );
+      return;
+    }
 
-		console.log("Exiting compute environments: ", JSON.stringify(computeEnvs));
-	}
+    console.log("Exiting compute environments: ", JSON.stringify(computeEnvs));
+  }
 
-	public async computeStreamableLogs(args: string[]) {
-		const jobId = args[0];
-		const logsResponse = await ProviderInstance.computeStreamableLogs(
-			this.oceanNodeUrl,
-			this.signer,
-			jobId
-		);
+  public async computeStreamableLogs(args: string[]) {
+    const jobId = args[0];
+    const logsResponse = await ProviderInstance.computeStreamableLogs(
+      this.oceanNodeUrl,
+      this.signer,
+      jobId
+    );
 
-		if (!logsResponse) {
-			console.error("Error fetching streamable logs. No logs available.");
-			return;
-		}
+    if (!logsResponse) {
+      console.error("Error fetching streamable logs. No logs available.");
+      return;
+    }
 
-		let text: string;
-		if (logsResponse[Symbol.asyncIterator]) {
-			const chunks: Uint8Array[] = [];
-			for await (const chunk of logsResponse) {
-				chunks.push(chunk);
-			}
-			text = Buffer.concat(chunks).toString("utf-8");
-		} else {
-			text = await new Response(logsResponse).text();
-		}
-		console.log("Streamable Logs:");
-		console.log(text);
-	}
+    let text: string;
+    if (logsResponse[Symbol.asyncIterator]) {
+      const chunks: Uint8Array[] = [];
+      for await (const chunk of logsResponse) {
+        chunks.push(chunk);
+      }
+      text = Buffer.concat(chunks).toString("utf-8");
+    } else {
+      text = await new Response(logsResponse).text();
+    }
+    console.log("Streamable Logs:");
+    console.log(text);
+  }
 
-	public async allowAlgo(args: string[]) {
-		const asset = await this.aquarius.waitForIndexer(
-			args[1],
-			null,
-			null,
-			this.indexingParams.retryInterval,
-			this.indexingParams.maxRetries
-		);
+  public async allowAlgo(args: string[]) {
+    const asset = await this.aquarius.waitForIndexer(
+      args[1],
+      null,
+      null,
+      this.indexingParams.retryInterval,
+      this.indexingParams.maxRetries
+    );
 
-		if (!asset) {
-			console.error(
-				"Error fetching DDO " + args[1] + ".  Does this asset exists?"
-			);
-			return;
-		}
+    if (!asset) {
+      console.error(
+        "Error fetching DDO " + args[1] + ".  Does this asset exists?"
+      );
+      return;
+    }
 		const ddoInstance = DDOManager.getDDOClass(asset);
 		const { indexedMetadata } = ddoInstance.getAssetFields();
 		const { services } = ddoInstance.getDDOFields();
 		if (indexedMetadata.nft.owner !== (await this.signer.getAddress())) {
-			console.error(
-				"You are not the owner of this asset, and there for you cannot update it."
-			);
-			return;
-		}
+      console.error(
+        "You are not the owner of this asset, and there for you cannot update it."
+      );
+      return;
+    }
 
 		if (services[0].type !== "compute") {
-			console.error(
-				"Error getting computeService for " +
-				args[1] +
-				".  Does this asset has an computeService?"
-			);
-			return;
-		}
-		const algoAsset = await this.aquarius.waitForIndexer(
-			args[2],
-			null,
-			null,
-			this.indexingParams.retryInterval,
-			this.indexingParams.maxRetries
-		);
-		if (!algoAsset) {
-			console.error(
-				"Error fetching DDO " + args[2] + ".  Does this asset exists?"
-			);
-			return;
-		}
+      console.error(
+        "Error getting computeService for " +
+          args[1] +
+          ".  Does this asset has an computeService?"
+      );
+      return;
+    }
+    const algoAsset = await this.aquarius.waitForIndexer(
+      args[2],
+      null,
+      null,
+      this.indexingParams.retryInterval,
+      this.indexingParams.maxRetries
+    );
+    if (!algoAsset) {
+      console.error(
+        "Error fetching DDO " + args[2] + ".  Does this asset exists?"
+      );
+      return;
+    }
 		const algoInstance = DDOManager.getDDOClass(algoAsset);
 		const { services: servicesAlgo, metadata: metadataAlgo } = algoInstance.getDDOFields();
-		const encryptDDO = args[3] === "false" ? false : true;
-		let filesChecksum;
-		try {
-			filesChecksum = await ProviderInstance.checkDidFiles(
-				algoAsset.id,
+    const encryptDDO = args[3] === "false" ? false : true;
+    let filesChecksum;
+    try {
+      filesChecksum = await ProviderInstance.checkDidFiles(
+        algoAsset.id,
 				servicesAlgo[0].id,
 				servicesAlgo[0].serviceEndpoint,
-				true
-			);
-		} catch (e) {
-			console.error("Error checking algo files: ", e);
-			return;
-		}
+        true
+      );
+    } catch (e) {
+      console.error("Error checking algo files: ", e);
+      return;
+    }
 
-		const containerChecksum =
+    const containerChecksum =
 			metadataAlgo.algorithm.container.entrypoint +
 			metadataAlgo.algorithm.container.checksum;
-		const trustedAlgorithm = {
-			did: algoAsset.id,
-			containerSectionChecksum: getHash(containerChecksum),
-			filesChecksum: filesChecksum?.[0]?.checksum,
+    const trustedAlgorithm = {
+      did: algoAsset.id,
+      containerSectionChecksum: getHash(containerChecksum),
+      filesChecksum: filesChecksum?.[0]?.checksum,
 			serviceId: servicesAlgo[0].id,
-		};
+    };
 		services[0].compute.publisherTrustedAlgorithms.push(trustedAlgorithm);
-		try {
-			const txid = await updateAssetMetadata(
-				this.signer,
-				asset,
-				this.oceanNodeUrl,
-				this.aquarius,
-				encryptDDO
-			);
-			console.log("Successfully updated asset metadata: " + txid);
-		} catch (e) {
-			console.error("Error updating asset metadata: ", e);
-			return;
-		}
-	}
+    try {
+      const txid = await updateAssetMetadata(
+        this.signer,
+        asset,
+        this.oceanNodeUrl,
+        this.aquarius,
+        encryptDDO
+      );
+      console.log("Successfully updated asset metadata: " + txid);
+    } catch (e) {
+      console.error("Error updating asset metadata: ", e);
+      return;
+    }
+  }
 
-	public async disallowAlgo(args: string[]) {
-		const asset = await this.aquarius.waitForIndexer(
-			args[1],
-			null,
-			null,
-			this.indexingParams.retryInterval,
-			this.indexingParams.maxRetries
-		);
-		if (!asset) {
-			console.error(
-				"Error fetching DDO " + args[1] + ".  Does this asset exists?"
-			);
-			return;
-		}
+  public async disallowAlgo(args: string[]) {
+    const asset = await this.aquarius.waitForIndexer(
+      args[1],
+      null,
+      null,
+      this.indexingParams.retryInterval,
+      this.indexingParams.maxRetries
+    );
+    if (!asset) {
+      console.error(
+        "Error fetching DDO " + args[1] + ".  Does this asset exists?"
+      );
+      return;
+    }
 		const ddoInstance = DDOManager.getDDOClass(asset);
 		const { indexedMetadata } = ddoInstance.getAssetFields();
 		const { services } = ddoInstance.getDDOFields();
 		if (indexedMetadata.nft.owner !== (await this.signer.getAddress())) {
-			console.error(
-				"You are not the owner of this asset, and there for you cannot update it."
-			);
-			return;
-		}
+      console.error(
+        "You are not the owner of this asset, and there for you cannot update it."
+      );
+      return;
+    }
 		if (services[0].type !== "compute") {
-			console.error(
-				"Error getting computeService for " +
-				args[1] +
-				".  Does this asset has an computeService?"
-			);
-			return;
-		}
+      console.error(
+        "Error getting computeService for " +
+          args[1] +
+          ".  Does this asset has an computeService?"
+      );
+      return;
+    }
 		if (services[0].compute.publisherTrustedAlgorithms) {
-			console.error(
-				" " + args[1] + ".  Does this asset has an computeService?"
-			);
-			return;
-		}
-		const encryptDDO = args[3] === "false" ? false : true;
-		const indexToDelete =
+      console.error(
+        " " + args[1] + ".  Does this asset has an computeService?"
+      );
+      return;
+    }
+    const encryptDDO = args[3] === "false" ? false : true;
+    const indexToDelete =
 			services[0].compute.publisherTrustedAlgorithms.findIndex(
-				(item) => item.did === args[2]
-			);
+        (item) => item.did === args[2]
+      );
 
-		if (indexToDelete !== -1) {
+    if (indexToDelete !== -1) {
 			services[0].compute.publisherTrustedAlgorithms.splice(
-				indexToDelete,
-				1
-			);
-		} else {
-			console.error(
-				" " +
-				args[2] +
-				".  is not allowed by the publisher to run on " +
-				args[1]
-			);
-			return;
-		}
+        indexToDelete,
+        1
+      );
+    } else {
+      console.error(
+        " " +
+          args[2] +
+          ".  is not allowed by the publisher to run on " +
+          args[1]
+      );
+      return;
+    }
 
-		const txid = await updateAssetMetadata(
-			this.signer,
-			asset,
-			this.oceanNodeUrl,
-			this.aquarius,
-			encryptDDO
-		);
-		console.log("Asset updated " + txid);
-	}
+    const txid = await updateAssetMetadata(
+      this.signer,
+      asset,
+      this.oceanNodeUrl,
+      this.aquarius,
+      encryptDDO
+    );
+    console.log("Asset updated " + txid);
+  }
 
-	public async getJobStatus(args: string[]) {
-		// args[1] - did (for checking if data asset exists, legacy)
-		// args[2] - jobId
-		// args[3] - agreementId
-		const hasAgreementId = args.length === 4;
+  public async getJobStatus(args: string[]) {
+    // args[1] - did (for checking if data asset exists, legacy)
+    // args[2] - jobId
+    // args[3] - agreementId
+    const hasAgreementId = args.length === 4;
 
-		const dataDdo = await this.aquarius.waitForIndexer(
-			args[1],
-			null,
-			null,
-			this.indexingParams.retryInterval,
-			this.indexingParams.maxRetries
-		);
-		if (!dataDdo) {
-			console.error(
-				"Error fetching DDO " + args[1] + ".  Does this asset exists?"
-			);
-			return;
-		}
-		const jobId = args[2];
-		let agreementId = null;
-		if (hasAgreementId) {
-			agreementId = args[3];
-		}
+    const dataDdo = await this.aquarius.waitForIndexer(
+      args[1],
+      null,
+      null,
+      this.indexingParams.retryInterval,
+      this.indexingParams.maxRetries
+    );
+    if (!dataDdo) {
+      console.error(
+        "Error fetching DDO " + args[1] + ".  Does this asset exists?"
+      );
+      return;
+    }
+    const jobId = args[2];
+    let agreementId = null;
+    if (hasAgreementId) {
+      agreementId = args[3];
+    }
 
-		const jobStatus = (await ProviderInstance.computeStatus(
-			this.oceanNodeUrl,
-			this.signer,
-			jobId,
-			agreementId
-		)) as ComputeJob;
-		console.log(util.inspect(jobStatus, false, null, true));
-	}
+    const jobStatus = (await ProviderInstance.computeStatus(
+      this.oceanNodeUrl,
+      this.signer,
+      jobId,
+      agreementId
+    )) as ComputeJob;
+    console.log(util.inspect(jobStatus, false, null, true));
+  }
 
-	public async downloadJobResults(args: string[]) {
-		try {
-			const stream = await ProviderInstance.getComputeResult(
-				this.oceanNodeUrl,
-				this.signer,
-				args[1],
-				parseInt(args[2])
-			);
-			const chunks: Uint8Array[] = [];
-			for await (const chunk of stream) {
-				chunks.push(chunk);
-			}
-			const destPath = args[3] || ".";
-			const filename = `file_${args[2]}.out`;
-			const filePath = path.join(destPath, filename);
-			fs.writeFileSync(filePath, Buffer.concat(chunks));
-			console.log("File downloaded successfully:", filePath);
-		} catch (e) {
-			console.log(`Download compute result failed: ${e}`);
-		}
-	}
+  public async downloadJobResults(args: string[]) {
+    try {
+      const stream = await ProviderInstance.getComputeResult(
+        this.oceanNodeUrl,
+        this.signer,
+        args[1],
+        parseInt(args[2])
+      );
+      const chunks: Uint8Array[] = [];
+      for await (const chunk of stream) {
+        chunks.push(chunk);
+      }
+      const destPath = args[3] || ".";
+      const filename = `file_${args[2]}.out`;
+      const filePath = path.join(destPath, filename);
+      fs.writeFileSync(filePath, Buffer.concat(chunks));
+      console.log("File downloaded successfully:", filePath);
+    } catch (e) {
+      console.log(`Download compute result failed: ${e}`);
+    }
+  }
 
-	public async mintOceanTokens() {
-		try {
-			const config = await getConfigByChainId(Number(this.config.chainId));
-			const minAbi = [
-				{
-					constant: false,
-					inputs: [
-						{ name: "to", type: "address" },
-						{ name: "value", type: "uint256" },
-					],
-					name: "mint",
-					outputs: [{ name: "", type: "bool" }],
-					payable: false,
-					stateMutability: "nonpayable",
-					type: "function",
-				},
-			];
+  public async mintOceanTokens() {
+    try {
+      const config = await getConfigByChainId(Number(this.config.chainId));
+      const minAbi = [
+        {
+          constant: false,
+          inputs: [
+            { name: "to", type: "address" },
+            { name: "value", type: "uint256" },
+          ],
+          name: "mint",
+          outputs: [{ name: "", type: "bool" }],
+          payable: false,
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+      ];
 
-			const tokenContract = new ethers.Contract(
-				config?.Ocean,
-				minAbi,
-				this.signer
-			);
-			const estGasPublisher = await tokenContract.mint.estimateGas(
-				await this.signer.getAddress(),
-				await amountToUnits(null, null, "1000", 18)
-			);
-			const tx = await sendTx(
-				estGasPublisher,
-				this.signer,
-				1,
-				tokenContract.mint,
-				await this.signer.getAddress(),
-				amountToUnits(null, null, "1000", 18)
-			);
-			await tx.wait();
-		} catch (error) {
-			console.error("Error minting Ocean tokens:", error);
-		}
-	}
+      const tokenContract = new ethers.Contract(
+        config?.Ocean,
+        minAbi,
+        this.signer
+      );
+      const estGasPublisher = await tokenContract.mint.estimateGas(
+        await this.signer.getAddress(),
+        await amountToUnits(null, null, "1000", 18)
+      );
+      const tx = await sendTx(
+        estGasPublisher,
+        this.signer,
+        1,
+        tokenContract.mint,
+        await this.signer.getAddress(),
+        amountToUnits(null, null, "1000", 18)
+      );
+      await tx.wait();
+    } catch (error) {
+      console.error("Error minting Ocean tokens:", error);
+    }
+  }
 
-	public async generateAuthToken() {
-		const authToken = await ProviderInstance.generateAuthToken(
-			this.signer,
-			this.oceanNodeUrl
-		);
-		console.log(`Auth token successfully generated: ${authToken}`);
-	}
+  public async generateAuthToken() {
+    const authToken = await ProviderInstance.generateAuthToken(
+      this.signer,
+      this.oceanNodeUrl
+    );
+    console.log(`Auth token successfully generated: ${authToken}`);
+  }
 
-	public async invalidateAuthToken(args: string[]) {
-		const authToken = args[0];
-		const result = await ProviderInstance.invalidateAuthToken(
-			this.signer,
-			authToken,
-			this.oceanNodeUrl
-		);
-		if (!result.success) {
-			console.log("Auth token could not be invalidated");
-			return;
-		}
+  public async invalidateAuthToken(args: string[]) {
+    const authToken = args[0];
+    const result = await ProviderInstance.invalidateAuthToken(
+      this.signer,
+      authToken,
+      this.oceanNodeUrl
+    );
+    if (!result.success) {
+      console.log("Auth token could not be invalidated");
+      return;
+    }
 
-		console.log(`Auth token successfully invalidated`);
-	}
+    console.log(`Auth token successfully invalidated`);
+  }
 
-	public async getEscrowBalance(token: string): Promise<number> {
-		const config = await getConfigByChainId(Number(this.config.chainId));
-		const escrow = new EscrowContract(
-			getAddress(config.Escrow),
-			this.signer,
-			Number(this.config.chainId)
-		);
+  public async getEscrowBalance(token: string): Promise<number> {
+    const config = await getConfigByChainId(Number(this.config.chainId));
+    const escrow = new EscrowContract(
+      getAddress(config.Escrow),
+      this.signer,
+      Number(this.config.chainId)
+    );
 
-		try {
-			const balance = await escrow.getUserFunds(
-				await this.signer.getAddress(),
-				token
-			);
-			const decimals = await getTokenDecimals(this.signer, token);
-			const available = balance.available;
-			const amount = await unitsToAmount(
-				this.signer,
-				token,
-				available,
-				decimals
-			);
-			console.log(`Escrow user funds for token ${token}: ${amount}`);
-			return Number(amount);
-		} catch (error) {
-			console.error("Error getting escrow balance:", error);
-		}
-	}
+    try {
+      const balance = await escrow.getUserFunds(
+        await this.signer.getAddress(),
+        token
+      );
+      const decimals = await getTokenDecimals(this.signer, token);
+      const available = balance.available;
+      const amount = await unitsToAmount(
+        this.signer,
+        token,
+        available,
+        decimals
+      );
+      console.log(`Escrow user funds for token ${token}: ${amount}`);
+      return Number(amount);
+    } catch (error) {
+      console.error("Error getting escrow balance:", error);
+    }
+  }
 
-	public async withdrawFromEscrow(
-		token: string,
-		amount: string
-	): Promise<void> {
-		const config = await getConfigByChainId(Number(this.config.chainId));
-		const escrow = new EscrowContract(
-			getAddress(config.Escrow),
-			this.signer,
-			Number(this.config.chainId)
-		);
+  public async withdrawFromEscrow(
+    token: string,
+    amount: string
+  ): Promise<void> {
+    const config = await getConfigByChainId(Number(this.config.chainId));
+    const escrow = new EscrowContract(
+      getAddress(config.Escrow),
+      this.signer,
+      Number(this.config.chainId)
+    );
 
-		const balance = await this.getEscrowBalance(token);
-		if (balance < Number(amount)) {
-			console.error(`Insufficient balance in escrow for token ${token}`);
-			return;
-		}
+    const balance = await this.getEscrowBalance(token);
+    if (balance < Number(amount)) {
+      console.error(`Insufficient balance in escrow for token ${token}`);
+      return;
+    }
 
-		const withdrawTx = await escrow.withdraw([token], [amount]);
-		await withdrawTx.wait();
-		console.log(`Successfully withdrawn ${amount} ${token} from escrow`);
-	}
+    const withdrawTx = await escrow.withdraw([token], [amount]);
+    await withdrawTx.wait();
+    console.log(`Successfully withdrawn ${amount} ${token} from escrow`);
+  }
 
-	public async depositToEscrow(
-		signer: Signer,
-		token: string,
-		amount: string,
-		chainId: number
-	) {
-		try {
-			const amountInUnits = await amountToUnits(signer, token, amount, 18);
-			const config = await getConfigByChainId(chainId);
-			const escrowAddress = config.Escrow;
+  public async depositToEscrow(
+    signer: Signer,
+    token: string,
+    amount: string,
+    chainId: number
+  ) {
+    try {
+      const amountInUnits = await amountToUnits(signer, token, amount, 18);
+      const config = await getConfigByChainId(chainId);
+      const escrowAddress = config.Escrow;
 
-			const tokenContract = new ethers.Contract(
-				token,
-				["function approve(address spender, uint256 amount) returns (bool)"],
-				signer
-			);
+      const tokenContract = new ethers.Contract(
+        token,
+        ["function approve(address spender, uint256 amount) returns (bool)"],
+        signer
+      );
 
-			const escrow = new EscrowContract(
-				getAddress(escrowAddress),
-				signer,
-				chainId
-			);
+      const escrow = new EscrowContract(
+        getAddress(escrowAddress),
+        signer,
+        chainId
+      );
 
-			console.log("Approving token transfer...");
-			const approveTx = await tokenContract.approve(
-				escrowAddress,
-				amountInUnits
-			);
-			await approveTx.wait();
-			console.log(`Successfully approved ${amount} ${token} to escrow`);
+      console.log("Approving token transfer...");
+      const approveTx = await tokenContract.approve(
+        escrowAddress,
+        amountInUnits
+      );
+      await approveTx.wait();
+      console.log(`Successfully approved ${amount} ${token} to escrow`);
 
-			console.log("Depositing to escrow...");
-			const depositTx = await escrow.deposit(token, amount);
-			await depositTx.wait();
-			return true;
-		} catch (error) {
-			console.error("Error depositing to escrow:", error);
-			return false;
-		}
-	}
+      console.log("Depositing to escrow...");
+      const depositTx = await escrow.deposit(token, amount);
+      await depositTx.wait();
+      return true;
+    } catch (error) {
+      console.error("Error depositing to escrow:", error);
+      return false;
+    }
+  }
 
-	public async authorizeEscrowPayee(
-		token: string,
-		payee: string,
-		maxLockedAmount: string,
-		maxLockSeconds: string,
-		maxLockCounts: string
-	) {
-		try {
-			const config = await getConfigByChainId(Number(this.config.chainId));
-			const escrowAddress = config.Escrow;
+  public async authorizeEscrowPayee(
+    token: string,
+    payee: string,
+    maxLockedAmount: string,
+    maxLockSeconds: string,
+    maxLockCounts: string
+  ) {
+    try {
+      const config = await getConfigByChainId(Number(this.config.chainId));
+      const escrowAddress = config.Escrow;
 
-			const escrow = new EscrowContract(getAddress(escrowAddress), this.signer);
+      const escrow = new EscrowContract(getAddress(escrowAddress), this.signer);
 
-			console.log("Authorizing payee...");
-			const authorizeTx = await escrow.authorize(
-				getAddress(token),
-				getAddress(payee),
-				maxLockedAmount,
-				maxLockSeconds,
-				maxLockCounts
-			);
-			await authorizeTx.wait();
-			console.log(`Successfully authorized payee ${payee} for token ${token}`);
+      console.log("Authorizing payee...");
+      const authorizeTx = await escrow.authorize(
+        getAddress(token),
+        getAddress(payee),
+        maxLockedAmount,
+        maxLockSeconds,
+        maxLockCounts
+      );
+      await authorizeTx.wait();
+      console.log(`Successfully authorized payee ${payee} for token ${token}`);
 
-			return true;
-		} catch (error) {
-			console.error("Error authorizing payee:", error);
-			return false;
-		}
-	}
+      return true;
+    } catch (error) {
+      console.error("Error authorizing payee:", error);
+      return false;
+    }
+  }
 
-	public async getAuthorizationsEscrow(token: string, payee: string) {
-		const config = await getConfigByChainId(Number(this.config.chainId));
-		const payer = await this.signer.getAddress();
-		const tokenAddress = getAddress(token);
-		const payerAddress = getAddress(payer);
-		const payeeAddress = getAddress(payee);
-		const decimals = await getTokenDecimals(this.signer, token);
-		const escrow = new EscrowContract(
-			getAddress(config.Escrow),
-			this.signer,
-			Number(this.config.chainId)
-		);
+  public async getAuthorizationsEscrow(token: string, payee: string) {
+    const config = await getConfigByChainId(Number(this.config.chainId));
+    const payer = await this.signer.getAddress();
+    const tokenAddress = getAddress(token);
+    const payerAddress = getAddress(payer);
+    const payeeAddress = getAddress(payee);
+    const decimals = await getTokenDecimals(this.signer, token);
+    const escrow = new EscrowContract(
+      getAddress(config.Escrow),
+      this.signer,
+      Number(this.config.chainId)
+    );
 
-		const authorizations = await escrow.getAuthorizations(
-			tokenAddress,
-			payerAddress,
-			payeeAddress
-		);
-		const authorization = authorizations[0];
-		if (!authorization || authorization.length === 0) {
-			console.log("No authorizations found");
-			return;
-		}
+    const authorizations = await escrow.getAuthorizations(
+      tokenAddress,
+      payerAddress,
+      payeeAddress
+    );
+    const authorization = authorizations[0];
+    if (!authorization || authorization.length === 0) {
+      console.log("No authorizations found");
+      return;
+    }
 
-		const currentLockedAmount = await unitsToAmount(
-			this.signer,
-			token,
-			authorization.currentLockedAmount.toString(),
-			decimals
-		);
-		const maxLockedAmount = await unitsToAmount(
-			this.signer,
-			token,
-			authorization.maxLockedAmount.toString(),
-			decimals
-		);
+    const currentLockedAmount = await unitsToAmount(
+      this.signer,
+      token,
+      authorization.currentLockedAmount.toString(),
+      decimals
+    );
+    const maxLockedAmount = await unitsToAmount(
+      this.signer,
+      token,
+      authorization.maxLockedAmount.toString(),
+      decimals
+    );
 
-		console.log("Authorizations found:");
-		console.log(`- Current Locked Amount: ${Number(currentLockedAmount)}`);
-		console.log(`- Current Locks: ${authorization.currentLocks}`);
-		console.log(`- Max locked amount: ${Number(maxLockedAmount)}`);
-		console.log(`- Max lock seconds: ${authorization.maxLockSeconds}`);
-		console.log(`- Max lock counts: ${authorization.maxLockCounts}`);
+    console.log("Authorizations found:");
+    console.log(`- Current Locked Amount: ${Number(currentLockedAmount)}`);
+    console.log(`- Current Locks: ${authorization.currentLocks}`);
+    console.log(`- Max locked amount: ${Number(maxLockedAmount)}`);
+    console.log(`- Max lock seconds: ${authorization.maxLockSeconds}`);
+    console.log(`- Max lock counts: ${authorization.maxLockCounts}`);
 
-		return authorizations;
-	}
+    return authorizations;
+  }
 
-	public async createAccessList(args: string[]): Promise<void> {
-		try {
-			const name = args[0];
-			const symbol = args[1];
-			const transferable = args[2] === "true";
-			const initialUsers = args[3]
-				? args[3].split(",").map((u) => u.trim())
-				: [];
+  public async createAccessList(args: string[]): Promise<void> {
+    try {
+      const name = args[0];
+      const symbol = args[1];
+      const transferable = args[2] === "true";
+      const initialUsers = args[3]
+        ? args[3].split(",").map((u) => u.trim())
+        : [];
 
-			if (!name || !symbol) {
-				console.error(chalk.red("Name and symbol are required"));
-				return;
-			}
+      if (!name || !symbol) {
+        console.error(chalk.red("Name and symbol are required"));
+        return;
+      }
 
-			const config = await getConfigByChainId(Number(this.config.chainId));
-			if (!config.AccessListFactory) {
-				console.error(
-					chalk.red(
-						"Access list factory not found. Check local address.json file"
-					)
-				);
-				return;
-			}
-			const accessListFactory = new AccesslistFactory(
-				config.AccessListFactory,
-				this.signer,
-				Number(this.config.chainId)
-			);
+      const config = await getConfigByChainId(Number(this.config.chainId));
+      if (!config.AccessListFactory) {
+        console.error(
+          chalk.red(
+            "Access list factory not found. Check local address.json file"
+          )
+        );
+        return;
+      }
+      const accessListFactory = new AccesslistFactory(
+        config.AccessListFactory,
+        this.signer,
+        Number(this.config.chainId)
+      );
 
-			const owner = await this.signer.getAddress();
-			const tokenURIs = initialUsers.map(
-				() => "https://oceanprotocol.com/nft/"
-			);
+      const owner = await this.signer.getAddress();
+      const tokenURIs = initialUsers.map(
+        () => "https://oceanprotocol.com/nft/"
+      );
 
-			console.log(chalk.cyan("Creating new access list..."));
-			console.log(`Name: ${name}`);
-			console.log(`Symbol: ${symbol}`);
-			console.log(`Transferable: ${transferable}`);
-			console.log(`Owner: ${owner}`);
-			console.log(
+      console.log(chalk.cyan("Creating new access list..."));
+      console.log(`Name: ${name}`);
+      console.log(`Symbol: ${symbol}`);
+      console.log(`Transferable: ${transferable}`);
+      console.log(`Owner: ${owner}`);
+      console.log(
 				`Initial users: ${initialUsers.length > 0 ? initialUsers.join(", ") : "none"
-				}`
-			);
+        }`
+      );
 
-			const accessListAddress =
-				await accessListFactory.deployAccessListContract(
-					name,
-					symbol,
-					tokenURIs,
-					transferable,
-					owner,
-					initialUsers
-				);
+      const accessListAddress =
+        await accessListFactory.deployAccessListContract(
+          name,
+          symbol,
+          tokenURIs,
+          transferable,
+          owner,
+          initialUsers
+        );
 
-			console.log(chalk.green(`\nAccess list created successfully!`));
-			console.log(chalk.green(`Contract address: ${accessListAddress}`));
-		} catch (error) {
-			console.error(chalk.red("Error creating access list:"), error);
-		}
-	}
+      console.log(chalk.green(`\nAccess list created successfully!`));
+      console.log(chalk.green(`Contract address: ${accessListAddress}`));
+    } catch (error) {
+      console.error(chalk.red("Error creating access list:"), error);
+    }
+  }
 
-	public async addToAccessList(args: string[]): Promise<void> {
-		try {
-			const accessListAddress = args[0];
-			const users = args[1].split(",").map((u) => u.trim());
+  public async addToAccessList(args: string[]): Promise<void> {
+    try {
+      const accessListAddress = args[0];
+      const users = args[1].split(",").map((u) => u.trim());
 
-			if (!accessListAddress || users.length === 0) {
-				console.error(
-					chalk.red("Access list address and at least one user are required")
-				);
-				return;
-			}
+      if (!accessListAddress || users.length === 0) {
+        console.error(
+          chalk.red("Access list address and at least one user are required")
+        );
+        return;
+      }
 
-			const accessList = new AccessListContract(
-				accessListAddress,
-				this.signer,
-				Number(this.config.chainId)
-			);
+      const accessList = new AccessListContract(
+        accessListAddress,
+        this.signer,
+        Number(this.config.chainId)
+      );
 
-			console.log(
-				chalk.cyan(`Adding ${users.length} user(s) to access list...`)
-			);
+      console.log(
+        chalk.cyan(`Adding ${users.length} user(s) to access list...`)
+      );
 
-			if (users.length === 1) {
-				const tx = await accessList.mint(
-					users[0],
-					"https://oceanprotocol.com/nft/"
-				);
-				await tx.wait();
-				console.log(
-					chalk.green(`Successfully added user ${users[0]} to access list`)
-				);
-				return;
-			}
+      if (users.length === 1) {
+        const tx = await accessList.mint(
+          users[0],
+          "https://oceanprotocol.com/nft/"
+        );
+        await tx.wait();
+        console.log(
+          chalk.green(`Successfully added user ${users[0]} to access list`)
+        );
+        return;
+      }
 
-			const tokenURIs = users.map(() => "https://oceanprotocol.com/nft/");
-			const tx = await accessList.batchMint(users, tokenURIs);
-			await tx.wait();
-			console.log(
-				chalk.green(`Successfully added ${users.length} users to access list:`)
-			);
-			users.forEach((user) => console.log(`  - ${user}`));
-		} catch (error) {
-			console.error(chalk.red("Error adding users to access list:"), error);
-		}
-	}
+      const tokenURIs = users.map(() => "https://oceanprotocol.com/nft/");
+      const tx = await accessList.batchMint(users, tokenURIs);
+      await tx.wait();
+      console.log(
+        chalk.green(`Successfully added ${users.length} users to access list:`)
+      );
+      users.forEach((user) => console.log(`  - ${user}`));
+    } catch (error) {
+      console.error(chalk.red("Error adding users to access list:"), error);
+    }
+  }
 
-	public async checkAccessList(args: string[]): Promise<void> {
-		try {
-			const accessListAddress = args[0];
-			const users = args[1].split(",").map((u) => u.trim());
+  public async checkAccessList(args: string[]): Promise<void> {
+    try {
+      const accessListAddress = args[0];
+      const users = args[1].split(",").map((u) => u.trim());
 
-			if (!accessListAddress || users.length === 0) {
-				console.error(
-					chalk.red("Access list address and at least one user are required")
-				);
-				return;
-			}
+      if (!accessListAddress || users.length === 0) {
+        console.error(
+          chalk.red("Access list address and at least one user are required")
+        );
+        return;
+      }
 
-			const accessList = new AccessListContract(
-				accessListAddress,
-				this.signer,
-				Number(this.config.chainId)
-			);
+      const accessList = new AccessListContract(
+        accessListAddress,
+        this.signer,
+        Number(this.config.chainId)
+      );
 
-			console.log(
-				chalk.cyan(`Checking access list for ${users.length} user(s)...\n`)
-			);
+      console.log(
+        chalk.cyan(`Checking access list for ${users.length} user(s)...\n`)
+      );
 
-			for (const user of users) {
-				const balance = await accessList.balance(user);
-				const hasAccess = Number(balance) > 0;
+      for (const user of users) {
+        const balance = await accessList.balance(user);
+        const hasAccess = Number(balance) > 0;
 
-				if (hasAccess) {
-					console.log(
-						chalk.green(`✓ ${user}: Has access (balance: ${balance})`)
-					);
-				} else {
-					console.log(chalk.red(`✗ ${user}: No access`));
-				}
-			}
-		} catch (error) {
-			console.error(chalk.red("Error checking access list:"), error);
-		}
-	}
+        if (hasAccess) {
+          console.log(
+            chalk.green(`✓ ${user}: Has access (balance: ${balance})`)
+          );
+        } else {
+          console.log(chalk.red(`✗ ${user}: No access`));
+        }
+      }
+    } catch (error) {
+      console.error(chalk.red("Error checking access list:"), error);
+    }
+  }
 
-	public async removeFromAccessList(args: string[]): Promise<void> {
-		try {
-			const accessListAddress = args[0];
-			const users = args[1].split(",").map((u) => u.trim());
+  public async removeFromAccessList(args: string[]): Promise<void> {
+    try {
+      const accessListAddress = args[0];
+      const users = args[1].split(",").map((u) => u.trim());
 
-			if (!accessListAddress || users.length === 0) {
-				console.error(
-					chalk.red(
-						"Access list address and at least one user address are required"
-					)
-				);
-				return;
-			}
+      if (!accessListAddress || users.length === 0) {
+        console.error(
+          chalk.red(
+            "Access list address and at least one user address are required"
+          )
+        );
+        return;
+      }
 
-			const accessList = new AccessListContract(
-				accessListAddress,
-				this.signer,
-				Number(this.config.chainId)
-			);
+      const accessList = new AccessListContract(
+        accessListAddress,
+        this.signer,
+        Number(this.config.chainId)
+      );
 
-			console.log(
-				chalk.cyan(`Removing ${users.length} user(s) from access list...`)
-			);
-			for (const user of users) {
-				const balance = await accessList.balance(user);
+      console.log(
+        chalk.cyan(`Removing ${users.length} user(s) from access list...`)
+      );
+      for (const user of users) {
+        const balance = await accessList.balance(user);
 
-				if (Number(balance) === 0) {
-					console.log(
-						chalk.yellow(
-							`⚠ User ${user} is not on the access list, skipping...`
-						)
-					);
-					continue;
-				}
+        if (Number(balance) === 0) {
+          console.log(
+            chalk.yellow(
+              `⚠ User ${user} is not on the access list, skipping...`
+            )
+          );
+          continue;
+        }
 
-				const balanceNum = Number(balance);
-				const contract = accessList.contract;
+        const balanceNum = Number(balance);
+        const contract = accessList.contract;
 
-				let removedCount = 0;
-				for (let index = 0; index < balanceNum; index++) {
-					try {
-						const tokenId = await contract.tokenOfOwnerByIndex(user, index);
-						const tx = await accessList.burn(Number(tokenId));
-						await tx.wait();
+        let removedCount = 0;
+        for (let index = 0; index < balanceNum; index++) {
+          try {
+            const tokenId = await contract.tokenOfOwnerByIndex(user, index);
+            const tx = await accessList.burn(Number(tokenId));
+            await tx.wait();
 
-						console.log(
-							chalk.green(
-								`✓ Successfully removed user ${user} (token ID: ${tokenId})`
-							)
-						);
-						removedCount++;
-					} catch (e: any) {
-						console.log(
-							chalk.yellow(
-								`⚠ Could not remove token at index ${index} for user ${user}: ${e.message}`
-							)
-						);
-					}
-				}
+            console.log(
+              chalk.green(
+                `✓ Successfully removed user ${user} (token ID: ${tokenId})`
+              )
+            );
+            removedCount++;
+          } catch (e: any) {
+            console.log(
+              chalk.yellow(
+                `⚠ Could not remove token at index ${index} for user ${user}: ${e.message}`
+              )
+            );
+          }
+        }
 
-				if (removedCount === 0) {
-					console.log(
-						chalk.yellow(`⚠ Could not remove any tokens for user ${user}`)
-					);
-				} else if (removedCount < balanceNum) {
-					console.log(
-						chalk.yellow(
-							`⚠ Only removed ${removedCount} of ${balanceNum} tokens for user ${user}`
-						)
-					);
-				}
-			}
-		} catch (error) {
-			console.error(chalk.red("Error removing users from access list:"), error);
-		}
-	}
+        if (removedCount === 0) {
+          console.log(
+            chalk.yellow(`⚠ Could not remove any tokens for user ${user}`)
+          );
+        } else if (removedCount < balanceNum) {
+          console.log(
+            chalk.yellow(
+              `⚠ Only removed ${removedCount} of ${balanceNum} tokens for user ${user}`
+            )
+          );
+        }
+      }
+    } catch (error) {
+      console.error(chalk.red("Error removing users from access list:"), error);
+    }
+  }
 
-	public async downloadNodeLogs(args: string[]): Promise<void> {
-		try {
-			const outputLocation = args[0];
-			const last = args[1];
-			let from = args[2];
-			let to = args[3];
-			const maxLogs = args[4] ? Math.min(parseInt(args[4], 10), 1000) : undefined;
+  public async downloadNodeLogs(args: string[]): Promise<void> {
+    try {
+      const outputLocation = args[0];
+      const last = args[1];
+      let from = args[2];
+      let to = args[3];
+      const maxLogs = args[4] ? Math.min(parseInt(args[4], 10), 1000) : undefined;
 
-			if (!outputLocation) {
-				console.error(chalk.red("Output location is required"));
-				return;
-			}
+      if (!outputLocation) {
+        console.error(chalk.red("Output location is required"));
+        return;
+      }
 
-			if (!fs.existsSync(outputLocation)) {
-				console.error(
-					chalk.red(`Output directory does not exist: ${outputLocation}`)
-				);
-				return;
-			}
+      if (!fs.existsSync(outputLocation)) {
+        console.error(
+          chalk.red(`Output directory does not exist: ${outputLocation}`)
+        );
+        return;
+      }
 
-			if (last && (from || to)) {
-				console.error(
-					chalk.red("Use either --last or --from/--to, not both")
-				);
-				return;
-			}
+      if (last && (from || to)) {
+        console.error(
+          chalk.red("Use either --last or --from/--to, not both")
+        );
+        return;
+      }
 
-			if ((from && !to) || (!from && to)) {
-				console.error(
-					chalk.red(
-						"Both --from and --to are required when specifying a time range"
-					)
-				);
-				return;
-			}
+      if ((from && !to) || (!from && to)) {
+        console.error(
+          chalk.red(
+            "Both --from and --to are required when specifying a time range"
+          )
+        );
+        return;
+      }
 
-			if (!last && !from && !to) {
-				to = `${Date.now()}`;
-				from = `${Date.now() - 60 * 60 * 1000}`; // default: last 1 hour
-			}
+      if (!last && !from && !to) {
+        to = `${Date.now()}`;
+        from = `${Date.now() - 60 * 60 * 1000}`; // default: last 1 hour
+      }
 
-			if (last) {
-				to = `${Date.now()}`;
-				from = `${Date.now() - parseInt(last, 10) * 60 * 60 * 1000}`;
-			}
+      if (last) {
+        to = `${Date.now()}`;
+        from = `${Date.now() - parseInt(last, 10) * 60 * 60 * 1000}`;
+      }
 
-			const logs = await ProviderInstance.downloadNodeLogs(
-				this.oceanNodeUrl,
-				this.signer,
-				from,
-				to,
-				maxLogs
-			);
+      const logs = await ProviderInstance.downloadNodeLogs(
+        this.oceanNodeUrl,
+        this.signer,
+        from,
+        to,
+        maxLogs
+      );
 
-			const text = JSON.stringify(logs, null, 2);
-			const outputPath = `${outputLocation}/logs.json`;
-			fs.writeFileSync(outputPath, text);
-			console.log(chalk.green(`Logs saved to ${outputPath}`));
-		} catch (error) {
-			console.error(chalk.red("Error downloading node logs: "), error);
-		}
-	}
+      const text = JSON.stringify(logs, null, 2);
+      const outputPath = `${outputLocation}/logs.json`;
+      fs.writeFileSync(outputPath, text);
+      console.log(chalk.green(`Logs saved to ${outputPath}`));
+    } catch (error) {
+      console.error(chalk.red("Error downloading node logs: "), error);
+    }
+  }
 
-	public async createBucket(args: string[]): Promise<void> {
-		try {
-			const accessListAddress = args[1];
-			let accessLists: Array<{ [chainId: string]: string[] }> = [];
+  public async createBucket(args: string[]): Promise<void> {
+    try {
+      const accessListAddress = args[1];
+      let accessLists: Array<{ [chainId: string]: string[] }> = [];
 
-			if (accessListAddress) {
-				if (!/^0x[a-fA-F0-9]{40}$/.test(accessListAddress)) {
-					console.error(chalk.red(`Invalid access list address: ${accessListAddress}`));
-					return;
-				}
-				const { chainId } = await this.signer.provider.getNetwork();
-				accessLists = [{ [String(chainId)]: [accessListAddress] }];
-			}
+      if (accessListAddress) {
+        if (!/^0x[a-fA-F0-9]{40}$/.test(accessListAddress)) {
+          console.error(chalk.red(`Invalid access list address: ${accessListAddress}`));
+          return;
+        }
+        const { chainId } = await this.signer.provider.getNetwork();
+        accessLists = [{ [String(chainId)]: [accessListAddress] }];
+      }
 
-			const result = await ProviderInstance.createPersistentStorageBucket(
-				this.oceanNodeUrl,
-				this.signer,
-				{ accessLists }
-			);
-			console.log(chalk.green("Bucket created."));
-			console.log(util.inspect(result, false, null, true));
-		} catch (error) {
-			console.error(chalk.red("Error creating bucket: "), error);
-		}
-	}
+      const result = await ProviderInstance.createPersistentStorageBucket(
+        this.oceanNodeUrl,
+        this.signer,
+        { accessLists }
+      );
+      console.log(chalk.green("Bucket created."));
+      console.log(util.inspect(result, false, null, true));
+    } catch (error) {
+      console.error(chalk.red("Error creating bucket: "), error);
+    }
+  }
 
-	public async addFileToBucket(args: string[]): Promise<void> {
-		try {
-			const bucketId = args[1];
-			const filePath = args[2];
-			const fileName = args[3] || (filePath ? path.basename(filePath) : undefined);
-			if (!bucketId || !filePath) {
-				console.error(chalk.red("bucketId and filePath are required"));
-				return;
-			}
-			if (!fs.existsSync(filePath)) {
-				console.error(chalk.red(`File not found: ${filePath}`));
-				return;
-			}
+  public async addFileToBucket(args: string[]): Promise<void> {
+    try {
+      const bucketId = args[1];
+      const filePath = args[2];
+      const fileName = args[3] || (filePath ? path.basename(filePath) : undefined);
+      if (!bucketId || !filePath) {
+        console.error(chalk.red("bucketId and filePath are required"));
+        return;
+      }
+      if (!fs.existsSync(filePath)) {
+        console.error(chalk.red(`File not found: ${filePath}`));
+        return;
+      }
 
-			const stream = fs.createReadStream(filePath);
-			const result = await ProviderInstance.uploadPersistentStorageFile(
-				this.oceanNodeUrl,
-				this.signer,
-				bucketId,
-				fileName,
-				stream as unknown as AsyncIterable<Uint8Array>
-			);
-			console.log(chalk.green(`File '${fileName}' uploaded to bucket ${bucketId}.`));
-			console.log(util.inspect(result, false, null, true));
-		} catch (error) {
-			console.error(chalk.red("Error uploading file: "), error);
-		}
-	}
+      const stream = fs.createReadStream(filePath);
+      const result = await ProviderInstance.uploadPersistentStorageFile(
+        this.oceanNodeUrl,
+        this.signer,
+        bucketId,
+        fileName,
+        stream as unknown as AsyncIterable<Uint8Array>
+      );
+      console.log(chalk.green(`File '${fileName}' uploaded to bucket ${bucketId}.`));
+      console.log(util.inspect(result, false, null, true));
+    } catch (error) {
+      console.error(chalk.red("Error uploading file: "), error);
+    }
+  }
 
-	public async listBuckets(args: string[]): Promise<void> {
-		try {
-			const owner = args[1] || (await this.signer.getAddress());
-			const buckets = await ProviderInstance.getPersistentStorageBuckets(
-				this.oceanNodeUrl,
-				this.signer,
-				owner
-			);
-			console.log(chalk.cyan(`Buckets owned by ${owner}:`));
-			console.log(util.inspect(buckets, false, null, true));
-		} catch (error) {
-			console.error(chalk.red("Error listing buckets: "), error);
-		}
-	}
+  public async listBuckets(args: string[]): Promise<void> {
+    try {
+      const owner = args[1] || (await this.signer.getAddress());
+      const buckets = await ProviderInstance.getPersistentStorageBuckets(
+        this.oceanNodeUrl,
+        this.signer,
+        owner
+      );
+      console.log(chalk.cyan(`Buckets owned by ${owner}:`));
+      console.log(util.inspect(buckets, false, null, true));
+    } catch (error) {
+      console.error(chalk.red("Error listing buckets: "), error);
+    }
+  }
 
-	public async listFilesInBucket(args: string[]): Promise<void> {
-		try {
-			const bucketId = args[1];
-			if (!bucketId) {
-				console.error(chalk.red("bucketId is required"));
-				return;
-			}
-			const files = await ProviderInstance.listPersistentStorageFiles(
-				this.oceanNodeUrl,
-				this.signer,
-				bucketId
-			);
-			console.log(chalk.cyan(`Files in bucket ${bucketId}:`));
-			console.log(util.inspect(files, false, null, true));
-		} catch (error) {
-			console.error(chalk.red("Error listing files: "), error);
-		}
-	}
+  public async listFilesInBucket(args: string[]): Promise<void> {
+    try {
+      const bucketId = args[1];
+      if (!bucketId) {
+        console.error(chalk.red("bucketId is required"));
+        return;
+      }
+      const files = await ProviderInstance.listPersistentStorageFiles(
+        this.oceanNodeUrl,
+        this.signer,
+        bucketId
+      );
+      console.log(chalk.cyan(`Files in bucket ${bucketId}:`));
+      console.log(util.inspect(files, false, null, true));
+    } catch (error) {
+      console.error(chalk.red("Error listing files: "), error);
+    }
+  }
 
-	public async getFileObject(args: string[]): Promise<void> {
-		try {
-			const bucketId = args[1];
-			const fileName = args[2];
-			if (!bucketId || !fileName) {
-				console.error(chalk.red("bucketId and fileName are required"));
-				return;
-			}
-			const fileObject = await ProviderInstance.getPersistentStorageFileObject(
-				this.oceanNodeUrl,
-				this.signer,
-				bucketId,
-				fileName
-			);
-			console.log(JSON.stringify(fileObject, null, 2));
-		} catch (error) {
-			console.error(chalk.red("Error getting file object: "), error);
-		}
-	}
+  public async getFileObject(args: string[]): Promise<void> {
+    try {
+      const bucketId = args[1];
+      const fileName = args[2];
+      if (!bucketId || !fileName) {
+        console.error(chalk.red("bucketId and fileName are required"));
+        return;
+      }
+      const fileObject = await ProviderInstance.getPersistentStorageFileObject(
+        this.oceanNodeUrl,
+        this.signer,
+        bucketId,
+        fileName
+      );
+      console.log(JSON.stringify(fileObject, null, 2));
+    } catch (error) {
+      console.error(chalk.red("Error getting file object: "), error);
+    }
+  }
 
-	public async deleteFile(args: string[]): Promise<void> {
-		try {
-			const bucketId = args[1];
-			const fileName = args[2];
-			if (!bucketId || !fileName) {
-				console.error(chalk.red("bucketId and fileName are required"));
-				return;
-			}
-			const result = await ProviderInstance.deletePersistentStorageFile(
-				this.oceanNodeUrl,
-				this.signer,
-				bucketId,
-				fileName
-			);
-			console.log(chalk.green(`File '${fileName}' deleted from bucket ${bucketId}.`));
-			console.log(util.inspect(result, false, null, true));
-		} catch (error) {
-			console.error(chalk.red("Error deleting file: "), error);
-		}
-	}
+  public async deleteFile(args: string[]): Promise<void> {
+    try {
+      const bucketId = args[1];
+      const fileName = args[2];
+      if (!bucketId || !fileName) {
+        console.error(chalk.red("bucketId and fileName are required"));
+        return;
+      }
+      const result = await ProviderInstance.deletePersistentStorageFile(
+        this.oceanNodeUrl,
+        this.signer,
+        bucketId,
+        fileName
+      );
+      console.log(chalk.green(`File '${fileName}' deleted from bucket ${bucketId}.`));
+      console.log(util.inspect(result, false, null, true));
+    } catch (error) {
+      console.error(chalk.red("Error deleting file: "), error);
+    }
+  }
 }

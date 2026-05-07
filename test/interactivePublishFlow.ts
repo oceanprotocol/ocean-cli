@@ -44,7 +44,7 @@ describe("Ocean CLI Interactive Publishing", function() {
             const inputInterval = setInterval(() => {
                 if (inputIndex < inputs.length) {
                     if (child.stdin) {
-                        child.stdin.write(inputs[inputIndex]);
+                    child.stdin.write(inputs[inputIndex]);
                     }
                     inputIndex++;
                 } else {
@@ -63,7 +63,7 @@ describe("Ocean CLI Interactive Publishing", function() {
                 expect(code).to.equal(0);
                 expect(fullOutput).to.contain("Asset successfully published with DID:");
                 expect(fullOutput).to.contain("Metadata successfully updated for DID:");
-
+                
                 const match = fullOutput.match(/did:op:[a-f0-9]{64}/);
                 if (match) {
                     publishedDid = match[0];

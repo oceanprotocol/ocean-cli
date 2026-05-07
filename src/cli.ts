@@ -291,18 +291,18 @@ export async function createCLI() {
       "Output backend to save job results to. Supported types include S3, FTP, URL, Arweave, etc. Defaults to node local disk if omitted."
     )
     .action(async (datasetDids, algoDid, computeEnvId, maxJobDuration, paymentToken, resources, output, serviceIds, algoServiceId, options) => {
-      const dsDids = options.datasets || datasetDids;
-      const aDid = options.algo || algoDid;
-      const envId = options.env || computeEnvId;
-      const jobDuration = options.maxJobDuration || maxJobDuration;
-      const token = options.token || paymentToken;
-      const res = options.resources || resources;
-      const outputLocation = options.output || output;
+        const dsDids = options.datasets || datasetDids;
+        const aDid = options.algo || algoDid;
+        const envId = options.env || computeEnvId;
+        const jobDuration = options.maxJobDuration || maxJobDuration;
+        const token = options.token || paymentToken;
+        const res = options.resources || resources;
+        const outputLocation = options.output || output;
       const svcIds = options.services ?? serviceIds ?? '';
       const algoSvcId = options.algoService ?? algoServiceId ?? '';
-      if (!dsDids || !aDid || !envId || !jobDuration || !token || !res) {
+        if (!dsDids || !aDid || !envId || !jobDuration || !token || !res) {
         console.error(chalk.red('Missing required arguments'));
-        // process.exit(1);
+          // process.exit(1);
         return
       }
 
@@ -323,59 +323,59 @@ export async function createCLI() {
             'If serviceIds is provided, it must match datasetDids length (positional 1–1).'
           )
         );
-        return;
-      }
-      const { signer, chainId } = await initializeSigner();
-      const commands = new Commands(signer, chainId);
+          return;
+        }
+        const { signer, chainId } = await initializeSigner();
+        const commands = new Commands(signer, chainId);
 
       const initArgs = [null, dsDids, aDid, envId, jobDuration, token, res, output, svcIds, algoSvcId];
       console.log('initArgs:', initArgs);
-      const initResp = await commands.initializeCompute(initArgs);
+        const initResp = await commands.initializeCompute(initArgs);
 
-      if (!initResp) {
-        console.error(chalk.red("Initialization failed. Aborting."));
-        return;
-      }
-
-      console.log(chalk.yellow("\n--- Payment Details ---"));
-      console.log(JSON.stringify(initResp, null, 2));
-      const amount = await unitsToAmount(
-        signer,
-        initResp.payment.token,
-        initResp.payment.amount.toString()
-      );
-
-      const proceed = options.accept;
-      if (!proceed) {
-        if (!process.stdin.isTTY) {
-          console.error(
-            chalk.red(
-              'Cannot prompt for confirmation (non-TTY). Use "--accept true" to skip.'
-            )
-          );
-          process.exit(1);
-        }
-        const rl = createInterface({ input, output: stdout });
-        const confirmation = await rl.question(
-          `\nProceed with payment for starting compute job at price ${amount} in tokens from address ${initResp.payment.token}? (y/n): `
-        );
-        rl.close();
-        if (
-          confirmation.toLowerCase() !== "y" &&
-          confirmation.toLowerCase() !== "yes"
-        ) {
-          console.log(chalk.red("Compute job canceled by user."));
+        if (!initResp) {
+          console.error(chalk.red("Initialization failed. Aborting."));
           return;
         }
-      } else {
-        console.log(chalk.cyan("Auto-confirm enabled with --yes flag."));
-      }
+
+        console.log(chalk.yellow("\n--- Payment Details ---"));
+        console.log(JSON.stringify(initResp, null, 2));
+        const amount = await unitsToAmount(
+          signer,
+          initResp.payment.token,
+          initResp.payment.amount.toString()
+        );
+
+        const proceed = options.accept;
+        if (!proceed) {
+          if (!process.stdin.isTTY) {
+            console.error(
+              chalk.red(
+                'Cannot prompt for confirmation (non-TTY). Use "--accept true" to skip.'
+              )
+            );
+            process.exit(1);
+          }
+          const rl = createInterface({ input, output: stdout });
+          const confirmation = await rl.question(
+            `\nProceed with payment for starting compute job at price ${amount} in tokens from address ${initResp.payment.token}? (y/n): `
+          );
+          rl.close();
+          if (
+            confirmation.toLowerCase() !== "y" &&
+            confirmation.toLowerCase() !== "yes"
+          ) {
+            console.log(chalk.red("Compute job canceled by user."));
+            return;
+          }
+        } else {
+          console.log(chalk.cyan("Auto-confirm enabled with --yes flag."));
+        }
 
       const computeArgs = [null, dsDids, aDid, envId, JSON.stringify(initResp), jobDuration, token, res, outputLocation, svcIds, algoSvcId];
 
-      await commands.computeStart(computeArgs);
-      console.log(chalk.green("Compute job started successfully."));
-    }
+        await commands.computeStart(computeArgs);
+        console.log(chalk.green("Compute job started successfully."));
+      }
     );
 
   // startFreeCompute command

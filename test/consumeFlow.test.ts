@@ -53,18 +53,18 @@ describe("Ocean CLI Publishing", function() {
         process.env.ADDRESS_FILE = path.join(process.env.HOME || "", ".ocean/ocean-contracts/artifacts/address.json");
 
         const output = await runCommand(`npm run cli publish ${metadataFile}`);
-        const jsonMatch = output.match(/did:op:[a-f0-9]{64}/);
+		const jsonMatch = output.match(/did:op:[a-f0-9]{64}/);
         if (!jsonMatch) {
-            console.error("Raw output:", output);
-            throw new Error("Could not find did in the output");
-        }
+			console.error("Raw output:", output);
+			throw new Error("Could not find did in the output");
+		}
 
-        try {
-            downloadDatasetDid = jsonMatch[0];
-        } catch (error) {
-            console.error("Extracted output:", jsonMatch[0]);
-            throw new Error("Failed to parse the extracted output:\n" + error);
-        }
+		try {
+			downloadDatasetDid = jsonMatch[0];
+		} catch (error) {
+			console.error("Extracted output:", jsonMatch[0]);
+			throw new Error("Failed to parse the extracted output:\n" + error);
+		}
 
     });
 
@@ -99,18 +99,18 @@ describe("Ocean CLI Publishing", function() {
 
         const output = await runCommand(`npm run cli publish ${metadataFile}`);
 
-        const jsonMatch = output.match(/did:op:[a-f0-9]{64}/);
+		const jsonMatch = output.match(/did:op:[a-f0-9]{64}/);
         if (!jsonMatch) {
-            console.error("Raw output:", output);
-            throw new Error("Could not find did in the output");
-        }
+			console.error("Raw output:", output);
+			throw new Error("Could not find did in the output");
+		}
 
-        try {
-            computeDatasetDid = jsonMatch[0];
-        } catch (error) {
-            console.error("Extracted output:", jsonMatch[0]);
-            throw new Error("Failed to parse the extracted output:\n" + error);
-        }
+		try {
+			computeDatasetDid = jsonMatch[0];
+		} catch (error) {
+			console.error("Extracted output:", jsonMatch[0]);
+			throw new Error("Failed to parse the extracted output:\n" + error);
+		}
     });
 
     it("should publish a js Algorithm using 'npm run cli publishAlgo'", async function() {
@@ -124,16 +124,16 @@ describe("Ocean CLI Publishing", function() {
         const output = await runCommand(`npm run cli publishAlgo ${filePath}`);
         const jsonMatch = output.match(/did:op:[a-f0-9]{64}/);
         if (!jsonMatch) {
-            console.error("Raw output:", output);
-            throw new Error("Could not find did in the output");
-        }
+			console.error("Raw output:", output);
+			throw new Error("Could not find did in the output");
+		}
 
-        try {
-            jsAlgoDid = jsonMatch[0];
-        } catch (error) {
-            console.error("Extracted output:", jsonMatch[0]);
-            throw new Error("Failed to parse the extracted output:\n" + error);
-        }
+		try {
+			jsAlgoDid = jsonMatch[0];
+		} catch (error) {
+			console.error("Extracted output:", jsonMatch[0]);
+			throw new Error("Failed to parse the extracted output:\n" + error);
+		}
     });
 
     it("should publish a python Algorithm using 'npm run cli publishAlgo'", async function() {
@@ -147,85 +147,85 @@ describe("Ocean CLI Publishing", function() {
         const output = await runCommand(`npm run cli publishAlgo ${filePath}`);
         const jsonMatch = output.match(/did:op:[a-f0-9]{64}/);
         if (!jsonMatch) {
-            console.error("Raw output:", output);
-            throw new Error("Could not find did in the output");
-        }
+			console.error("Raw output:", output);
+			throw new Error("Could not find did in the output");
+		}
 
-        try {
-            pythonAlgoDid = jsonMatch[0];
-        } catch (error) {
-            console.error("Extracted output:", jsonMatch[0]);
-            throw new Error("Failed to parse the extracted output:\n" + error);
-        }
+		try {
+			pythonAlgoDid = jsonMatch[0];
+		} catch (error) {
+			console.error("Extracted output:", jsonMatch[0]);
+			throw new Error("Failed to parse the extracted output:\n" + error);
+		}
     });
 
     it("should get DDO using 'npm run cli getDDO' for download dataset", async function() {
 
         const output = await runCommand(`npm run cli getDDO ${downloadDatasetDid}`);
 
-        const jsonMatch = output.match(/s*([\s\S]*)/);
-        if (!jsonMatch) {
-            console.error("Raw output:", output);
-            throw new Error("Could not find ddo in the output");
-        }
+		const jsonMatch = output.match(/s*([\s\S]*)/);
+		if (!jsonMatch) {
+			console.error("Raw output:", output);
+			throw new Error("Could not find ddo in the output");
+		}
 
         try {
             expect(output).to.contain(`Resolving Asset with DID: ${downloadDatasetDid}`)
-        } catch (error) {
-            console.error("Extracted output:", jsonMatch[0]);
-            throw new Error("Failed to parse the extracted output:\n" + error);
-        }
+		} catch (error) {
+			console.error("Extracted output:", jsonMatch[0]);
+			throw new Error("Failed to parse the extracted output:\n" + error);
+		}
     });
 
     it("should get DDO using 'npm run cli getDDO' for compute dataset", async function() {
         const output = await runCommand(`npm run cli getDDO ${computeDatasetDid}`);
 
-        const jsonMatch = output.match(/s*([\s\S]*)/);
-        if (!jsonMatch) {
-            console.error("Raw output:", output);
-            throw new Error("Could not find ddo in the output");
-        }
+		const jsonMatch = output.match(/s*([\s\S]*)/);
+		if (!jsonMatch) {
+			console.error("Raw output:", output);
+			throw new Error("Could not find ddo in the output");
+		}
 
         try {
             expect(output).to.contain(`Resolving Asset with DID: ${computeDatasetDid}`)
-        } catch (error) {
-            console.error("Extracted output:", jsonMatch[0]);
-            throw new Error("Failed to parse the extracted output:\n" + error);
-        }
+		} catch (error) {
+			console.error("Extracted output:", jsonMatch[0]);
+			throw new Error("Failed to parse the extracted output:\n" + error);
+		}
     });
 
     it("should get DDO using 'npm run cli getDDO' for JS algorithm", async function() {
         const output = await runCommand(`npm run cli getDDO ${jsAlgoDid}`);
 
-        const jsonMatch = output.match(/s*([\s\S]*)/);
-        if (!jsonMatch) {
-            console.error("Raw output:", output);
-            throw new Error("Could not find ddo in the output");
-        }
+		const jsonMatch = output.match(/s*([\s\S]*)/);
+		if (!jsonMatch) {
+			console.error("Raw output:", output);
+			throw new Error("Could not find ddo in the output");
+		}
 
         try {
-            expect(output).to.contain(`Resolving Asset with DID: ${jsAlgoDid}`)
-        } catch (error) {
-            console.error("Extracted output:", jsonMatch[0]);
-            throw new Error("Failed to parse the extracted output:\n" + error);
-        }
+			expect(output).to.contain(`Resolving Asset with DID: ${jsAlgoDid}`)
+		} catch (error) {
+			console.error("Extracted output:", jsonMatch[0]);
+			throw new Error("Failed to parse the extracted output:\n" + error);
+		}
     });
 
     it("should get DDO using 'npm run cli getDDO' for python algorithm", async function() {
         const output = await runCommand(`npm run cli getDDO ${pythonAlgoDid}`);
 
-        const jsonMatch = output.match(/s*([\s\S]*)/);
-        if (!jsonMatch) {
-            console.error("Raw output:", output);
-            throw new Error("Could not find ddo in the output");
-        }
+		const jsonMatch = output.match(/s*([\s\S]*)/);
+		if (!jsonMatch) {
+			console.error("Raw output:", output);
+			throw new Error("Could not find ddo in the output");
+		}
 
         try {
-            expect(output).to.contain(`Resolving Asset with DID: ${pythonAlgoDid}`)
-        } catch (error) {
-            console.error("Extracted output:", jsonMatch[0]);
-            throw new Error("Failed to parse the extracted output:\n" + error);
-        }
+			expect(output).to.contain(`Resolving Asset with DID: ${pythonAlgoDid}`)
+		} catch (error) {
+			console.error("Extracted output:", jsonMatch[0]);
+			throw new Error("Failed to parse the extracted output:\n" + error);
+		}
     });
 
     it("should download the download dataset", async function() {

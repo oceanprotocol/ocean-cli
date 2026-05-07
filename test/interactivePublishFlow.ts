@@ -13,7 +13,7 @@ describe("Ocean CLI Interactive Publishing", function() {
     const projectRoot = path.resolve(__dirname, "..");
     let publishedDid: string;
 
-    it("should publish an asset using 'npm run cli start' interactive flow", function (done) {
+    it("should publish an asset using 'npm run cli start' interactive flow", function(done) {
         process.env.PRIVATE_KEY = "0x1d751ded5a32226054cd2e71261039b65afb9ee1c746d055dd699b1150a5befc";
         process.env.RPC = "http://127.0.0.1:8545";
         process.env.NODE_URL = "http://127.0.0.1:8001";
@@ -79,7 +79,7 @@ describe("Ocean CLI Interactive Publishing", function() {
         });
     });
 
-    it("should get DDO using 'npm run cli getDDO' for the published asset", function (done) {
+    it("should get DDO using 'npm run cli getDDO' for the published asset", function(done) {
         exec(`npm run cli getDDO ${publishedDid}`, { cwd: projectRoot }, (error, stdout) => {
             try {
                 expect(stdout).to.contain(`${publishedDid}`);

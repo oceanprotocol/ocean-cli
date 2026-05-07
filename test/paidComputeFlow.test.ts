@@ -3,7 +3,7 @@ import path from "path";
 import fs from "fs";
 import { homedir } from 'os'
 import {
-    ProviderInstance
+	ProviderInstance
 } from "@oceanprotocol/lib";
 import { projectRoot, runCommand } from "./util.js";
 
@@ -23,9 +23,9 @@ describe("Ocean CLI Paid Compute", function() {
     const getAddresses = () => {
         const data = JSON.parse(
             fs.readFileSync(
-                process.env.ADDRESS_FILE ||
+            process.env.ADDRESS_FILE ||
                 `${homedir}/.ocean/ocean-contracts/artifacts/address.json`,
-                'utf8'
+            'utf8'
             )
         )
         return data.development
@@ -46,18 +46,18 @@ describe("Ocean CLI Paid Compute", function() {
 
         const output = await runCommand(`npm run cli publish ${metadataFile}`);
 
-        const jsonMatch = output.match(/did:op:[a-f0-9]{64}/);
+		const jsonMatch = output.match(/did:op:[a-f0-9]{64}/);
         if (!jsonMatch) {
-            console.error("Raw output:", output);
-            throw new Error("Could not find compute dataset did in the output");
-        }
+			console.error("Raw output:", output);
+			throw new Error("Could not find compute dataset did in the output");
+		}
 
-        try {
-            computeDatasetDid = jsonMatch[0];
-        } catch (error) {
-            console.error("Extracted output:", jsonMatch[0]);
-            throw new Error("Failed to parse the extracted output:\n" + error);
-        }
+		try {
+			computeDatasetDid = jsonMatch[0];
+		} catch (error) {
+			console.error("Extracted output:", jsonMatch[0]);
+			throw new Error("Failed to parse the extracted output:\n" + error);
+		}
     });
 
     it("should publish a js Algorithm using 'npm run cli publishAlgo'", async function() {
@@ -70,82 +70,82 @@ describe("Ocean CLI Paid Compute", function() {
 
         const output = await runCommand(`npm run cli publishAlgo ${filePath}`);
 
-        const jsonMatch = output.match(/did:op:[a-f0-9]{64}/);
-        if (!jsonMatch) {
-            console.error("Raw output:", output);
-            throw new Error("Could not find algo did in the output");
-        }
+		const jsonMatch = output.match(/did:op:[a-f0-9]{64}/);
+		if (!jsonMatch) {
+			console.error("Raw output:", output);
+			throw new Error("Could not find algo did in the output");
+		}
 
         try {
-            jsAlgoDid = jsonMatch[0];
-        } catch (error) {
-            console.error("Extracted output:", jsonMatch[0]);
-            throw new Error("Failed to parse the extracted output:\n" + error);
-        }
+			jsAlgoDid = jsonMatch[0];
+		} catch (error) {
+			console.error("Extracted output:", jsonMatch[0]);
+			throw new Error("Failed to parse the extracted output:\n" + error);
+		}
     });
 
     it("should get DDO using 'npm run cli getDDO' for compute dataset", async function() {
         const output = await runCommand(`npm run cli getDDO ${computeDatasetDid}`);
 
-        const jsonMatch = output.match(/s*([\s\S]*)/);
-        if (!jsonMatch) {
-            console.error("Raw output:", output);
-            throw new Error("Could not find ddo in the output");
-        }
+		const jsonMatch = output.match(/s*([\s\S]*)/);
+		if (!jsonMatch) {
+			console.error("Raw output:", output);
+			throw new Error("Could not find ddo in the output");
+		}
 
         try {
             expect(output).to.contain(`Resolving Asset with DID: ${computeDatasetDid}`)
-        } catch (error) {
-            console.error("Extracted output:", jsonMatch[0]);
-            throw new Error("Failed to parse the extracted output:\n" + error);
-        }
+		} catch (error) {
+			console.error("Extracted output:", jsonMatch[0]);
+			throw new Error("Failed to parse the extracted output:\n" + error);
+		}
     });
 
     it("should get DDO using 'npm run cli getDDO' for JS algorithm", async function() {
         const output = await runCommand(`npm run cli getDDO ${jsAlgoDid}`);
 
-        const jsonMatch = output.match(/s*([\s\S]*)/);
-        if (!jsonMatch) {
-            console.error("Raw output:", output);
-            throw new Error("Could not find ddo in the output");
-        }
+		const jsonMatch = output.match(/s*([\s\S]*)/);
+		if (!jsonMatch) {
+			console.error("Raw output:", output);
+			throw new Error("Could not find ddo in the output");
+		}
 
         try {
-            expect(output).to.contain(`Resolving Asset with DID: ${jsAlgoDid}`)
-        } catch (error) {
-            console.error("Extracted output:", jsonMatch[0]);
-            throw new Error("Failed to parse the extracted output:\n" + error);
-        }
+			expect(output).to.contain(`Resolving Asset with DID: ${jsAlgoDid}`)
+		} catch (error) {
+			console.error("Extracted output:", jsonMatch[0]);
+			throw new Error("Failed to parse the extracted output:\n" + error);
+		}
     });
 
-    it("should get compute environments using 'npm run cli getComputeEnvironments'", async function() {
+     it("should get compute environments using 'npm run cli getComputeEnvironments'", async function() {
         const output = await runCommand(`npm run cli getComputeEnvironments`);
 
-        const jsonMatch = output.match(/Exiting compute environments:\s*([\s\S]*)/);
-        if (!jsonMatch) {
-            console.error("Raw output:", output);
-            throw new Error("Could not find compute environments in the output");
-        }
+		const jsonMatch = output.match(/Exiting compute environments:\s*([\s\S]*)/);
+		if (!jsonMatch) {
+			console.error("Raw output:", output);
+			throw new Error("Could not find compute environments in the output");
+		}
 
-        let environments;
-        try {
-            environments = eval(jsonMatch[1]);
-        } catch (error) {
-            console.error(`Extracted output: ${jsonMatch[0]} and final result: ${jsonMatch[1]}`);
-            throw new Error("Failed to parse the extracted output:\n" + error);
-        }
+		let environments;
+		try {
+			environments = eval(jsonMatch[1]);
+		} catch (error) {
+			console.error(`Extracted output: ${jsonMatch[0]} and final result: ${jsonMatch[1]}`);
+			throw new Error("Failed to parse the extracted output:\n" + error);
+		}
 
-        expect(environments).to.be.an("array").that.is.not.empty;
+		expect(environments).to.be.an("array").that.is.not.empty;
 
-        const firstEnv = environments[0];
+		const firstEnv = environments[0];
 
-        expect(firstEnv).to.have.property("id").that.is.a("string");
-        expect(firstEnv).to.have.property("consumerAddress").that.is.a("string");
-        expect(firstEnv).to.have.property("resources").that.is.an("array");
+		expect(firstEnv).to.have.property("id").that.is.a("string");
+		expect(firstEnv).to.have.property("consumerAddress").that.is.a("string");
+		expect(firstEnv).to.have.property("resources").that.is.an("array");
 
-        computeEnvId = firstEnv.id;
+		computeEnvId = firstEnv.id;
 
-        console.log(`Fetched Compute Env ID: ${computeEnvId}`);
+		console.log(`Fetched Compute Env ID: ${computeEnvId}`);
     });
 
     it("should start paid compute on compute dataset and algorithm with services id for dataset and algorithm", async function() {
@@ -196,24 +196,24 @@ describe("Ocean CLI Paid Compute", function() {
     }).timeout(10200)
 
     it("should get job status", async () => {
-        const output = await runCommand(`npm run cli getJobStatus ${computeDatasetDid} ${computeJobId} ''`);
-        expect(output).to.contain(computeJobId);
-        expect(output.toLowerCase()).to.match(/status/);
-        console.log(`Job status retrieved for jobId: ${computeJobId}`);
-    });
+		const output = await runCommand(`npm run cli getJobStatus ${computeDatasetDid} ${computeJobId} ''`);
+		expect(output).to.contain(computeJobId);
+		expect(output.toLowerCase()).to.match(/status/);
+		console.log(`Job status retrieved for jobId: ${computeJobId}`);
+	});
 
-    it("should download compute job results", async () => {
-        const destFolder = path.join(projectRoot, "test-results", computeJobId);
-        fs.mkdirSync(destFolder, { recursive: true });
+	it("should download compute job results", async () => {
+		const destFolder = path.join(projectRoot, "test-results", computeJobId);
+		fs.mkdirSync(destFolder, { recursive: true });
 
-        const output = await runCommand(`npm run cli downloadJobResults ${computeJobId} 1 ${destFolder}`);
+		const output = await runCommand(`npm run cli downloadJobResults ${computeJobId} 1 ${destFolder}`);
 
-        expect(output.toLowerCase()).to.match(/download(ed)?/);
+		expect(output.toLowerCase()).to.match(/download(ed)?/);
 
-        const files = fs.readdirSync(destFolder);
-        expect(files.length).to.be.greaterThan(0, "No result files downloaded");
-        console.log(`Downloaded results to: ${destFolder}`);
+		const files = fs.readdirSync(destFolder);
+		expect(files.length).to.be.greaterThan(0, "No result files downloaded");
+		console.log(`Downloaded results to: ${destFolder}`);
         fs.rmSync(path.join(projectRoot, "test-results"), { recursive: true })
-    });
+	});
 
 });

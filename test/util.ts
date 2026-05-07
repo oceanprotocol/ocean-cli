@@ -24,3 +24,21 @@ export const runCommand = async (command: string): Promise<string> => {
         throw error;
     }
 };
+
+export const runCommandAs = async (
+    privateKey: string,
+    command: string
+): Promise<string> => {
+    console.log(`\n[CMD as ${privateKey.slice(0, 6)}…]: ${command}`);
+    try {
+        const { stdout } = await execPromise(command, {
+            cwd: projectRoot,
+            env: { ...process.env, PRIVATE_KEY: privateKey },
+        });
+        console.log(`[OUTPUT]:\n${stdout}`);
+        return stdout;
+    } catch (error: any) {
+        console.error(`[ERROR]:\n${error.stderr || error.message}`);
+        throw error;
+    }
+};

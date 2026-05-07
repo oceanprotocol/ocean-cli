@@ -4,7 +4,7 @@ import { JsonRpcProvider, Signer, ethers } from "ethers";
 import chalk from "chalk";
 import { stdin as input, stdout } from "node:process";
 import { createInterface } from "readline/promises";
-import { unitsToAmount } from "@oceanprotocol/lib";
+import { unitsToAmount, ProviderInstance, isP2pUri } from "@oceanprotocol/lib";
 import { toBoolean } from "./helpers.js";
 
 async function initializeSigner() {
@@ -34,6 +34,88 @@ export async function createCLI() {
   if (!process.env.NODE_URL) {
     console.error(chalk.red("Have you forgot to set env NODE_URL?"));
     process.exit(1);
+  }
+
+  if (isP2pUri(process.env.NODE_URL)) {
+    const extra = process.env.BOOTSTRAP_PEERS?.split(",").filter(Boolean) || [];
+
+    // Default Ocean bootstrap nodes (must be included explicitly since passing
+    // bootstrapPeers to setupP2P replaces the built-in defaults)
+    const oceanDefaults = [
+      "/dns4/bootstrap1.oncompute.ai/tcp/9001/ws/p2p/16Uiu2HAmLhRDqfufZiQnxvQs2XHhd6hwkLSPfjAQg1gH8wgRixiP",
+      "/dns4/bootstrap2.oncompute.ai/tcp/9001/ws/p2p/16Uiu2HAmHwzeVw7RpGopjZe6qNBJbzDDBdqtrSk7Gcx1emYsfgL4",
+      "/dns4/bootstrap3.oncompute.ai/tcp/9001/ws/p2p/16Uiu2HAmBKSeEP3v4tYEPsZsZv9VELinyMCsrVTJW9BvQeFXx28U",
+      "/dns4/bootstrap4.oncompute.ai/tcp/9001/ws/p2p/16Uiu2HAmSTVTArioKm2wVcyeASHYEsnx2ZNq467Z4GMDU4ErEPom",
+    ];
+
+    const nodeUrl = process.env.NODE_URL;
+    const isFullMultiaddr =
+      nodeUrl.startsWith("/") && nodeUrl.includes("/p2p/");
+    const localPeer = isFullMultiaddr
+      ? [nodeUrl]
+      : [`/ip4/127.0.0.1/tcp/9001/ws/p2p/${nodeUrl}`];
+    const bootstrapPeers = [...localPeer, ...extra, ...oceanDefaults];
+    console.log(chalk.cyan("P2P mode detected. Initializing libp2p..."));
+    console.log(chalk.cyan(`Bootstrap peers: ${bootstrapPeers.length}`));
+
+    for (const peer of localPeer) {
+      console.log(chalk.cyan(`  Local: ${peer}`));
+    }
+    // Allow localhost connections / local nodes
+    await ProviderInstance.setupP2P({
+      bootstrapPeers,
+      libp2p: {
+        connectionGater: {
+          denyDialMultiaddr: () => false,
+        },
+      },
+    } as any);
+    console.log(
+      chalk.cyan("libp2p node started. Waiting for peer connections...")
+    );
+
+    // Wait for the TARGET peer (the one in NODE_URL) to be connected,
+    // not just any bootstrap peer — otherwise signed commands fail with
+    // "Cannot reach peer ...".
+    const targetPeerId = isFullMultiaddr
+      ? nodeUrl.split("/p2p/").pop()!
+      : nodeUrl;
+    const maxWait = 20_000;
+    const interval = 500;
+    let waited = 0;
+    const libp2p = (ProviderInstance as any).p2pProvider?.libp2pNode;
+    const isTargetConnected = () =>
+      (libp2p?.getPeers() ?? []).some(
+        (p: { toString(): string }) => p.toString() === targetPeerId
+      );
+    while (waited < maxWait) {
+      if (isTargetConnected()) {
+        const total = libp2p?.getConnections()?.length ?? 0;
+        console.log(
+          chalk.green(
+            `Connected to target peer ${targetPeerId.slice(0, 12)}… in ${waited}ms (total peers: ${total})`
+          )
+        );
+        break;
+      }
+      await new Promise((r) => setTimeout(r, interval));
+      waited += interval;
+      if (waited % 3000 === 0) {
+        const total = libp2p?.getConnections()?.length ?? 0;
+        console.log(
+          chalk.yellow(
+            `  Waiting for target peer ${targetPeerId.slice(0, 12)}… (${waited / 1000}s, ${total} other peer(s))`
+          )
+        );
+      }
+    }
+    if (!isTargetConnected()) {
+      console.error(
+        chalk.red(
+          `Target peer ${targetPeerId} not reachable after ${maxWait / 1000}s. Commands will fail.`
+        )
+      );
+    }
   }
 
   const program = new Command();
@@ -614,35 +696,35 @@ export async function createCLI() {
     .argument("<name>", "Name for the access list")
     .argument("<symbol>", "Symbol for the access list")
     .argument(
-      "[transferable]",
-      "Whether tokens are transferable (true/false)",
-      "false"
-    )
-    .argument(
       "[initialUsers]",
       "Comma-separated list of initial user addresses",
       ""
     )
+    .argument(
+      "[transferable]",
+      "Whether tokens are transferable (true/false)",
+      "false"
+    )
     .option("-n, --name <name>", "Name for the access list")
     .option("-s, --symbol <symbol>", "Symbol for the access list")
+    .option(
+      "-u, --initial-users [initialUsers]",
+      "Comma-separated list of initial user addresses",
+      ""
+    )
     .option(
       "-t, --transferable [transferable]",
       "Whether tokens are transferable (true/false)",
       "false"
     )
-    .option(
-      "-u, --users [initialUsers]",
-      "Comma-separated list of initial user addresses",
-      ""
-    )
-    .action(async (name, symbol, transferable, initialUsers, options) => {
+    .action(async (name, symbol, initialUsers, transferable, options) => {
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
       await commands.createAccessList([
         options.name || name,
         options.symbol || symbol,
         options.transferable || transferable,
-        options.users || initialUsers,
+        options.initialUsers || initialUsers,
       ]);
     });
 
@@ -722,12 +804,21 @@ export async function createCLI() {
     )
     .argument("[from]", "Start time (epoch ms) to get logs from")
     .argument("[to]", "End time (epoch ms) to get logs to")
-    .argument("[maxLogs]", "Maximum number of logs to retrieve (default: 100, max: 1000)")
+    .argument(
+      "[maxLogs]",
+      "Maximum number of logs to retrieve (default: 100, max: 1000)"
+    )
     .option("-o, --output <output>", "Output directory to save the logs")
-    .option("-l, --last [last]", "Period of time to get logs from now (in hours)")
+    .option(
+      "-l, --last [last]",
+      "Period of time to get logs from now (in hours)"
+    )
     .option("-f, --from [from]", "Start time (epoch ms) to get logs from")
     .option("-t, --to [to]", "End time (epoch ms) to get logs to")
-    .option("-m, --maxLogs [maxLogs]", "Maximum number of logs to retrieve (default: 100, max: 1000)")
+    .option(
+      "-m, --maxLogs [maxLogs]",
+      "Maximum number of logs to retrieve (default: 100, max: 1000)"
+    )
     .action(async (output, last, from, to, options) => {
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
@@ -738,6 +829,70 @@ export async function createCLI() {
         options.to || to,
         options.maxLogs,
       ]);
+    });
+
+  program
+    .command("createBucket")
+    .description("Create a new persistent-storage bucket. Pass an access list to gate it; omit for owner-only access (chain inferred from RPC)")
+    .argument("[accessListAddress]", "Access list contract address (0x…); omit for owner-only access")
+    .action(async (accessListAddress) => {
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
+      await commands.createBucket([null, accessListAddress]);
+    });
+
+  program
+    .command("addFileToBucket")
+    .description("Upload a local file into a bucket")
+    .argument("<bucketId>", "Bucket id")
+    .argument("<filePath>", "Path to local file")
+    .argument("[fileName]", "Name under which to store the file (defaults to basename)")
+    .action(async (bucketId, filePath, fileName) => {
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
+      await commands.addFileToBucket([null, bucketId, filePath, fileName]);
+    });
+
+  program
+    .command("listBuckets")
+    .description("List buckets owned by an address (defaults to signer)")
+    .option("-o, --owner <address>", "Owner address")
+    .action(async (options) => {
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
+      await commands.listBuckets([null, options.owner]);
+    });
+
+  program
+    .command("listFilesInBucket")
+    .description("List files in a bucket")
+    .argument("<bucketId>", "Bucket id")
+    .action(async (bucketId) => {
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
+      await commands.listFilesInBucket([null, bucketId]);
+    });
+
+  program
+    .command("getFileObject")
+    .description("Get the file-object descriptor for a file in a bucket")
+    .argument("<bucketId>", "Bucket id")
+    .argument("<fileName>", "File name")
+    .action(async (bucketId, fileName) => {
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
+      await commands.getFileObject([null, bucketId, fileName]);
+    });
+
+  program
+    .command("deleteFile")
+    .description("Delete a file from a bucket")
+    .argument("<bucketId>", "Bucket id")
+    .argument("<fileName>", "File name")
+    .action(async (bucketId, fileName) => {
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
+      await commands.deleteFile([null, bucketId, fileName]);
     });
 
   return program;

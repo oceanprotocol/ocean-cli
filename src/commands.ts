@@ -1,4 +1,5 @@
 import fs from "fs";
+import path from "path";
 import util from "util";
 import {
 	createAssetUtil,
@@ -245,7 +246,7 @@ export class Commands {
 
 		const orderTx = await tx.wait();
 
-		const urlDownloadUrl = await ProviderInstance.getDownloadUrl(
+		const downloadResult = await ProviderInstance.getDownloadUrl(
 			dataDdo.id,
 			serviceId,
 			0,
@@ -255,9 +256,16 @@ export class Commands {
 			policyServer
 		);
 		try {
-			const path = args[2] ? args[2] : ".";
-			const { filename } = await downloadFile(urlDownloadUrl, path);
-			console.log("File downloaded successfully:", path + "/" + filename);
+			const destPath = args[2] ? args[2] : ".";
+			if (typeof downloadResult === "string") {
+				const { filename } = await downloadFile(downloadResult, destPath);
+				console.log("File downloaded successfully:", destPath + "/" + filename);
+			} else {
+				const filename = downloadResult.filename || "file.out";
+				const filePath = path.join(destPath, filename);
+				fs.writeFileSync(filePath, Buffer.from(downloadResult.data));
+				console.log("File downloaded successfully:", filePath);
+			}
 		} catch (e) {
 			console.log(`Download url dataset failed: ${e}`);
 		}
@@ -1193,23 +1201,24 @@ export class Commands {
 			this.signer,
 			jobId
 		);
-		console.log("response: ", logsResponse);
 
 		if (!logsResponse) {
 			console.error("Error fetching streamable logs. No logs available.");
 			return;
-		} else {
-			const stream = logsResponse as ReadableStream;
-			console.log("stream: ", stream);
-			const text = await new Response(stream).text();
-			console.log("Streamable Logs: ");
-			console.log(text);
-			// for await (const value of stream) {
-			// 	// just print it to the console
-			// 	console.log(value);
-			// }
 		}
-		console.log("Exiting computeStreamableLogs: ", logsResponse);
+
+		let text: string;
+		if (logsResponse[Symbol.asyncIterator]) {
+			const chunks: Uint8Array[] = [];
+			for await (const chunk of logsResponse) {
+				chunks.push(chunk);
+			}
+			text = Buffer.concat(chunks).toString("utf-8");
+		} else {
+			text = await new Response(logsResponse).text();
+		}
+		console.log("Streamable Logs:");
+		console.log(text);
 	}
 
 	public async allowAlgo(args: string[]) {
@@ -1394,7 +1403,7 @@ export class Commands {
 
 		const jobStatus = (await ProviderInstance.computeStatus(
 			this.oceanNodeUrl,
-			await this.signer.getAddress(),
+			this.signer,
 			jobId,
 			agreementId
 		)) as ComputeJob;
@@ -1402,24 +1411,24 @@ export class Commands {
 	}
 
 	public async downloadJobResults(args: string[]) {
-		const jobResult = await ProviderInstance.getComputeResultUrl(
-			this.oceanNodeUrl,
-			this.signer,
-			args[1],
-			parseInt(args[2])
-		);
-		console.log("jobResult ", jobResult);
-
 		try {
-			const path = args[3] ? args[3] : ".";
-			const { filename } = await downloadFile(
-				jobResult,
-				path,
+			const stream = await ProviderInstance.getComputeResult(
+				this.oceanNodeUrl,
+				this.signer,
+				args[1],
 				parseInt(args[2])
 			);
-			console.log("File downloaded successfully:", path + "/" + filename);
+			const chunks: Uint8Array[] = [];
+			for await (const chunk of stream) {
+				chunks.push(chunk);
+			}
+			const destPath = args[3] || ".";
+			const filename = `file_${args[2]}.out`;
+			const filePath = path.join(destPath, filename);
+			fs.writeFileSync(filePath, Buffer.concat(chunks));
+			console.log("File downloaded successfully:", filePath);
 		} catch (e) {
-			console.log(`Download url dataset failed: ${e}`);
+			console.log(`Download compute result failed: ${e}`);
 		}
 	}
 
@@ -1925,7 +1934,7 @@ export class Commands {
 				from = `${Date.now() - parseInt(last, 10) * 60 * 60 * 1000}`;
 			}
 
-			const response = await ProviderInstance.downloadNodeLogs(
+			const logs = await ProviderInstance.downloadNodeLogs(
 				this.oceanNodeUrl,
 				this.signer,
 				from,
@@ -1933,12 +1942,142 @@ export class Commands {
 				maxLogs
 			);
 
-			const text = await new Response(response).text();
+			const text = JSON.stringify(logs, null, 2);
 			const outputPath = `${outputLocation}/logs.json`;
 			fs.writeFileSync(outputPath, text);
 			console.log(chalk.green(`Logs saved to ${outputPath}`));
 		} catch (error) {
 			console.error(chalk.red("Error downloading node logs: "), error);
+		}
+	}
+
+	public async createBucket(args: string[]): Promise<void> {
+		try {
+			const accessListAddress = args[1];
+			let accessLists: Array<{ [chainId: string]: string[] }> = [];
+
+			if (accessListAddress) {
+				if (!/^0x[a-fA-F0-9]{40}$/.test(accessListAddress)) {
+					console.error(chalk.red(`Invalid access list address: ${accessListAddress}`));
+					return;
+				}
+				const { chainId } = await this.signer.provider.getNetwork();
+				accessLists = [{ [String(chainId)]: [accessListAddress] }];
+			}
+
+			const result = await ProviderInstance.createPersistentStorageBucket(
+				this.oceanNodeUrl,
+				this.signer,
+				{ accessLists }
+			);
+			console.log(chalk.green("Bucket created."));
+			console.log(util.inspect(result, false, null, true));
+		} catch (error) {
+			console.error(chalk.red("Error creating bucket: "), error);
+		}
+	}
+
+	public async addFileToBucket(args: string[]): Promise<void> {
+		try {
+			const bucketId = args[1];
+			const filePath = args[2];
+			const fileName = args[3] || (filePath ? path.basename(filePath) : undefined);
+			if (!bucketId || !filePath) {
+				console.error(chalk.red("bucketId and filePath are required"));
+				return;
+			}
+			if (!fs.existsSync(filePath)) {
+				console.error(chalk.red(`File not found: ${filePath}`));
+				return;
+			}
+
+			const stream = fs.createReadStream(filePath);
+			const result = await ProviderInstance.uploadPersistentStorageFile(
+				this.oceanNodeUrl,
+				this.signer,
+				bucketId,
+				fileName,
+				stream as unknown as AsyncIterable<Uint8Array>
+			);
+			console.log(chalk.green(`File '${fileName}' uploaded to bucket ${bucketId}.`));
+			console.log(util.inspect(result, false, null, true));
+		} catch (error) {
+			console.error(chalk.red("Error uploading file: "), error);
+		}
+	}
+
+	public async listBuckets(args: string[]): Promise<void> {
+		try {
+			const owner = args[1] || (await this.signer.getAddress());
+			const buckets = await ProviderInstance.getPersistentStorageBuckets(
+				this.oceanNodeUrl,
+				this.signer,
+				owner
+			);
+			console.log(chalk.cyan(`Buckets owned by ${owner}:`));
+			console.log(util.inspect(buckets, false, null, true));
+		} catch (error) {
+			console.error(chalk.red("Error listing buckets: "), error);
+		}
+	}
+
+	public async listFilesInBucket(args: string[]): Promise<void> {
+		try {
+			const bucketId = args[1];
+			if (!bucketId) {
+				console.error(chalk.red("bucketId is required"));
+				return;
+			}
+			const files = await ProviderInstance.listPersistentStorageFiles(
+				this.oceanNodeUrl,
+				this.signer,
+				bucketId
+			);
+			console.log(chalk.cyan(`Files in bucket ${bucketId}:`));
+			console.log(util.inspect(files, false, null, true));
+		} catch (error) {
+			console.error(chalk.red("Error listing files: "), error);
+		}
+	}
+
+	public async getFileObject(args: string[]): Promise<void> {
+		try {
+			const bucketId = args[1];
+			const fileName = args[2];
+			if (!bucketId || !fileName) {
+				console.error(chalk.red("bucketId and fileName are required"));
+				return;
+			}
+			const fileObject = await ProviderInstance.getPersistentStorageFileObject(
+				this.oceanNodeUrl,
+				this.signer,
+				bucketId,
+				fileName
+			);
+			console.log(JSON.stringify(fileObject, null, 2));
+		} catch (error) {
+			console.error(chalk.red("Error getting file object: "), error);
+		}
+	}
+
+	public async deleteFile(args: string[]): Promise<void> {
+		try {
+			const bucketId = args[1];
+			const fileName = args[2];
+			if (!bucketId || !fileName) {
+				console.error(chalk.red("bucketId and fileName are required"));
+				return;
+			}
+			const result = await ProviderInstance.deletePersistentStorageFile(
+				this.oceanNodeUrl,
+				this.signer,
+				bucketId,
+				fileName
+			);
+			console.log(chalk.green(`File '${fileName}' deleted from bucket ${bucketId}.`));
+			console.log(util.inspect(result, false, null, true));
+		} catch (error) {
+			console.error(chalk.red("Error deleting file: "), error);
 		}
 	}
 }

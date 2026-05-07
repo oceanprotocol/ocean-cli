@@ -84,7 +84,7 @@ export INDEXING_MAX_RETRIES='100'
 export INDEXING_RETRY_INTERVAL='3000'
 ```
 
-- Optional, set AVOID_LOOP_RUN to 'true' to run each command and exit afterwards (usefull for CI test env and default behaviour). IF not set or set to 'false' the CLI will listen interactively for commands, until exit is manually forced 
+- Optional, set AVOID_LOOP_RUN to 'true' to run each command and exit afterwards (usefull for CI test env and default behaviour). IF not set or set to 'false' the CLI will listen interactively for commands, until exit is manually forced
 
 ```
 export AVOID_LOOP_RUN='true/false'
@@ -136,85 +136,85 @@ npm run cli <command> [options] <arguments>
 
 #### Help Commands
 
-- **General help:**  
+- **General help:**
   `npm run cli --help` or `npm run cli -h`
 
-- **Command-specific help:**  
+- **Command-specific help:**
   `npm run cli help <command>`
 
 #### Examples
 
 **Get DDO:**
 
-- **Positional:**  
+- **Positional:**
   `npm run cli getDDO did:op:123`
 
-- **Named Option:**  
+- **Named Option:**
   `npm run cli getDDO --did did:op:123`
 
 ---
 
 **Publish:**
 
-- **Positional:**  
+- **Positional:**
   `npm run cli publish metadata.json`
 
-- **Named Options:**  
-  `npm run cli publish --file metadata.json`  
-  With encryption disabled:  
-  `npm run cli publish --file metadata.json --encrypt false`  
+- **Named Options:**
+  `npm run cli publish --file metadata.json`
+  With encryption disabled:
+  `npm run cli publish --file metadata.json --encrypt false`
   (Note: `--file` and `--encrypt` can be in any order.)
 
 ---
 
 **Publish Algorithm:**
 
-- **Positional:**  
+- **Positional:**
   `npm run cli publishAlgo algorithm.json`
 
-- **Named Options:**  
-  `npm run cli publishAlgo --file algorithm.json`  
-  With encryption disabled:  
+- **Named Options:**
+  `npm run cli publishAlgo --file algorithm.json`
+  With encryption disabled:
   `npm run cli publishAlgo --encrypt false --file algorithm.json`
 
 ---
 
 **Edit Asset:**
 
-- **Positional:**  
+- **Positional:**
   `npm run cli editAsset did:op:123 metadata.json`
 
-- **Named Options:**  
-  `npm run cli editAsset --did did:op:123 --file metadata.json`  
-  (The flags can be provided in any order, for example:  
+- **Named Options:**
+  `npm run cli editAsset --did did:op:123 --file metadata.json`
+  (The flags can be provided in any order, for example:
   `npm run cli editAsset --file metadata.json --did did:op:123`)
 
 ---
 
 **Download:**
 
-- **Positional:**  
+- **Positional:**
   `npm run cli download did:op:123 ./custom-folder serviceId`
 
-- **Named Options:**  
-  `npm run cli download --did did:op:123 --folder ./custom-folder --service serviceId`  
+- **Named Options:**
+  `npm run cli download --did did:op:123 --folder ./custom-folder --service serviceId`
   (Order of `--did` and `--folder` does not matter.)
 
-- **Rules:**  
+- **Rules:**
   serviceId is optional. If omitted, the CLI defaults to the first available download service.
-  
+
 ---
 
 **Start Compute:**
 
-- **Positional:**  
+- **Positional:**
   `npm run cli startCompute -- did1,did2 algoDid env1 maxJobDuration paymentToken resources svc1,svc2 algoServiceId`
 
-- **Named Options:**  
-  `npm run cli startCompute --datasets did1,did2 --algo algoDid --env env1 --maxJobDuration maxJobDuration --token paymentToken --resources resources --accept true --services svc1,svc2 ----algo-service algoServiceId`  
+- **Named Options:**
+  `npm run cli startCompute --datasets did1,did2 --algo algoDid --env env1 --maxJobDuration maxJobDuration --token paymentToken --resources resources --accept true --services svc1,svc2 ----algo-service algoServiceId`
   (Options can be provided in any order.)
 
-- **Rules:**  
+- **Rules:**
   serviceIds and algoServiceId are optional. If omitted, the CLI defaults to the first available service.
 
 
@@ -229,17 +229,17 @@ e.g.: `'[{"id":"cpu","amount":3},{"id":"ram","amount":16772672536},{"id":"disk",
 
 **Start Free Compute:**
 
-- **Positional:**  
+- **Positional:**
   `npm run cli startFreeCompute did1,did2 algoDid env1`
 
-- **Named Options:**  
-  `npm run cli startFreeCompute --datasets did1,did2 --algo algoDid --env env1 --services svc1,svc2 ----algo-service algoServiceId`  
+- **Named Options:**
+  `npm run cli startFreeCompute --datasets did1,did2 --algo algoDid --env env1 --services svc1,svc2 ----algo-service algoServiceId`
   (Options can be provided in any order.)
 
   - `output` is an optional stringified JSON object specifying a remote storage backend where job results will be uploaded. Same format as `startCompute`.
 
-- **Rules:**  
-  serviceIds and algoServiceId are optional. If omitted, the CLI defaults to the first available service.`  
+- **Rules:**
+  serviceIds and algoServiceId are optional. If omitted, the CLI defaults to the first available service.`
   (Options can be provided in any order.)
 
 - `output` is an optional stringified JSON object specifying a remote storage backend where job results will be uploaded. Same format as `startCompute`.
@@ -248,11 +248,11 @@ e.g.: `'[{"id":"cpu","amount":3},{"id":"ram","amount":16772672536},{"id":"disk",
 
 **Stop Compute:**
 
-- **Positional:**  
+- **Positional:**
   `npm run cli stopCompute did:op:123 job-123`
 
-- **Named Options:**  
-  `npm run cli stopCompute --dataset did:op:123 --job job-123`  
+- **Named Options:**
+  `npm run cli stopCompute --dataset did:op:123 --job job-123`
   (Optionally, you can also provide an agreement ID using `--agreement`.)
 
 ---
@@ -271,86 +271,86 @@ e.g.: `'[{"id":"cpu","amount":3},{"id":"ram","amount":16772672536},{"id":"disk",
 
 **Get Job Status:**
 
-- **Positional:**  
+- **Positional:**
   `npm run cli getJobStatus did:op:123 job-123`
 
-- **Named Options:**  
-  `npm run cli getJobStatus --dataset did:op:123 --job job-123`  
+- **Named Options:**
+  `npm run cli getJobStatus --dataset did:op:123 --job job-123`
   (Optionally, an agreement ID may be provided.)
 
 ---
 
 **Download Job Results:**
 
-- **Positional:**  
+- **Positional:**
   `npm run cli downloadJobResults job-123 0 ./results`
 
-- **Named Options:**  
+- **Named Options:**
   `npm run cli downloadJobResults --job job-123 --index 0 --folder ./results`
 
 ---
 
 **Mint Ocean:**
 
-- **Positional:**  
-  `npm run cli mintOcean`  
+- **Positional:**
+  `npm run cli mintOcean`
   (No arguments are required for this command.)
 
 ---
 
 **Generate Auth Token:**
 
-  `npm run cli generateAuthToken`  
+  `npm run cli generateAuthToken`
   (No arguments are required for this command.)
 
 ---
 
 **Invalidate Auth Token:**
 
-- **Positional:**  
+- **Positional:**
   `npm run cli invalidateAuthToken myAuthToken123`
 
-- **Named Option:**  
+- **Named Option:**
   `npm run cli invalidateAuthToken --token myAuthToken123`
 
 ---
 
 **Deposit to Escrow:**
 
-- **Positional:**  
+- **Positional:**
   `npm run cli depositEscrow 0x1234...tokenAddress 100`
 
-- **Named Options:**  
+- **Named Options:**
   `npm run cli depositEscrow --token 0x1234...tokenAddress --amount 100`
 
 ---
 
 **Get User Funds in Escrow:**
 
-- **Positional:**  
+- **Positional:**
   `npm run cli getUserFundsEscrow 0x1234...tokenAddress`
 
-- **Named Option:**  
+- **Named Option:**
   `npm run cli getUserFundsEscrow --token 0x1234...tokenAddress`
 
 ---
 
 **Withdraw from Escrow:**
 
-- **Positional:**  
+- **Positional:**
   `npm run cli withdrawFromEscrow 0x1234...tokenAddress 50`
 
-- **Named Options:**  
+- **Named Options:**
   `npm run cli withdrawFromEscrow --token 0x1234...tokenAddress --amount 50`
 
 ---
 
 **Authorize Escrow Payee:**
 
-- **Positional:**  
+- **Positional:**
   `npm run cli authorizeEscrow 0x1234...tokenAddress 0x5678...payeeAddress 1000 3600 10`
 
-- **Named Options:**  
+- **Named Options:**
   `npm run cli authorizeEscrow --token 0x1234...tokenAddress --payee 0x5678...payeeAddress --maxLockedAmount 1000 --maxLockSeconds 3600 --maxLockCounts 10`
 
 - Arguments:
@@ -364,20 +364,20 @@ e.g.: `'[{"id":"cpu","amount":3},{"id":"ram","amount":16772672536},{"id":"disk",
 
 **Get Escrow Authorizations:**
 
-- **Positional:**  
+- **Positional:**
   `npm run cli getAuthorizationsEscrow 0x1234...tokenAddress 0x5678...payeeAddress`
 
-- **Named Options:**  
+- **Named Options:**
   `npm run cli getAuthorizationsEscrow --token 0x1234...tokenAddress --payee 0x5678...payeeAddress`
 
 ---
 
 **Create Access List:**
 
-- **Positional:**  
+- **Positional:**
   `npm run cli createAccessList "My Access List" "MAL" "0xUser1,0xUser2" false`
 
-- **Named Options:**  
+- **Named Options:**
   `npm run cli createAccessList --name "My Access List" --symbol "MAL" --initial-users "0xUser1,0xUser2" --transferable false`
 
 - Arguments:
@@ -390,61 +390,61 @@ e.g.: `'[{"id":"cpu","amount":3},{"id":"ram","amount":16772672536},{"id":"disk",
 
 **Add to Access List:**
 
-- **Positional:**  
+- **Positional:**
   `npm run cli addToAccessList 0x1234...accessListAddress "0xUser1,0xUser2"`
 
-- **Named Options:**  
+- **Named Options:**
   `npm run cli addToAccessList --address 0x1234...accessListAddress --users "0xUser1,0xUser2"`
 
 ---
 
 **Check Access List:**
 
-- **Positional:**  
+- **Positional:**
   `npm run cli checkAccessList 0x1234...accessListAddress "0xUser1,0xUser2"`
 
-- **Named Options:**  
+- **Named Options:**
   `npm run cli checkAccessList --address 0x1234...accessListAddress --users "0xUser1,0xUser2"`
 
 ---
 
 **Remove from Access List:**
 
-- **Positional:**  
+- **Positional:**
   `npm run cli removeFromAccessList 0x1234...accessListAddress "0xUser1,0xUser2"`
 
-- **Named Options:**  
+- **Named Options:**
   `npm run cli removeFromAccessList --address 0x1234...accessListAddress --users "0xUser1,0xUser2"`
 
 ---
 
 #### Available Named Options Per Command
 
-- **getDDO:**  
+- **getDDO:**
   `-d, --did <did>`
 
-- **publish:**  
-  `-f, --file <metadataFile>`  
+- **publish:**
+  `-f, --file <metadataFile>`
   `-e, --encrypt [boolean]` (Default: `true`)
 
-- **publishAlgo:**  
-  `-f, --file <metadataFile>`  
+- **publishAlgo:**
+  `-f, --file <metadataFile>`
   `-e, --encrypt [boolean]` (Default: `true`)
 
-- **editAsset:**  
-  `-d, --did <datasetDid>`  
-  `-f, --file <metadataFile>`  
+- **editAsset:**
+  `-d, --did <datasetDid>`
+  `-f, --file <metadataFile>`
   `-e, --encrypt [boolean]` (Default: `true`)
 
-- **download:**  
-  `-d, --did <did>`  
+- **download:**
+  `-d, --did <did>`
   `-f, --folder [destinationFolder]` (Default: `.`)
   `-s, --service <serviceId>` (Optional, target a specific service)
 
 
-- **startCompute:**  
-  `-d, --datasets <datasetDids>`  
-  `-a, --algo <algoDid>`  
+- **startCompute:**
+  `-d, --datasets <datasetDids>`
+  `-a, --algo <algoDid>`
   `-e, --env <computeEnvId>`
   `--init <initializeResponse>`
   `--maxJobDuration <maxJobDuration>`
@@ -452,89 +452,89 @@ e.g.: `'[{"id":"cpu","amount":3},{"id":"ram","amount":16772672536},{"id":"disk",
   `--resources <resources>`
   `--amountToDeposit <amountToDeposit>` (Id `''`, it will fallback to initialize compute payment amount.)
   `-o, --output [output]` (Optional. Stringified JSON object specifying a remote storage backend for job results.)
-  `-s, --services [serviceIds]` (Optional, comma-separated; must match datasetDids length, positional 1–1)  
+  `-s, --services [serviceIds]` (Optional, comma-separated; must match datasetDids length, positional 1–1)
   `-x, --algo-service [algoServiceId]` (Optional, override algorithm service)
 
-- **startFreeCompute:**  
-  `-d, --datasets <datasetDids>`  
-  `-a, --algo <algoDid>`  
+- **startFreeCompute:**
+  `-d, --datasets <datasetDids>`
+  `-a, --algo <algoDid>`
   `-e, --env <computeEnvId>`
   `-o, --output [output]` (Optional. Stringified JSON object specifying a remote storage backend for job results.)
-  `-s, --services [serviceIds]` (Optional, comma-separated; must match datasetDids length, positional 1–1)  
+  `-s, --services [serviceIds]` (Optional, comma-separated; must match datasetDids length, positional 1–1)
   `-x, --algo-service [algoServiceId]` (Optional, override algorithm service)
 
-- **getComputeEnvironments:**  
+- **getComputeEnvironments:**
 
-- **computeStreamableLogs:**  
+- **computeStreamableLogs:**
 
-- **stopCompute:**  
-  `-d, --dataset <datasetDid>`  
-  `-j, --job <jobId>`  
+- **stopCompute:**
+  `-d, --dataset <datasetDid>`
+  `-j, --job <jobId>`
   `-a, --agreement [agreementId]`
 
-- **getJobStatus:**  
-  `-d, --dataset <datasetDid>`  
-  `-j, --job <jobId>`  
+- **getJobStatus:**
+  `-d, --dataset <datasetDid>`
+  `-j, --job <jobId>`
   `-a, --agreement [agreementId]`
 
-- **downloadJobResults:**  
-  `-j, --job <jobId>`  
-  `-i, --index <index>`  
+- **downloadJobResults:**
+  `-j, --job <jobId>`
+  `-i, --index <index>`
   `-f, --folder [destinationFolder]`
 
-- **mintOcean:**  
+- **mintOcean:**
   No options/arguments required.
 
-- **generateAuthToken:**  
+- **generateAuthToken:**
   No options/arguments required.
 
-- **invalidateAuthToken:**  
+- **invalidateAuthToken:**
   `-t, --token <token>`
 
-- **depositEscrow:**  
-  `-t, --token <token>`  
+- **depositEscrow:**
+  `-t, --token <token>`
   `-a, --amount <amount>`
 
-- **getUserFundsEscrow:**  
+- **getUserFundsEscrow:**
   `-t, --token <token>`
 
-- **withdrawFromEscrow:**  
-  `-t, --token <token>`  
+- **withdrawFromEscrow:**
+  `-t, --token <token>`
   `-a, --amount <amount>`
 
-- **authorizeEscrow:**  
-  `-t, --token <token>`  
-  `-p, --payee <payee>`  
-  `-m, --maxLockedAmount <maxLockedAmount>`  
-  `-s, --maxLockSeconds <maxLockSeconds>`  
+- **authorizeEscrow:**
+  `-t, --token <token>`
+  `-p, --payee <payee>`
+  `-m, --maxLockedAmount <maxLockedAmount>`
+  `-s, --maxLockSeconds <maxLockSeconds>`
   `-c, --maxLockCounts <maxLockCounts>`
 
-- **getAuthorizationsEscrow:**  
-  `-t, --token <token>`  
+- **getAuthorizationsEscrow:**
+  `-t, --token <token>`
   `-p, --payee <payee>`
 
-- **createAccessList:**  
-  `-n, --name <name>`  
-  `-s, --symbol <symbol>`  
-  `-u, --initial-users [initialUsers]` (Default: `''`)  
+- **createAccessList:**
+  `-n, --name <name>`
+  `-s, --symbol <symbol>`
+  `-u, --initial-users [initialUsers]` (Default: `''`)
   `-t, --transferable [transferable]` (Default: `false`)
 
-- **addToAccessList:**  
-  `-a, --address <accessListAddress>`  
+- **addToAccessList:**
+  `-a, --address <accessListAddress>`
   `-u, --users <users>`
 
-- **checkAccessList:**  
-  `-a, --address <accessListAddress>`  
+- **checkAccessList:**
+  `-a, --address <accessListAddress>`
   `-u, --users <users>`
 
-- **removeFromAccessList:**  
-  `-a, --address <accessListAddress>`  
+- **removeFromAccessList:**
+  `-a, --address <accessListAddress>`
   `-u, --users <users>`
 
 ---
 
-**Note:**  
-- When using **named options**, you can write them in any order.  
+**Note:**
+- When using **named options**, you can write them in any order.
 - When relying on **positional arguments**, ensure they follow the exact order as defined by the command.
 
 This flexible approach lets you use the style that best suits your workflow while remaining fully backwards compatible.

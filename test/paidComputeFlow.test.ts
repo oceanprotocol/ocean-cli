@@ -9,7 +9,7 @@ import { projectRoot, runCommand } from "./util.js";
 
 
 
-describe("Ocean CLI Paid Compute", function () {
+describe("Ocean CLI Paid Compute", function() {
     this.timeout(600000); // Set a longer timeout to allow the command to execute
 
     let computeDatasetDid: string;
@@ -31,7 +31,7 @@ describe("Ocean CLI Paid Compute", function () {
         return data.development
     };
 
-    it("should publish a compute dataset using 'npm run cli publish'", async function () {
+    it("should publish a compute dataset using 'npm run cli publish'", async function() {
         const metadataFile = path.resolve(projectRoot, "metadata/simpleComputeDataset.json");
         // Ensure the metadata file exists
         if (!fs.existsSync(metadataFile)) {
@@ -60,7 +60,7 @@ describe("Ocean CLI Paid Compute", function () {
         }
     });
 
-    it("should publish a js Algorithm using 'npm run cli publishAlgo'", async function () {
+    it("should publish a js Algorithm using 'npm run cli publishAlgo'", async function() {
         const filePath = path.resolve(projectRoot, "metadata/jsAlgo.json");
 
         // Ensure the metadata file exists
@@ -84,7 +84,7 @@ describe("Ocean CLI Paid Compute", function () {
         }
     });
 
-    it("should get DDO using 'npm run cli getDDO' for compute dataset", async function () {
+    it("should get DDO using 'npm run cli getDDO' for compute dataset", async function() {
         const output = await runCommand(`npm run cli getDDO ${computeDatasetDid}`);
 
         const jsonMatch = output.match(/s*([\s\S]*)/);
@@ -101,7 +101,7 @@ describe("Ocean CLI Paid Compute", function () {
         }
     });
 
-    it("should get DDO using 'npm run cli getDDO' for JS algorithm", async function () {
+    it("should get DDO using 'npm run cli getDDO' for JS algorithm", async function() {
         const output = await runCommand(`npm run cli getDDO ${jsAlgoDid}`);
 
         const jsonMatch = output.match(/s*([\s\S]*)/);
@@ -118,7 +118,7 @@ describe("Ocean CLI Paid Compute", function () {
         }
     });
 
-    it("should get compute environments using 'npm run cli getComputeEnvironments'", async function () {
+    it("should get compute environments using 'npm run cli getComputeEnvironments'", async function() {
         const output = await runCommand(`npm run cli getComputeEnvironments`);
 
         const jsonMatch = output.match(/Exiting compute environments:\s*([\s\S]*)/);
@@ -148,7 +148,7 @@ describe("Ocean CLI Paid Compute", function () {
         console.log(`Fetched Compute Env ID: ${computeEnvId}`);
     });
 
-    it("should start paid compute on compute dataset and algorithm with services id for dataset and algorithm", async function () {
+    it("should start paid compute on compute dataset and algorithm with services id for dataset and algorithm", async function() {
         const computeEnvs = await ProviderInstance.getComputeEnvironments('http://127.0.0.1:8001');
         const env = computeEnvs[0];
         expect(env).to.be.an('object').and.to.not.be.null.and.to.not.be.undefined;

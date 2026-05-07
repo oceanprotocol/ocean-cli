@@ -6,7 +6,7 @@ import https from "https";
 
 import { projectRoot, runCommand } from "./util.js";
 
-describe("Ocean CLI Publishing", function () {
+describe("Ocean CLI Publishing", function() {
     this.timeout(200000); // Set a longer timeout to allow the command to execute
 
     let downloadDatasetDid: string;
@@ -38,7 +38,7 @@ describe("Ocean CLI Publishing", function () {
     };
 
 
-    it("should publish a dataset using 'npm run cli publish'", async function () {
+    it("should publish a dataset using 'npm run cli publish'", async function() {
         const metadataFile = path.resolve(projectRoot, "metadata/simpleDownloadDataset.json");
 
         // Ensure the metadata file exists
@@ -68,7 +68,7 @@ describe("Ocean CLI Publishing", function () {
 
     });
 
-    it("should publish a dataset v5 using 'npm run cli publish'", async function () {
+    it("should publish a dataset v5 using 'npm run cli publish'", async function() {
         const metadataFile = path.resolve(projectRoot, "metadata/simpleDownloadDatasetV5.json");
 
         // Ensure the metadata file exists
@@ -90,7 +90,7 @@ describe("Ocean CLI Publishing", function () {
         }
     });
 
-    it("should publish a compute dataset using 'npm run cli publish'", async function () {
+    it("should publish a compute dataset using 'npm run cli publish'", async function() {
         const metadataFile = path.resolve(projectRoot, "metadata/simpleComputeDataset.json");
         // Ensure the metadata file exists
         if (!fs.existsSync(metadataFile)) {
@@ -113,7 +113,7 @@ describe("Ocean CLI Publishing", function () {
         }
     });
 
-    it("should publish a js Algorithm using 'npm run cli publishAlgo'", async function () {
+    it("should publish a js Algorithm using 'npm run cli publishAlgo'", async function() {
         const filePath = path.resolve(projectRoot, "metadata/jsAlgo.json");
 
         // Ensure the metadata file exists
@@ -136,7 +136,7 @@ describe("Ocean CLI Publishing", function () {
         }
     });
 
-    it("should publish a python Algorithm using 'npm run cli publishAlgo'", async function () {
+    it("should publish a python Algorithm using 'npm run cli publishAlgo'", async function() {
         const filePath = path.resolve(projectRoot, "metadata/pythonAlgo.json");
 
         // Ensure the metadata file exists
@@ -159,7 +159,7 @@ describe("Ocean CLI Publishing", function () {
         }
     });
 
-    it("should get DDO using 'npm run cli getDDO' for download dataset", async function () {
+    it("should get DDO using 'npm run cli getDDO' for download dataset", async function() {
 
         const output = await runCommand(`npm run cli getDDO ${downloadDatasetDid}`);
 
@@ -177,7 +177,7 @@ describe("Ocean CLI Publishing", function () {
         }
     });
 
-    it("should get DDO using 'npm run cli getDDO' for compute dataset", async function () {
+    it("should get DDO using 'npm run cli getDDO' for compute dataset", async function() {
         const output = await runCommand(`npm run cli getDDO ${computeDatasetDid}`);
 
         const jsonMatch = output.match(/s*([\s\S]*)/);
@@ -194,7 +194,7 @@ describe("Ocean CLI Publishing", function () {
         }
     });
 
-    it("should get DDO using 'npm run cli getDDO' for JS algorithm", async function () {
+    it("should get DDO using 'npm run cli getDDO' for JS algorithm", async function() {
         const output = await runCommand(`npm run cli getDDO ${jsAlgoDid}`);
 
         const jsonMatch = output.match(/s*([\s\S]*)/);
@@ -211,7 +211,7 @@ describe("Ocean CLI Publishing", function () {
         }
     });
 
-    it("should get DDO using 'npm run cli getDDO' for python algorithm", async function () {
+    it("should get DDO using 'npm run cli getDDO' for python algorithm", async function() {
         const output = await runCommand(`npm run cli getDDO ${pythonAlgoDid}`);
 
         const jsonMatch = output.match(/s*([\s\S]*)/);
@@ -228,7 +228,7 @@ describe("Ocean CLI Publishing", function () {
         }
     });
 
-    it("should download the download dataset", async function () {
+    it("should download the download dataset", async function() {
         this.timeout(10000); // Increase timeout if needed
         const output = await runCommand(`npm run cli download ${downloadDatasetDid} .`);
 

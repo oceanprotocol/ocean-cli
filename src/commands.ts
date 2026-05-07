@@ -531,7 +531,7 @@ export class Commands {
 				paymentToken,
 				supportedMaxJobDuration,
 				providerURI,
-				this.signer, // V1 was this.signer.getAddress()
+				await this.signer.getAddress(),
 				parsedResources,
 				Number(chainId),
 				policiesServer

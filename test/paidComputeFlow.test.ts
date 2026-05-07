@@ -38,7 +38,7 @@ describe("Ocean CLI Paid Compute", function() {
             throw new Error("Metadata file not found: " + metadataFile);
         }
 
-        process.env.PRIVATE_KEY = "0x1263dc73bef43a9da06149c7e598f52025bf4027f1d6c13896b71e81bb9233fb";
+        process.env.PRIVATE_KEY = "0x1d751ded5a32226054cd2e71261039b65afb9ee1c746d055dd699b1150a5befc";
         // Using this account: 0xe2DD09d719Da89e5a3D0F2549c7E24566e947260
         process.env.RPC = "http://localhost:8545";
         process.env.NODE_URL = "http://localhost:8001";

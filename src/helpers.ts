@@ -3,7 +3,7 @@ import fetch from "cross-fetch";
 import { promises as fs, readFileSync } from "fs";
 import * as path from "path";
 import * as sapphire from '@oasisprotocol/sapphire-paratime';
-import { Asset, DDO } from '@oceanprotocol/ddo-js';
+import { Asset, DDO, DDOManager } from '@oceanprotocol/ddo-js';
 import {
 	AccesslistFactory, Aquarius,
 	Nft,
@@ -118,7 +118,6 @@ export async function createAssetUtil(
 	accessListFactory?: string,
 	allowAccessList?: string,
 	denyAccessList?: string,
-
 ) {
 	const isAddress = typeof templateIDorAddress === 'string'
 	const isTemplateIndex = typeof templateIDorAddress === 'number'
@@ -159,10 +158,12 @@ export async function updateAssetMetadata(
 	let flags;
 	let metadata;
 	const validateResult = await aquariusInstance.validate(updatedDdo, owner, oceanNodeUrl);
+	const ddoInstance = DDOManager.getDDOClass(updatedDdo);
+	const { chainId, nftAddress } = ddoInstance.getDDOFields();
 	if (encryptDDO) {
 		const providerResponse = await ProviderInstance.encrypt(
 			updatedDdo,
-			updatedDdo.chainId,
+			chainId,
 			oceanNodeUrl,
 			owner
 		);
@@ -177,7 +178,7 @@ export async function updateAssetMetadata(
 	}
 
 	const updateDdoTX = await nft.setMetadata(
-		updatedDdo.nftAddress,
+		nftAddress,
 		await owner.getAddress(),
 		0,
 		oceanNodeUrl,
@@ -257,7 +258,9 @@ export async function isOrderable(
 	algorithm: ComputeAlgorithm,
 	algorithmDDO: Asset | DDO
 ): Promise<boolean> {
-	const datasetService = asset.services.find((s) => s.id === serviceId);
+	const ddoInstanceAsset = DDOManager.getDDOClass(asset);
+	const { services: servicesAsset } = ddoInstanceAsset.getDDOFields();
+	const datasetService = servicesAsset.find((s) => s.id === serviceId);
 	if (!datasetService) return false;
 
 	if (datasetService.type === "compute") {

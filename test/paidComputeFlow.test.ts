@@ -148,14 +148,16 @@ describe("Ocean CLI Paid Compute", function() {
 		console.log(`Fetched Compute Env ID: ${computeEnvId}`);
     });
 
-    it("should start paid compute on compute dataset and algorithm", async function() {
+    it("should start paid compute on compute dataset and algorithm with services id for dataset and algorithm", async function() {
         const computeEnvs = await ProviderInstance.getComputeEnvironments('http://127.0.0.1:8001');
         const env = computeEnvs[0];
         expect(env).to.be.an('object').and.to.not.be.null.and.to.not.be.undefined;
 
         resources = []
         const paymentToken = getAddresses().Ocean
-        const output = await runCommand(`npm run cli -- startCompute ${computeDatasetDid} ${jsAlgoDid} ${computeEnvId} 900 ${paymentToken} '${JSON.stringify(resources)}' --accept true`);
+        const serviceIdDataset = 'ccb398c50d6abd5b456e8d7242bd856a1767a890b537c2f8c10ba8b8a10e6025'
+        const serviceIdAlgorithm = 'db164c1b981e4d2974e90e61bda121512e6909c1035c908d68933ae4cfaba6b0'
+        const output = await runCommand(`npm run cli -- startCompute ${computeDatasetDid} ${jsAlgoDid} ${computeEnvId} 900 ${paymentToken} '${JSON.stringify(resources)}' 'null' ${serviceIdDataset} ${serviceIdAlgorithm} --accept true`);
         const jobIdMatch = output.match(/JobID:\s*([^\s]+)/);
         const agreementIdMatch = output.match(/Agreement ID:\s*([^\s]+)/);
 

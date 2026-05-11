@@ -43,7 +43,9 @@ describe("Ocean CLI Interactive Publishing", function() {
         if (child.stdin) {
             const inputInterval = setInterval(() => {
                 if (inputIndex < inputs.length) {
+                    if (child.stdin) {
                     child.stdin.write(inputs[inputIndex]);
+                    }
                     inputIndex++;
                 } else {
                     clearInterval(inputInterval);

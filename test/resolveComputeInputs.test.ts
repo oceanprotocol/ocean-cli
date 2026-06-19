@@ -74,6 +74,22 @@ describe("resolveComputeInputs", function () {
     expect(res.ddos.every((d) => d !== null)).to.equal(true);
   });
 
+  it("supports the legacy unbracketed comma-separated DIDs form", async function () {
+    const res = await resolveComputeInputs(
+      "did:op:a,did:op:b",
+      "did:op:algo1",
+      makeAquarius(),
+      indexingParams,
+      FALLBACK
+    );
+    expect(res.assets).to.have.length(2);
+    expect(res.assets.map((a) => a.documentId)).to.deep.equal([
+      "did:op:a",
+      "did:op:b",
+    ]);
+    expect(res.ddos.every((d) => d !== null)).to.equal(true);
+  });
+
   it("treats a JSON object datasets arg as a raw asset (no DDO, fallback provider)", async function () {
     const res = await resolveComputeInputs(
       JSON.stringify(RAW_DATASET),

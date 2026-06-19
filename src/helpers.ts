@@ -319,6 +319,13 @@ function parseComputeInput(raw: string): (string | Record<string, unknown>)[] {
 			const single = processed.trim();
 			return single.length > 0 ? [single] : [];
 		}
+		// legacy unbracketed comma-separated DIDs: `did:op:a,did:op:b`
+		if (trimmed.indexOf(",") > -1) {
+			return trimmed
+				.split(",")
+				.map((s) => s.trim())
+				.filter((s) => s.length > 0);
+		}
 		return [trimmed];
 	}
 }

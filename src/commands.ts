@@ -301,7 +301,7 @@ export class Commands {
     for (let i = 0; i < assets.length; i++) {
       const dataDdo = ddos[i];
       if (!dataDdo) continue;
-      const canStartCompute = isOrderable(
+      const canStartCompute = await isOrderable(
         dataDdo,
         dataDdo.services[0].id,
         algo,
@@ -470,7 +470,7 @@ export class Commands {
     for (let i = 0; i < assets.length; i++) {
       const dataDdo = ddos[i];
       if (!dataDdo) continue;
-      const canStartCompute = isOrderable(
+      const canStartCompute = await isOrderable(
         dataDdo,
         dataDdo.services[0].id,
         algo,
@@ -765,7 +765,7 @@ export class Commands {
     for (let i = 0; i < assets.length; i++) {
       const dataDdo = ddos[i];
       if (!dataDdo) continue;
-      const canStartCompute = isOrderable(
+      const canStartCompute = await isOrderable(
         dataDdo,
         dataDdo.services[0].id,
         algo,

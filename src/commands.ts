@@ -11,10 +11,11 @@ import {
   IndexerWaitParams,
   fixAndParseProviderFees,
   getConfigByChainId,
+  resolveComputeInputs,
 } from "./helpers.js";
 import {
   Aquarius,
-  ComputeAlgorithm,
+  ComputeAsset,
   ComputeJob,
   Config,
   ConfigHelper,
@@ -30,6 +31,7 @@ import {
   AccesslistFactory,
   AccessListContract,
 } from "@oceanprotocol/lib";
+import { Asset, DDO } from "@oceanprotocol/ddo-js";
 import { Signer, ethers, getAddress } from "ethers";
 import { interactiveFlow } from "./interactiveFlow.js";
 import { publishAsset } from "./publishAsset.js";
@@ -252,67 +254,15 @@ export class Commands {
   }
 
   public async initializeCompute(args: string[]) {
-    const inputDatasetsString = args[1];
-    let inputDatasets = [];
-
-    if (
-      inputDatasetsString.includes("[") &&
-      inputDatasetsString.includes("]")
-    ) {
-      const processedInput = inputDatasetsString
-        .replaceAll("]", "")
-        .replaceAll("[", "");
-      if (processedInput.indexOf(",") > -1) {
-        inputDatasets = processedInput.split(",");
-      }
-    } else {
-      inputDatasets.push(inputDatasetsString);
-    }
-
-    const ddos = [];
-
-    for (const dataset in inputDatasets) {
-      const dataDdo = await this.aquarius.waitForIndexer(
-        inputDatasets[dataset],
-        null,
-        null,
-        this.indexingParams.retryInterval,
-        this.indexingParams.maxRetries
-      );
-      if (!dataDdo) {
-        console.error(
-          "Error fetching DDO " + dataset[1] + ".  Does this asset exists?"
-        );
-        return;
-      } else {
-        ddos.push(dataDdo);
-      }
-    }
-    if (
-      inputDatasets.length > 0 &&
-      (ddos.length <= 0 || ddos.length != inputDatasets.length)
-    ) {
-      console.error("Not all the data ddos are available.");
-      return;
-    }
-    let providerURI = this.oceanNodeUrl;
-    if (ddos.length > 0) {
-      providerURI = ddos[0].services[0].serviceEndpoint;
-    }
-
-    const algoDdo = await this.aquarius.waitForIndexer(
+    const resolved = await resolveComputeInputs(
+      args[1],
       args[2],
-      null,
-      null,
-      this.indexingParams.retryInterval,
-      this.indexingParams.maxRetries
+      this.aquarius,
+      this.indexingParams,
+      this.oceanNodeUrl
     );
-    if (!algoDdo) {
-      console.error(
-        "Error fetching DDO " + args[1] + ".  Does this asset exists?"
-      );
-      return;
-    }
+    if (!resolved) return;
+    const { assets, algo, ddos, algoDdo, providerURI } = resolved;
 
     const computeEnvs = await ProviderInstance.getComputeEnvironments(
       this.oceanNodeUrl
@@ -346,19 +296,16 @@ export class Commands {
       return;
     }
 
-    const algo: ComputeAlgorithm = {
-      documentId: algoDdo.id,
-      serviceId: algoDdo.services[0].id,
-      meta: algoDdo.metadata.algorithm,
-    };
-
-    const assets = [];
-    for (const dataDdo in ddos) {
+    // Validate orderability only for DID-based datasets (raw fileObject assets
+    // have no DDO and are validated by the node).
+    for (let i = 0; i < assets.length; i++) {
+      const dataDdo = ddos[i];
+      if (!dataDdo) continue;
       const canStartCompute = isOrderable(
-        ddos[dataDdo],
-        ddos[dataDdo].services[0].id,
+        dataDdo,
+        dataDdo.services[0].id,
         algo,
-        algoDdo
+        algoDdo as Asset | DDO
       );
       if (!canStartCompute) {
         console.error(
@@ -366,10 +313,6 @@ export class Commands {
         );
         return;
       }
-      assets.push({
-        documentId: ddos[dataDdo].id,
-        serviceId: ddos[dataDdo].services[0].id,
-      });
     }
     const maxJobDuration = Number(args[4]);
     if (!maxJobDuration) {
@@ -481,66 +424,15 @@ export class Commands {
   }
 
   public async computeStart(args: string[]) {
-    const inputDatasetsString = args[1];
-    let inputDatasets = [];
-
-    if (
-      inputDatasetsString.includes("[") &&
-      inputDatasetsString.includes("]")
-    ) {
-      const processedInput = inputDatasetsString
-        .replaceAll("]", "")
-        .replaceAll("[", "");
-      if (processedInput.indexOf(",") > -1) {
-        inputDatasets = processedInput.split(",");
-      }
-    } else {
-      inputDatasets.push(inputDatasetsString);
-    }
-
-    const ddos = [];
-
-    for (const dataset in inputDatasets) {
-      const dataDdo = await this.aquarius.waitForIndexer(
-        inputDatasets[dataset],
-        null,
-        null,
-        this.indexingParams.retryInterval,
-        this.indexingParams.maxRetries
-      );
-      if (!dataDdo) {
-        console.error(
-          "Error fetching DDO " + dataset[1] + ".  Does this asset exists?"
-        );
-        return;
-      } else {
-        ddos.push(dataDdo);
-      }
-    }
-    if (
-      inputDatasets.length > 0 &&
-      (ddos.length <= 0 || ddos.length != inputDatasets.length)
-    ) {
-      console.error("Not all the data ddos are available.");
-      return;
-    }
-    let providerURI = this.oceanNodeUrl;
-    if (ddos.length > 0) {
-      providerURI = ddos[0].services[0].serviceEndpoint;
-    }
-    const algoDdo = await this.aquarius.waitForIndexer(
+    const resolved = await resolveComputeInputs(
+      args[1],
       args[2],
-      null,
-      null,
-      this.indexingParams.retryInterval,
-      this.indexingParams.maxRetries
+      this.aquarius,
+      this.indexingParams,
+      this.oceanNodeUrl
     );
-    if (!algoDdo) {
-      console.error(
-        "Error fetching DDO " + args[1] + ".  Does this asset exists?"
-      );
-      return;
-    }
+    if (!resolved) return;
+    const { assets, algo, ddos, algoDdo, providerURI } = resolved;
 
     const computeEnvs = await ProviderInstance.getComputeEnvironments(
       this.oceanNodeUrl
@@ -573,19 +465,16 @@ export class Commands {
       return;
     }
 
-    const algo: ComputeAlgorithm = {
-      documentId: algoDdo.id,
-      serviceId: algoDdo.services[0].id,
-      meta: algoDdo.metadata.algorithm,
-    };
-
-    const assets = [];
-    for (const dataDdo in ddos) {
+    // Validate orderability only for DID-based datasets (raw fileObject assets
+    // have no DDO and are validated by the node).
+    for (let i = 0; i < assets.length; i++) {
+      const dataDdo = ddos[i];
+      if (!dataDdo) continue;
       const canStartCompute = isOrderable(
-        ddos[dataDdo],
-        ddos[dataDdo].services[0].id,
+        dataDdo,
+        dataDdo.services[0].id,
         algo,
-        algoDdo
+        algoDdo as Asset | DDO
       );
       if (!canStartCompute) {
         console.error(
@@ -593,52 +482,57 @@ export class Commands {
         );
         return;
       }
-      assets.push({
-        documentId: ddos[dataDdo].id,
-        serviceId: ddos[dataDdo].services[0].id,
-      });
     }
     const providerInitializeComputeJob = args[4]; // provider fees + payment
     const parsedProviderInitializeComputeJob = fixAndParseProviderFees(
       providerInitializeComputeJob
     );
-    console.log("Ordering algorithm: ", args[2]);
     const datatoken = new Datatoken(
       this.signer,
       (await this.signer.provider.getNetwork()).chainId.toString(),
       this.config
     );
-    algo.transferTxId = await handleComputeOrder(
-      parsedProviderInitializeComputeJob?.algorithm,
-      algoDdo,
-      this.signer,
-      computeEnv.consumerAddress,
-      0,
-      datatoken,
-      this.config,
-      parsedProviderInitializeComputeJob?.algorithm?.providerFee,
-      providerURI
-    );
-    if (!algo.transferTxId) {
-      console.error(
-        "Error ordering compute for algorithm with DID: " +
-          args[2] +
-          ".  Do you have enough tokens?"
-      );
-      return;
-    }
-    console.log("Ordering assets: ", args[1]);
-
-    for (let i = 0; i < ddos.length; i++) {
-      assets[i].transferTxId = await handleComputeOrder(
-        parsedProviderInitializeComputeJob?.datasets[i],
-        ddos[i],
+    // Only order DID-based algorithms; raw (fileObject) algorithms have no datatoken.
+    if (algoDdo) {
+      console.log("Ordering algorithm: ", args[2]);
+      algo.transferTxId = await handleComputeOrder(
+        parsedProviderInitializeComputeJob?.algorithm,
+        algoDdo as Asset,
         this.signer,
         computeEnv.consumerAddress,
         0,
         datatoken,
         this.config,
-        parsedProviderInitializeComputeJob?.datasets[i].providerFee,
+        parsedProviderInitializeComputeJob?.algorithm?.providerFee,
+        providerURI
+      );
+      if (!algo.transferTxId) {
+        console.error(
+          "Error ordering compute for algorithm with DID: " +
+            args[2] +
+            ".  Do you have enough tokens?"
+        );
+        return;
+      }
+    }
+    console.log("Ordering assets: ", args[1]);
+
+    // Only order DID-based datasets; raw (fileObject) assets keep their index
+    // slot in `assets`/`ddos` but have no datatoken to order.
+    for (let i = 0; i < assets.length; i++) {
+      const dataDdo = ddos[i];
+      if (!dataDdo) continue;
+      const feeEntry = parsedProviderInitializeComputeJob?.datasets?.[i];
+      if (!feeEntry) continue;
+      assets[i].transferTxId = await handleComputeOrder(
+        feeEntry,
+        dataDdo as Asset,
+        this.signer,
+        computeEnv.consumerAddress,
+        0,
+        datatoken,
+        this.config,
+        feeEntry.providerFee,
         providerURI
       );
       if (!assets[i].transferTxId) {
@@ -765,27 +659,25 @@ export class Commands {
     console.log("Starting compute job using provider: ", providerURI);
 
     const additionalDatasets = assets.length > 1 ? assets.slice(1) : null;
+    const describeAsset = (asset: ComputeAsset) =>
+      asset.documentId || asset.fileObject?.type || "raw asset";
     if (assets.length > 0) {
       console.log(
         "Starting compute job on " +
-          assets[0].documentId +
+          describeAsset(assets[0]) +
           " with additional datasets:" +
-          (!additionalDatasets ? "none" : additionalDatasets[0].documentId)
+          (!additionalDatasets ? "none" : describeAsset(additionalDatasets[0]))
       );
     } else {
       console.log(
         "Starting compute job on " +
           algo.documentId +
           " with additional datasets:" +
-          (!additionalDatasets ? "none" : additionalDatasets[0].documentId)
+          (!additionalDatasets ? "none" : describeAsset(additionalDatasets[0]))
       );
     }
-    if (additionalDatasets !== null) {
-      console.log(
-        "Adding additional datasets to dataset, according to C2D V2 specs"
-      );
-      assets.push(additionalDatasets);
-    }
+    // All datasets (primary + additional) are already in `assets` per C2D V2 specs;
+    // they are passed together below. (C2D V1 took additionalDatasets separately.)
 
     let output = null;
     if (args[8]) {
@@ -825,68 +717,15 @@ export class Commands {
   }
 
   public async freeComputeStart(args: string[]) {
-    const inputDatasetsString = args[1];
-    let inputDatasets = [];
-
-    if (
-      inputDatasetsString.includes("[") &&
-      inputDatasetsString.includes("]")
-    ) {
-      const processedInput = inputDatasetsString
-        .replaceAll("]", "")
-        .replaceAll("[", "");
-      if (processedInput.indexOf(",") > -1) {
-        inputDatasets = processedInput.split(",");
-      }
-    } else {
-      inputDatasets.push(inputDatasetsString);
-    }
-
-    const ddos = [];
-
-    for (const dataset in inputDatasets) {
-      const dataDdo = await this.aquarius.waitForIndexer(
-        inputDatasets[dataset],
-        null,
-        null,
-        this.indexingParams.retryInterval,
-        this.indexingParams.maxRetries
-      );
-      if (!dataDdo) {
-        console.error(
-          "Error fetching DDO " + dataset[1] + ".  Does this asset exists?"
-        );
-        return;
-      } else {
-        ddos.push(dataDdo);
-      }
-    }
-
-    if (
-      inputDatasets.length > 0 &&
-      (ddos.length <= 0 || ddos.length != inputDatasets.length)
-    ) {
-      console.error("Not all the data ddos are available.");
-      return;
-    }
-    let providerURI = this.oceanNodeUrl;
-    if (ddos.length > 0) {
-      providerURI = ddos[0].services[0].serviceEndpoint;
-    }
-
-    const algoDdo = await this.aquarius.waitForIndexer(
+    const resolved = await resolveComputeInputs(
+      args[1],
       args[2],
-      null,
-      null,
-      this.indexingParams.retryInterval,
-      this.indexingParams.maxRetries
+      this.aquarius,
+      this.indexingParams,
+      this.oceanNodeUrl
     );
-    if (!algoDdo) {
-      console.error(
-        "Error fetching DDO " + args[1] + ".  Does this asset exists?"
-      );
-      return;
-    }
+    if (!resolved) return;
+    const { assets, algo, ddos, algoDdo, providerURI } = resolved;
 
     const computeEnvs = await ProviderInstance.getComputeEnvironments(
       this.oceanNodeUrl
@@ -898,10 +737,6 @@ export class Commands {
       );
       return;
     }
-
-    const mytime = new Date();
-    const computeMinutes = 5;
-    mytime.setMinutes(mytime.getMinutes() + computeMinutes);
 
     const computeEnvID = args[3];
     // NO chainId needed anymore (is not part of ComputeEnvironment spec anymore)
@@ -925,19 +760,16 @@ export class Commands {
       return;
     }
 
-    const algo: ComputeAlgorithm = {
-      documentId: algoDdo.id,
-      serviceId: algoDdo.services[0].id,
-      meta: algoDdo.metadata.algorithm,
-    };
-
-    const assets = [];
-    for (const dataDdo in ddos) {
+    // Validate orderability only for DID-based datasets (raw fileObject assets
+    // have no DDO and are validated by the node).
+    for (let i = 0; i < assets.length; i++) {
+      const dataDdo = ddos[i];
+      if (!dataDdo) continue;
       const canStartCompute = isOrderable(
-        ddos[dataDdo],
-        ddos[dataDdo].services[0].id,
+        dataDdo,
+        dataDdo.services[0].id,
         algo,
-        algoDdo
+        algoDdo as Asset | DDO
       );
       if (!canStartCompute) {
         console.error(
@@ -945,36 +777,29 @@ export class Commands {
         );
         return;
       }
-      assets.push({
-        documentId: ddos[dataDdo].id,
-        serviceId: ddos[dataDdo].services[0].id,
-      });
     }
 
     console.log("Starting compute job using provider: ", providerURI);
     const additionalDatasets = assets.length > 1 ? assets.slice(1) : null;
+    const describeAsset = (asset: ComputeAsset) =>
+      asset.documentId || asset.fileObject?.type || "raw asset";
     if (assets.length > 0) {
       console.log(
         "Starting compute job on " +
-          assets[0].documentId +
+          describeAsset(assets[0]) +
           " with additional datasets:" +
-          (!additionalDatasets ? "none" : additionalDatasets[0].documentId)
+          (!additionalDatasets ? "none" : describeAsset(additionalDatasets[0]))
       );
     } else {
       console.log(
         "Starting compute job on " +
           algo.documentId +
           " with additional datasets:" +
-          (!additionalDatasets ? "none" : additionalDatasets[0].documentId)
+          (!additionalDatasets ? "none" : describeAsset(additionalDatasets[0]))
       );
     }
-
-    if (additionalDatasets !== null) {
-      console.log(
-        "Adding additional datasets to dataset, according to C2D V2 specs"
-      );
-      assets.push(additionalDatasets);
-    }
+    // All datasets (primary + additional) are already in `assets` per C2D V2 specs;
+    // they are passed together below. (C2D V1 took additionalDatasets separately.)
 
     let output = null;
     if (args[4]) {
@@ -1827,6 +1652,9 @@ export class Commands {
       const bucketId = args[1];
       const filePath = args[2];
       const fileName = args[3] || (filePath ? path.basename(filePath) : undefined);
+      console.log("Bucket ID:", bucketId);
+      console.log("File Path:", filePath);
+      console.log("File Name:", fileName);
       if (!bucketId || !filePath) {
         console.error(chalk.red("bucketId and filePath are required"));
         return;

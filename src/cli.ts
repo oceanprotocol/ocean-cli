@@ -264,9 +264,12 @@ export async function createCLI() {
     .description("Starts a compute job")
     .argument(
       "<datasetDids>",
-      "Dataset DIDs (comma-separated) OR (empty array for none)"
+      "Dataset DIDs (comma-separated), an empty array for none, OR a JSON ComputeAsset object/array with a fileObject (raw datasets, no DID). Mixed input must be valid JSON, e.g. '[\"did:op:abc\",{\"fileObject\":{...}}]'"
     )
-    .argument("<algoDid>", "Algorithm DID")
+    .argument(
+      "<algoDid>",
+      "Algorithm DID, OR a JSON ComputeAlgorithm object with a fileObject and meta (raw algorithm, no DID)"
+    )
     .argument("<computeEnvId>", "Compute environment ID")
     .argument("<maxJobDuration>", "maxJobDuration for compute job")
     .argument("<paymentToken>", "Payment token for compute")
@@ -277,9 +280,12 @@ export async function createCLI() {
     )
     .option(
       "-d, --datasets <datasetDids>",
-      "Dataset DIDs (comma-separated) OR (empty array for none)"
+      "Dataset DIDs (comma-separated), an empty array for none, OR a JSON ComputeAsset object/array with a fileObject (raw datasets, no DID)"
     )
-    .option("-a, --algo <algoDid>", "Algorithm DID")
+    .option(
+      "-a, --algo <algoDid>",
+      "Algorithm DID, OR a JSON ComputeAlgorithm object with a fileObject and meta (raw algorithm, no DID)"
+    )
     .option("-e, --env <computeEnvId>", "Compute environment ID")
     .option("--maxJobDuration <maxJobDuration>", "Compute maxJobDuration")
     .option("-t, --token <paymentToken>", "Compute payment token")
@@ -384,9 +390,12 @@ export async function createCLI() {
     .description("Starts a FREE compute job")
     .argument(
       "<datasetDids>",
-      "Dataset DIDs (comma-separated) OR (empty array for none)"
+      "Dataset DIDs (comma-separated), an empty array for none, OR a JSON ComputeAsset object/array with a fileObject (raw datasets, no DID). Mixed input must be valid JSON, e.g. '[\"did:op:abc\",{\"fileObject\":{...}}]'"
     )
-    .argument("<algoDid>", "Algorithm DID")
+    .argument(
+      "<algoDid>",
+      "Algorithm DID, OR a JSON ComputeAlgorithm object with a fileObject and meta (raw algorithm, no DID)"
+    )
     .argument("<computeEnvId>", "Compute environment ID")
     .argument(
       "[output]",
@@ -394,9 +403,12 @@ export async function createCLI() {
     )
     .option(
       "-d, --datasets <datasetDids>",
-      "Dataset DIDs (comma-separated) OR (empty array for none)"
+      "Dataset DIDs (comma-separated), an empty array for none, OR a JSON ComputeAsset object/array with a fileObject (raw datasets, no DID)"
     )
-    .option("-a, --algo <algoDid>", "Algorithm DID")
+    .option(
+      "-a, --algo <algoDid>",
+      "Algorithm DID, OR a JSON ComputeAlgorithm object with a fileObject and meta (raw algorithm, no DID)"
+    )
     .option("-e, --env <computeEnvId>", "Compute environment ID")
     .option(
       "-o, --output [output]",

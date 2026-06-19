@@ -1652,9 +1652,6 @@ export class Commands {
       const bucketId = args[1];
       const filePath = args[2];
       const fileName = args[3] || (filePath ? path.basename(filePath) : undefined);
-      console.log("Bucket ID:", bucketId);
-      console.log("File Path:", filePath);
-      console.log("File Name:", fileName);
       if (!bucketId || !filePath) {
         console.error(chalk.red("bucketId and filePath are required"));
         return;

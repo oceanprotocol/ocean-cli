@@ -6,7 +6,6 @@ import {
   handleComputeOrder,
   updateAssetMetadata,
   downloadFile,
-  isOrderable,
   getIndexingWaitSettings,
   IndexerWaitParams,
   fixAndParseProviderFees,
@@ -31,7 +30,7 @@ import {
   AccesslistFactory,
   AccessListContract,
 } from "@oceanprotocol/lib";
-import { Asset, DDO } from "@oceanprotocol/ddo-js";
+import { Asset } from "@oceanprotocol/ddo-js";
 import { Signer, ethers, getAddress } from "ethers";
 import { interactiveFlow } from "./interactiveFlow.js";
 import { publishAsset } from "./publishAsset.js";
@@ -262,7 +261,7 @@ export class Commands {
       this.oceanNodeUrl
     );
     if (!resolved) return;
-    const { assets, algo, ddos, algoDdo, providerURI } = resolved;
+    const { assets, algo, providerURI } = resolved;
 
     const computeEnvs = await ProviderInstance.getComputeEnvironments(
       this.oceanNodeUrl
@@ -296,24 +295,6 @@ export class Commands {
       return;
     }
 
-    // Validate orderability only for DID-based datasets (raw fileObject assets
-    // have no DDO and are validated by the node).
-    for (let i = 0; i < assets.length; i++) {
-      const dataDdo = ddos[i];
-      if (!dataDdo) continue;
-      const canStartCompute = await isOrderable(
-        dataDdo,
-        dataDdo.services[0].id,
-        algo,
-        algoDdo as Asset | DDO
-      );
-      if (!canStartCompute) {
-        console.error(
-          "Error Cannot start compute job using the datasets DIDs & algorithm DID provided"
-        );
-        return;
-      }
-    }
     const maxJobDuration = Number(args[4]);
     if (!maxJobDuration) {
       console.error(
@@ -465,24 +446,6 @@ export class Commands {
       return;
     }
 
-    // Validate orderability only for DID-based datasets (raw fileObject assets
-    // have no DDO and are validated by the node).
-    for (let i = 0; i < assets.length; i++) {
-      const dataDdo = ddos[i];
-      if (!dataDdo) continue;
-      const canStartCompute = await isOrderable(
-        dataDdo,
-        dataDdo.services[0].id,
-        algo,
-        algoDdo as Asset | DDO
-      );
-      if (!canStartCompute) {
-        console.error(
-          "Error Cannot start compute job using the datasets DIDs & algorithm DID provided"
-        );
-        return;
-      }
-    }
     const providerInitializeComputeJob = args[4]; // provider fees + payment
     const parsedProviderInitializeComputeJob = fixAndParseProviderFees(
       providerInitializeComputeJob
@@ -725,7 +688,7 @@ export class Commands {
       this.oceanNodeUrl
     );
     if (!resolved) return;
-    const { assets, algo, ddos, algoDdo, providerURI } = resolved;
+    const { assets, algo, providerURI } = resolved;
 
     const computeEnvs = await ProviderInstance.getComputeEnvironments(
       this.oceanNodeUrl
@@ -758,25 +721,6 @@ export class Commands {
         computeEnvID
       );
       return;
-    }
-
-    // Validate orderability only for DID-based datasets (raw fileObject assets
-    // have no DDO and are validated by the node).
-    for (let i = 0; i < assets.length; i++) {
-      const dataDdo = ddos[i];
-      if (!dataDdo) continue;
-      const canStartCompute = await isOrderable(
-        dataDdo,
-        dataDdo.services[0].id,
-        algo,
-        algoDdo as Asset | DDO
-      );
-      if (!canStartCompute) {
-        console.error(
-          "Error Cannot start compute job using the datasets DIDs & algorithm DID provided"
-        );
-        return;
-      }
     }
 
     console.log("Starting compute job using provider: ", providerURI);

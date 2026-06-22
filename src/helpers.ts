@@ -20,7 +20,7 @@ import {
 	DownloadResponse,
 	ProviderFees,
 	ComputeAlgorithm,
-	LoggerInstance,
+	ComputeAsset,
 	createAsset
 } from "@oceanprotocol/lib";
 import { homedir } from "os";
@@ -251,35 +251,157 @@ export async function handleComputeOrder(
 	return orderStartedTx.transactionHash;
 }
 
-export async function isOrderable(
-	asset: Asset | DDO,
-	serviceId: string,
-	algorithm: ComputeAlgorithm,
-	algorithmDDO: Asset | DDO
-): Promise<boolean> {
-	const datasetService = asset.services.find((s) => s.id === serviceId);
-	if (!datasetService) return false;
+export interface ResolvedComputeInputs {
+	assets: ComputeAsset[]; // index-aligned with `ddos`
+	algo: ComputeAlgorithm;
+	ddos: (Asset | DDO | null)[]; // null where the asset is raw (fileObject)
+	algoDdo: Asset | DDO | null; // null when the algo is raw
+	providerURI: string; // first DID-based DDO endpoint, else fallback
+}
 
-	if (datasetService.type === "compute") {
-		if (algorithm.meta) {
-			if (datasetService.compute.allowRawAlgorithm) return true;
-			return false;
-		}
-		if (algorithm.documentId) {
-			const algoService = algorithmDDO.services.find(
-				(s) => s.id === algorithm.serviceId
-			);
-			if (algoService && algoService.type === "compute") {
-				if (algoService.serviceEndpoint !== datasetService.serviceEndpoint) {
-					LoggerInstance.error(
-						"ERROR: Both assets with compute service are not served by the same provider"
-					);
-					return false;
-				}
+// Parses a single compute input string (datasets or algo) into a list of tokens.
+// Each token is either a DID string or a raw ComputeAsset/ComputeAlgorithm object.
+// Supports: a bare DID, a JSON object, a JSON array of DIDs and/or objects, and the
+// legacy unquoted `[did:a,did:b]` form (kept for backward compatibility).
+function parseComputeInput(raw: string): (string | Record<string, unknown>)[] {
+	if (raw === undefined || raw === null) return [];
+	const trimmed = String(raw).trim();
+	if (trimmed.length === 0) return [];
+	try {
+		const parsed = JSON.parse(trimmed);
+		if (Array.isArray(parsed)) return parsed;
+		if (parsed && typeof parsed === "object") return [parsed];
+		// a JSON primitive (e.g. a quoted string) -> treat as a single DID
+		return [String(parsed)];
+	} catch {
+		// not valid JSON: bare DID or legacy `[did:a,did:b]`
+		if (trimmed.includes("[") && trimmed.includes("]")) {
+			const processed = trimmed.replaceAll("]", "").replaceAll("[", "");
+			if (processed.indexOf(",") > -1) {
+				return processed
+					.split(",")
+					.map((s) => s.trim())
+					.filter((s) => s.length > 0);
 			}
+			// `[did]` or `[]`
+			const single = processed.trim();
+			return single.length > 0 ? [single] : [];
+		}
+		// legacy unbracketed comma-separated DIDs: `did:op:a,did:op:b`
+		if (trimmed.indexOf(",") > -1) {
+			return trimmed
+				.split(",")
+				.map((s) => s.trim())
+				.filter((s) => s.length > 0);
+		}
+		return [trimmed];
+	}
+}
+
+// Resolves the raw datasets/algo CLI strings into fully-built ComputeAsset[] and
+// ComputeAlgorithm, plus index-aligned DDO arrays (null where the entry is raw).
+// DID entries are resolved via Aquarius; raw (fileObject) entries are passed through
+// untouched. Returns null (after logging) when a DID cannot be resolved.
+export async function resolveComputeInputs(
+	datasetsInput: string,
+	algoInput: string,
+	aquarius: Aquarius,
+	indexingParams: IndexerWaitParams,
+	fallbackProviderURI: string
+): Promise<ResolvedComputeInputs | null> {
+	const datasetTokens = parseComputeInput(datasetsInput);
+
+	const assets: ComputeAsset[] = [];
+	const ddos: (Asset | DDO | null)[] = [];
+
+	for (const token of datasetTokens) {
+		if (typeof token === "string") {
+			const dataDdo = await aquarius.waitForIndexer(
+				token,
+				undefined,
+				undefined,
+				indexingParams.retryInterval,
+				indexingParams.maxRetries
+			);
+			if (!dataDdo) {
+				console.error(
+					"Error fetching DDO " + token + ".  Does this asset exists?"
+				);
+				return null;
+			}
+			assets.push({
+				documentId: dataDdo.id,
+				serviceId: dataDdo.services[0].id,
+			});
+			ddos.push(dataDdo);
+		} else if (token && typeof token === "object") {
+			const rawAsset = token as unknown as ComputeAsset;
+			if (!rawAsset.fileObject) {
+				console.error(
+					"Error: raw dataset asset must contain a 'fileObject'. Got: " +
+						JSON.stringify(token)
+				);
+				return null;
+			}
+			assets.push({
+				...rawAsset,
+				documentId: rawAsset.documentId ?? "",
+				serviceId: rawAsset.serviceId ?? "",
+			});
+			ddos.push(null);
+		} else {
+			console.error("Error: invalid dataset input entry: " + String(token));
+			return null;
 		}
 	}
-	return true;
+
+	let providerURI = fallbackProviderURI;
+	const firstDdo = ddos.find((d) => d !== null);
+	if (firstDdo) {
+		providerURI = firstDdo.services[0].serviceEndpoint;
+	}
+
+	// Resolve the algorithm (single entry: DID or raw object)
+	const algoTokens = parseComputeInput(algoInput);
+	const algoToken = algoTokens.length > 0 ? algoTokens[0] : algoInput;
+	let algo: ComputeAlgorithm;
+	let algoDdo: Asset | DDO | null = null;
+
+	if (typeof algoToken === "string") {
+		algoDdo = await aquarius.waitForIndexer(
+			algoToken,
+			undefined,
+			undefined,
+			indexingParams.retryInterval,
+			indexingParams.maxRetries
+		);
+		if (!algoDdo) {
+			console.error(
+				"Error fetching DDO " + algoToken + ".  Does this asset exists?"
+			);
+			return null;
+		}
+		algo = {
+			documentId: algoDdo.id,
+			serviceId: algoDdo.services[0].id,
+			meta: algoDdo.metadata.algorithm,
+		};
+	} else if (algoToken && typeof algoToken === "object") {
+		const rawAlgo = algoToken as unknown as ComputeAlgorithm;
+		if (!rawAlgo.fileObject) {
+			console.error(
+				"Error: raw algorithm must contain a 'fileObject'. Got: " +
+					JSON.stringify(algoToken)
+			);
+			return null;
+		}
+		algo = rawAlgo;
+	} else {
+		console.error("Error: invalid algorithm input: " + String(algoToken));
+		return null;
+	}
+
+	return { assets, algo, ddos, algoDdo, providerURI };
 }
 
 

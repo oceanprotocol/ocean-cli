@@ -211,6 +211,17 @@ e.g.: `'[{"id":"cpu","amount":3},{"id":"ram","amount":16772672536},{"id":"disk",
 -  `--accept` option can be set to `true` or `false`. If it is set to `false` a prompt will be displayed to the user for manual accepting the payment before starting a compute job. If it is set to `true`, the compute job starts automatically, without user input.
 - `output` is an optional stringified JSON object specifying a remote storage backend where job results will be uploaded. Supported types include S3, FTP, URL, Arweave, and IPFS. If omitted, results are stored on the node's local disk. e.g.: `'{"remoteStorage":{"type":"s3","s3Access":{"endpoint":"https://s3.amazonaws.com","region":"us-east-1","bucket":"my-results","objectKey":"jobs/result.tar","accessKeyId":"AKIA...","secretAccessKey":"..."}}}'`
 
+**Raw (unpublished) datasets and algorithms:**
+
+Instead of a DID, you can pass a full `ComputeAsset` (datasets) or `ComputeAlgorithm` (algorithm) JSON object with a `fileObject`, to run compute on raw data/algorithms that are not published as assets. Raw entries have no DID and are not ordered (no datatoken). DID-based and raw entries can be mixed within the datasets argument (the value must then be valid JSON, with DIDs quoted). JSON must be single-quoted on the shell.
+
+- Raw algorithm against a published dataset that allows raw algorithms (`allowRawAlgorithm: true`):  
+  `npm run cli startCompute -- did:op:dataset '{"fileObject":{"type":"url","url":"https://example.com/algo.py","method":"GET"},"meta":{"container":{"entrypoint":"python $ALGO","image":"oceanprotocol/algo_dockers","tag":"python-branin","checksum":"sha256:..."}}}' env1 900 paymentToken resources --accept true`
+- Raw dataset(s) against a published algorithm:  
+  `npm run cli startCompute -- '[{"fileObject":{"type":"url","url":"https://example.com/data.csv","method":"GET"}}]' did:op:algo env1 900 paymentToken resources --accept true`
+- Mixed datasets (a published DID and a raw file):  
+  `npm run cli startCompute -- '["did:op:dataset",{"fileObject":{"type":"ipfs","hash":"Qm..."}}]' did:op:algo env1 900 paymentToken resources --accept true`
+
 ---
 
 **Start Free Compute:**
@@ -223,6 +234,8 @@ e.g.: `'[{"id":"cpu","amount":3},{"id":"ram","amount":16772672536},{"id":"disk",
   (Options can be provided in any order.)
 
 - `output` is an optional stringified JSON object specifying a remote storage backend where job results will be uploaded. Same format as `startCompute`.
+- Like `startCompute`, the datasets and algorithm arguments accept raw `ComputeAsset`/`ComputeAlgorithm` JSON objects with a `fileObject` (no DID), and mixed DID + raw datasets. e.g.:  
+  `npm run cli startFreeCompute did:op:dataset '{"fileObject":{"type":"url","url":"https://example.com/algo.py","method":"GET"},"meta":{"container":{"entrypoint":"python $ALGO","image":"oceanprotocol/algo_dockers","tag":"python-branin","checksum":"sha256:..."}}}' env1`
 
 ---
 

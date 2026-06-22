@@ -36,6 +36,8 @@ import { interactiveFlow } from "./interactiveFlow.js";
 import { publishAsset } from "./publishAsset.js";
 import chalk from "chalk";
 
+const UPLOAD_TIMEOUT_MS = 30 * 60_000;
+
 export class Commands {
   public signer: Signer;
   public config: Config;
@@ -1508,7 +1510,9 @@ export class Commands {
       const last = args[1];
       let from = args[2];
       let to = args[3];
-      const maxLogs = args[4] ? Math.min(parseInt(args[4], 10), 1000) : undefined;
+      const maxLogs = args[4]
+        ? Math.min(parseInt(args[4], 10), 1000)
+        : undefined;
 
       if (!outputLocation) {
         console.error(chalk.red("Output location is required"));
@@ -1523,9 +1527,7 @@ export class Commands {
       }
 
       if (last && (from || to)) {
-        console.error(
-          chalk.red("Use either --last or --from/--to, not both")
-        );
+        console.error(chalk.red("Use either --last or --from/--to, not both"));
         return;
       }
 
@@ -1572,7 +1574,9 @@ export class Commands {
 
       if (accessListAddress) {
         if (!/^0x[a-fA-F0-9]{40}$/.test(accessListAddress)) {
-          console.error(chalk.red(`Invalid access list address: ${accessListAddress}`));
+          console.error(
+            chalk.red(`Invalid access list address: ${accessListAddress}`)
+          );
           return;
         }
         const { chainId } = await this.signer.provider.getNetwork();
@@ -1595,7 +1599,8 @@ export class Commands {
     try {
       const bucketId = args[1];
       const filePath = args[2];
-      const fileName = args[3] || (filePath ? path.basename(filePath) : undefined);
+      const fileName =
+        args[3] || (filePath ? path.basename(filePath) : undefined);
       if (!bucketId || !filePath) {
         console.error(chalk.red("bucketId and filePath are required"));
         return;
@@ -1605,15 +1610,40 @@ export class Commands {
         return;
       }
 
+      const totalBytes = fs.statSync(filePath).size;
+      let uploadedBytes = 0;
+      let lastPct = 0;
+      const withProgress = async function* (
+        source: AsyncIterable<Uint8Array>
+      ): AsyncIterable<Uint8Array> {
+        for await (const chunk of source) {
+          uploadedBytes += chunk.length;
+          const pct = Math.floor((uploadedBytes / totalBytes) * 100);
+          if (pct >= lastPct + 5) {
+            lastPct = pct;
+            console.log(chalk.cyan(`Upload progress: ${pct}%`));
+          }
+          yield chunk;
+        }
+      };
+
       const stream = fs.createReadStream(filePath);
+      console.log(
+        chalk.cyan(
+          `Starting upload of '${fileName}' (${totalBytes} bytes) to bucket ${bucketId}...`
+        )
+      );
       const result = await ProviderInstance.uploadPersistentStorageFile(
         this.oceanNodeUrl,
         this.signer,
         bucketId,
         fileName,
-        stream as unknown as AsyncIterable<Uint8Array>
+        withProgress(stream as unknown as AsyncIterable<Uint8Array>),
+        AbortSignal.timeout(UPLOAD_TIMEOUT_MS)
       );
-      console.log(chalk.green(`File '${fileName}' uploaded to bucket ${bucketId}.`));
+      console.log(
+        chalk.green(`File '${fileName}' uploaded to bucket ${bucketId}.`)
+      );
       console.log(util.inspect(result, false, null, true));
     } catch (error) {
       console.error(chalk.red("Error uploading file: "), error);
@@ -1688,7 +1718,9 @@ export class Commands {
         bucketId,
         fileName
       );
-      console.log(chalk.green(`File '${fileName}' deleted from bucket ${bucketId}.`));
+      console.log(
+        chalk.green(`File '${fileName}' deleted from bucket ${bucketId}.`)
+      );
       console.log(util.inspect(result, false, null, true));
     } catch (error) {
       console.error(chalk.red("Error deleting file: "), error);

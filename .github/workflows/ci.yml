@@ -75,6 +75,7 @@ jobs:
         with:
           repository: 'oceanprotocol/barge'
           path: 'barge'
+          ref: "feature/node-v4"
 
       - name: Login to Docker Hub
         if: ${{ env.DOCKERHUB_PASSWORD && env.DOCKERHUB_USERNAME }}
@@ -89,6 +90,9 @@ jobs:
         working-directory: ${{ github.workspace }}/barge
         run: |
           bash -x start_ocean.sh --with-typesense 2>&1 > start_ocean.log &
+        env:
+          CONTRACTS_VERSION: '2.9.0'
+          NODE_VERSION: "pr-1408"
       - run: npm ci
       - run: npm run build
       - run: docker image ls

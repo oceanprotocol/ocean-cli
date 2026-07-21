@@ -265,12 +265,12 @@ export async function isOrderable(
 	if (!datasetService) return false;
 
 	if (datasetService.type === "compute") {
-		if (algorithm.meta) {
-			if (datasetService.compute.allowRawAlgorithm) return true;
-			return false;
-		}
+		// A DID-based algorithm carries a `documentId` (and, for convenience, its
+		// `meta`); a raw algorithm carries only `meta` (a fileObject, no DID). Check
+		// `documentId` first so published algorithms are validated against the
+		// dataset's provider rather than the raw-algorithm allowance.
 		if (algorithm.documentId) {
-			const algoService = algorithmDDO.services.find(
+			const algoService = algorithmDDO?.services.find(
 				(s) => s.id === algorithm.serviceId
 			);
 			if (algoService && algoService.type === "compute") {
@@ -281,6 +281,9 @@ export async function isOrderable(
 					return false;
 				}
 			}
+		} else if (algorithm.meta) {
+			if (datasetService.compute.allowRawAlgorithm) return true;
+			return false;
 		}
 	}
 	return true;

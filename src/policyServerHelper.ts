@@ -364,7 +364,7 @@ export async function getPolicyServerOBJs(
     serviceId: string
     asset: Asset
     version?: string
-  },
+  } | null,
   signer: Signer,
   providerUrl: string
 ): Promise<PolicyServerInitiateComputeActionData[] | null> {

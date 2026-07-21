@@ -32,7 +32,7 @@ import {
   AccessListContract,
   ZERO_ADDRESS,
 } from "@oceanprotocol/lib";
-import { Asset, DDOManager } from '@oceanprotocol/ddo-js';
+import { Asset, DDOManager, validateDDO } from '@oceanprotocol/ddo-js';
 import { Signer, ethers, getAddress } from "ethers";
 import { interactiveFlow } from "./interactiveFlow.js";
 import { publishAsset } from "./publishAsset.js";
@@ -72,23 +72,73 @@ export class Commands {
     });
   }
 
-  // Populate the indexer-derived address fields a publisher can't leave empty.
-  // Newer @oceanprotocol/ddo-js validates these via ethers getAddress(), which
-  // throws on empty/absent values. The owner is the signer; nft.address and
-  // stats[].datatokenAddress are only created inside ocean.js createAsset, so we
-  // seed ZERO_ADDRESS placeholders — the node's indexer overwrites all of
-  // indexedMetadata from on-chain events after publish.
-  private async fillIndexedMetadataAddresses(asset: any): Promise<void> {
-    const indexedMetadata = asset?.indexedMetadata;
-    if (!indexedMetadata) return;
-    const ownerAddress = await this.signer.getAddress();
-    if (indexedMetadata.nft) {
-      if (!indexedMetadata.nft.owner) indexedMetadata.nft.owner = ownerAddress;
-      if (!indexedMetadata.nft.address) indexedMetadata.nft.address = ZERO_ADDRESS;
+  // Seed every address field that the Ocean Node / on-chain publish flow fills in
+  // (they are empty or "0x0" placeholders in a raw metadata file) with a valid
+  // ZERO_ADDRESS, so DDO validation — which runs each through ethers getAddress()
+  // — doesn't throw on empty/absent values. Covers both the v4 (top-level) and v5
+  // (credentialSubject) shapes. Access-control wildcards under `credentials`
+  // (e.g. { type: "address", values: [{ address: "*" }] }) are deliberately left
+  // untouched — they are not EVM addresses. Mutates the object passed in.
+  private fillNodeManagedAddresses(ddo: any): void {
+    if (!ddo || typeof ddo !== "object") return;
+    const isPlaceholder = (v: unknown) =>
+      v === undefined || v === null || v === "" || v === "0x0";
+
+    // credentialSubject (v5) or the DDO root (v4) carries nftAddress + services.
+    const subject = ddo.credentialSubject ?? ddo;
+    if (isPlaceholder(subject.nftAddress)) subject.nftAddress = ZERO_ADDRESS;
+    for (const svc of subject.services ?? []) {
+      if (isPlaceholder(svc.datatokenAddress)) svc.datatokenAddress = ZERO_ADDRESS;
+      // `files` is an object with placeholder addresses before encryption.
+      const files = svc.files;
+      if (files && typeof files === "object" && !Array.isArray(files)) {
+        if (isPlaceholder(files.nftAddress)) files.nftAddress = ZERO_ADDRESS;
+        if (isPlaceholder(files.datatokenAddress)) files.datatokenAddress = ZERO_ADDRESS;
+      }
     }
-    for (const stat of indexedMetadata.stats ?? []) {
-      if (!stat.datatokenAddress) stat.datatokenAddress = ZERO_ADDRESS;
+
+    // indexedMetadata (same shape in v4 and v5) is fully indexer-derived.
+    const indexedMetadata = ddo.indexedMetadata;
+    if (indexedMetadata?.nft) {
+      if (isPlaceholder(indexedMetadata.nft.address)) indexedMetadata.nft.address = ZERO_ADDRESS;
+      if (isPlaceholder(indexedMetadata.nft.owner)) indexedMetadata.nft.owner = ZERO_ADDRESS;
     }
+    for (const stat of indexedMetadata?.stats ?? []) {
+      if (isPlaceholder(stat.datatokenAddress)) stat.datatokenAddress = ZERO_ADDRESS;
+    }
+  }
+
+  // Run the same @oceanprotocol/ddo-js validation the Ocean Node applies, locally
+  // and before publishing, so failures surface as field-level detail here instead
+  // of as an opaque error from the node. The real on-chain addresses don't exist
+  // until ocean.js createAsset runs, so we validate a COPY with node-managed
+  // address fields seeded to ZERO_ADDRESS (see fillNodeManagedAddresses) — that
+  // gets past the getAddress() checks so genuine structural issues are visible.
+  // Advisory only (logs, does not block); the original DDO is left untouched.
+  private async validateBeforePublish(asset: any): Promise<[boolean, any]> {
+    const candidate = JSON.parse(JSON.stringify(asset));
+    this.fillNodeManagedAddresses(candidate);
+    let valid = false;
+    let errors: any = null;
+    try {
+      [valid, errors] = await validateDDO(candidate);
+    } catch (e: any) {
+      console.warn(
+        chalk.yellow("Could not run DDO validation: " + (e?.message ?? e))
+      );
+      return [false, { general: [String(e?.message ?? e)] }];
+    }
+    if (valid) {
+      console.log(chalk.green("DDO validation passed."));
+    } else {
+      console.warn(
+        chalk.yellow(
+          "DDO validation reported issues (fields):\n" +
+            JSON.stringify(errors, null, 2)
+        )
+      );
+    }
+    return [valid, errors];
   }
 
   // commands
@@ -104,7 +154,7 @@ export class Commands {
     }
     const encryptDDO = args[2] === "false" ? false : true;
     try {
-      await this.fillIndexedMetadataAddresses(asset);
+      await this.validateBeforePublish(asset);
 			const ddoInstance = DDOManager.getDDOClass(asset);
 			const { indexedMetadata } = ddoInstance.getAssetFields();
 			const { services } = ddoInstance.getDDOFields();
@@ -140,7 +190,7 @@ export class Commands {
     const encryptDDO = args[2] === "false" ? false : true;
     // add some more checks
     try {
-      await this.fillIndexedMetadataAddresses(algoAsset);
+      await this.validateBeforePublish(algoAsset);
 			const ddoInstance = DDOManager.getDDOClass(algoAsset);
 			const { indexedMetadata } = ddoInstance.getAssetFields();
 			const { services } = ddoInstance.getDDOFields();

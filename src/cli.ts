@@ -340,7 +340,7 @@ export async function createCLI() {
         const { signer, chainId } = await initializeSigner();
         const commands = new Commands(signer, chainId);
 
-      const initArgs = [null, dsDids, aDid, envId, jobDuration, token, res, output, svcIds, algoSvcId];
+      const initArgs = [null, dsDids, aDid, envId, jobDuration, token, res, outputLocation, svcIds, algoSvcId];
       console.log('initArgs:', initArgs);
         const initResp = await commands.initializeCompute(initArgs);
 

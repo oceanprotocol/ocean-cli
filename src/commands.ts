@@ -37,7 +37,7 @@ import { Signer, ethers, getAddress } from "ethers";
 import { interactiveFlow } from "./interactiveFlow.js";
 import { publishAsset } from "./publishAsset.js";
 import chalk from 'chalk';
-import { getPolicyServerOBJ, getPolicyServerOBJs } from "./policyServerHelper.js";
+import { getPolicyServerOBJ, getPolicyServerOBJs, isVersionGte } from "./policyServerHelper.js";
 
 const UPLOAD_TIMEOUT_MS = 30 * 60_000;
 
@@ -293,7 +293,7 @@ export class Commands {
 		const serviceId = args[3] ? args[3] : services[0].id;
 		let policyServer = null
 		try {
-			if (version >= '5.0.0') {
+			if (isVersionGte(version, '5.0.0')) {
 				policyServer = await getPolicyServerOBJ(dataDdo, serviceId, this.signer, this.oceanNodeUrl);
 			}
 		} catch (error) {
@@ -1362,9 +1362,14 @@ export class Commands {
       );
       return;
     }
-		if (services[0].compute.publisherTrustedAlgorithms) {
+		if (
+			!services[0].compute.publisherTrustedAlgorithms ||
+			services[0].compute.publisherTrustedAlgorithms.length === 0
+		) {
       console.error(
-        " " + args[1] + ".  Does this asset has an computeService?"
+        "Asset " +
+          args[1] +
+          " has no publisherTrustedAlgorithms list to remove an algorithm from."
       );
       return;
     }

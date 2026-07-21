@@ -3,6 +3,26 @@ import { PolicyServerActions, PolicyServerGetPdAction, PolicyServerInitiateActio
 import axios from "axios"
 import { Signer } from "ethers"
 
+// Semver-aware "version >= minimum" comparison (numeric, dot-separated). Avoids
+// the lexicographic pitfalls of comparing version strings directly (e.g.
+// '5.10.0' < '5.9.0' as strings). A missing/empty version is treated as below
+// any minimum. No semver package is a project dependency, so this is inlined.
+export function isVersionGte(
+  version: string | undefined,
+  minimum: string
+): boolean {
+  if (!version) return false
+  const parse = (v: string) => v.split('.').map((n) => parseInt(n, 10) || 0)
+  const a = parse(version)
+  const b = parse(minimum)
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const x = a[i] ?? 0
+    const y = b[i] ?? 0
+    if (x !== y) return x > y
+  }
+  return true
+}
+
 export async function connectToSSIWallet(
   owner: Signer,
   api: string
@@ -27,7 +47,7 @@ export async function connectToSSIWallet(
     )
     return response.data
   } catch (error) {
-    throw error.response
+    throw error.response ?? error
   }
 }
 
@@ -60,7 +80,7 @@ export async function sendPresentationRequest(
 
     return response.data
   } catch (error) {
-    throw error.response
+    throw error.response ?? error
   }
 }
 
@@ -87,7 +107,7 @@ export async function resolvePresentationRequest(
 
     return response.data
   } catch (error) {
-    throw error.response
+    throw error.response ?? error
   }
 }
 
@@ -112,7 +132,7 @@ export async function getWalletDids(
 
     return response.data
   } catch (error) {
-    throw error.response
+    throw error.response ?? error
   }
 }
 
@@ -198,7 +218,7 @@ export async function matchCredentialForPresentationDefinition(
 
     return response.data
   } catch (error) {
-    throw error.response
+    throw error.response ?? error
   }
 }
 
@@ -373,7 +393,7 @@ export async function getPolicyServerOBJs(
 
     // --- datasets
     for (const ddo of ddos) {
-      if (!ddo.version || ddo.version < '5.0.0') {
+      if (!isVersionGte(ddo.version, '5.0.0')) {
         return null
       }
       const result = await getPolicyServerOBJ(
@@ -389,22 +409,25 @@ export async function getPolicyServerOBJs(
       })
     }
 
-    // --- algo
-    if (!algo?.version || algo.version < '5.0.0') {
-      return null
-    }
-    if (algo.serviceId) {
-      const algoResult = await getPolicyServerOBJ(
-        algo.asset,
-        algo.serviceId,
-        signer,
-        providerUrl
-      )
-      results.push({
-        ...algoResult,
-        documentId: algo.documentId,
-        serviceId: algo.serviceId
-      })
+    // --- algo (only when an algorithm is present; raw/no-algo jobs keep the
+    // dataset actions already collected above)
+    if (algo) {
+      if (!isVersionGte(algo.version, '5.0.0')) {
+        return null
+      }
+      if (algo.serviceId) {
+        const algoResult = await getPolicyServerOBJ(
+          algo.asset,
+          algo.serviceId,
+          signer,
+          providerUrl
+        )
+        results.push({
+          ...algoResult,
+          documentId: algo.documentId,
+          serviceId: algo.serviceId
+        })
+      }
     }
 
     return results

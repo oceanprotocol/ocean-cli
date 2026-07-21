@@ -30,6 +30,7 @@ import {
   getTokenDecimals,
   AccesslistFactory,
   AccessListContract,
+  ZERO_ADDRESS,
 } from "@oceanprotocol/lib";
 import { Asset, DDOManager } from '@oceanprotocol/ddo-js';
 import { Signer, ethers, getAddress } from "ethers";
@@ -71,6 +72,25 @@ export class Commands {
     });
   }
 
+  // Populate the indexer-derived address fields a publisher can't leave empty.
+  // Newer @oceanprotocol/ddo-js validates these via ethers getAddress(), which
+  // throws on empty/absent values. The owner is the signer; nft.address and
+  // stats[].datatokenAddress are only created inside ocean.js createAsset, so we
+  // seed ZERO_ADDRESS placeholders — the node's indexer overwrites all of
+  // indexedMetadata from on-chain events after publish.
+  private async fillIndexedMetadataAddresses(asset: any): Promise<void> {
+    const indexedMetadata = asset?.indexedMetadata;
+    if (!indexedMetadata) return;
+    const ownerAddress = await this.signer.getAddress();
+    if (indexedMetadata.nft) {
+      if (!indexedMetadata.nft.owner) indexedMetadata.nft.owner = ownerAddress;
+      if (!indexedMetadata.nft.address) indexedMetadata.nft.address = ZERO_ADDRESS;
+    }
+    for (const stat of indexedMetadata.stats ?? []) {
+      if (!stat.datatokenAddress) stat.datatokenAddress = ZERO_ADDRESS;
+    }
+  }
+
   // commands
   public async publish(args: string[]) {
     console.log("start publishing");
@@ -84,6 +104,7 @@ export class Commands {
     }
     const encryptDDO = args[2] === "false" ? false : true;
     try {
+      await this.fillIndexedMetadataAddresses(asset);
 			const ddoInstance = DDOManager.getDDOClass(asset);
 			const { indexedMetadata } = ddoInstance.getAssetFields();
 			const { services } = ddoInstance.getDDOFields();
@@ -119,6 +140,7 @@ export class Commands {
     const encryptDDO = args[2] === "false" ? false : true;
     // add some more checks
     try {
+      await this.fillIndexedMetadataAddresses(algoAsset);
 			const ddoInstance = DDOManager.getDDOClass(algoAsset);
 			const { indexedMetadata } = ddoInstance.getAssetFields();
 			const { services } = ddoInstance.getDDOFields();

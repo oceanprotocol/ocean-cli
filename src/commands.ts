@@ -1140,10 +1140,9 @@ export class Commands {
     console.log(jobStatus);
   }
 
-  public async getComputeEnvironments() {
-    const computeEnvs = await ProviderInstance.getComputeEnvironments(
-      this.oceanNodeUrl
-    );
+  public async getComputeEnvironments(nodeUrlOverride?: string) {
+    const nodeUrl = nodeUrlOverride || this.oceanNodeUrl;
+    const computeEnvs = await ProviderInstance.getComputeEnvironments(nodeUrl);
 
     if (!computeEnvs || computeEnvs.length < 1) {
       console.error(
@@ -1152,7 +1151,7 @@ export class Commands {
       return;
     }
 
-    console.log("Exiting compute environments: ", JSON.stringify(computeEnvs));
+    console.log("Existing compute environments: ", JSON.stringify(computeEnvs));
   }
 
   public async computeStreamableLogs(args: string[]) {

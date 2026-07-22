@@ -121,7 +121,7 @@ describe("Ocean CLI Paid Compute", function() {
      it("should get compute environments using 'npm run cli getComputeEnvironments'", async function() {
         const output = await runCommand(`npm run cli getComputeEnvironments`);
 
-		const jsonMatch = output.match(/Exiting compute environments:\s*([\s\S]*)/);
+		const jsonMatch = output.match(/Existing compute environments:\s*([\s\S]*)/);
 		if (!jsonMatch) {
 			console.error("Raw output:", output);
 			throw new Error("Could not find compute environments in the output");

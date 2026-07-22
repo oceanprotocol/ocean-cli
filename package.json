@@ -17,6 +17,9 @@
   },
   "author": "Ocean Protocol <devops@oceanprotocol.com>",
   "license": "Apache-2.0",
+  "engines": {
+    "node": ">=22"
+  },
   "bugs": {
     "url": "https://github.com/oceanprotocol/ocean.js-cli/issues"
   },
@@ -48,6 +51,7 @@
     "@oceanprotocol/contracts": "^2.5.0",
     "@oceanprotocol/ddo-js": "^0.3.0",
     "@oceanprotocol/lib": "^9.0.0-next.1",
+    "axios": "^1.11.0",
     "commander": "^13.1.0",
     "cross-fetch": "^3.1.5",
     "crypto-js": "^4.1.1",

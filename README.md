@@ -90,6 +90,14 @@ export INDEXING_RETRY_INTERVAL='3000'
 export AVOID_LOOP_RUN='true/false'
 ```
 
+- Optional, set SSI_WALLET_API, SSI_WALLET_ID, SSI_WALLET_DID to support v5 DDOs (assets using credentialSubject and SSI policy flows).
+
+```bash
+export SSI_WALLET_API="https://your-ssi-wallet.example/api"
+export SSI_WALLET_ID="did:example:your-wallet-did-or-id"
+export SSI_WALLET_DID="did:example"
+```
+
 
 
 ### Build the TypeScript code
@@ -108,7 +116,7 @@ npm run cli h
 
 E.g. run publish command
 
-Make sure to update chainId from the assets from `metadata` folder.
+Make sure to update chainId and serviceEndpoint from the assets from `metadata` folder.
 
 ```
 npm run cli publish metadata/simpleDownloadDataset.json
@@ -186,22 +194,28 @@ npm run cli <command> [options] <arguments>
 **Download:**
 
 - **Positional:**  
-  `npm run cli download did:op:123 ./custom-folder`
+  `npm run cli download did:op:123 ./custom-folder serviceId`
 
 - **Named Options:**  
-  `npm run cli download --did did:op:123 --folder ./custom-folder`  
+  `npm run cli download --did did:op:123 --folder ./custom-folder --service serviceId`
   (Order of `--did` and `--folder` does not matter.)
+
+- **Rules:**
+  serviceId is optional. If omitted, the CLI defaults to the first available download service.
 
 ---
 
 **Start Compute:**
 
 - **Positional:**  
-  `npm run cli startCompute -- did1,did2 algoDid env1 maxJobDuration paymentToken resources --accept true`
+  `npm run cli startCompute -- did1,did2 algoDid env1 maxJobDuration paymentToken resources svc1,svc2 algoServiceId`
 
 - **Named Options:**  
-  `npm run cli startCompute --datasets did1,did2 --algo algoDid --env env1 --maxJobDuration maxJobDuration --token paymentToken --resources resources --accept true`  
+  `npm run cli startCompute --datasets did1,did2 --algo algoDid --env env1 --maxJobDuration maxJobDuration --token paymentToken --resources resources --accept true --services svc1,svc2 --algo-service algoServiceId`
   (Options can be provided in any order.)
+
+- **Rules:**
+  serviceIds and algoServiceId are optional. If omitted, the CLI defaults to the first available service.
 
 
 - `maxJobDuration` is a required parameter an represents the time measured in seconds for job maximum execution, the payment is based on this maxJobDuration value, user needs to provide this.
@@ -229,8 +243,14 @@ Instead of a DID, you can pass a full `ComputeAsset` (datasets) or `ComputeAlgor
 - **Positional:**  
   `npm run cli startFreeCompute did1,did2 algoDid env1`
 
-- **Named Options:**  
-  `npm run cli startFreeCompute --datasets did1,did2 --algo algoDid --env env1`  
+- **Named Options:**
+  `npm run cli startFreeCompute --datasets did1,did2 --algo algoDid --env env1 --services svc1,svc2 --algo-service algoServiceId`
+  (Options can be provided in any order.)
+
+  - `output` is an optional stringified JSON object specifying a remote storage backend where job results will be uploaded. Same format as `startCompute`.
+
+- **Rules:**
+  serviceIds and algoServiceId are optional. If omitted, the CLI defaults to the first available service.`
   (Options can be provided in any order.)
 
 - `output` is an optional stringified JSON object specifying a remote storage backend where job results will be uploaded. Same format as `startCompute`.
@@ -253,6 +273,10 @@ Instead of a DID, you can pass a full `ComputeAsset` (datasets) or `ComputeAlgor
 **Get Compute Environments:**
 
   `npm run cli getComputeEnvironments`
+
+  Optionally pass a specific Ocean Node URL or peer id to query instead of `NODE_URL`:
+
+  `npm run cli getComputeEnvironments <nodeUrlOrPeerId>`
 
 ---
 
@@ -411,6 +435,82 @@ Instead of a DID, you can pass a full `ComputeAsset` (datasets) or `ComputeAlgor
 
 ---
 
+**Allow Algorithm on Dataset:**
+
+- **Positional:**  
+  `npm run cli allowAlgo did:op:dataset did:op:algo`
+
+- **With named option:**  
+  `npm run cli allowAlgo did:op:dataset did:op:algo --encrypt true`
+
+- The dataset and algorithm DIDs are required positional arguments (`--dataset` / `--algo` may override them, but the positionals must still be supplied). `--encrypt` toggles DDO encryption (default: `true`).
+
+- Approves an algorithm to run on a compute-enabled dataset (signer must be the dataset NFT owner).
+
+---
+
+**Create Bucket:**
+
+  `npm run cli createBucket`
+
+- Creates a new persistent-storage bucket on the node. Pass an access-list contract address to gate it; omit for owner-only access:
+
+  `npm run cli createBucket 0x1234...accessListAddress`
+
+---
+
+**Add File to Bucket:**
+
+  `npm run cli addFileToBucket <bucketId> ./path/to/file.csv`
+
+- Optionally pass a name to store the file under (defaults to the file's basename):
+
+  `npm run cli addFileToBucket <bucketId> ./path/to/file.csv results.csv`
+
+---
+
+**List Buckets:**
+
+  `npm run cli listBuckets`
+
+- Lists buckets owned by the signer, or by a specific owner:
+
+  `npm run cli listBuckets --owner 0x1234...ownerAddress`
+
+---
+
+**List Files in Bucket:**
+
+  `npm run cli listFilesInBucket <bucketId>`
+
+---
+
+**Get File Object:**
+
+  `npm run cli getFileObject <bucketId> <fileName>`
+
+- Returns the file-object descriptor for a file in a bucket.
+
+---
+
+**Delete File:**
+
+  `npm run cli deleteFile <bucketId> <fileName>`
+
+---
+
+**Download Node Logs (admin):**
+
+- **Positional:**  
+  `npm run cli downloadNodeLogs ./logs 24`
+
+- **Named Options:**  
+  `npm run cli downloadNodeLogs --output ./logs --last 24`
+
+- Downloads node logs into `<output>/logs.json`. Use either `last` (hours from now) **or** a `from`/`to` epoch-ms range. `maxLogs` caps the number of entries (default: 100, max: 1000). Requires admin privileges on the node.
+
+---
+
 #### Available Named Options Per Command
 
 - **getDDO:**  
@@ -432,10 +532,17 @@ Instead of a DID, you can pass a full `ComputeAsset` (datasets) or `ComputeAlgor
 - **download:**  
   `-d, --did <did>`  
   `-f, --folder [destinationFolder]` (Default: `.`)
+  `-s, --service <serviceId>` (Optional, target a specific service)
 
-- **startCompute:**  
-  `-d, --datasets <datasetDids>`  
+- **allowAlgo:**  
+  `-d, --dataset <datasetDid>`  
   `-a, --algo <algoDid>`  
+  `-e, --encrypt [boolean]` (Default: `true`)
+
+
+- **startCompute:**
+  `-d, --datasets <datasetDids>`
+  `-a, --algo <algoDid>`
   `-e, --env <computeEnvId>`
   `--init <initializeResponse>`
   `--maxJobDuration <maxJobDuration>`
@@ -443,14 +550,19 @@ Instead of a DID, you can pass a full `ComputeAsset` (datasets) or `ComputeAlgor
   `--resources <resources>`
   `--amountToDeposit <amountToDeposit>` (Id `''`, it will fallback to initialize compute payment amount.)
   `-o, --output [output]` (Optional. Stringified JSON object specifying a remote storage backend for job results.)
+  `-s, --services [serviceIds]` (Optional, comma-separated; must match datasetDids length, positional 1–1)
+  `-x, --algo-service [algoServiceId]` (Optional, override algorithm service)
 
 - **startFreeCompute:**  
   `-d, --datasets <datasetDids>`  
   `-a, --algo <algoDid>`  
   `-e, --env <computeEnvId>`
   `-o, --output [output]` (Optional. Stringified JSON object specifying a remote storage backend for job results.)
+  `-s, --services [serviceIds]` (Optional, comma-separated; must match datasetDids length, positional 1–1)
+  `-x, --algo-service [algoServiceId]` (Optional, override algorithm service)
 
 - **getComputeEnvironments:**  
+  `-n, --node [node]` (Optional. Ocean Node URL or peer id to query; defaults to `NODE_URL`)
 
 - **computeStreamableLogs:**  
 
@@ -517,6 +629,31 @@ Instead of a DID, you can pass a full `ComputeAsset` (datasets) or `ComputeAlgor
 - **removeFromAccessList:**  
   `-a, --address <accessListAddress>`  
   `-u, --users <users>`
+
+- **createBucket:**  
+  Positional only: `[accessListAddress]` (optional; omit for owner-only access)
+
+- **addFileToBucket:**  
+  Positional only: `<bucketId> <filePath> [fileName]`
+
+- **listBuckets:**  
+  `-o, --owner <address>` (Optional; defaults to signer)
+
+- **listFilesInBucket:**  
+  Positional only: `<bucketId>`
+
+- **getFileObject:**  
+  Positional only: `<bucketId> <fileName>`
+
+- **deleteFile:**  
+  Positional only: `<bucketId> <fileName>`
+
+- **downloadNodeLogs:**  
+  `-o, --output <output>`  
+  `-l, --last [last]` (Hours from now; use either `last` or `from`/`to`)  
+  `-f, --from [from]` (Start time, epoch ms)  
+  `-t, --to [to]` (End time, epoch ms)  
+  `-m, --maxLogs [maxLogs]` (Default: 100, max: 1000)
 
 ---
 

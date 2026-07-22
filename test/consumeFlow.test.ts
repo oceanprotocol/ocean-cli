@@ -68,6 +68,28 @@ describe("Ocean CLI Publishing", function() {
 
     });
 
+    it("should publish a dataset v5 using 'npm run cli publish'", async function() {
+        const metadataFile = path.resolve(projectRoot, "metadata/simpleDownloadDatasetV5.json");
+
+        // Ensure the metadata file exists
+        if (!fs.existsSync(metadataFile)) {
+            throw new Error("Metadata file not found: " + metadataFile);
+        }
+
+        process.env.PRIVATE_KEY = "0x1d751ded5a32226054cd2e71261039b65afb9ee1c746d055dd699b1150a5befc";
+        // Using this account: 0x529043886F21D9bc1AE0feDb751e34265a246e47
+        process.env.RPC = "http://127.0.0.1:8545";
+        process.env.NODE_URL = "http://127.0.0.1:8001";
+        process.env.ADDRESS_FILE = path.join(process.env.HOME || "", ".ocean/ocean-contracts/artifacts/address.json");
+
+        const output = await runCommand(`npm run cli publish ${metadataFile}`);
+        const jsonMatch = output.match(/did:ope:[a-f0-9]{64}/);
+        if (!jsonMatch) {
+            console.error("Raw output:", output);
+            throw new Error("Could not find did in the output");
+        }
+    });
+
     it("should publish a compute dataset using 'npm run cli publish'", async function() {
         const metadataFile = path.resolve(projectRoot, "metadata/simpleComputeDataset.json");
         // Ensure the metadata file exists

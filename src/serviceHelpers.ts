@@ -391,6 +391,11 @@ export async function pollServiceStatus(
 // 4.8 Job pretty-printer
 // ---------------------------------------------------------------------------
 
+// Safe ISO expiry rendering: never throws on undefined/zero/invalid values.
+export function formatExpiry(ms?: number): string {
+  return typeof ms === "number" && ms > 0 ? new Date(ms).toISOString() : "n/a";
+}
+
 function relativeTime(ms: number): string {
   const diff = ms - Date.now();
   const abs = Math.abs(diff);
@@ -424,9 +429,7 @@ export function printServiceJob(
 
   const expires =
     typeof job.expiresAt === "number" && job.expiresAt > 0
-      ? `${new Date(job.expiresAt).toISOString()}  (${relativeTime(
-          job.expiresAt
-        )})`
+      ? `${formatExpiry(job.expiresAt)}  (${relativeTime(job.expiresAt)})`
       : "n/a";
   console.log(`  created: ${job.dateCreated}   expires: ${expires}`);
 

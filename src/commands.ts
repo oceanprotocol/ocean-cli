@@ -55,6 +55,7 @@ import {
   verifyServiceEscrow,
   pollServiceStatus,
   printServiceJob,
+  formatExpiry,
   statusLabel,
   isTerminal,
 } from "./serviceHelpers.js";
@@ -1872,9 +1873,7 @@ export class Commands {
       // 6. Report
       console.log(chalk.green(`Service ${serviceId} extended.`));
       console.log(
-        `  expiry: ${new Date(oldExpiry).toISOString()} → ${new Date(
-          newJob.expiresAt
-        ).toISOString()}`
+        `  expiry: ${formatExpiry(oldExpiry)} → ${formatExpiry(newJob.expiresAt)}`
       );
       console.log(`  extendPayments: ${newJob.extendPayments?.length ?? 0}`);
       return newJob;

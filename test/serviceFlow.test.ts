@@ -41,7 +41,7 @@ describe("Ocean CLI Service-on-Demand", function () {
     const data = JSON.parse(
       fs.readFileSync(
         process.env.ADDRESS_FILE ||
-          `${homedir}/.ocean/ocean-contracts/artifacts/address.json`,
+          `${homedir()}/.ocean/ocean-contracts/artifacts/address.json`,
         "utf8"
       )
     );
@@ -67,7 +67,7 @@ describe("Ocean CLI Service-on-Demand", function () {
     process.env.NODE_URL = process.env.NODE_URL || "http://localhost:8001";
     process.env.ADDRESS_FILE =
       process.env.ADDRESS_FILE ||
-      `${homedir}/.ocean/ocean-contracts/artifacts/address.json`;
+      `${homedir()}/.ocean/ocean-contracts/artifacts/address.json`;
     oceanToken = getAddresses().Ocean;
   });
 

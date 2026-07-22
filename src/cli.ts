@@ -1,11 +1,47 @@
 import { Command } from "commander";
 import { Commands } from "./commands.js";
 import { JsonRpcProvider, Signer, ethers } from "ethers";
+import fs from "fs";
 import chalk from "chalk";
 import { stdin as input, stdout } from "node:process";
 import { createInterface } from "readline/promises";
-import { unitsToAmount, ProviderInstance, isP2pUri } from "@oceanprotocol/lib";
+import {
+  unitsToAmount,
+  ProviderInstance,
+  isP2pUri,
+  ServiceStatusNumber,
+} from "@oceanprotocol/lib";
 import { toBoolean } from "./helpers.js";
+
+// Parse a CLI JSON array-of-strings option (e.g. --cmd '["python","app.py"]').
+// Returns the array, or throws with a clear message for the action to surface.
+function parseJsonStringArray(name: string, value: string): string[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    throw new Error(`${name} must be a JSON array, e.g. '["a","b"]'`);
+  }
+  if (!Array.isArray(parsed) || !parsed.every((x) => typeof x === "string")) {
+    throw new Error(`${name} must be a JSON array of strings`);
+  }
+  return parsed as string[];
+}
+
+// Parse a comma-separated port list, validating each is an integer 1-65535.
+function parsePorts(value: string): number[] {
+  return value
+    .split(",")
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map((p) => {
+      const n = parseInt(p, 10);
+      if (!Number.isInteger(n) || n < 1 || n > 65535) {
+        throw new Error(`Invalid port "${p}" (must be an integer 1-65535)`);
+      }
+      return n;
+    });
+}
 
 async function initializeSigner() {
   const provider = new JsonRpcProvider(process.env.RPC);
@@ -559,6 +595,296 @@ export async function createCLI() {
         resultIndex,
         destinationFolder,
       ]);
+    });
+
+  // =========================================================================
+  // Service-on-Demand commands
+  // =========================================================================
+
+  // getServiceTemplates command
+  program
+    .command("getServiceTemplates")
+    .alias("serviceTemplates")
+    .description(
+      "Lists the node's Service-on-Demand templates and compatible environments"
+    )
+    .argument(
+      "[node]",
+      "Optional Ocean Node URL or peer id to query (defaults to NODE_URL)"
+    )
+    .option("-n, --node <node>", "Ocean Node URL or peer id to query")
+    .action(async (node, options) => {
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
+      await commands.getServiceTemplates(options.node || node);
+    });
+
+  // startService command
+  program
+    .command("startService")
+    .description(
+      "Starts an on-demand service (long-running container) on a compute environment, paid via escrow"
+    )
+    .argument("<computeEnvId>", "Compute environment ID (must have services enabled)")
+    .argument("<duration>", "Requested duration in seconds", parseInt)
+    .argument("<paymentToken>", "Payment token address")
+    .option("--template <templateId>", "Start from an operator-published template")
+    .option("-i, --image <image>", "Container image (alternative to --template)")
+    .option("--tag <tag>", "Image tag (mutually exclusive with --checksum/--dockerfile)")
+    .option("--checksum <sha256>", "Image digest, e.g. sha256:<64 hex>")
+    .option("--dockerfile <path>", "Path to a local Dockerfile (node must allow image builds)")
+    .option(
+      "--additional-docker-files <path>",
+      "Path to JSON file of {filename: content} used with --dockerfile"
+    )
+    .option("--cmd <json>", 'Docker CMD override as JSON array, e.g. \'["python","app.py"]\'')
+    .option("--entrypoint <json>", "Docker ENTRYPOINT override as JSON array")
+    .option("-p, --ports <ports>", "Comma-separated container ports to expose, e.g. 8888,8080")
+    .option(
+      "-r, --resources <resources>",
+      'Stringified JSON [{"id":"cpu","amount":1},...]; defaults to template requirements'
+    )
+    .option(
+      "-u, --user-data <json>",
+      "JSON object of container env vars (encrypted to the node; never logged)"
+    )
+    .option("--user-data-file <path>", "Path to JSON file with container env vars")
+    .option("--accept [boolean]", "Auto-confirm payment (true/false)", toBoolean)
+    .option("--wait [boolean]", "Poll until Running or failure (default true)", toBoolean, true)
+    .option("--timeout <seconds>", "Max seconds to wait for Running (default 600)", parseInt)
+    .action(async (computeEnvId, duration, paymentToken, options) => {
+      const envId = options.env || computeEnvId;
+      const token = paymentToken;
+      if (!envId || !duration || !token) {
+        console.error(chalk.red("Missing required arguments: <computeEnvId> <duration> <paymentToken>"));
+        return;
+      }
+      if (!Number.isInteger(duration) || duration <= 0) {
+        console.error(chalk.red("Duration must be a positive integer number of seconds."));
+        return;
+      }
+      if (options.template && options.image) {
+        console.error(chalk.red("Provide either --template or --image, not both."));
+        return;
+      }
+
+      let ports: number[] | undefined;
+      let cmd: string[] | undefined;
+      let entrypoint: string[] | undefined;
+      try {
+        if (options.ports) ports = parsePorts(options.ports);
+        if (options.cmd) cmd = parseJsonStringArray("--cmd", options.cmd);
+        if (options.entrypoint)
+          entrypoint = parseJsonStringArray("--entrypoint", options.entrypoint);
+      } catch (e) {
+        console.error(chalk.red((e as Error).message));
+        return;
+      }
+
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
+      await commands.startService({
+        envId,
+        duration,
+        paymentToken: token,
+        templateId: options.template,
+        image: options.image,
+        tag: options.tag,
+        checksum: options.checksum,
+        dockerfilePath: options.dockerfile,
+        additionalDockerFilesPath: options.additionalDockerFiles,
+        cmd,
+        entrypoint,
+        ports,
+        resources: options.resources,
+        userDataInline: options.userData,
+        userDataFilePath: options.userDataFile,
+        accept: options.accept,
+        wait: options.wait,
+        timeout: options.timeout,
+      });
+    });
+
+  // getServiceStatus command (caller-owned, full detail)
+  program
+    .command("getServiceStatus")
+    .alias("myServices")
+    .description("Shows status + endpoints of YOUR on-demand service(s)")
+    .argument("[serviceId]", "Service ID; omit to list all your services")
+    .option("-s, --service <serviceId>", "Service ID")
+    .option("-v, --verbose [boolean]", "Dump full job objects", toBoolean)
+    .action(async (serviceId, options) => {
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
+      await commands.getServiceStatus(options.service || serviceId, options.verbose);
+    });
+
+  // getServices command (SERVICES_LIST — node-wide, all owners)
+  program
+    .command("getServices")
+    .alias("listServices")
+    .description(
+      "Lists on-demand services across ALL owners on the node (docker spec hidden)"
+    )
+    .argument(
+      "[node]",
+      "Optional Ocean Node URL or peer id to query (defaults to NODE_URL)"
+    )
+    .option("-n, --node <node>", "Ocean Node URL or peer id to query")
+    .option(
+      "--status <status>",
+      "Filter by a single service status number (e.g. 40 for Running)",
+      parseInt
+    )
+    .option("--include-all [boolean]", "Include all statuses, not just active reservations", toBoolean)
+    .option("--from <timestamp>", "Only services created at/after this time (ISO string or Unix timestamp)")
+    .option("-v, --verbose [boolean]", "Dump full job objects", toBoolean)
+    .action(async (node, options) => {
+      if (
+        options.status !== undefined &&
+        ServiceStatusNumber[options.status] === undefined
+      ) {
+        console.error(
+          chalk.red(
+            `Unknown --status ${options.status}. Valid values: 10,11,12,13,14,15,20,30,40,50,70,75,99`
+          )
+        );
+        return;
+      }
+      const filters: {
+        status?: number;
+        includeAllStatuses?: boolean;
+        fromTimestamp?: string;
+      } = {};
+      if (options.status !== undefined) filters.status = options.status;
+      if (options.includeAll !== undefined)
+        filters.includeAllStatuses = options.includeAll;
+      if (options.from !== undefined) filters.fromTimestamp = options.from;
+
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
+      await commands.getServices(options.node || node, filters, options.verbose);
+    });
+
+  // serviceLogs command (streamable logs)
+  program
+    .command("serviceLogs")
+    .alias("computeServiceLogs")
+    .description("Streams live logs from an on-demand service's container")
+    .argument("<serviceId>", "Service ID")
+    .option("-s, --service <serviceId>", "Service ID")
+    .option(
+      "--since <since>",
+      "Only logs since this time — Unix seconds or a relative duration like 30s / 2h"
+    )
+    .action(async (serviceId, options) => {
+      const id = options.service || serviceId;
+      if (!id) {
+        console.error(chalk.red("Missing required argument: <serviceId>"));
+        return;
+      }
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
+      await commands.serviceLogs(id, options.since);
+    });
+
+  // extendService command
+  program
+    .command("extendService")
+    .description("Extends a running on-demand service's expiry (paid via escrow)")
+    .argument("<serviceId>", "Service ID")
+    .argument("<additionalDuration>", "Additional duration in seconds", parseInt)
+    .argument("[paymentToken]", "Payment token (defaults to the token used at start)")
+    .option("-s, --service <serviceId>", "Service ID")
+    .option("--duration <additionalDuration>", "Additional duration in seconds", parseInt)
+    .option("-t, --token [paymentToken]", "Payment token")
+    .option("--accept [boolean]", "Auto-confirm payment (true/false)", toBoolean)
+    .action(async (serviceId, additionalDuration, paymentToken, options) => {
+      const id = options.service || serviceId;
+      const addl = options.duration || additionalDuration;
+      const token = options.token || paymentToken;
+      if (!id || !addl) {
+        console.error(chalk.red("Missing required arguments: <serviceId> <additionalDuration>"));
+        return;
+      }
+      if (!Number.isInteger(addl) || addl <= 0) {
+        console.error(chalk.red("additionalDuration must be a positive integer number of seconds."));
+        return;
+      }
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
+      await commands.extendService(id, addl, token, options.accept);
+    });
+
+  // restartService command
+  program
+    .command("restartService")
+    .description(
+      "Recreates the container of a running service (same ports & expiry; no extra charge)"
+    )
+    .argument("<serviceId>", "Service ID")
+    .option("-u, --user-data <json>", "REPLACE stored container env vars (JSON object)")
+    .option("--user-data-file <path>", "Path to JSON file with replacement env vars")
+    .option("--cmd <json>", "REPLACE stored Docker CMD as JSON array (#2114); empty array clears it")
+    .option("--entrypoint <json>", "REPLACE stored Docker ENTRYPOINT as JSON array (#2114)")
+    .option("--wait [boolean]", "Poll until Running (default true)", toBoolean, true)
+    .option("--timeout <seconds>", "Max seconds to wait (default 600)", parseInt)
+    .action(async (serviceId, options) => {
+      if (!serviceId) {
+        console.error(chalk.red("Missing required argument: <serviceId>"));
+        return;
+      }
+      let userData: Record<string, unknown> | undefined;
+      let cmd: string[] | undefined;
+      let entrypoint: string[] | undefined;
+      try {
+        if (options.userData) {
+          const parsed = JSON.parse(options.userData);
+          if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+            throw new Error("--user-data must be a JSON object");
+          }
+          userData = parsed;
+        } else if (options.userDataFile) {
+          const parsed = JSON.parse(fs.readFileSync(options.userDataFile, "utf8"));
+          if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+            throw new Error("--user-data-file must contain a JSON object");
+          }
+          userData = parsed;
+        }
+        if (options.cmd !== undefined) cmd = parseJsonStringArray("--cmd", options.cmd);
+        if (options.entrypoint !== undefined)
+          entrypoint = parseJsonStringArray("--entrypoint", options.entrypoint);
+      } catch (e) {
+        console.error(chalk.red((e as Error).message));
+        return;
+      }
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
+      await commands.restartService(
+        serviceId,
+        userData,
+        cmd,
+        entrypoint,
+        options.wait,
+        options.timeout
+      );
+    });
+
+  // stopService command
+  program
+    .command("stopService")
+    .description("Stops an on-demand service and releases its resources")
+    .argument("<serviceId>", "Service ID")
+    .option("-s, --service <serviceId>", "Service ID")
+    .action(async (serviceId, options) => {
+      const id = options.service || serviceId;
+      if (!id) {
+        console.error(chalk.red("Missing required argument: <serviceId>"));
+        return;
+      }
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
+      await commands.stopService(id);
     });
 
   // mintOcean command

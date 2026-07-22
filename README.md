@@ -14,6 +14,7 @@ With the Ocean CLI tool you can:
 - **Edit** existing assets.
 - **Consume** data services, ordering datatokens and downloading data.
 - **Compute to data** on public available datasets using a published algorithm.
+- **Run on-demand services**: launch long-running containers (JupyterLab, inference servers, …) on compute environments, paid via escrow.
 - **Manage access control** with access lists for restricting dataset/algorithm access.
 - **Handle escrow payments** for compute jobs with deposit, withdrawal, and authorization.
 - **Manage authentication** with token generation and invalidation.
@@ -307,6 +308,71 @@ Instead of a DID, you can pass a full `ComputeAsset` (datasets) or `ComputeAlgor
 
 ---
 
+### Service-on-Demand (long-running containers)
+
+Launch a long-running container (JupyterLab, an inference server, nginx, …) on a
+compute environment. Unlike a compute job — which runs an algorithm to completion
+and exits — an on-demand service stays up until it **expires**, is **stopped**, or
+is **extended**, and is reachable through a forwarded port (`http://<nodeHost>:<hostPort>`).
+
+Full happy path:
+
+```bash
+# 1. Inspect the node's templates and which environments can run them
+npm run cli getServiceTemplates
+
+# 2. Fund escrow and authorize the environment's consumer address as payee
+#    (maxLockSeconds must be at least duration + 3600)
+npm run cli depositEscrow 0x<token> 100
+npm run cli authorizeEscrow 0x<token> 0x<envConsumerAddress> 100 90000 100
+
+# 3a. Start from an operator template
+npm run cli -- startService <envId> 3600 0x<token> --template jupyter-cpu \
+  --user-data '{"JUPYTER_TOKEN":"secret"}'
+
+# 3b. …or bring your own image (pass the tag via --tag, NOT inside --image)
+npm run cli -- startService <envId> 3600 0x<token> \
+  --image nginxinc/nginx-unprivileged --tag alpine --ports 8080
+
+# 4. Inspect / manage
+npm run cli getServiceStatus <serviceId>          # YOUR services, full detail
+npm run cli -- getServices --status 40            # ALL owners' running services on the node (SERVICES_LIST)
+npm run cli -- serviceLogs <serviceId> --since 10m
+npm run cli -- extendService <serviceId> 1800 --accept true
+npm run cli -- restartService <serviceId> --cmd '["python","app.py"]'   # optional cmd/entrypoint override
+npm run cli stopService <serviceId>
+```
+
+Notes:
+
+- **Duration is in seconds.** The CLI prints an **estimated** cost for the payment
+  prompt; the **authoritative** cost is computed by the node and shown as
+  `Node-computed cost:` right after start.
+- **Start is asynchronous.** `startService` returns immediately with a `serviceId`
+  in status `Starting (10)`; the CLI then polls until `Running (40)` (unless
+  `--wait false`) and prints the endpoint URL. If polling is interrupted, resume
+  with `getServiceStatus <serviceId>`.
+- **Escrow must be funded and authorized before start.** Escrow shortfalls do not
+  fail the HTTP call — they surface as the job ending in `Error`/`*Failed` — so the
+  CLI pre-verifies funds/authorization client-side and aborts early with the exact
+  remediation commands.
+- **Image spec:** provide at most one of `--tag`, `--checksum`, `--dockerfile`, and
+  keep the tag in `--tag` (an image reference that already contains a tag makes the
+  node build an invalid `image:tag:latest` reference).
+- **Ports:** containers run with `CapDrop ALL` and cannot bind ports below 1024 —
+  services must listen on a high container port (e.g. 8080).
+- **`--user-data`** is a plain JSON object of container env vars; ocean.js encrypts
+  it to the node's key. The CLI **never logs its values** (keys only).
+- **`getServiceStatus` vs `getServices`:** `getServiceStatus` shows *your* services
+  with full detail; `getServices` (alias `listServices`, the SERVICES_LIST command)
+  lists services across *all* owners on the node, with the docker image spec
+  stripped, and supports `--status` / `--include-all` / `--from` filters.
+- **`restartService --cmd/--entrypoint`** replace the stored command/entrypoint on
+  the recreated container (an empty array clears them); omit to reuse the stored
+  configuration.
+
+---
+
 **Mint Ocean:**
 
 - **Positional:**  
@@ -580,6 +646,57 @@ Instead of a DID, you can pass a full `ComputeAsset` (datasets) or `ComputeAlgor
   `-j, --job <jobId>`  
   `-i, --index <index>`  
   `-f, --folder [destinationFolder]`
+
+- **getServiceTemplates:** (alias `serviceTemplates`)  
+  `[node]` (Optional positional. Ocean Node URL or peer id to query; defaults to `NODE_URL`)  
+  `-n, --node <node>` (Optional. Same as the positional)
+
+- **startService:**  
+  `<computeEnvId>` `<duration>` (seconds) `<paymentToken>` (required positionals)  
+  `--template <templateId>` (Start from an operator-published template)  
+  `-i, --image <image>` (Container image — alternative to `--template`; keep the tag in `--tag`)  
+  `--tag <tag>` / `--checksum <sha256>` / `--dockerfile <path>` (image spec — provide at most one)  
+  `--additional-docker-files <path>` (JSON file of `{filename: content}`, used with `--dockerfile`)  
+  `--cmd <json>` / `--entrypoint <json>` (Docker CMD/ENTRYPOINT override as JSON arrays)  
+  `-p, --ports <ports>` (Comma-separated container ports, e.g. `8888,8080`)  
+  `-r, --resources <resources>` (Stringified JSON `[{"id":"cpu","amount":1},…]`; defaults to template requirements)  
+  `-u, --user-data <json>` / `--user-data-file <path>` (Container env vars; encrypted to the node, never logged)  
+  `--accept [boolean]` (Auto-confirm payment)  
+  `--wait [boolean]` (Poll until Running/failure; default `true`)  
+  `--timeout <seconds>` (Max seconds to wait for Running; default 600)
+
+- **getServiceStatus:** (alias `myServices`)  
+  `[serviceId]` (Optional; omit to list all your services)  
+  `-s, --service <serviceId>`  
+  `-v, --verbose [boolean]` (Dump full job objects)
+
+- **getServices:** (alias `listServices` — the SERVICES_LIST command, all owners)  
+  `[node]` / `-n, --node <node>` (Optional Ocean Node URL or peer id; defaults to `NODE_URL`)  
+  `--status <status>` (Filter by a single status number, e.g. `40` for Running)  
+  `--include-all [boolean]` (Include all statuses, not just active reservations)  
+  `--from <timestamp>` (Only services created at/after this ISO string or Unix timestamp)  
+  `-v, --verbose [boolean]` (Dump full job objects)
+
+- **serviceLogs:** (alias `computeServiceLogs`)  
+  `<serviceId>` / `-s, --service <serviceId>`  
+  `--since <since>` (Unix seconds or a relative duration like `30s` / `2h`)
+
+- **extendService:**  
+  `<serviceId>` `<additionalDuration>` (seconds) `[paymentToken]`  
+  `-s, --service <serviceId>`  
+  `--duration <additionalDuration>`  
+  `-t, --token [paymentToken]` (defaults to the token used at start)  
+  `--accept [boolean]` (Auto-confirm payment)
+
+- **restartService:**  
+  `<serviceId>`  
+  `-u, --user-data <json>` / `--user-data-file <path>` (REPLACE stored env vars)  
+  `--cmd <json>` / `--entrypoint <json>` (REPLACE stored Docker CMD/ENTRYPOINT; empty array clears)  
+  `--wait [boolean]` (Poll until Running; default `true`)  
+  `--timeout <seconds>` (Max seconds to wait; default 600)
+
+- **stopService:**  
+  `<serviceId>` / `-s, --service <serviceId>`
 
 - **mintOcean:**  
   No options/arguments required.

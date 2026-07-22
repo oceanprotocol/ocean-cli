@@ -30,13 +30,34 @@ import {
   getTokenDecimals,
   AccesslistFactory,
   AccessListContract,
+  ComputeResourceRequest,
+  ServiceJob,
+  ServiceJobListed,
+  ServiceStartParams,
+  ServiceStatusNumber,
+  ServiceTemplatePublic,
 } from "@oceanprotocol/lib";
 import { Asset, DDOManager } from '@oceanprotocol/ddo-js';
 import { Signer, ethers, getAddress } from "ethers";
+import { stdin as input, stdout as output } from "node:process";
+import { createInterface } from "readline/promises";
 import { interactiveFlow } from "./interactiveFlow.js";
 import { publishAsset } from "./publishAsset.js";
 import chalk from 'chalk';
 import { getPolicyServerOBJ, getPolicyServerOBJs, isVersionGte } from "./policyServerHelper.js";
+import {
+  findServiceEnvironments,
+  templateMismatchReason,
+  resolveServiceResources,
+  estimateServiceCost,
+  parseUserData,
+  describeUserDataKeys,
+  verifyServiceEscrow,
+  pollServiceStatus,
+  printServiceJob,
+  statusLabel,
+  isTerminal,
+} from "./serviceHelpers.js";
 
 const UPLOAD_TIMEOUT_MS = 30 * 60_000;
 
@@ -1179,6 +1200,783 @@ export class Commands {
     }
     console.log("Streamable Logs:");
     console.log(text);
+  }
+
+  // =========================================================================
+  // Service-on-Demand (long-running containers on a compute environment)
+  // =========================================================================
+
+  // Interactive payment confirmation, mirroring the startCompute prompt.
+  // Returns true to proceed, false to abort. REPL-safe (no process.exit).
+  private async confirmServicePayment(
+    costHuman: number,
+    token: string,
+    durationSeconds: number,
+    accept?: boolean
+  ): Promise<boolean> {
+    console.log(
+      chalk.yellow(
+        `\n--- Payment Details ---\n` +
+          `  estimated cost: ${costHuman} (token ${token})\n` +
+          `  duration: ${durationSeconds}s\n` +
+          `  Note: the final cost is computed by the node and shown after start.`
+      )
+    );
+    if (accept) {
+      console.log(chalk.cyan("Auto-confirm enabled with --accept."));
+      return true;
+    }
+    if (!process.stdin.isTTY) {
+      console.error(
+        chalk.red(
+          'Cannot prompt for confirmation (non-TTY). Use "--accept true" to skip.'
+        )
+      );
+      return false;
+    }
+    const rl = createInterface({ input, output });
+    const confirmation = await rl.question(
+      `\nProceed with payment of estimated ${costHuman} ${token} for ${durationSeconds}s? (y/n): `
+    );
+    rl.close();
+    const answer = confirmation.trim().toLowerCase();
+    if (answer !== "y" && answer !== "yes") {
+      console.log(chalk.red("Service start canceled by user."));
+      return false;
+    }
+    return true;
+  }
+
+  public async getServiceTemplates(nodeUrlOverride?: string): Promise<void> {
+    const nodeUrl = nodeUrlOverride || this.oceanNodeUrl;
+    try {
+      const templates = await ProviderInstance.getServiceTemplates(nodeUrl);
+      if (!templates || templates.length < 1) {
+        console.log(
+          chalk.yellow("Node has no Service-on-Demand templates configured.")
+        );
+        return;
+      }
+
+      let envs = [];
+      try {
+        envs = await ProviderInstance.getComputeEnvironments(nodeUrl);
+      } catch {
+        envs = [];
+      }
+
+      for (const t of templates) {
+        const imageSpec = t.tag
+          ? `${t.image}:${t.tag}`
+          : t.checksum
+          ? `${t.image}@${t.checksum}`
+          : t.dockerfile
+          ? `${t.image} (dockerfile)`
+          : t.image;
+        console.log(`\n${chalk.bold(t.id)}${t.name ? ` — ${t.name}` : ""}`);
+        if (t.description) console.log(`  ${t.description}`);
+        console.log(`  image: ${imageSpec}`);
+        console.log(`  exposedPorts: ${JSON.stringify(t.exposedPorts ?? [])}`);
+        if (t.userConfigurableEnvVars?.length) {
+          console.log("  userConfigurableEnvVars:");
+          for (const v of t.userConfigurableEnvVars) {
+            console.log(
+              `    - ${v.key}${v.sensitive ? " (sensitive)" : ""}${
+                v.validation ? ` [validation: ${v.validation}]` : ""
+              }`
+            );
+          }
+        }
+        if (t.requiredResources?.length) {
+          console.log(
+            `  requiredResources: ${JSON.stringify(t.requiredResources)}`
+          );
+        }
+        if (t.recommendedResources?.length) {
+          console.log(
+            `  recommendedResources: ${JSON.stringify(t.recommendedResources)}`
+          );
+        }
+        const compatible = findServiceEnvironments(envs, t).map((e) => e.id);
+        if (compatible.length) {
+          console.log(`  compatible environments: ${compatible.join(", ")}`);
+        } else {
+          console.log(
+            chalk.red(
+              "  compatible environments: none — insufficient free resources or services disabled"
+            )
+          );
+        }
+      }
+
+      // Stable, machine-parseable line (mirrors getComputeEnvironments).
+      console.log("Service templates: " + JSON.stringify(templates));
+    } catch (error) {
+      console.error(chalk.red("Error fetching service templates:"), error);
+    }
+  }
+
+  public async startService(opts: {
+    envId: string;
+    duration: number;
+    paymentToken: string;
+    templateId?: string;
+    image?: string;
+    tag?: string;
+    checksum?: string;
+    dockerfilePath?: string;
+    additionalDockerFilesPath?: string;
+    cmd?: string[];
+    entrypoint?: string[];
+    ports?: number[];
+    resources?: string;
+    userDataInline?: string;
+    userDataFilePath?: string;
+    accept?: boolean;
+    wait?: boolean;
+    timeout?: number;
+  }): Promise<ServiceJob | undefined> {
+    try {
+      const { chainId } = await this.signer.provider.getNetwork();
+      const chainIdNum = Number(chainId);
+
+      // 1. Resolve env
+      const envs = await ProviderInstance.getComputeEnvironments(
+        this.oceanNodeUrl
+      );
+      if (!envs || envs.length < 1) {
+        console.error(chalk.red("No compute environments available."));
+        return;
+      }
+      const env = envs.find((e) => e.id === opts.envId);
+      if (!env) {
+        console.error(
+          chalk.red(`No compute environment matches id: ${opts.envId}`)
+        );
+        return;
+      }
+      if (env.features?.services === false) {
+        console.error(
+          chalk.red(`Environment ${env.id} has services disabled.`)
+        );
+        return;
+      }
+
+      // 2. Resolve container spec (template and/or explicit flags)
+      let template: ServiceTemplatePublic | undefined;
+      let image: string | undefined;
+      let tag: string | undefined;
+      let checksum: string | undefined;
+      let dockerfile: string | undefined;
+      let additionalDockerFiles: Record<string, string> | undefined;
+      let exposedPorts: number[] | undefined;
+      let dockerCmd: string[] | undefined;
+      let dockerEntrypoint: string[] | undefined;
+
+      if (opts.templateId) {
+        const templates = await ProviderInstance.getServiceTemplates(
+          this.oceanNodeUrl
+        );
+        template = (templates ?? []).find((t) => t.id === opts.templateId);
+        if (!template) {
+          console.error(
+            chalk.red(`Template "${opts.templateId}" not found on the node.`)
+          );
+          return;
+        }
+        image = template.image;
+        tag = template.tag;
+        checksum = template.checksum;
+        dockerfile = template.dockerfile;
+        additionalDockerFiles = template.additionalDockerFiles;
+        exposedPorts = template.exposedPorts;
+        // NOTE the field rename: template.command -> dockerCmd, .entrypoint -> dockerEntrypoint
+        dockerCmd = template.command;
+        dockerEntrypoint = template.entrypoint;
+
+        const reason = templateMismatchReason(env, template);
+        if (reason) {
+          console.error(
+            chalk.red(
+              `Environment ${env.id} does not satisfy template "${template.id}": ${reason}`
+            )
+          );
+          return;
+        }
+      }
+
+      // Explicit flags override template values.
+      image = opts.image || image;
+      if (!image) {
+        console.error(
+          chalk.red("An image is required: pass --template <id> or --image <image>.")
+        );
+        return;
+      }
+      if (opts.tag !== undefined) tag = opts.tag;
+      if (opts.checksum !== undefined) checksum = opts.checksum;
+      if (opts.dockerfilePath) {
+        try {
+          dockerfile = fs.readFileSync(opts.dockerfilePath, "utf8");
+        } catch (e) {
+          console.error(
+            chalk.red(`Cannot read Dockerfile at ${opts.dockerfilePath}`),
+            e
+          );
+          return;
+        }
+      }
+      if (opts.additionalDockerFilesPath) {
+        try {
+          additionalDockerFiles = JSON.parse(
+            fs.readFileSync(opts.additionalDockerFilesPath, "utf8")
+          );
+        } catch (e) {
+          console.error(
+            chalk.red(
+              `Cannot read additional docker files JSON at ${opts.additionalDockerFilesPath}`
+            ),
+            e
+          );
+          return;
+        }
+      }
+
+      const specCount = [tag, checksum, dockerfile].filter(Boolean).length;
+      if (specCount > 1) {
+        console.error(
+          chalk.red(
+            "Provide at most one of --tag, --checksum or --dockerfile."
+          )
+        );
+        return;
+      }
+
+      if (opts.ports) exposedPorts = opts.ports;
+      if (opts.cmd) dockerCmd = opts.cmd;
+      if (opts.entrypoint) dockerEntrypoint = opts.entrypoint;
+
+      // 3. Resolve resources
+      let resources: ComputeResourceRequest[];
+      if (opts.resources) {
+        try {
+          const parsed = JSON.parse(opts.resources);
+          if (
+            !Array.isArray(parsed) ||
+            !parsed.every(
+              (r) =>
+                r &&
+                typeof r.id === "string" &&
+                typeof r.amount === "number"
+            )
+          ) {
+            throw new Error("must be an array of {id, amount}");
+          }
+          resources = parsed;
+        } catch (e) {
+          console.error(
+            chalk.red(`Invalid --resources JSON: ${(e as Error).message}`)
+          );
+          return;
+        }
+      } else {
+        resources = resolveServiceResources(template, env);
+      }
+      console.log(`Requested resources: ${JSON.stringify(resources)}`);
+
+      // 4. Duration
+      if (!Number.isInteger(opts.duration) || opts.duration <= 0) {
+        console.error(
+          chalk.red("Duration must be a positive integer number of seconds.")
+        );
+        return;
+      }
+      if (opts.duration > 86400) {
+        console.log(
+          chalk.yellow(
+            `Warning: duration ${opts.duration}s exceeds the node's typical maxDurationSeconds (86400) — the node may clamp or reject it.`
+          )
+        );
+      }
+
+      // 5. userData (never logged — keys only)
+      let userDataFromFile: Record<string, unknown> | undefined;
+      if (opts.userDataFilePath) {
+        try {
+          userDataFromFile = JSON.parse(
+            fs.readFileSync(opts.userDataFilePath, "utf8")
+          );
+        } catch (e) {
+          console.error(
+            chalk.red(`Cannot read user-data file at ${opts.userDataFilePath}`),
+            e
+          );
+          return;
+        }
+      }
+      let userData: Record<string, unknown> | undefined;
+      try {
+        userData = parseUserData(
+          opts.userDataInline,
+          userDataFromFile,
+          template
+        );
+      } catch (e) {
+        console.error(chalk.red((e as Error).message));
+        return;
+      }
+      const userDataKeys = describeUserDataKeys(userData);
+      if (userDataKeys) console.log(`userData keys: ${userDataKeys}`);
+
+      // 6. Cost + escrow gate
+      const cost = estimateServiceCost(
+        env,
+        chainIdNum,
+        opts.paymentToken,
+        resources,
+        opts.duration
+      );
+      if (cost === null) {
+        console.error(
+          chalk.red(
+            `Environment ${env.id} has no pricing for token ${opts.paymentToken} on chain ${chainIdNum}.`
+          )
+        );
+        return;
+      }
+      const escrowOk = await verifyServiceEscrow(
+        this.signer,
+        chainIdNum,
+        opts.paymentToken,
+        env.consumerAddress,
+        cost,
+        opts.duration
+      );
+      if (!escrowOk) return;
+
+      // 7. Confirmation prompt
+      const proceed = await this.confirmServicePayment(
+        cost,
+        opts.paymentToken,
+        opts.duration,
+        opts.accept
+      );
+      if (!proceed) return;
+
+      // 8. Start (async on the node — returns immediately in status Starting)
+      const params: ServiceStartParams = {
+        environment: env.id,
+        image,
+        tag,
+        checksum,
+        dockerfile,
+        additionalDockerFiles,
+        dockerCmd,
+        dockerEntrypoint,
+        exposedPorts,
+        resources,
+        duration: opts.duration,
+        userData, // plain object; ocean.js encrypts it to the node
+        payment: { chainId: chainIdNum, token: opts.paymentToken },
+      };
+
+      const jobs = await ProviderInstance.serviceStart(
+        this.oceanNodeUrl,
+        this.signer,
+        params,
+        AbortSignal.timeout(120_000)
+      );
+      const job = jobs?.[0];
+      if (!job) {
+        console.error(chalk.red("Service start returned no job."), jobs);
+        return;
+      }
+
+      // Always print the id first — polling may die but the user needs it.
+      console.log(chalk.green(`Service started. ServiceID: ${job.serviceId}`));
+      if (job.payment?.cost !== undefined) {
+        console.log(`Node-computed cost: ${job.payment.cost}`);
+      }
+
+      // 9. Wait for Running (unless --wait false)
+      if (opts.wait === false) {
+        console.log(
+          `Check later with: npm run cli getServiceStatus ${job.serviceId}`
+        );
+        return job;
+      }
+
+      try {
+        const running = await pollServiceStatus(
+          this.oceanNodeUrl,
+          this.signer,
+          job.serviceId,
+          ServiceStatusNumber.Running,
+          (opts.timeout ?? 600) * 1000
+        );
+        printServiceJob(running);
+        return running;
+      } catch (e) {
+        console.error(chalk.red((e as Error).message));
+        console.log(
+          `Check later with: npm run cli getServiceStatus ${job.serviceId}`
+        );
+        return job;
+      }
+    } catch (error) {
+      console.error(chalk.red("Error starting service:"), error);
+    }
+  }
+
+  public async getServiceStatus(
+    serviceId?: string,
+    verbose?: boolean
+  ): Promise<ServiceJob[]> {
+    try {
+      const jobs = await ProviderInstance.getServiceStatus(
+        this.oceanNodeUrl,
+        this.signer,
+        serviceId
+      );
+      if (!jobs || jobs.length < 1) {
+        const who = await this.signer.getAddress();
+        console.log(
+          chalk.yellow(
+            `No services found for ${who}${
+              serviceId ? ` with id ${serviceId}` : ""
+            }`
+          )
+        );
+        return [];
+      }
+      for (const job of jobs) printServiceJob(job, { verbose });
+      return jobs;
+    } catch (error) {
+      console.error(chalk.red("Error fetching service status:"), error);
+      return [];
+    }
+  }
+
+  public async getServices(
+    nodeUrlOverride?: string,
+    filters?: {
+      status?: number;
+      includeAllStatuses?: boolean;
+      fromTimestamp?: string;
+    },
+    verbose?: boolean
+  ): Promise<ServiceJobListed[]> {
+    const nodeUrl = nodeUrlOverride || this.oceanNodeUrl;
+    try {
+      const jobs = await ProviderInstance.getServices(
+        nodeUrl,
+        this.signer,
+        filters as any
+      );
+      if (!jobs || jobs.length < 1) {
+        const filterDesc =
+          filters && Object.keys(filters).length
+            ? ` (filters: ${JSON.stringify(filters)})`
+            : "";
+        console.log(chalk.yellow(`No services found on ${nodeUrl}${filterDesc}`));
+        console.log("Services list: " + JSON.stringify(jobs ?? []));
+        return [];
+      }
+      for (const job of jobs) printServiceJob(job as ServiceJob, { verbose });
+      // Stable, machine-parseable line for tests/scripts.
+      console.log("Services list: " + JSON.stringify(jobs));
+      return jobs;
+    } catch (error) {
+      console.error(chalk.red("Error listing services:"), error);
+      return [];
+    }
+  }
+
+  public async serviceLogs(serviceId: string, since?: string): Promise<void> {
+    try {
+      const stream = await ProviderInstance.serviceGetStreamableLogs(
+        this.oceanNodeUrl,
+        this.signer,
+        serviceId,
+        since
+      );
+      if (!stream) {
+        console.log(
+          chalk.yellow(`No logs available for service ${serviceId}`)
+        );
+        return;
+      }
+      let text: string;
+      if (stream[Symbol.asyncIterator]) {
+        const chunks: Uint8Array[] = [];
+        for await (const chunk of stream) chunks.push(chunk);
+        text = Buffer.concat(chunks).toString("utf-8");
+      } else {
+        text = await new Response(stream).text();
+      }
+      console.log("Service Logs:");
+      console.log(text);
+    } catch (error) {
+      console.error(chalk.red("Error fetching service logs:"), error);
+    }
+  }
+
+  public async extendService(
+    serviceId: string,
+    additionalDuration: number,
+    paymentToken?: string,
+    accept?: boolean
+  ): Promise<ServiceJob | undefined> {
+    try {
+      if (!Number.isInteger(additionalDuration) || additionalDuration <= 0) {
+        console.error(
+          chalk.red("additionalDuration must be a positive integer (seconds).")
+        );
+        return;
+      }
+
+      // 1. Fetch the job
+      const jobs = await ProviderInstance.getServiceStatus(
+        this.oceanNodeUrl,
+        this.signer,
+        serviceId
+      );
+      const job = (jobs ?? []).find((j) => j.serviceId === serviceId);
+      if (!job) {
+        console.error(chalk.red(`Service ${serviceId} not found.`));
+        return;
+      }
+      if (isTerminal(job.status)) {
+        console.error(
+          chalk.red(
+            `Service ${serviceId} is ${statusLabel(
+              job.status,
+              job.statusText
+            )} (${job.status}) — nothing to extend.`
+          )
+        );
+        return;
+      }
+
+      const { chainId } = await this.signer.provider.getNetwork();
+      const chainIdNum = Number(chainId);
+      const token = paymentToken || job.payment?.token;
+      if (!token) {
+        console.error(
+          chalk.red(
+            "No payment token: pass one explicitly (the job has no stored token)."
+          )
+        );
+        return;
+      }
+      if (
+        job.payment?.chainId !== undefined &&
+        Number(job.payment.chainId) !== chainIdNum
+      ) {
+        console.log(
+          chalk.yellow(
+            `Warning: job was paid on chain ${job.payment.chainId} but the signer is on ${chainIdNum}; the environment must price on this chain.`
+          )
+        );
+      }
+
+      // Resolve the env once — we need its consumerAddress (escrow payee) and,
+      // as a fallback, its fee schedule for the cost estimate.
+      const envs = await ProviderInstance.getComputeEnvironments(
+        this.oceanNodeUrl
+      );
+      const env = (envs ?? []).find((e) => e.id === job.environment);
+      if (!env) {
+        console.error(
+          chalk.red(
+            `Environment ${job.environment} for this service was not found on the node.`
+          )
+        );
+        return;
+      }
+
+      // 2/3. Estimate cost: prefer the running job's priced resources when the
+      // token matches; otherwise fall back to the env fee schedule.
+      let cost: number | null = null;
+      const sameToken =
+        job.payment?.token &&
+        job.payment.token.toLowerCase() === token.toLowerCase();
+      const pricedResources =
+        Array.isArray(job.resources) &&
+        job.resources.length > 0 &&
+        job.resources.every((r) => typeof r?.price === "number");
+      if (sameToken && pricedResources) {
+        const minutes = Math.ceil(additionalDuration / 60);
+        cost = job.resources.reduce(
+          (sum: number, r: any) =>
+            sum + Number(r.price ?? 0) * Number(r.amount ?? 0) * minutes,
+          0
+        );
+      } else {
+        const resources = (job.resources ?? []).map((r: any) => ({
+          id: r.id,
+          amount: r.amount,
+        }));
+        cost = estimateServiceCost(
+          env,
+          chainIdNum,
+          token,
+          resources,
+          additionalDuration
+        );
+      }
+      if (cost === null) {
+        console.error(
+          chalk.red(
+            `Could not estimate extend cost for token ${token} on chain ${chainIdNum}.`
+          )
+        );
+        return;
+      }
+
+      const escrowOk = await verifyServiceEscrow(
+        this.signer,
+        chainIdNum,
+        token,
+        env.consumerAddress,
+        cost,
+        additionalDuration
+      );
+      if (!escrowOk) return;
+
+      // 4. Confirmation prompt
+      const proceed = await this.confirmServicePayment(
+        cost,
+        token,
+        additionalDuration,
+        accept
+      );
+      if (!proceed) return;
+
+      // 5. Extend
+      const oldExpiry = job.expiresAt;
+      const extended = await ProviderInstance.serviceExtend(
+        this.oceanNodeUrl,
+        this.signer,
+        serviceId,
+        additionalDuration,
+        { chainId: chainIdNum, token },
+        AbortSignal.timeout(120_000)
+      );
+      const newJob = extended?.[0];
+      if (!newJob) {
+        console.error(chalk.red("Extend returned no job."), extended);
+        return;
+      }
+
+      // 6. Report
+      console.log(chalk.green(`Service ${serviceId} extended.`));
+      console.log(
+        `  expiry: ${new Date(oldExpiry).toISOString()} → ${new Date(
+          newJob.expiresAt
+        ).toISOString()}`
+      );
+      console.log(`  extendPayments: ${newJob.extendPayments?.length ?? 0}`);
+      return newJob;
+    } catch (error) {
+      console.error(chalk.red("Error extending service:"), error);
+    }
+  }
+
+  public async restartService(
+    serviceId: string,
+    userData?: Record<string, unknown>,
+    dockerCmd?: string[],
+    dockerEntrypoint?: string[],
+    wait?: boolean,
+    timeout?: number
+  ): Promise<ServiceJob | undefined> {
+    try {
+      // 1. Fetch current job to learn the old containerId (poll for the new one)
+      const jobs = await ProviderInstance.getServiceStatus(
+        this.oceanNodeUrl,
+        this.signer,
+        serviceId
+      );
+      const job = (jobs ?? []).find((j) => j.serviceId === serviceId);
+      if (!job) {
+        console.error(chalk.red(`Service ${serviceId} not found.`));
+        return;
+      }
+      const oldContainerId = job.containerId;
+
+      // 2. Restart. dockerCmd/dockerEntrypoint sit BEFORE the signal (#2114).
+      const restarted = await ProviderInstance.serviceRestart(
+        this.oceanNodeUrl,
+        this.signer,
+        serviceId,
+        userData,
+        dockerCmd,
+        dockerEntrypoint,
+        AbortSignal.timeout(120_000)
+      );
+      const newJob = restarted?.[0];
+      if (!newJob) {
+        console.error(chalk.red("Restart returned no job."), restarted);
+        return;
+      }
+      console.log(chalk.green(`Service ${serviceId} restarting...`));
+
+      // 3. Wait for the NEW container to reach Running
+      if (wait === false) {
+        console.log(
+          `Check later with: npm run cli getServiceStatus ${serviceId}`
+        );
+        return newJob;
+      }
+      try {
+        const running = await pollServiceStatus(
+          this.oceanNodeUrl,
+          this.signer,
+          serviceId,
+          ServiceStatusNumber.Running,
+          (timeout ?? 600) * 1000,
+          oldContainerId
+        );
+        printServiceJob(running);
+        return running;
+      } catch (e) {
+        console.error(chalk.red((e as Error).message));
+        console.log(
+          `Check later with: npm run cli getServiceStatus ${serviceId}`
+        );
+        return newJob;
+      }
+    } catch (error) {
+      console.error(chalk.red("Error restarting service:"), error);
+    }
+  }
+
+  public async stopService(serviceId: string): Promise<ServiceJob | undefined> {
+    try {
+      const jobs = await ProviderInstance.serviceStop(
+        this.oceanNodeUrl,
+        this.signer,
+        serviceId,
+        AbortSignal.timeout(120_000)
+      );
+      const job = jobs?.[0];
+      if (!job) {
+        console.error(chalk.red("Stop returned no job."), jobs);
+        return;
+      }
+      console.log(
+        chalk.green(
+          `Service ${serviceId} stopped — status ${statusLabel(
+            job.status,
+            job.statusText
+          )} (${job.status})`
+        )
+      );
+      return job;
+    } catch (error) {
+      console.error(chalk.red("Error stopping service:"), error);
+    }
   }
 
   public async allowAlgo(args: string[]) {

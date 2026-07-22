@@ -232,12 +232,20 @@ export class Commands {
       this.config.chainId,
       this.config
     );
+    // Order the same service that policy retrieval and getDownloadUrl target.
+    const serviceIndex = services.findIndex((s) => s.id === serviceId);
     const tx = await orderAsset(
       dataDdo,
       this.signer,
       this.config,
       datatoken,
-      this.oceanNodeUrl
+      this.oceanNodeUrl,
+      undefined, // consumerAddress
+      undefined, // consumeMarketOrderFee
+      undefined, // providerFees
+      undefined, // consumeMarketFixedSwapFee
+      undefined, // datatokenIndex
+      serviceIndex < 0 ? 0 : serviceIndex
     );
 
     if (!tx) {
@@ -690,6 +698,15 @@ export class Commands {
       });
     }
 
+    // Resolve policy-server objects up front so a policy-resolution failure aborts
+    // before any paid orders are submitted below.
+    const policiesServer = await getPolicyServerOBJs(
+      assetsForPolicy,
+      assetAlgo,
+      this.signer,
+      this.oceanNodeUrl
+    );
+
     const providerInitializeComputeJob = args[4]; // provider fees + payment
     const parsedProviderInitializeComputeJob = fixAndParseProviderFees(
       providerInitializeComputeJob
@@ -895,13 +912,6 @@ export class Commands {
         return;
       }
     }
-    const policiesServer = await getPolicyServerOBJs(
-      assetsForPolicy,
-      assetAlgo,
-      this.signer,
-      this.oceanNodeUrl
-    );
-
     const computeJobs = await ProviderInstance.computeStart(
       providerURI,
       this.signer,
@@ -1243,6 +1253,9 @@ export class Commands {
       filesChecksum: filesChecksum?.[0]?.checksum,
 			serviceId: servicesAlgo[0].id,
     };
+		if (!services[0].compute.publisherTrustedAlgorithms) {
+			services[0].compute.publisherTrustedAlgorithms = [];
+		}
 		services[0].compute.publisherTrustedAlgorithms.push(trustedAlgorithm);
     try {
       const txid = await updateAssetMetadata(

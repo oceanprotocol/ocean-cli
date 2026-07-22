@@ -42,7 +42,7 @@ describe("Ocean CLI Setup", function() {
                 expect(stdout).to.contain("Starts a FREE compute job");
                 expect(stdout).to.contain("stopCompute [options] <datasetDid> <jobId> <agreementId>");
                 expect(stdout).to.contain("Stops a compute job");
-                expect(stdout).to.contain("getJobStatus [options] <datasetDid> <jobId> <agreementId>");
+                expect(stdout).to.contain("getJobStatus [options] <datasetDid> <jobId> [agreementId]");
                 expect(stdout).to.contain("Displays the compute job status");
                 expect(stdout).to.contain("downloadJobResults <jobId> <resultIndex> [destinationFolder]");
                 expect(stdout).to.contain("Downloads compute job results");

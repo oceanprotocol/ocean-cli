@@ -11,6 +11,7 @@ import {
   fixAndParseProviderFees,
   getConfigByChainId,
   resolveComputeInputs,
+  isOrderable,
 } from "./helpers.js";
 import {
   Aquarius,
@@ -30,11 +31,12 @@ import {
   AccesslistFactory,
   AccessListContract,
 } from "@oceanprotocol/lib";
-import { Asset } from "@oceanprotocol/ddo-js";
+import { Asset, DDOManager } from '@oceanprotocol/ddo-js';
 import { Signer, ethers, getAddress } from "ethers";
 import { interactiveFlow } from "./interactiveFlow.js";
 import { publishAsset } from "./publishAsset.js";
-import chalk from "chalk";
+import chalk from 'chalk';
+import { getPolicyServerOBJ, getPolicyServerOBJs, isVersionGte } from "./policyServerHelper.js";
 
 const UPLOAD_TIMEOUT_MS = 30 * 60_000;
 
@@ -82,12 +84,15 @@ export class Commands {
     }
     const encryptDDO = args[2] === "false" ? false : true;
     try {
+			const ddoInstance = DDOManager.getDDOClass(asset);
+			const { indexedMetadata } = ddoInstance.getAssetFields();
+			const { services } = ddoInstance.getDDOFields();
       // add some more checks
       const urlAssetId = await createAssetUtil(
-        asset.indexedMetadata.nft.name,
-        asset.indexedMetadata.nft.symbol,
+				indexedMetadata.nft.name,
+				indexedMetadata.nft.symbol,
         this.signer,
-        asset.services[0].files.files,
+				(services[0].files as any).files ?? services[0].files,
         asset,
         this.oceanNodeUrl,
         this.config,
@@ -114,11 +119,14 @@ export class Commands {
     const encryptDDO = args[2] === "false" ? false : true;
     // add some more checks
     try {
+			const ddoInstance = DDOManager.getDDOClass(algoAsset);
+			const { indexedMetadata } = ddoInstance.getAssetFields();
+			const { services } = ddoInstance.getDDOFields();
       const algoDid = await createAssetUtil(
-        algoAsset.indexedMetadata.nft.name,
-        algoAsset.indexedMetadata.nft.symbol,
+				indexedMetadata.nft.name,
+				indexedMetadata.nft.symbol,
         this.signer,
-        algoAsset.services[0].files.files,
+				(services[0].files as any).files ?? services[0].files,
         algoAsset,
         this.oceanNodeUrl,
         this.config,
@@ -193,8 +201,9 @@ export class Commands {
   }
 
   public async download(args: string[]) {
+		const did = args[1];
     const dataDdo = await this.aquarius.waitForIndexer(
-      args[1],
+			did,
       null,
       null,
       this.indexingParams.retryInterval,
@@ -202,28 +211,46 @@ export class Commands {
     );
     if (!dataDdo) {
       console.error(
-        "Error fetching DDO " + args[1] + ".  Does this asset exists?"
+				"Error fetching DDO " + did + ".  Does this asset exists?"
       );
       return;
     }
 
+		const ddoInstance = DDOManager.getDDOClass(dataDdo);
+		const { services, version } = ddoInstance.getDDOFields();
+		const serviceId = args[3] ? args[3] : services[0].id;
+		let policyServer = null
+		try {
+			if (isVersionGte(version, '5.0.0')) {
+				policyServer = await getPolicyServerOBJ(dataDdo, serviceId, this.signer, this.oceanNodeUrl);
+			}
+		} catch (error) {
+			throw new Error('Error getting Policy Server Object: ' + error.message)
+		}
     const datatoken = new Datatoken(
       this.signer,
       this.config.chainId,
       this.config
     );
-
+    // Order the same service that policy retrieval and getDownloadUrl target.
+    const serviceIndex = services.findIndex((s) => s.id === serviceId);
     const tx = await orderAsset(
       dataDdo,
       this.signer,
       this.config,
       datatoken,
-      this.oceanNodeUrl
+      this.oceanNodeUrl,
+      undefined, // consumerAddress
+      undefined, // consumeMarketOrderFee
+      undefined, // providerFees
+      undefined, // consumeMarketFixedSwapFee
+      undefined, // datatokenIndex
+      serviceIndex < 0 ? 0 : serviceIndex
     );
 
     if (!tx) {
       console.error(
-        "Error ordering access for " + args[1] + ".  Do you have enough tokens?"
+				"Error ordering access for " + did + ".  Do you have enough tokens?"
       );
       return;
     }
@@ -232,11 +259,12 @@ export class Commands {
 
     const downloadResult = await ProviderInstance.getDownloadUrl(
       dataDdo.id,
-      dataDdo.services[0].id,
+			serviceId,
       0,
       orderTx.hash,
       this.oceanNodeUrl,
-      this.signer
+			this.signer,
+			policyServer
     );
     try {
       const destPath = args[2] ? args[2] : ".";
@@ -263,7 +291,17 @@ export class Commands {
       this.oceanNodeUrl
     );
     if (!resolved) return;
-    const { assets, algo, providerURI } = resolved;
+    const { assets, algo, ddos, algoDdo } = resolved;
+    let { providerURI } = resolved;
+
+    // Optional per-dataset service selection (positional, 1-1 with datasets).
+    const inputServicesString = args[8];
+    let inputServices: string[] = [];
+    if (typeof inputServicesString === "string" && inputServicesString.trim().length > 0) {
+      inputServices = inputServicesString.split(",").map((s) => s.trim()).filter(Boolean);
+    } else if (Array.isArray(inputServicesString)) {
+      inputServices = (inputServicesString as string[]).map(String).map((s) => s.trim()).filter(Boolean);
+    }
 
     const computeEnvs = await ProviderInstance.getComputeEnvironments(
       this.oceanNodeUrl
@@ -280,7 +318,6 @@ export class Commands {
     // NO chainId needed anymore (is not part of ComputeEnvironment spec anymore)
     // const chainComputeEnvs = computeEnvs[computeEnvID]; // was algoDdo.chainId
     let computeEnv = null; // chainComputeEnvs[0];
-
     if (computeEnvID && computeEnvID.length > 1) {
       for (const index in computeEnvs) {
         if (computeEnvID == computeEnvs[index].id) {
@@ -295,6 +332,93 @@ export class Commands {
         computeEnvID
       );
       return;
+    }
+
+    // Optional algorithm service selection (only for DID-based algorithms).
+    let assetAlgo: {
+      documentId: string;
+      serviceId: string;
+      asset: Asset;
+      version?: string;
+    } | null = null;
+    if (algoDdo) {
+      const ddoAlgoInstance = DDOManager.getDDOClass(algoDdo);
+      const { services: servicesAlgo, version: versionAlgo } =
+        ddoAlgoInstance.getDDOFields();
+      const algoServiceIdInput = args[9] as string | undefined;
+      if (typeof algoServiceIdInput === "string" && algoServiceIdInput.trim().length > 0) {
+        const expectedAlgoServiceId = algoServiceIdInput.trim();
+        const matchAlgoSvc = servicesAlgo.find((s: any) => s.id === expectedAlgoServiceId);
+        if (!matchAlgoSvc) {
+          console.error(
+            `Algorithm Service ID "${expectedAlgoServiceId}" not found in algo DDO ${algoDdo.id}. ` +
+            "Provide a valid service.id from the algorithm asset or omit the argument to use the default (services[0])."
+          );
+          return;
+        }
+        algo.serviceId = expectedAlgoServiceId;
+      }
+      assetAlgo = {
+        documentId: algoDdo.id,
+        serviceId: algo.serviceId,
+        asset: algoDdo as Asset,
+        version: versionAlgo,
+      };
+    }
+
+    // Apply per-dataset service selection & orderability checks for DID-based
+    // datasets. Raw (fileObject) datasets keep their resolved entry untouched.
+    const assetsForPolicy: {
+      documentId: string;
+      serviceId: string;
+      asset: Asset;
+      version?: string;
+    }[] = [];
+    for (let i = 0; i < assets.length; i++) {
+      const dataDdo = ddos[i];
+      if (!dataDdo) continue;
+      const ddoInstanceDdo = DDOManager.getDDOClass(dataDdo);
+      const { services: servicesDdo, version: versionDdo } =
+        ddoInstanceDdo.getDDOFields();
+      let chosenServiceId = assets[i].serviceId || servicesDdo[0].id;
+      if (inputServices.length > 0) {
+        const expectedServiceId = inputServices[i];
+        if (expectedServiceId) {
+          const match = servicesDdo.find((s: any) => s.id === expectedServiceId);
+          if (!match) {
+            console.error(
+              `Service ID "${expectedServiceId}" not found in dataset ${dataDdo.id}. ` +
+              "Ensure serviceIds[i] exists in the corresponding dataset services."
+            );
+            return;
+          }
+          chosenServiceId = expectedServiceId;
+          if (i === 0 && match.serviceEndpoint) {
+            providerURI = match.serviceEndpoint;
+          }
+        }
+      } else if (i === 0 && servicesDdo[0]?.serviceEndpoint) {
+        providerURI = servicesDdo[0].serviceEndpoint;
+      }
+      assets[i].serviceId = chosenServiceId;
+      const canStartCompute = await isOrderable(
+        dataDdo,
+        chosenServiceId,
+        algo,
+        algoDdo as Asset
+      );
+      if (!canStartCompute) {
+        console.error(
+          "Error Cannot start compute job using the datasets DIDs & algorithm DID provided"
+        );
+        return;
+      }
+      assetsForPolicy.push({
+        documentId: dataDdo.id,
+        serviceId: chosenServiceId,
+        asset: dataDdo as Asset,
+        version: versionDdo,
+      });
     }
 
     const maxJobDuration = Number(args[4]);
@@ -376,6 +500,12 @@ export class Commands {
       );
       return;
     }
+    const policiesServer = await getPolicyServerOBJs(
+      assetsForPolicy,
+      assetAlgo,
+      this.signer,
+      this.oceanNodeUrl
+    );
     const parsedResources = JSON.parse(resources);
     const providerInitializeComputeJob =
       await ProviderInstance.initializeCompute(
@@ -387,7 +517,8 @@ export class Commands {
         providerURI,
         await this.signer.getAddress(),
         parsedResources,
-        Number(chainId)
+        Number(chainId),
+        policiesServer
       );
     if (
       !providerInitializeComputeJob ||
@@ -415,7 +546,17 @@ export class Commands {
       this.oceanNodeUrl
     );
     if (!resolved) return;
-    const { assets, algo, ddos, algoDdo, providerURI } = resolved;
+    const { assets, algo, ddos, algoDdo } = resolved;
+    let { providerURI } = resolved;
+
+    // Optional per-dataset service selection (positional, 1-1 with datasets).
+    const inputServicesString = args[9];
+    let inputServices: string[] = [];
+    if (typeof inputServicesString === "string" && inputServicesString.trim().length > 0) {
+      inputServices = inputServicesString.split(",").map((s) => s.trim()).filter(Boolean);
+    } else if (Array.isArray(inputServicesString)) {
+      inputServices = (inputServicesString as string[]).map(String).map((s) => s.trim()).filter(Boolean);
+    }
 
     const computeEnvs = await ProviderInstance.getComputeEnvironments(
       this.oceanNodeUrl
@@ -448,6 +589,124 @@ export class Commands {
       return;
     }
 
+    // Optional algorithm service selection & serviceIndex (only for DID-based algorithms).
+    let algoServiceIndex = 0;
+    let assetAlgo: {
+      documentId: string;
+      serviceId: string;
+      asset: Asset;
+      version?: string;
+    } | null = null;
+    if (algoDdo) {
+      const ddoInstanceAlgo = DDOManager.getDDOClass(algoDdo);
+      const { services: servicesAlgo, version: versionAlgo } =
+        ddoInstanceAlgo.getDDOFields();
+      const algoServiceIdInput = args[10] as string | undefined;
+      let chosenAlgoServiceId = algo.serviceId || servicesAlgo[0].id;
+      if (typeof algoServiceIdInput === "string" && algoServiceIdInput.trim().length > 0) {
+        const expectedAlgoServiceId = algoServiceIdInput.trim();
+        const matchAlgoSvc = servicesAlgo.find((s: any) => s.id === expectedAlgoServiceId);
+        if (!matchAlgoSvc) {
+          console.error(
+            `Algorithm Service ID "${expectedAlgoServiceId}" not found in algo DDO ${algoDdo.id}. ` +
+            "Provide a valid service.id from the algorithm asset or omit the argument to use the default (services[0])."
+          );
+          return;
+        }
+        chosenAlgoServiceId = expectedAlgoServiceId;
+      }
+      algoServiceIndex = servicesAlgo.findIndex((s: any) => s.id === chosenAlgoServiceId);
+      if (algoServiceIndex < 0) {
+        console.error(
+          `Could not resolve serviceIndex for algorithm serviceId ${chosenAlgoServiceId}`
+        );
+        return;
+      }
+      algo.serviceId = chosenAlgoServiceId;
+      assetAlgo = {
+        documentId: algoDdo.id,
+        serviceId: chosenAlgoServiceId,
+        asset: algoDdo as Asset,
+        version: versionAlgo,
+      };
+    }
+
+    // Apply per-dataset service selection, serviceIndex & orderability checks for
+    // DID-based datasets. Raw (fileObject) datasets keep their index slot.
+    const datasetServiceIndex: (number | null)[] = [];
+    const assetsForPolicy: {
+      documentId: string;
+      serviceId: string;
+      asset: Asset;
+      version?: string;
+    }[] = [];
+    for (let i = 0; i < assets.length; i++) {
+      const dataDdo = ddos[i];
+      if (!dataDdo) {
+        datasetServiceIndex.push(null);
+        continue;
+      }
+      const ddoInstanceDdo = DDOManager.getDDOClass(dataDdo);
+      const { services: servicesDdo, version: versionDdo } =
+        ddoInstanceDdo.getDDOFields();
+      let chosenServiceId = assets[i].serviceId || servicesDdo[0].id;
+      if (inputServices.length > 0) {
+        const expectedServiceId = inputServices[i];
+        if (expectedServiceId) {
+          const match = servicesDdo.find((s: any) => s.id === expectedServiceId);
+          if (!match) {
+            console.error(
+              `Service ID "${expectedServiceId}" not found in dataset ${dataDdo.id}. ` +
+              "Ensure serviceIds[i] exists in the corresponding dataset services."
+            );
+            return;
+          }
+          chosenServiceId = expectedServiceId;
+          if (i === 0 && match.serviceEndpoint) {
+            providerURI = match.serviceEndpoint;
+          }
+        }
+      } else if (i === 0 && servicesDdo[0]?.serviceEndpoint) {
+        providerURI = servicesDdo[0].serviceEndpoint;
+      }
+      const chosenServiceIndex = servicesDdo.findIndex((s: any) => s.id === chosenServiceId);
+      if (chosenServiceIndex < 0) {
+        console.error(
+          `Could not resolve serviceIndex for dataset ${dataDdo.id} with serviceId ${chosenServiceId}`
+        );
+        return;
+      }
+      datasetServiceIndex.push(chosenServiceIndex);
+      assets[i].serviceId = chosenServiceId;
+      const canStartCompute = await isOrderable(
+        dataDdo,
+        chosenServiceId,
+        algo,
+        algoDdo as Asset
+      );
+      if (!canStartCompute) {
+        console.error(
+          "Error Cannot start compute job using the datasets DIDs & algorithm DID provided"
+        );
+        return;
+      }
+      assetsForPolicy.push({
+        documentId: dataDdo.id,
+        serviceId: chosenServiceId,
+        asset: dataDdo as Asset,
+        version: versionDdo,
+      });
+    }
+
+    // Resolve policy-server objects up front so a policy-resolution failure aborts
+    // before any paid orders are submitted below.
+    const policiesServer = await getPolicyServerOBJs(
+      assetsForPolicy,
+      assetAlgo,
+      this.signer,
+      this.oceanNodeUrl
+    );
+
     const providerInitializeComputeJob = args[4]; // provider fees + payment
     const parsedProviderInitializeComputeJob = fixAndParseProviderFees(
       providerInitializeComputeJob
@@ -465,7 +724,7 @@ export class Commands {
         algoDdo as Asset,
         this.signer,
         computeEnv.consumerAddress,
-        0,
+        algoServiceIndex,
         datatoken,
         this.config,
         parsedProviderInitializeComputeJob?.algorithm?.providerFee,
@@ -494,7 +753,7 @@ export class Commands {
         dataDdo as Asset,
         this.signer,
         computeEnv.consumerAddress,
-        0,
+        datasetServiceIndex[i] ?? 0,
         datatoken,
         this.config,
         feeEntry.providerFee,
@@ -653,7 +912,6 @@ export class Commands {
         return;
       }
     }
-
     const computeJobs = await ProviderInstance.computeStart(
       providerURI,
       this.signer,
@@ -667,7 +925,8 @@ export class Commands {
       null,
       null,
       // additionalDatasets, only c2d v1
-      output
+      output,
+      policiesServer
     );
 
     console.log("computeJobs: ", computeJobs);
@@ -690,12 +949,21 @@ export class Commands {
       this.oceanNodeUrl
     );
     if (!resolved) return;
-    const { assets, algo, providerURI } = resolved;
+    const { assets, algo, ddos, algoDdo } = resolved;
+    let { providerURI } = resolved;
+
+    // Optional per-dataset service selection (positional, 1-1 with datasets).
+    const inputServicesString = args[5];
+    let inputServices: string[] = [];
+    if (typeof inputServicesString === "string" && inputServicesString.trim().length > 0) {
+      inputServices = inputServicesString.split(",").map((s) => s.trim()).filter(Boolean);
+    } else if (Array.isArray(inputServicesString)) {
+      inputServices = (inputServicesString as string[]).map(String).map((s) => s.trim()).filter(Boolean);
+    }
 
     const computeEnvs = await ProviderInstance.getComputeEnvironments(
       this.oceanNodeUrl
     );
-
     if (!computeEnvs || computeEnvs.length < 1) {
       console.error(
         "Error fetching compute environments. No compute environments available."
@@ -707,7 +975,6 @@ export class Commands {
     // NO chainId needed anymore (is not part of ComputeEnvironment spec anymore)
     // const chainComputeEnvs = computeEnvs[computeEnvID]; // was algoDdo.chainId
     let computeEnv = null; // chainComputeEnvs[0];
-
     if (computeEnvID && computeEnvID.length > 1) {
       for (const env of computeEnvs) {
         if (computeEnvID == env.id && env.free) {
@@ -725,27 +992,92 @@ export class Commands {
       return;
     }
 
-    console.log("Starting compute job using provider: ", providerURI);
-    const additionalDatasets = assets.length > 1 ? assets.slice(1) : null;
-    const describeAsset = (asset: ComputeAsset) =>
-      asset.documentId || asset.fileObject?.type || "raw asset";
-    if (assets.length > 0) {
-      console.log(
-        "Starting compute job on " +
-          describeAsset(assets[0]) +
-          " with additional datasets:" +
-          (!additionalDatasets ? "none" : describeAsset(additionalDatasets[0]))
-      );
-    } else {
-      console.log(
-        "Starting compute job on " +
-          algo.documentId +
-          " with additional datasets:" +
-          (!additionalDatasets ? "none" : describeAsset(additionalDatasets[0]))
-      );
+    // Optional algorithm service selection (only for DID-based algorithms).
+    let assetAlgo: {
+      documentId: string;
+      serviceId: string;
+      asset: Asset;
+      version?: string;
+    } | null = null;
+    if (algoDdo) {
+      const ddoInstanceAlgo = DDOManager.getDDOClass(algoDdo);
+      const { services: servicesAlgo, version: versionAlgo } =
+        ddoInstanceAlgo.getDDOFields();
+      const algoServiceIdInput = args[6] as string | undefined;
+      if (typeof algoServiceIdInput === "string" && algoServiceIdInput.trim().length > 0) {
+        const expectedAlgoServiceId = algoServiceIdInput.trim();
+        const matchAlgoSvc = servicesAlgo.find((s: any) => s.id === expectedAlgoServiceId);
+        if (!matchAlgoSvc) {
+          console.error(
+            `Algorithm Service ID "${expectedAlgoServiceId}" not found in algo DDO ${algoDdo.id}. ` +
+            "Provide a valid service.id from the algorithm asset or omit the argument to use the default (services[0])."
+          );
+          return;
+        }
+        algo.serviceId = expectedAlgoServiceId;
+      }
+      assetAlgo = {
+        documentId: algoDdo.id,
+        serviceId: algo.serviceId,
+        asset: algoDdo as Asset,
+        version: versionAlgo,
+      };
     }
-    // All datasets (primary + additional) are already in `assets` per C2D V2 specs;
-    // they are passed together below. (C2D V1 took additionalDatasets separately.)
+
+    // Apply per-dataset service selection & orderability checks for DID-based
+    // datasets. Raw (fileObject) datasets keep their resolved entry untouched.
+    const assetsForPolicy: {
+      documentId: string;
+      serviceId: string;
+      asset: Asset;
+      version?: string;
+    }[] = [];
+    for (let i = 0; i < assets.length; i++) {
+      const dataDdo = ddos[i];
+      if (!dataDdo) continue;
+      const ddoInstanceDdo = DDOManager.getDDOClass(dataDdo);
+      const { services: servicesDdo, version: versionDdo } =
+        ddoInstanceDdo.getDDOFields();
+      let chosenServiceId = assets[i].serviceId || servicesDdo[0].id;
+      if (inputServices.length > 0) {
+        const expectedServiceId = inputServices[i];
+        if (expectedServiceId) {
+          const match = servicesDdo.find((s: any) => s.id === expectedServiceId);
+          if (!match) {
+            console.error(
+              `Service ID "${expectedServiceId}" not found in dataset ${dataDdo.id}. ` +
+              "Ensure serviceIds[i] exists in the corresponding dataset services."
+            );
+            return;
+          }
+          chosenServiceId = expectedServiceId;
+          if (i === 0 && match.serviceEndpoint) {
+            providerURI = match.serviceEndpoint;
+          }
+        }
+      } else if (i === 0 && servicesDdo[0]?.serviceEndpoint) {
+        providerURI = servicesDdo[0].serviceEndpoint;
+      }
+      assets[i].serviceId = chosenServiceId;
+      const canStartCompute = await isOrderable(
+        dataDdo,
+        chosenServiceId,
+        algo,
+        algoDdo as Asset
+      );
+      if (!canStartCompute) {
+        console.error(
+          "Error Cannot start compute job using the datasets DIDs & algorithm DID provided"
+        );
+        return;
+      }
+      assetsForPolicy.push({
+        documentId: dataDdo.id,
+        serviceId: chosenServiceId,
+        asset: dataDdo as Asset,
+        version: versionDdo,
+      });
+    }
 
     let output = null;
     if (args[4]) {
@@ -757,6 +1089,12 @@ export class Commands {
       }
     }
 
+    const policiesServer = await getPolicyServerOBJs(
+      assetsForPolicy,
+      assetAlgo,
+      this.signer,
+      this.oceanNodeUrl
+    );
     const computeJobs = await ProviderInstance.freeComputeStart(
       providerURI,
       this.signer,
@@ -766,10 +1104,9 @@ export class Commands {
       null,
       null,
       null,
-      output
+      output,
+      policiesServer
     );
-
-    console.log("compute jobs: ", computeJobs);
 
     if (computeJobs && computeJobs[0]) {
       const { jobId } = computeJobs[0];
@@ -853,21 +1190,24 @@ export class Commands {
       this.indexingParams.retryInterval,
       this.indexingParams.maxRetries
     );
+
     if (!asset) {
       console.error(
         "Error fetching DDO " + args[1] + ".  Does this asset exists?"
       );
       return;
     }
-
-    if (asset.indexedMetadata.nft.owner !== (await this.signer.getAddress())) {
+		const ddoInstance = DDOManager.getDDOClass(asset);
+		const { indexedMetadata } = ddoInstance.getAssetFields();
+		const { services } = ddoInstance.getDDOFields();
+		if (indexedMetadata.nft.owner !== (await this.signer.getAddress())) {
       console.error(
         "You are not the owner of this asset, and there for you cannot update it."
       );
       return;
     }
 
-    if (asset.services[0].type !== "compute") {
+		if (services[0].type !== "compute") {
       console.error(
         "Error getting computeService for " +
           args[1] +
@@ -888,13 +1228,15 @@ export class Commands {
       );
       return;
     }
+		const algoInstance = DDOManager.getDDOClass(algoAsset);
+		const { services: servicesAlgo, metadata: metadataAlgo } = algoInstance.getDDOFields();
     const encryptDDO = args[3] === "false" ? false : true;
     let filesChecksum;
     try {
       filesChecksum = await ProviderInstance.checkDidFiles(
         algoAsset.id,
-        algoAsset.services[0].id,
-        algoAsset.services[0].serviceEndpoint,
+				servicesAlgo[0].id,
+				servicesAlgo[0].serviceEndpoint,
         true
       );
     } catch (e) {
@@ -903,14 +1245,18 @@ export class Commands {
     }
 
     const containerChecksum =
-      algoAsset.metadata.algorithm.container.entrypoint +
-      algoAsset.metadata.algorithm.container.checksum;
+			metadataAlgo.algorithm.container.entrypoint +
+			metadataAlgo.algorithm.container.checksum;
     const trustedAlgorithm = {
       did: algoAsset.id,
       containerSectionChecksum: getHash(containerChecksum),
       filesChecksum: filesChecksum?.[0]?.checksum,
+			serviceId: servicesAlgo[0].id,
     };
-    asset.services[0].compute.publisherTrustedAlgorithms.push(trustedAlgorithm);
+		if (!services[0].compute.publisherTrustedAlgorithms) {
+			services[0].compute.publisherTrustedAlgorithms = [];
+		}
+		services[0].compute.publisherTrustedAlgorithms.push(trustedAlgorithm);
     try {
       const txid = await updateAssetMetadata(
         this.signer,
@@ -940,13 +1286,16 @@ export class Commands {
       );
       return;
     }
-    if (asset.indexedMetadata.nft.owner !== (await this.signer.getAddress())) {
+		const ddoInstance = DDOManager.getDDOClass(asset);
+		const { indexedMetadata } = ddoInstance.getAssetFields();
+		const { services } = ddoInstance.getDDOFields();
+		if (indexedMetadata.nft.owner !== (await this.signer.getAddress())) {
       console.error(
         "You are not the owner of this asset, and there for you cannot update it."
       );
       return;
     }
-    if (asset.services[0].type !== "compute") {
+		if (services[0].type !== "compute") {
       console.error(
         "Error getting computeService for " +
           args[1] +
@@ -954,20 +1303,25 @@ export class Commands {
       );
       return;
     }
-    if (asset.services[0].compute.publisherTrustedAlgorithms) {
+		if (
+			!services[0].compute.publisherTrustedAlgorithms ||
+			services[0].compute.publisherTrustedAlgorithms.length === 0
+		) {
       console.error(
-        " " + args[1] + ".  Does this asset has an computeService?"
+        "Asset " +
+          args[1] +
+          " has no publisherTrustedAlgorithms list to remove an algorithm from."
       );
       return;
     }
     const encryptDDO = args[3] === "false" ? false : true;
     const indexToDelete =
-      asset.services[0].compute.publisherTrustedAlgorithms.findIndex(
+			services[0].compute.publisherTrustedAlgorithms.findIndex(
         (item) => item.did === args[2]
       );
 
     if (indexToDelete !== -1) {
-      asset.services[0].compute.publisherTrustedAlgorithms.splice(
+			services[0].compute.publisherTrustedAlgorithms.splice(
         indexToDelete,
         1
       );
@@ -1320,8 +1674,7 @@ export class Commands {
       console.log(`Transferable: ${transferable}`);
       console.log(`Owner: ${owner}`);
       console.log(
-        `Initial users: ${
-          initialUsers.length > 0 ? initialUsers.join(", ") : "none"
+				`Initial users: ${initialUsers.length > 0 ? initialUsers.join(", ") : "none"
         }`
       );
 

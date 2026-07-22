@@ -15,8 +15,8 @@
       "name": "The Digital Project Management Office (DigitalPMO)",
       "description": {
         "@value": "fdsfsdfsdfsdfsdfsd",
-        "@direction": "",
-        "@language": ""
+        "@direction": "ltr",
+        "@language": "en"
       },
       "tags": [],
       "author": "",

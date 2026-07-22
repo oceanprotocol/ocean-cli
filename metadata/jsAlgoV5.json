@@ -13,8 +13,8 @@
       "name": "cli algo test",
       "description": {
         "@value": "testing algo",
-        "@direction": "",
-        "@language": ""
+        "@direction": "ltr",
+        "@language": "en"
       },
       "tags": [
         "test"

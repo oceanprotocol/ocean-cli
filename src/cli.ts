@@ -466,11 +466,16 @@ export async function createCLI() {
   program
     .command("getComputeEnvironments")
     .alias("getC2DEnvs")
+    .argument(
+      "[node]",
+      "Optional Ocean Node URL or peer id to query (defaults to NODE_URL)"
+    )
+    .option("-n, --node [node]", "Ocean Node URL or peer id to query")
     .description("Gets the existing compute environments")
-    .action(async () => {
+    .action(async (node, options) => {
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
-      await commands.getComputeEnvironments();
+      await commands.getComputeEnvironments(options.node || node);
     });
 
   // computeStreamableLogs command

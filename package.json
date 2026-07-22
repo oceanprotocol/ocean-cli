@@ -17,6 +17,9 @@
   },
   "author": "Ocean Protocol <devops@oceanprotocol.com>",
   "license": "Apache-2.0",
+  "engines": {
+    "node": ">=22"
+  },
   "bugs": {
     "url": "https://github.com/oceanprotocol/ocean.js-cli/issues"
   },

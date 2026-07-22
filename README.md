@@ -274,6 +274,10 @@ Instead of a DID, you can pass a full `ComputeAsset` (datasets) or `ComputeAlgor
 
   `npm run cli getComputeEnvironments`
 
+  Optionally pass a specific Ocean Node URL or peer id to query instead of `NODE_URL`:
+
+  `npm run cli getComputeEnvironments <nodeUrlOrPeerId>`
+
 ---
 
 **Get Compute Streamable Logs:**
@@ -431,6 +435,80 @@ Instead of a DID, you can pass a full `ComputeAsset` (datasets) or `ComputeAlgor
 
 ---
 
+**Allow Algorithm on Dataset:**
+
+- **Positional:**  
+  `npm run cli allowAlgo did:op:dataset did:op:algo`
+
+- **Named Options:**  
+  `npm run cli allowAlgo --dataset did:op:dataset --algo did:op:algo --encrypt true`
+
+- Approves an algorithm to run on a compute-enabled dataset (signer must be the dataset NFT owner).
+
+---
+
+**Create Bucket:**
+
+  `npm run cli createBucket`
+
+- Creates a new persistent-storage bucket on the node. Pass an access-list contract address to gate it; omit for owner-only access:
+
+  `npm run cli createBucket 0x1234...accessListAddress`
+
+---
+
+**Add File to Bucket:**
+
+  `npm run cli addFileToBucket <bucketId> ./path/to/file.csv`
+
+- Optionally pass a name to store the file under (defaults to the file's basename):
+
+  `npm run cli addFileToBucket <bucketId> ./path/to/file.csv results.csv`
+
+---
+
+**List Buckets:**
+
+  `npm run cli listBuckets`
+
+- Lists buckets owned by the signer, or by a specific owner:
+
+  `npm run cli listBuckets --owner 0x1234...ownerAddress`
+
+---
+
+**List Files in Bucket:**
+
+  `npm run cli listFilesInBucket <bucketId>`
+
+---
+
+**Get File Object:**
+
+  `npm run cli getFileObject <bucketId> <fileName>`
+
+- Returns the file-object descriptor for a file in a bucket.
+
+---
+
+**Delete File:**
+
+  `npm run cli deleteFile <bucketId> <fileName>`
+
+---
+
+**Download Node Logs (admin):**
+
+- **Positional:**  
+  `npm run cli downloadNodeLogs ./logs 24`
+
+- **Named Options:**  
+  `npm run cli downloadNodeLogs --output ./logs --last 24`
+
+- Downloads node logs into `<output>/logs.json`. Use either `last` (hours from now) **or** a `from`/`to` epoch-ms range. `maxLogs` caps the number of entries (default: 100, max: 1000). Requires admin privileges on the node.
+
+---
+
 #### Available Named Options Per Command
 
 - **getDDO:**  
@@ -453,6 +531,11 @@ Instead of a DID, you can pass a full `ComputeAsset` (datasets) or `ComputeAlgor
   `-d, --did <did>`  
   `-f, --folder [destinationFolder]` (Default: `.`)
   `-s, --service <serviceId>` (Optional, target a specific service)
+
+- **allowAlgo:**  
+  `-d, --dataset <datasetDid>`  
+  `-a, --algo <algoDid>`  
+  `-e, --encrypt [boolean]` (Default: `true`)
 
 
 - **startCompute:**
@@ -477,6 +560,7 @@ Instead of a DID, you can pass a full `ComputeAsset` (datasets) or `ComputeAlgor
   `-x, --algo-service [algoServiceId]` (Optional, override algorithm service)
 
 - **getComputeEnvironments:**  
+  `-n, --node [node]` (Optional. Ocean Node URL or peer id to query; defaults to `NODE_URL`)
 
 - **computeStreamableLogs:**  
 
@@ -543,6 +627,31 @@ Instead of a DID, you can pass a full `ComputeAsset` (datasets) or `ComputeAlgor
 - **removeFromAccessList:**  
   `-a, --address <accessListAddress>`  
   `-u, --users <users>`
+
+- **createBucket:**  
+  Positional only: `[accessListAddress]` (optional; omit for owner-only access)
+
+- **addFileToBucket:**  
+  Positional only: `<bucketId> <filePath> [fileName]`
+
+- **listBuckets:**  
+  `-o, --owner <address>` (Optional; defaults to signer)
+
+- **listFilesInBucket:**  
+  Positional only: `<bucketId>`
+
+- **getFileObject:**  
+  Positional only: `<bucketId> <fileName>`
+
+- **deleteFile:**  
+  Positional only: `<bucketId> <fileName>`
+
+- **downloadNodeLogs:**  
+  `-o, --output <output>`  
+  `-l, --last [last]` (Hours from now; use either `last` or `from`/`to`)  
+  `-f, --from [from]` (Start time, epoch ms)  
+  `-t, --to [to]` (End time, epoch ms)  
+  `-m, --maxLogs [maxLogs]` (Default: 100, max: 1000)
 
 ---
 

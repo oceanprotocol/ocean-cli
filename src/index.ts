@@ -8,14 +8,18 @@ let program: Command
 const supportedCommands: string[] = []
 
 /**
- * Make Commander throw instead of calling process.exit on errors / help /
- * version. This must be applied to every subcommand, not just the root program:
- * a subcommand parse error (e.g. a missing required argument) is raised by the
- * subcommand itself, which would otherwise kill the whole REPL process.
+ * Prepare commander for REPL use: make it throw instead of calling process.exit
+ * on errors / help / version, and colorize its own error output (e.g. "missing
+ * required argument"). Both must be applied to every subcommand, not just the
+ * root program: a subcommand parse error is raised and written by the subcommand
+ * itself, which would otherwise kill the REPL and print an uncolored message.
  */
-function enableExitOverride(cmd: Command): void {
+function configureForLoop(cmd: Command): void {
 	cmd.exitOverride()
-	for (const sub of cmd.commands) enableExitOverride(sub)
+	cmd.configureOutput({
+		outputError: (str, write) => write(chalk.red(str)),
+	})
+	for (const sub of cmd.commands) configureForLoop(sub)
 }
 
 /**
@@ -169,8 +173,8 @@ async function main(): Promise<void> {
 		}
 
 		// In loop mode, commander must throw (not exit) on any error so a bad
-		// command never terminates the REPL.
-		enableExitOverride(program)
+		// command never terminates the REPL, and its errors are colorized.
+		configureForLoop(program)
 
 		// Run the initial command passed on argv once (if any), surfacing errors.
 		const initialTokens = process.argv.slice(2)

@@ -470,7 +470,7 @@ export async function createCLI() {
       "[node]",
       "Optional Ocean Node URL or peer id to query (defaults to NODE_URL)"
     )
-    .option("-n, --node [node]", "Ocean Node URL or peer id to query")
+    .option("-n, --node <node>", "Ocean Node URL or peer id to query")
     .description("Gets the existing compute environments")
     .action(async (node, options) => {
       const { signer, chainId } = await initializeSigner();

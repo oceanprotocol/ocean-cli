@@ -440,8 +440,10 @@ Instead of a DID, you can pass a full `ComputeAsset` (datasets) or `ComputeAlgor
 - **Positional:**  
   `npm run cli allowAlgo did:op:dataset did:op:algo`
 
-- **Named Options:**  
-  `npm run cli allowAlgo --dataset did:op:dataset --algo did:op:algo --encrypt true`
+- **With named option:**  
+  `npm run cli allowAlgo did:op:dataset did:op:algo --encrypt true`
+
+- The dataset and algorithm DIDs are required positional arguments (`--dataset` / `--algo` may override them, but the positionals must still be supplied). `--encrypt` toggles DDO encryption (default: `true`).
 
 - Approves an algorithm to run on a compute-enabled dataset (signer must be the dataset NFT owner).
 

@@ -154,9 +154,11 @@ async function main() {
 			if (alias) supportedCommands.push(alias)
 		}
 
-		// Handle help command without initializing signer
+		// Handle help flag without initializing signer, and exit so it prints
+		// once (not again via parseAsync/runLoop below).
 		if (process.argv.includes('--help') || process.argv.includes('-h')) {
 			program.outputHelp();
+			return;
 		}
 
 		if (process.env.AVOID_LOOP_RUN === 'true') {

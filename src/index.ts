@@ -1,9 +1,10 @@
 import { Command, CommanderError } from "commander";
+import chalk from "chalk";
 import { stdin as input, stdout as output } from "node:process";
 import { createInterface } from "readline/promises";
 import { createCLI } from './cli.js';
 
-let program
+let program: Command
 const supportedCommands: string[] = []
 
 /**
@@ -78,7 +79,7 @@ async function runTokens(tokens: string[]): Promise<void> {
 	// reject unknown command names.
 	const commandName = tokens[0]
 	if (!commandName.startsWith("-") && !supportedCommands.includes(commandName)) {
-		console.log(`Invalid option: ${commandName}. Type 'help' to see the available commands.`)
+		console.log(chalk.red(`Invalid option: ${commandName}. Type 'help' to see the available commands.`))
 		return
 	}
 
@@ -88,7 +89,7 @@ async function runTokens(tokens: string[]): Promise<void> {
 		// CommanderError (missing/excess args, unknown option, help, version) is
 		// already reported by commander itself — don't double-print it.
 		if (!(error instanceof CommanderError)) {
-			console.error("Command error:", error?.message ?? error)
+			console.error(chalk.red(`Command error: ${error?.message ?? error}`))
 		}
 	}
 }
@@ -145,7 +146,7 @@ async function runLoop(): Promise<void> {
 	rl.close()
 }
 
-async function main() {
+async function main(): Promise<void> {
 	try {
 		program = await createCLI();
 		for (const command of program.commands) {
@@ -181,7 +182,7 @@ async function main() {
 		await runLoop()
 
 	} catch (error) {
-		console.error('Program Error:', error.message);
+		console.error(chalk.red(`Program Error: ${error.message}`));
 		process.exit(1);
 	}
 }

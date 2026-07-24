@@ -40,6 +40,10 @@ jobs:
       - name: Run lint
         run: npm run lint
 
+permissions:
+  contents: read
+
+jobs:
   pack_smoke:
     # Guards the global-install contract without needing a full Ocean stack:
     # a broken bin, cwd-dependent module loading, or env-gated --help/--version
@@ -49,6 +53,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Set up Node.js
         uses: actions/setup-node@v4

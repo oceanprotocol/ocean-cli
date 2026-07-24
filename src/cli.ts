@@ -11,6 +11,7 @@ import {
   ProviderInstance,
   isP2pUri,
   ServiceStatusNumber,
+  ServiceRestartParams,
 } from "@oceanprotocol/lib";
 import { toBoolean } from "./helpers.js";
 
@@ -841,13 +842,24 @@ export async function createCLI() {
   program
     .command("restartService")
     .description(
-      "Recreates the container of a running service (same ports & expiry; no extra charge)"
+      "Restarts a running service (same ports & expiry; no extra charge). " +
+        "With no container-spec flags the container bounces unchanged (REUSE); " +
+        "supplying any image-spec flag (--image/--tag/--checksum/--dockerfile/" +
+        "--additional-docker-files) rebuilds it on the new spec (RESPEC, #2119)"
     )
     .argument("<serviceId>", "Service ID")
     .option("-u, --user-data <json>", "REPLACE stored container env vars (JSON object)")
     .option("--user-data-file <path>", "Path to JSON file with replacement env vars")
     .option("--cmd <json>", "REPLACE stored Docker CMD as JSON array (#2114); empty array clears it")
     .option("--entrypoint <json>", "REPLACE stored Docker ENTRYPOINT as JSON array (#2114)")
+    .option("--image <image>", "RESPEC: rebuild on this container image (#2119)")
+    .option("--tag <tag>", "RESPEC: rebuild on this image tag (#2119)")
+    .option("--checksum <checksum>", "RESPEC: image digest/checksum (#2119)")
+    .option("--dockerfile <dockerfile>", "RESPEC: dockerfile contents to build from (#2119)")
+    .option(
+      "--additional-docker-files <json>",
+      "RESPEC: extra build files as a JSON object { path: contents } (#2119)"
+    )
     .option("--wait [boolean]", "Poll until Running (default true)", toBoolean, true)
     .option("--timeout <seconds>", "Max seconds to wait (default 600)", parseInt)
     .action(async (serviceId, options) => {
@@ -855,26 +867,36 @@ export async function createCLI() {
         console.error(chalk.red("Missing required argument: <serviceId>"));
         return;
       }
-      let userData: Record<string, unknown> | undefined;
-      let cmd: string[] | undefined;
-      let entrypoint: string[] | undefined;
+      const params: ServiceRestartParams = {};
       try {
         if (options.userData) {
           const parsed = JSON.parse(options.userData);
           if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
             throw new Error("--user-data must be a JSON object");
           }
-          userData = parsed;
+          params.userData = parsed;
         } else if (options.userDataFile) {
           const parsed = JSON.parse(fs.readFileSync(options.userDataFile, "utf8"));
           if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
             throw new Error("--user-data-file must contain a JSON object");
           }
-          userData = parsed;
+          params.userData = parsed;
         }
-        if (options.cmd !== undefined) cmd = parseJsonStringArray("--cmd", options.cmd);
+        if (options.cmd !== undefined)
+          params.dockerCmd = parseJsonStringArray("--cmd", options.cmd);
         if (options.entrypoint !== undefined)
-          entrypoint = parseJsonStringArray("--entrypoint", options.entrypoint);
+          params.dockerEntrypoint = parseJsonStringArray("--entrypoint", options.entrypoint);
+        if (options.image !== undefined) params.image = options.image;
+        if (options.tag !== undefined) params.tag = options.tag;
+        if (options.checksum !== undefined) params.checksum = options.checksum;
+        if (options.dockerfile !== undefined) params.dockerfile = options.dockerfile;
+        if (options.additionalDockerFiles !== undefined) {
+          const parsed = JSON.parse(options.additionalDockerFiles);
+          if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+            throw new Error("--additional-docker-files must be a JSON object");
+          }
+          params.additionalDockerFiles = parsed;
+        }
       } catch (e) {
         console.error(chalk.red((e as Error).message));
         return;
@@ -883,9 +905,7 @@ export async function createCLI() {
       const commands = new Commands(signer, chainId);
       await commands.restartService(
         serviceId,
-        userData,
-        cmd,
-        entrypoint,
+        Object.keys(params).length > 0 ? params : undefined,
         options.wait,
         options.timeout
       );

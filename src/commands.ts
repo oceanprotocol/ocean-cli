@@ -33,6 +33,7 @@ import {
   ComputeResourceRequest,
   ServiceJob,
   ServiceJobListed,
+  ServiceRestartParams,
   ServiceStartParams,
   ServiceStatusNumber,
   ServiceTemplatePublic,
@@ -1884,9 +1885,7 @@ export class Commands {
 
   public async restartService(
     serviceId: string,
-    userData?: Record<string, unknown>,
-    dockerCmd?: string[],
-    dockerEntrypoint?: string[],
+    params?: ServiceRestartParams,
     wait?: boolean,
     timeout?: number
   ): Promise<ServiceJob | undefined> {
@@ -1904,14 +1903,13 @@ export class Commands {
       }
       const oldContainerId = job.containerId;
 
-      // 2. Restart. dockerCmd/dockerEntrypoint sit BEFORE the signal (#2114).
+      // 2. Restart. Omitting all container-spec fields bounces the container
+      //    unchanged (REUSE); supplying any image-spec field rebuilds it (RESPEC, #2119).
       const restarted = await ProviderInstance.serviceRestart(
         this.oceanNodeUrl,
         this.signer,
         serviceId,
-        userData,
-        dockerCmd,
-        dockerEntrypoint,
+        params,
         AbortSignal.timeout(120_000)
       );
       const newJob = restarted?.[0];

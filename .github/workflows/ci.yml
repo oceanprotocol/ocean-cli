@@ -3,6 +3,9 @@ name: Test Flow
 on:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -40,10 +43,6 @@ jobs:
       - name: Run lint
         run: npm run lint
 
-permissions:
-  contents: read
-
-jobs:
   pack_smoke:
     # Guards the global-install contract without needing a full Ocean stack:
     # a broken bin, cwd-dependent module loading, or env-gated --help/--version

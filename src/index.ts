@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import "./warnings.js";
 import { Command, CommanderError } from "commander";
 import chalk from "chalk";
 import { stdin as input, stdout as output } from "node:process";
@@ -204,9 +205,13 @@ async function main(): Promise<void> {
 		configureForLoop(program)
 
 		// Run the initial command passed on argv once (if any), surfacing errors.
+		// When started with no command at all, show the help menu up front so the
+		// user sees what's available instead of facing a bare prompt.
 		const initialTokens = process.argv.slice(2)
 		if (initialTokens.length > 0) {
 			await runTokens(initialTokens)
+		} else {
+			console.log(program.helpInformation())
 		}
 
 		// Then loop on stdin until the user exits or input is exhausted.

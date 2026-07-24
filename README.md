@@ -339,7 +339,9 @@ npm run cli getServiceStatus <serviceId>          # YOUR services, full detail
 npm run cli -- getServices --status 40            # ALL owners' running services on the node (SERVICES_LIST)
 npm run cli -- serviceLogs <serviceId> --since 10m
 npm run cli -- extendService <serviceId> 1800 --accept true
+npm run cli -- restartService <serviceId>                               # REUSE: bounce container unchanged
 npm run cli -- restartService <serviceId> --cmd '["python","app.py"]'   # optional cmd/entrypoint override
+npm run cli -- restartService <serviceId> --image myrepo/algo --tag v2  # RESPEC: rebuild on a new image (#2119)
 npm run cli stopService <serviceId>
 ```
 
@@ -367,6 +369,11 @@ Notes:
   with full detail; `getServices` (alias `listServices`, the SERVICES_LIST command)
   lists services across *all* owners on the node, with the docker image spec
   stripped, and supports `--status` / `--include-all` / `--from` filters.
+- **`restartService` has two modes (#2119):** with **no** container-spec flags the
+  container bounces on its stored spec (REUSE); supplying any image-spec flag
+  (`--image`, `--tag`, `--checksum`, `--dockerfile`, `--additional-docker-files`)
+  rebuilds the container on the new spec (RESPEC), keeping the same ports, expiry
+  and payment window at no extra charge.
 - **`restartService --cmd/--entrypoint`** replace the stored command/entrypoint on
   the recreated container (an empty array clears them); omit to reuse the stored
   configuration.
@@ -692,6 +699,7 @@ Notes:
   `<serviceId>`  
   `-u, --user-data <json>` / `--user-data-file <path>` (REPLACE stored env vars)  
   `--cmd <json>` / `--entrypoint <json>` (REPLACE stored Docker CMD/ENTRYPOINT; empty array clears)  
+  `--image <image>` / `--tag <tag>` / `--checksum <checksum>` / `--dockerfile <dockerfile>` / `--additional-docker-files <json>` (RESPEC: rebuild the container on a new image spec; #2119)  
   `--wait [boolean]` (Poll until Running; default `true`)  
   `--timeout <seconds>` (Max seconds to wait; default 600)
 

@@ -25,8 +25,21 @@ import {
 	LoggerInstance
 } from "@oceanprotocol/lib";
 import { homedir } from "os";
+import { createRequire } from "module";
 
-const ERC20Template = readFileSync('./node_modules/@oceanprotocol/contracts/artifacts/contracts/templates/ERC20Template.sol/ERC20Template.json', 'utf8') as any;
+// Resolve the ERC20 template ABI through the module system rather than a
+// cwd-relative path, so the compiled CLI works from any working directory
+// (e.g. when installed globally). require.resolve finds the JSON inside the
+// installed @oceanprotocol/contracts package regardless of cwd.
+const require = createRequire(import.meta.url);
+const ERC20Template = JSON.parse(
+	readFileSync(
+		require.resolve(
+			"@oceanprotocol/contracts/artifacts/contracts/templates/ERC20Template.sol/ERC20Template.json"
+		),
+		"utf8"
+	)
+);
 
 export async function downloadFile(
 	url: string,

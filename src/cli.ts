@@ -2,6 +2,7 @@ import { Command } from "commander";
 import { Commands } from "./commands.js";
 import { JsonRpcProvider, Signer, ethers } from "ethers";
 import fs from "fs";
+import { createRequire } from "module";
 import chalk from "chalk";
 import { stdin as input, stdout } from "node:process";
 import { createInterface } from "readline/promises";
@@ -12,6 +13,11 @@ import {
   ServiceStatusNumber,
 } from "@oceanprotocol/lib";
 import { toBoolean } from "./helpers.js";
+
+// Single source of truth for the CLI version: read it from package.json instead
+// of hardcoding, so it can't drift. `../package.json` resolves from both src/
+// (dev via tsx) and dist/ (published), since both sit one level below the root.
+const pkg = createRequire(import.meta.url)("../package.json");
 
 // Parse a CLI JSON array-of-strings option (e.g. --cmd '["python","app.py"]').
 // Returns the array, or throws with a clear message for the action to surface.
@@ -58,21 +64,36 @@ async function initializeSigner() {
 }
 
 export async function createCLI() {
-  if (!process.env.MNEMONIC && !process.env.PRIVATE_KEY) {
-    console.error(chalk.red("Have you forgot to set MNEMONIC or PRIVATE_KEY?"));
-    process.exit(1);
-  }
-  if (!process.env.RPC) {
-    console.error(chalk.red("Have you forgot to set env RPC?"));
-    process.exit(1);
+  // A pure help/version invocation must work with no configuration at all (a
+  // globally installed binary is expected to answer `--help`/`--version`
+  // without credentials). Detect it from argv and skip both env validation and
+  // the P2P bootstrap in that case; every real command still validates below.
+  const argv = process.argv.slice(2);
+  const isHelpOrVersion =
+    argv.includes("--help") ||
+    argv.includes("-h") ||
+    argv.includes("--version") ||
+    argv.includes("-V") ||
+    argv[0] === "help" ||
+    argv[0] === "h";
+
+  if (!isHelpOrVersion) {
+    if (!process.env.MNEMONIC && !process.env.PRIVATE_KEY) {
+      console.error(chalk.red("Have you forgot to set MNEMONIC or PRIVATE_KEY?"));
+      process.exit(1);
+    }
+    if (!process.env.RPC) {
+      console.error(chalk.red("Have you forgot to set env RPC?"));
+      process.exit(1);
+    }
+
+    if (!process.env.NODE_URL) {
+      console.error(chalk.red("Have you forgot to set env NODE_URL?"));
+      process.exit(1);
+    }
   }
 
-  if (!process.env.NODE_URL) {
-    console.error(chalk.red("Have you forgot to set env NODE_URL?"));
-    process.exit(1);
-  }
-
-  if (isP2pUri(process.env.NODE_URL)) {
+  if (!isHelpOrVersion && process.env.NODE_URL && isP2pUri(process.env.NODE_URL)) {
     const extra = process.env.BOOTSTRAP_PEERS?.split(",").filter(Boolean) || [];
 
     // Default Ocean bootstrap nodes (must be included explicitly since passing
@@ -159,7 +180,7 @@ export async function createCLI() {
   program
     .name("ocean-cli")
     .description("CLI tool to interact with Ocean Protocol")
-    .version("2.0.0")
+    .version(pkg.version)
     .helpOption("-h, --help", "Display help for command");
 
   // Custom help command to support legacy "h" invocation.

@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this project is
 
-`ocean-cli` (package name `ocean-cli`, version 2.0.0) is a TypeScript CLI that wraps the Ocean Protocol JavaScript library (`@oceanprotocol/lib`, a.k.a. ocean.js) to publish, edit, consume/download, and run compute-to-data (C2D) on assets, plus manage escrow payments, access lists, persistent-storage buckets, auth tokens, and admin node logs. It talks to an **Ocean Node** (the single service that replaced the old standalone Provider and Aquarius apps — it does metadata caching, indexing, encryption, ordering, and compute) and to an EVM chain via an RPC endpoint.
+`ocean-cli` (npm package `@oceanprotocol/cli`, version 2.0.0; installs a `bin` named `ocean-cli`) is a TypeScript CLI that wraps the Ocean Protocol JavaScript library (`@oceanprotocol/lib`, a.k.a. ocean.js) to publish, edit, consume/download, and run compute-to-data (C2D) on assets, plus manage escrow payments, access lists, persistent-storage buckets, auth tokens, and admin node logs. It talks to an **Ocean Node** (the single service that replaced the old standalone Provider and Aquarius apps — it does metadata caching, indexing, encryption, ordering, and compute) and to an EVM chain via an RPC endpoint.
 
 The package is pure ESM (`"type": "module"` in `package.json`). All relative imports MUST carry an explicit `.js` extension even though the source is `.ts` (e.g. `import { Commands } from "./commands.js"`). Node 22 is expected (`.nvmrc` = `22`; CI uses `22.5.1`).
 
@@ -22,6 +22,7 @@ Scripts (from `package.json`):
 - `npm run test` — `npm run lint && npm run test:system` (lint is part of "test").
 - `npm run test:system` — `npm run mocha 'test/**/*.test.ts'`.
 - `npm run mocha` — `NODE_OPTIONS='--experimental-require-module' mocha --config=test/.mocharc.json --node-env=test --exit`.
+- `npm run release` — `release-it --non-interactive`: bumps version, builds, regenerates the changelog (`npm run changelog` = `auto-changelog -p`), commits, tags `v${version}`, pushes, and cuts a GitHub Release. Does **not** publish to npm (`release-it` config `npm.publish: false`) — pushing the tag triggers `.github/workflows/publish.yml`, which runs `npm publish` (`--tag next` for tags containing `next`, else `latest`). Mirrors `@oceanprotocol/lib`'s release flow.
 
 Mocha config (`test/.mocharc.json`): loader `ts-node/esm`, `bail: true` (stops at first failure), `timeout: 20000`, `exit: true`.
 
@@ -50,7 +51,9 @@ npm run cli h                        # list commands ("h" and "help" are aliases
 npm run cli publish metadata/simpleDownloadDataset.json
 ```
 
-Important behavior of the entry point (`src/index.ts`): after running the command passed on argv **once**, the process enters an interactive REPL loop, printing `Enter command ('exit' | 'quit' or CTRL-C to terminate')` and reading further commands from stdin until you type `exit`/`quit`/`\q`. To get one-shot behavior (run and exit — required for CI and scripting) set `AVOID_LOOP_RUN=true`. In the REPL you may type either the bare command (`publish metadata/x.json`) or the full `npm run cli publish metadata/x.json` form.
+`npm run cli` (= `npx tsx src/index.ts`) runs from source, no build. A globally installed copy (`npm i -g @oceanprotocol/cli`) exposes the same thing as the `ocean-cli` binary — `ocean-cli <command>` is equivalent to `npm run cli <command>`.
+
+Important behavior of the entry point (`src/index.ts`): after running the command passed on argv **once**, the process enters an interactive REPL loop, printing `Enter command ('exit' | 'quit' | ESC or CTRL-C to terminate')` and reading further commands from stdin until you type `exit`/`quit`/`\q`, press **ESC** (TTY only), or hit CTRL-C. To get one-shot behavior (run and exit — required for CI and scripting) set `AVOID_LOOP_RUN=true`. In the REPL you may type either the bare command (`publish metadata/x.json`) or the full `npm run cli publish metadata/x.json` / `ocean-cli publish metadata/x.json` form (the leading prefix is stripped). Note: a pure help/version invocation (`--help`, `-h`, `--version`, `-V`, `h`, `help`) skips env-var validation and P2P bootstrap, so it works with no configuration; every other command still validates the env vars below.
 
 ### Required environment variables
 
@@ -92,7 +95,7 @@ Per-command flags and examples are exhaustively documented in `README.md` ("Comm
 
 `main()` in `index.ts` calls `createCLI()` (in `cli.ts`) to build the Commander `program`, records supported command names/aliases, prints the REPL banner, runs the initial argv command once, then loops on stdin (`waitForCommands`) unless `AVOID_LOOP_RUN=true`. It uses `program.exitOverride()` so Commander errors don't kill the loop.
 
-`createCLI()` does three things: (1) validates the required env vars, (2) if `NODE_URL` is a P2P URI, sets up libp2p (see "Transport"), (3) registers every command. Each command's `.action(...)`:
+`createCLI()` does three things: (1) validates the required env vars — **unless** the invocation is a pure help/version one (`--help`/`-h`/`--version`/`-V`/`h`/`help`), which is detected from `process.argv` and skips both validation and P2P so those work with no config, (2) if `NODE_URL` is a P2P URI, sets up libp2p (see "Transport"), (3) registers every command. Each command's `.action(...)`:
 
 1. merges positional + option values,
 2. calls the local `initializeSigner()` — builds a `JsonRpcProvider(RPC)`, a `Wallet` from `PRIVATE_KEY` (or `Wallet.fromPhrase(MNEMONIC)`), and reads `chainId` from the network,
@@ -121,7 +124,7 @@ One big class holding all command logic. The constructor:
 
 `helpers.ts` is the seam between the CLI and ocean.js:
 
-- `createAssetUtil(...)` wraps ocean.js `createAsset` (used by publish/publishAlgo and the interactive publisher). It resolves the active ERC20 template (`calculateActiveTemplateIndex` reads `@oceanprotocol/contracts` `ERC20Template.json` ABI from `node_modules`), and for **Oasis Sapphire** (`config.sdk === 'oasis'`) wraps the signer with `@oasisprotocol/sapphire-paratime` (`getSignerAccordingSdk`) and deploys an allow access list before creating the asset.
+- `createAssetUtil(...)` wraps ocean.js `createAsset` (used by publish/publishAlgo and the interactive publisher). It resolves the active ERC20 template (`calculateActiveTemplateIndex` reads and `JSON.parse`s the `@oceanprotocol/contracts` `ERC20Template.json` ABI, resolved via `createRequire`/`require.resolve` so it works from any cwd — e.g. a global install — not a cwd-relative `node_modules` path), and for **Oasis Sapphire** (`config.sdk === 'oasis'`) wraps the signer with `@oasisprotocol/sapphire-paratime` (`getSignerAccordingSdk`) and deploys an allow access list before creating the asset.
 - `updateAssetMetadata(...)` — used by `editAsset`, `allowAlgo`, `disallowAlgo` and the interactive publisher. It validates the DDO via `aquarius.validate`, then either `ProviderInstance.encrypt`s the DDO (flags = 2) or hexlifies raw JSON (flags = 0) depending on the `encryptDDO` flag, then calls `nft.setMetadata`.
 - `handleComputeOrder(...)` — the ordering state machine used in compute: validOrder + no fees → reuse as-is; validOrder + fees → `datatoken.reuseOrder` paying only provider fees; no order → `orderAsset` (pay 1 datatoken + fees). Approves provider-fee tokens first when the fee amount > 0.
 - `resolveComputeInputs(...)` + `parseComputeInput(...)` — parse the datasets/algo CLI strings (DID | JSON object | array | mixed | legacy `[did:a,did:b]`), resolve DID entries through `aquarius.waitForIndexer`, pass raw `fileObject` entries through (aligned with a `null` DDO slot), and pick `providerURI` from the first DID-based DDO's `serviceEndpoint` (else fall back to `NODE_URL`).

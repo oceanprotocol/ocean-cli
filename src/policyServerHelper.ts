@@ -1,5 +1,5 @@
 import { Asset } from "@oceanprotocol/ddo-js"
-import { PolicyServerActions, PolicyServerGetPdAction, PolicyServerInitiateAction, PolicyServerInitiateActionData, PolicyServerInitiateComputeActionData, PolicyServerPresentationDefinition, SsiVerifiableCredential, SsiWalletDid, SsiWalletSession } from "./policyServerInterfaces"
+import { PolicyServerActions, PolicyServerGetPdAction, PolicyServerInitiateAction, PolicyServerInitiateActionData, PolicyServerInitiateComputeActionData, PolicyServerPresentationDefinition, SsiVerifiableCredential, SsiWalletDid, SsiWalletSession } from "./policyServerInterfaces.js"
 import axios from "axios"
 import { Signer } from "ethers"
 

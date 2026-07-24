@@ -9,7 +9,7 @@ const __dirname = dirname(__filename);
 const projectRoot = path.resolve(__dirname, "..");
 
 // Recurring prompt string emitted by the REPL (keep in sync with src/index.ts).
-const PROMPT = "Enter command ('exit' | 'quit' or CTRL-C to terminate):\n";
+const PROMPT = "Enter command ('exit' | 'quit' | ESC or CTRL-C to terminate):\n";
 
 /**
  * Drive the interactive REPL (menu mode) with piped stdin.

@@ -34,12 +34,36 @@ If you run into problems, please open up a [new issue](https://github.com/oceanp
 
 ## 🏗 Installation & Usage
 
-### Clone and install
+### Install globally (recommended)
+
+Install the CLI from npm to get the `ocean-cli` command available everywhere:
 
 ```bash
-$ git clone https://github.com/oceanprotocol/ocean-cli.git
-npm install
+npm install -g @oceanprotocol/cli
 ```
+
+Then invoke it directly (from any directory):
+
+```bash
+ocean-cli h                 # list commands
+ocean-cli --version
+ocean-cli publish metadata/simpleDownloadDataset.json
+```
+
+> `ocean-cli --help`, `ocean-cli -h`, `ocean-cli --version` and `ocean-cli h` work with **no** environment variables set. Every other command requires the env vars described below.
+
+### From source (for contributors)
+
+Clone and install, then run the CLI straight from TypeScript with `npm run cli` (no build step needed):
+
+```bash
+git clone https://github.com/oceanprotocol/ocean-cli.git
+cd ocean-cli
+npm install
+npm run cli h
+```
+
+> **The command examples in this README use the `npm run cli <command>` form. If you installed globally, drop the `npm run cli` prefix and use `ocean-cli <command>` instead — the two are otherwise identical.** In interactive mode you can paste either form; a leading `npm run cli` or `ocean-cli` token is stripped automatically.
 
 ### Set up environment variables
 
@@ -73,22 +97,22 @@ export NODE_URL='XXXX'
 export ADDRESS_FILE='path-to-address-file'
 ```
 
-- Optional, set INDEXING_MAX_RETRIES to the max number of retries when waiting for an asset to be indexed. Default is 100 retries max.
+- Optional, set INDEXING_MAX_RETRIES to the max number of retries when waiting for an asset to be indexed. Default is 120 retries max.
 
 ```
-export INDEXING_MAX_RETRIES='100'
+export INDEXING_MAX_RETRIES='120'
 ```
 
-- Optional, set INDEXING_RETRY_INTERVAL to the interval (in miliseconds) for each retry when waiting for an asset to be indexed. Default is 3 seconds.
+- Optional, set INDEXING_RETRY_INTERVAL to the interval (in miliseconds) for each retry when waiting for an asset to be indexed. Default is 4 seconds (4000 ms).
 
 ```
-export INDEXING_RETRY_INTERVAL='3000'
+export INDEXING_RETRY_INTERVAL='4000'
 ```
 
-- Optional, set AVOID_LOOP_RUN to 'true' to run each command and exit afterwards (usefull for CI test env and default behaviour). IF not set or set to 'false' the CLI will listen interactively for commands, until exit is manually forced 
+- Optional, set AVOID_LOOP_RUN to `'true'` to run a single command and exit afterwards (one-shot mode — required for CI and scripting). **By default the CLI is interactive**: it runs the command you pass (if any), then keeps reading further commands from a prompt, just like a REPL. Exit the interactive loop with `exit` / `quit`, the **ESC** key, or **CTRL-C**.
 
 ```
-export AVOID_LOOP_RUN='true/false'
+export AVOID_LOOP_RUN='true'   # one-shot; unset or 'false' = interactive loop
 ```
 
 - Optional, set SSI_WALLET_API, SSI_WALLET_ID, SSI_WALLET_DID to support v5 DDOs (assets using credentialSubject and SSI policy flows).
@@ -138,7 +162,10 @@ npm run cli <command> [options] <arguments>
 #### Help Commands
 
 - **General help:**  
-  `npm run cli --help` or `npm run cli -h`
+  `npm run cli --help` or `npm run cli -h` (globally: `ocean-cli --help` / `ocean-cli -h`)
+
+- **Version:**  
+  `npm run cli --version` (globally: `ocean-cli --version`)
 
 - **Command-specific help:**  
   `npm run cli help <command>`

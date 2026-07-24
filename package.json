@@ -33,15 +33,15 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/oceanprotocol/ocean.js-cli.git"
+    "url": "git+https://github.com/oceanprotocol/ocean-cli.git"
   },
   "publishConfig": {
     "access": "public"
   },
   "bugs": {
-    "url": "https://github.com/oceanprotocol/ocean.js-cli/issues"
+    "url": "https://github.com/oceanprotocol/ocean-cli/issues"
   },
-  "homepage": "https://github.com/oceanprotocol/ocean.js-cli#readme",
+  "homepage": "https://github.com/oceanprotocol/ocean-cli#readme",
   "release-it": {
     "hooks": {
       "after:bump": "npm run build && npm run changelog && git add CHANGELOG.md"

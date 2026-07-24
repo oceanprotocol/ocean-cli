@@ -184,8 +184,14 @@ async function main(): Promise<void> {
 
 		// Handle help/version flags without initializing a signer, and exit so
 		// they print once and never drop into the REPL below. createCLI() already
-		// skips env validation for these invocations.
-		if (process.argv.includes('--help') || process.argv.includes('-h')) {
+		// skips env validation for these invocations. The bare positional forms
+		// `help`/`h` are treated the same as `--help` (print and exit) to match
+		// createCLI()'s configuration-free behavior; `help <command>` still routes
+		// to the registered help command below.
+		const cmdTokens = process.argv.slice(2);
+		const isBareHelp =
+			cmdTokens.length === 1 && (cmdTokens[0] === 'help' || cmdTokens[0] === 'h');
+		if (process.argv.includes('--help') || process.argv.includes('-h') || isBareHelp) {
 			program.outputHelp();
 			return;
 		}

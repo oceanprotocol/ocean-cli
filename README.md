@@ -99,19 +99,19 @@ export ADDRESS_FILE='path-to-address-file'
 
 - Optional, set INDEXING_MAX_RETRIES to the max number of retries when waiting for an asset to be indexed. Default is 120 retries max.
 
-```
+```bash
 export INDEXING_MAX_RETRIES='120'
 ```
 
-- Optional, set INDEXING_RETRY_INTERVAL to the interval (in miliseconds) for each retry when waiting for an asset to be indexed. Default is 4 seconds (4000 ms).
+- Optional, set INDEXING_RETRY_INTERVAL to the interval (in milliseconds) for each retry when waiting for an asset to be indexed. Default is 4 seconds (4000 ms).
 
-```
+```bash
 export INDEXING_RETRY_INTERVAL='4000'
 ```
 
 - Optional, set AVOID_LOOP_RUN to `'true'` to run a single command and exit afterwards (one-shot mode — required for CI and scripting). **By default the CLI is interactive**: it runs the command you pass (if any), then keeps reading further commands from a prompt, just like a REPL. Exit the interactive loop with `exit` / `quit`, the **ESC** key, or **CTRL-C**.
 
-```
+```bash
 export AVOID_LOOP_RUN='true'   # one-shot; unset or 'false' = interactive loop
 ```
 

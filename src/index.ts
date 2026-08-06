@@ -244,14 +244,20 @@ async function main(): Promise<void> {
 
 	} catch (error) {
 		console.error(chalk.red(`Program Error: ${error.message}`));
+		// Flush before exiting: process.exit() discards whatever a piped stdout/stderr
+		// still has buffered, which could swallow the message just written. Exiting
+		// here (rather than falling through to the finally) keeps failures immediate —
+		// the process is going away, so libp2p needs no orderly shutdown.
+		await flushOutput()
 		process.exit(1);
 	} finally {
 		// Once libp2p has started the process can no longer end on its own: stopping
 		// it cleanly still leaves a MessagePort holding the event loop open. So stop
 		// it and, if it had been running, exit explicitly — after draining stdout,
 		// since a piped stdout (tests, scripts) can still hold buffered output that
-		// process.exit() would discard. Covers every path out of the try above; the
-		// process.exit(1) in the catch terminates immediately and needs no cleanup.
+		// process.exit() would discard. Reached on every non-throwing path out of the
+		// try above; when nothing was started, Node exits on its own and drains the
+		// streams as part of that.
 		if (await stopP2P()) {
 			await flushOutput()
 			process.exit(process.exitCode ?? 0)

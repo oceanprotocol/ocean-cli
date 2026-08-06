@@ -101,7 +101,7 @@ npm run cli            # starts with no node
 
   You can switch node at any time with [`setNode`](#setnode) without restarting the CLI. See [`getNode`](#getnode) to check which node is active.
 
-- Optional, set DISABLE_P2P to `'true'` to skip starting the libp2p transport. By default the CLI starts libp2p at startup (in the background, so it does not delay the prompt) even when `NODE_URL` is an HTTP URL, so that a later switch to a P2P node does not have to wait for bootstrap peers and DHT warm-up. Set this when you only ever use HTTP nodes and do not want the CLI dialing the public Ocean bootstrap nodes.
+- Optional, set DISABLE_P2P to `'true'` to skip starting the libp2p transport. In interactive mode the CLI starts libp2p at startup (in the background, so it does not delay the prompt) even when `NODE_URL` is an HTTP URL, so that a later switch to a P2P node does not have to wait for bootstrap peers and DHT warm-up. One-shot runs (`AVOID_LOOP_RUN='true'`) skip that warm-up — they have no later command to benefit from it — and start libp2p only when the node they target is a P2P one. Set this when you only ever use HTTP nodes and do not want the CLI dialing the public Ocean bootstrap nodes.
 
 ```bash
 export DISABLE_P2P='true'

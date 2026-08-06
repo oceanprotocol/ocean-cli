@@ -85,10 +85,26 @@ export MNEMONIC="XXXX"
 export RPC='XXXX'
 ```
 
-- Mandatory, Set an Ocean Node URL. Ocean Nodes infrastructure is responsible for handling assets indexing and metadata caching. It replaced old Provider and Aquarius standalone apps.
+- Optional (but recommended), set an Ocean Node URL. Ocean Nodes infrastructure is responsible for handling assets indexing and metadata caching. It replaced old Provider and Aquarius standalone apps.
 
 ```
 export NODE_URL='XXXX'
+```
+
+  `NODE_URL` is the **initial** node only. If it is not set the CLI still starts, but **only `setNode`, `getNode` and `help` are available** — every other command is refused with `No Ocean Node set` until you pick a node:
+
+```bash
+npm run cli            # starts with no node
+# > setNode http://127.0.0.1:8001
+# > getComputeEnvironments        # now works
+```
+
+  You can switch node at any time with [`setNode`](#setnode) without restarting the CLI. See [`getNode`](#getnode) to check which node is active.
+
+- Optional, set DISABLE_P2P to `'true'` to skip starting the libp2p transport. By default the CLI starts libp2p at startup (in the background, so it does not delay the prompt) even when `NODE_URL` is an HTTP URL, so that a later switch to a P2P node does not have to wait for bootstrap peers and DHT warm-up. Set this when you only ever use HTTP nodes and do not want the CLI dialing the public Ocean bootstrap nodes.
+
+```bash
+export DISABLE_P2P='true'
 ```
 
 - Optional, set ADDRESS_FILE if you want to use a custom set of smart contract address
@@ -171,6 +187,32 @@ npm run cli <command> [options] <arguments>
   `npm run cli help <command>`
 
 #### Examples
+
+**Choosing the Ocean Node:**
+
+<a name="setnode"></a>
+
+- **Switch node (works inside the interactive loop, no restart needed):**  
+  `npm run cli setNode http://127.0.0.1:8001`  
+  Also accepts a peer id or a full multiaddr, and `--node`:  
+  `npm run cli setNode --node /dns4/node.example/tcp/9001/ws/p2p/16Uiu2HAm...`  
+  Alias: `useNode`.
+
+  The node is health-checked before the switch: if it cannot be reached, the current node is kept and nothing changes.
+
+<a name="getnode"></a>
+
+- **Show the node in use:**  
+  `npm run cli getNode` (alias `currentNode`) — prints the active node plus its version and the chain(s) it serves.
+
+Notes when switching nodes:
+
+- **Compute jobs live on the node that started them.** After a switch, `getJobStatus` / `downloadJobResults` query the *new* node — switch back to look up older jobs.
+- **For a node on your own machine, prefer the full multiaddr** (`/ip4/127.0.0.1/tcp/9001/ws/p2p/<peerId>`) over a bare peer id: a bare id has to be found via DHT, which may not advertise localhost addresses.
+- **In one-shot mode** (`AVOID_LOOP_RUN='true'`) `setNode` only validates the node and prints the result — the switch dies with the process. Use `NODE_URL` for one-shot runs.
+- `chainId` still comes from `RPC`, never from the node. `setNode` warns when the node does not serve the chain your RPC is on.
+
+---
 
 **Get DDO:**
 
@@ -612,6 +654,12 @@ Notes:
 ---
 
 #### Available Named Options Per Command
+
+- **setNode** (alias `useNode`)**:**  
+  `<nodeUrl>` (Positional. HTTP(S) URL, peer id or full multiaddr)  
+  `-n, --node <nodeUrl>` (Same as the positional)
+
+- **getNode** (alias `currentNode`)**:** no arguments
 
 - **getDDO:**  
   `-d, --did <did>`

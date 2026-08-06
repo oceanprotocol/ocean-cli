@@ -61,14 +61,15 @@ Validated at startup in `createCLI()` (`src/cli.ts`), which `process.exit(1)`s w
 
 - `PRIVATE_KEY` **or** `MNEMONIC` — signer credentials (private key preferred; mnemonic via `ethers.Wallet.fromPhrase`).
 - `RPC` — JSON-RPC endpoint; chainId is read from `provider.getNetwork()`, not configured manually.
-- `NODE_URL` — the Ocean Node. Can be an `http(s)://` URL, a raw libp2p peer id, or a full `/dns4/.../p2p/...` multiaddr (triggers P2P mode, see below).
 
 ### Optional environment variables
 
+- `NODE_URL` — the **initial** Ocean Node. An `http(s)://` URL, a raw libp2p peer id, or a full `/dns4/.../p2p/...` multiaddr. **Not required to start:** without it the CLI runs in a node-less state where the `preAction` gate in `createCLI()` refuses every command except `setNode` / `getNode` / `help` (see "Node selection"). Switchable at runtime with `setNode`.
+- `DISABLE_P2P` — `true` skips starting libp2p entirely. Combined with a P2P `NODE_URL` it is a fatal contradiction (`exit(1)` at startup).
 - `ADDRESS_FILE` — path to a contracts `address.json`. Defaults to `${homedir}/.ocean/ocean-contracts/artifacts/address.json`. Needed by escrow / mint / access-list commands (see "Config & chain selection").
 - `INDEXING_MAX_RETRIES` / `INDEXING_RETRY_INTERVAL` — how long to wait for an asset to be indexed. **Code defaults are 120 retries × 4000 ms** (`getIndexingWaitSettings()` in `helpers.ts`); the README's "100 / 3000" figures are stale.
 - `AVOID_LOOP_RUN` — `true` = one-shot (no REPL loop). Unset/`false` = interactive loop.
-- `BOOTSTRAP_PEERS` — comma-separated extra libp2p multiaddrs, only used in P2P mode.
+- `BOOTSTRAP_PEERS` — comma-separated extra libp2p multiaddrs, added to the bootstrap list built in `nodeConnection.ts`.
 
 ## CLI commands exposed
 
@@ -81,6 +82,7 @@ All registered in `src/cli.ts` via Commander (`commander` v13). Every command su
 - Access lists: `createAccessList`, `addToAccessList`, `checkAccessList`, `removeFromAccessList`.
 - Persistent storage buckets: `createBucket`, `addFileToBucket`, `listBuckets`, `listFilesInBucket`, `getFileObject`, `deleteFile`.
 - Admin: `downloadNodeLogs`.
+- Node selection: `setNode` (alias `useNode`), `getNode` (alias `currentNode`).
 - `help` / `h`.
 
 Per-command flags and examples are exhaustively documented in `README.md` ("Command Usage" / "Available Named Options Per Command"). A few load-bearing notes:
@@ -93,9 +95,9 @@ Per-command flags and examples are exhaustively documented in `README.md` ("Comm
 
 ### Entry point and dispatch (`src/index.ts` → `src/cli.ts`)
 
-`main()` in `index.ts` calls `createCLI()` (in `cli.ts`) to build the Commander `program`, records supported command names/aliases, prints the REPL banner, runs the initial argv command once, then loops on stdin (`waitForCommands`) unless `AVOID_LOOP_RUN=true`. It uses `program.exitOverride()` so Commander errors don't kill the loop.
+`main()` in `index.ts` calls `createCLI()` (in `cli.ts`) to build the Commander `program`, records supported command names/aliases, prints the REPL banner, runs the initial argv command once, then loops on stdin (`runLoop`) unless `AVOID_LOOP_RUN=true`. It uses `program.exitOverride()` so Commander errors don't kill the loop.
 
-`createCLI()` does three things: (1) validates the required env vars — **unless** the invocation is a pure help/version one (`--help`/`-h`/`--version`/`-V`/`h`/`help`), which is detected from `process.argv` and skips both validation and P2P so those work with no config, (2) if `NODE_URL` is a P2P URI, sets up libp2p (see "Transport"), (3) registers every command. Each command's `.action(...)`:
+`createCLI()` does four things: (1) validates `PRIVATE_KEY`/`MNEMONIC` and `RPC` — **unless** the invocation is a pure help/version one (`--help`/`-h`/`--version`/`-V`/`h`/`help`), which is detected from `process.argv` and skips both validation and P2P so those work with no config, (2) starts libp2p and health-checks `NODE_URL` if set (see "Transport" and "Node selection"), (3) registers the `preAction` gate that refuses non-`NODE_FREE_COMMANDS` while no node is set, (4) registers every command. Each command's `.action(...)`:
 
 1. merges positional + option values,
 2. calls the local `initializeSigner()` — builds a `JsonRpcProvider(RPC)`, a `Wallet` from `PRIVATE_KEY` (or `Wallet.fromPhrase(MNEMONIC)`), and reads `chainId` from the network,
@@ -157,9 +159,20 @@ The `startCompute` **action in `cli.ts`** orchestrates a two-phase flow (not a s
 - **Auth tokens**: `generateAuthToken` / `invalidateAuthToken` via `ProviderInstance`.
 - **downloadNodeLogs** (admin): time-range or `--last N` hours; writes `<output>/logs.json`.
 
-### Transport: HTTP vs P2P
+### Transport: HTTP vs P2P, and node selection (`src/nodeConnection.ts`)
 
-If `NODE_URL` passes `isP2pUri()`, `createCLI()` boots a libp2p node via `ProviderInstance.setupP2P`, seeding bootstrap peers = local peer (derived from the peer id or full multiaddr) + `BOOTSTRAP_PEERS` + four hard-coded Ocean bootstrap nodes, and then **waits up to 20 s for the specific target peer** (from `NODE_URL`) to connect before proceeding, because signed commands fail if only bootstrap peers are connected. CI exercises both transports (matrix `[http, p2p]`).
+All node lifecycle logic lives in `nodeConnection.ts`; `cli.ts` only calls into it.
+
+**libp2p is transport, not a connection to one node.** Every ocean.js P2P call takes a `nodeUri` and dials that peer on demand (direct dial for a full multiaddr, DHT lookup for a bare peer id), so one libp2p node serves any number of Ocean nodes and switching between them never restarts or stops it.
+
+- `startP2P(initialNodeUrl?)` — called **once at startup for every invocation** (not lazily, and not only for P2P `NODE_URL`s), because bootstrap dials + DHT warm-up take seconds and should overlap with the user reading the prompt. It is **deliberately not awaited**; the stored promise swallows its own rejection (an unhandled rejection on a fire-and-forget promise would kill the process) and remembers the failure for `ensureP2PReady()`. No-op when `DISABLE_P2P=true` or when `ProviderInstance.getLibp2pNode()` is already non-null. Bootstrap peers = the initial node if it is a P2P URI (bare peer ids get the `/ip4/127.0.0.1/tcp/9001/ws/p2p/<id>` localhost convention) + `BOOTSTRAP_PEERS` + four hard-coded Ocean bootstrap nodes (passing `bootstrapPeers` **replaces** the lib's defaults, so they must be listed explicitly).
+- `ensureP2PReady()` — awaited by every P2P-bound path; throws a clear reason instead of hanging when P2P is unavailable.
+- `validateNode(url)` — non-destructive health check via `ProviderInstance.getNodeStatus` under an `AbortSignal.timeout` (10 s HTTP, 30 s P2P since a bare peer id may need a DHT lookup). Over P2P the on-demand dial *is* the reachability check, which is what the old 20 s wait-for-target-peer polling loop did — that loop is gone.
+- `getCurrentNodeUrl()` / `setCurrentNodeUrl()` / `hasNode()` — `process.env.NODE_URL` stays the **single source of truth**, so switching node is just mutating it: `Commands`' constructor and `getMetadataURI()` re-read it per use.
+
+`setNode` validates first and only then mutates the env var, so a failed switch leaves everything untouched — there is nothing to roll back. The switch itself never touches the RPC/signer (node selection is independent of them and must work when the RPC is slow); `setNode` calls `initializeSigner()` only *after* committing, under a 5 s `Promise.race` timeout, purely to warn when the node does not serve the RPC's chain. CI exercises both transports (matrix `[http, p2p]`).
+
+**libp2p keeps the process alive.** A started libp2p node holds the event loop open, and even a clean `stop()` leaves a `MessagePort` behind (confirmed with `process.getActiveResourcesInfo()`). So `index.ts` ends with `if (await stopP2P()) { await flushOutput(); process.exit(...) }` — the flush matters because a piped stdout can still hold buffered output that `process.exit()` would discard. For the same reason the eager `startP2P` is **skipped in one-shot mode** (`AVOID_LOOP_RUN=true`): a one-shot run has no later command to warm up for, and would only pay startup + shutdown cost. One-shot runs that target a P2P node still get libp2p on demand via `validateNode` → `ensureP2PReady`.
 
 ### Interactive publish wizard (currently unwired)
 
@@ -190,3 +203,5 @@ CI (`.github/workflows/ci.yml`) has three jobs: `build`, `lint`, and `test_syste
 - The 1-indexed vs 0-indexed args-array split between `Commands` methods is easy to get wrong when adding/renaming commands.
 - Running the CLI without `AVOID_LOOP_RUN=true` drops into a stdin REPL after the first command — surprising in scripts.
 - `fixAndParseProviderFees` is a regex JSON patcher for the initialize→start round trip; prefer fixing the data shape over extending the regex.
+- A new command is refused when no node is set unless its canonical name is added to `NODE_FREE_COMMANDS` in `cli.ts`. The gate is a single root-level `preAction` hook keyed on `actionCommand.name()` (canonical, so aliases resolve for free) and throws a **plain `Error`, not a `CommanderError`** — that is what makes `index.ts` report it in red and keep the REPL alive, while one-shot mode exits 1.
+- `supportedCommands` in `index.ts` uses `command.aliases()` (plural). The old `alias()` returned only the first alias, silently making extra aliases unreachable in the REPL.

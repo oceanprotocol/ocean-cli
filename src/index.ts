@@ -5,6 +5,7 @@ import chalk from "chalk";
 import { stdin as input, stdout as output } from "node:process";
 import { createInterface } from "readline/promises";
 import { createCLI } from './cli.js';
+import { stopP2P } from './nodeConnection.js';
 
 let program: Command
 const supportedCommands: string[] = []
@@ -173,13 +174,31 @@ async function runLoop(): Promise<void> {
 	}
 }
 
+/**
+ * Wait until everything written to stdout/stderr has actually been handed over, so a
+ * forced process.exit() cannot truncate it. Writing an empty chunk queues the callback
+ * behind any pending writes on the stream.
+ */
+async function flushOutput(): Promise<void> {
+	await Promise.all(
+		[process.stdout, process.stderr].map(
+			(stream) =>
+				new Promise<void>((resolve) => {
+					if (stream.writableLength === 0) return resolve()
+					stream.write("", () => resolve())
+				})
+		)
+	)
+}
+
 async function main(): Promise<void> {
 	try {
 		program = await createCLI();
 		for (const command of program.commands) {
 			supportedCommands.push(command.name())
-			const alias = command.alias()
-			if (alias) supportedCommands.push(alias)
+			// aliases() (plural): alias() would only ever return the first one.
+			const aliases = command.aliases()
+			supportedCommands.push(...aliases)
 		}
 
 		// Handle help/version flags without initializing a signer, and exit so
@@ -226,6 +245,17 @@ async function main(): Promise<void> {
 	} catch (error) {
 		console.error(chalk.red(`Program Error: ${error.message}`));
 		process.exit(1);
+	} finally {
+		// Once libp2p has started the process can no longer end on its own: stopping
+		// it cleanly still leaves a MessagePort holding the event loop open. So stop
+		// it and, if it had been running, exit explicitly — after draining stdout,
+		// since a piped stdout (tests, scripts) can still hold buffered output that
+		// process.exit() would discard. Covers every path out of the try above; the
+		// process.exit(1) in the catch terminates immediately and needs no cleanup.
+		if (await stopP2P()) {
+			await flushOutput()
+			process.exit(process.exitCode ?? 0)
+		}
 	}
 }
 

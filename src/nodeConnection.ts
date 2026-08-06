@@ -216,9 +216,18 @@ export async function validateNode(
 
 /** Chain ids the node serves, as reported by its status (provider + indexer). */
 export function nodeChainIds(status: NodeStatus): string[] {
+  // Drop entries with no chainId before stringifying: String(undefined) would put the
+  // literal "undefined" in the list, which then shows up in getNode output and in the
+  // mismatch warning — and would make the list look non-empty when it holds no real ids.
   const ids = [
-    ...(status.provider || []).map((p) => String(p.chainId)),
-    ...(status.indexer || []).map((i) => String(i.chainId)),
+    ...(status.provider || [])
+      .map((p) => p.chainId)
+      .filter(Boolean)
+      .map(String),
+    ...(status.indexer || [])
+      .map((i) => i.chainId)
+      .filter(Boolean)
+      .map(String),
   ];
   return [...new Set(ids)];
 }

@@ -30,12 +30,14 @@ import {
   getTokenDecimals,
   AccesslistFactory,
   AccessListContract,
+  ProviderInitialize,
 } from "@oceanprotocol/lib";
 import { Asset, DDOManager } from '@oceanprotocol/ddo-js';
 import { Signer, ethers, getAddress } from "ethers";
 import { interactiveFlow } from "./interactiveFlow.js";
 import { publishAsset } from "./publishAsset.js";
 import chalk from 'chalk';
+import axios from "axios";
 import { getPolicyServerOBJ, getPolicyServerOBJs, isVersionGte } from "./policyServerHelper.js";
 
 const UPLOAD_TIMEOUT_MS = 30 * 60_000;
@@ -69,6 +71,93 @@ export class Commands {
     return new Promise((resolve) => {
       setTimeout(resolve, ms);
     });
+  }
+
+  private async initializeProvider(
+    asset: Asset,
+    serviceId: string,
+    accountId: string,
+    providerUrl: string
+  ): Promise<ProviderInitialize> {
+    if (process.env.SSI_WALLET_API?.trim()) {
+      const command = {
+        documentId: asset.id,
+        serviceId,
+        consumerAddress: accountId,
+        policyServer: {
+          sessionId: "",
+          successRedirectUri: "",
+          errorRedirectUri: "",
+          responseRedirectUri: "",
+          presentationDefinitionUri: "",
+        },
+      };
+
+      const initializePs = await ProviderInstance.initializePSVerification(
+        providerUrl,
+        command
+      );
+
+      if (!initializePs?.success) {
+        throw new Error(
+          `Provider initialization failed: ${initializePs?.error || "Policy Server verification failed"}`
+        );
+      }
+    }
+
+    if (!/^https?:\/\//i.test(providerUrl)) {
+      return ProviderInstance.initialize(
+        asset.id,
+        serviceId,
+        0,
+        accountId,
+        providerUrl
+      );
+    }
+
+    try {
+      const endpointsResponse = await axios.get(providerUrl);
+      const initializeRoute = endpointsResponse.data?.serviceEndpoints?.initialize?.[1];
+      if (!initializeRoute) {
+        throw new Error("Provider initialize endpoint not found");
+      }
+
+      const initializeUrl = `${providerUrl.replace(/\/+$/, "")}/${String(
+        initializeRoute
+      ).replace(/^\/+/, "")}`;
+      const response = await axios.get<ProviderInitialize>(initializeUrl, {
+        params: {
+          documentId: asset.id,
+          serviceId,
+          fileIndex: 0,
+          consumerAddress: accountId,
+        },
+        headers: { "Content-Type": "application/json" },
+      });
+
+      return response.data;
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error) && error.response?.data) {
+        const responseData: unknown = error.response.data;
+        let message: string;
+
+        if (typeof responseData === "string") {
+          message = responseData;
+        } else if (typeof responseData === "object") {
+          const data = responseData as { error?: unknown; message?: unknown };
+          const providerMessage = data.error ?? data.message;
+          message =
+            typeof providerMessage === "string"
+              ? providerMessage
+              : JSON.stringify(responseData);
+        } else {
+          message = String(responseData);
+        }
+
+        throw new Error(message.replace(/^Error:\s*/i, ""));
+      }
+      throw error;
+    }
   }
 
   // commands
@@ -219,34 +308,59 @@ export class Commands {
 		const ddoInstance = DDOManager.getDDOClass(dataDdo);
 		const { services, version } = ddoInstance.getDDOFields();
 		const serviceId = args[3] ? args[3] : services[0].id;
-		let policyServer = null
-		try {
-			if (isVersionGte(version, '5.0.0')) {
-				policyServer = await getPolicyServerOBJ(dataDdo, serviceId, this.signer, this.oceanNodeUrl);
-			}
-		} catch (error) {
-			throw new Error('Error getting Policy Server Object: ' + error.message)
-		}
+    const service = services.find((item) => item.id === serviceId);
+    if (!service) {
+      console.error(`Service ID "${serviceId}" not found in DDO ${did}.`);
+      return;
+    }
+
+    let policyServer = null;
+    if (isVersionGte(version, '5.0.0')) {
+      try {
+        await this.initializeProvider(
+          dataDdo,
+          serviceId,
+          await this.signer.getAddress(),
+          service.serviceEndpoint || this.oceanNodeUrl
+        );
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error("Error initializing Provider:", message);
+        return;
+      }
+
+      try {
+        policyServer = await getPolicyServerOBJ(
+          dataDdo,
+          serviceId,
+          this.signer,
+          this.oceanNodeUrl
+        );
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error("Error getting Policy Server Object:", message);
+        return;
+      }
+    }
     const datatoken = new Datatoken(
       this.signer,
       this.config.chainId,
       this.config
     );
-    // Order the same service that policy retrieval and getDownloadUrl target.
-    const serviceIndex = services.findIndex((s) => s.id === serviceId);
-    const tx = await orderAsset(
-      dataDdo,
-      this.signer,
-      this.config,
-      datatoken,
-      this.oceanNodeUrl,
-      undefined, // consumerAddress
-      undefined, // consumeMarketOrderFee
-      undefined, // providerFees
-      undefined, // consumeMarketFixedSwapFee
-      undefined, // datatokenIndex
-      serviceIndex < 0 ? 0 : serviceIndex
-    );
+    let tx;
+    try {
+      tx = await orderAsset(
+        dataDdo,
+        this.signer,
+        this.config,
+        datatoken,
+        this.oceanNodeUrl
+      );
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error("Error ordering asset:", message);
+      return;
+    }
 
     if (!tx) {
       console.error(

@@ -173,15 +173,15 @@ export class Commands {
     }
     const encryptDDO = args[2] === "false" ? false : true;
     try {
-      const ddoInstance = DDOManager.getDDOClass(asset);
-      const { indexedMetadata } = ddoInstance.getAssetFields();
-      const { services } = ddoInstance.getDDOFields();
+			const ddoInstance = DDOManager.getDDOClass(asset);
+			const { indexedMetadata } = ddoInstance.getAssetFields();
+			const { services } = ddoInstance.getDDOFields();
       // add some more checks
       const urlAssetId = await createAssetUtil(
-        indexedMetadata.nft.name,
-        indexedMetadata.nft.symbol,
+				indexedMetadata.nft.name,
+				indexedMetadata.nft.symbol,
         this.signer,
-        (services[0].files as any).files ?? services[0].files,
+				(services[0].files as any).files ?? services[0].files,
         asset,
         this.oceanNodeUrl,
         this.config,
@@ -208,14 +208,14 @@ export class Commands {
     const encryptDDO = args[2] === "false" ? false : true;
     // add some more checks
     try {
-      const ddoInstance = DDOManager.getDDOClass(algoAsset);
-      const { indexedMetadata } = ddoInstance.getAssetFields();
-      const { services } = ddoInstance.getDDOFields();
+			const ddoInstance = DDOManager.getDDOClass(algoAsset);
+			const { indexedMetadata } = ddoInstance.getAssetFields();
+			const { services } = ddoInstance.getDDOFields();
       const algoDid = await createAssetUtil(
-        indexedMetadata.nft.name,
-        indexedMetadata.nft.symbol,
+				indexedMetadata.nft.name,
+				indexedMetadata.nft.symbol,
         this.signer,
-        (services[0].files as any).files ?? services[0].files,
+				(services[0].files as any).files ?? services[0].files,
         algoAsset,
         this.oceanNodeUrl,
         this.config,
@@ -283,16 +283,16 @@ export class Commands {
     if (!resolvedDDO) {
       console.error(
         "Error fetching Asset with DID: " +
-        args[1] +
-        ".  Does this asset exists?"
+          args[1] +
+          ".  Does this asset exists?"
       );
     } else console.log(util.inspect(resolvedDDO, false, null, true));
   }
 
   public async download(args: string[]) {
-    const did = args[1];
+		const did = args[1];
     const dataDdo = await this.aquarius.waitForIndexer(
-      did,
+			did,
       null,
       null,
       this.indexingParams.retryInterval,
@@ -300,14 +300,14 @@ export class Commands {
     );
     if (!dataDdo) {
       console.error(
-        "Error fetching DDO " + did + ".  Does this asset exists?"
+				"Error fetching DDO " + did + ".  Does this asset exists?"
       );
       return;
     }
 
-    const ddoInstance = DDOManager.getDDOClass(dataDdo);
-    const { services, version } = ddoInstance.getDDOFields();
-    const serviceId = args[3] ? args[3] : services[0].id;
+		const ddoInstance = DDOManager.getDDOClass(dataDdo);
+		const { services, version } = ddoInstance.getDDOFields();
+		const serviceId = args[3] ? args[3] : services[0].id;
     const service = services.find((item) => item.id === serviceId);
     if (!service) {
       console.error(`Service ID "${serviceId}" not found in DDO ${did}.`);
@@ -362,23 +362,23 @@ export class Commands {
       return;
     }
 
-
     if (!tx) {
       console.error(
-        "Error ordering access for " + did + ".  Do you have enough tokens?"
+				"Error ordering access for " + did + ".  Do you have enough tokens?"
       );
       return;
     }
 
     const orderTx = await tx.wait();
+
     const downloadResult = await ProviderInstance.getDownloadUrl(
       dataDdo.id,
-      serviceId,
+			serviceId,
       0,
       orderTx.hash,
       this.oceanNodeUrl,
-      this.signer,
-      policyServer
+			this.signer,
+			policyServer
     );
     try {
       const destPath = args[2] ? args[2] : ".";
@@ -539,20 +539,20 @@ export class Commands {
     if (!maxJobDuration) {
       console.error(
         "Error initializing Provider for the compute job using dataset DID " +
-        args[1] +
-        " and algorithm DID " +
-        args[2] +
-        " because maxJobDuration was not provided."
+          args[1] +
+          " and algorithm DID " +
+          args[2] +
+          " because maxJobDuration was not provided."
       );
       return;
     }
     if (maxJobDuration < 0) {
       console.error(
         "Error initializing Provider for the compute job using dataset DID " +
-        args[1] +
-        " and algorithm DID " +
-        args[2] +
-        " because maxJobDuration is less than 0. It should be in seconds."
+          args[1] +
+          " and algorithm DID " +
+          args[2] +
+          " because maxJobDuration is less than 0. It should be in seconds."
       );
       return;
     }
@@ -564,10 +564,10 @@ export class Commands {
     if (!paymentToken) {
       console.error(
         "Error initializing Provider for the compute job using dataset DID " +
-        args[1] +
-        " and algorithm DID " +
-        args[2] +
-        " because paymentToken was not provided."
+          args[1] +
+          " and algorithm DID " +
+          args[2] +
+          " because paymentToken was not provided."
       );
       return;
     }
@@ -575,13 +575,13 @@ export class Commands {
     if (!Object.keys(computeEnv.fees).includes(chainId.toString())) {
       console.error(
         "Error starting paid compute using dataset DID " +
-        args[1] +
-        " and algorithm DID " +
-        args[2] +
-        " because chainId is not supported by compute environment. " +
-        args[3] +
-        ". Supported chain IDs: " +
-        computeEnv.fees.keys()
+          args[1] +
+          " and algorithm DID " +
+          args[2] +
+          " because chainId is not supported by compute environment. " +
+          args[3] +
+          ". Supported chain IDs: " +
+          computeEnv.fees.keys()
       );
       return;
     }
@@ -595,11 +595,11 @@ export class Commands {
     if (found === false) {
       console.error(
         "Error initializing Provider for the compute job using dataset DID " +
-        args[1] +
-        " and algorithm DID " +
-        args[2] +
-        " because paymentToken is not supported by this environment " +
-        args[3]
+          args[1] +
+          " and algorithm DID " +
+          args[2] +
+          " because paymentToken is not supported by this environment " +
+          args[3]
       );
       return;
     }
@@ -607,10 +607,10 @@ export class Commands {
     if (!resources) {
       console.error(
         "Error initializing Provider for the compute job using dataset DID " +
-        args[1] +
-        " and algorithm DID " +
-        args[2] +
-        " because resources for compute were not provided."
+          args[1] +
+          " and algorithm DID " +
+          args[2] +
+          " because resources for compute were not provided."
       );
       return;
     }
@@ -640,9 +640,9 @@ export class Commands {
     ) {
       console.error(
         "Error initializing Provider for the compute job using dataset DID " +
-        args[1] +
-        " and algorithm DID " +
-        args[2]
+          args[1] +
+          " and algorithm DID " +
+          args[2]
       );
       return;
     }
@@ -847,8 +847,8 @@ export class Commands {
       if (!algo.transferTxId) {
         console.error(
           "Error ordering compute for algorithm with DID: " +
-          args[2] +
-          ".  Do you have enough tokens?"
+            args[2] +
+            ".  Do you have enough tokens?"
         );
         return;
       }
@@ -876,8 +876,8 @@ export class Commands {
       if (!assets[i].transferTxId) {
         console.error(
           "Error ordering dataset with DID: " +
-          assets[i] +
-          ".  Do you have enough tokens?"
+            assets[i] +
+            ".  Do you have enough tokens?"
         );
         return;
       }
@@ -887,20 +887,20 @@ export class Commands {
     if (!maxJobDuration) {
       console.error(
         "Error initializing Provider for the compute job using dataset DID " +
-        args[1] +
-        " and algorithm DID " +
-        args[2] +
-        " because maxJobDuration was not provided."
+          args[1] +
+          " and algorithm DID " +
+          args[2] +
+          " because maxJobDuration was not provided."
       );
       return;
     }
     if (maxJobDuration < 0) {
       console.error(
         "Error starting paid compute using dataset DID " +
-        args[1] +
-        " and algorithm DID " +
-        args[2] +
-        " because maxJobDuration is less than 0. It should be in seconds."
+          args[1] +
+          " and algorithm DID " +
+          args[2] +
+          " because maxJobDuration is less than 0. It should be in seconds."
       );
       return;
     }
@@ -913,23 +913,23 @@ export class Commands {
     if (!paymentToken) {
       console.error(
         "Error starting paid compute using dataset DID " +
-        args[1] +
-        " and algorithm DID " +
-        args[2] +
-        " because paymentToken was not provided."
+          args[1] +
+          " and algorithm DID " +
+          args[2] +
+          " because paymentToken was not provided."
       );
       return;
     }
     if (!Object.keys(computeEnv.fees).includes(chainId.toString())) {
       console.error(
         "Error starting paid compute using dataset DID " +
-        args[1] +
-        " and algorithm DID " +
-        args[2] +
-        " because chainId is not supported by compute environment. " +
-        args[3] +
-        ". Supported chain IDs: " +
-        computeEnv.fees.keys()
+          args[1] +
+          " and algorithm DID " +
+          args[2] +
+          " because chainId is not supported by compute environment. " +
+          args[3] +
+          ". Supported chain IDs: " +
+          computeEnv.fees.keys()
       );
       return;
     }
@@ -943,11 +943,11 @@ export class Commands {
     if (found === false) {
       console.error(
         "Error starting paid compute using dataset DID " +
-        args[1] +
-        " and algorithm DID " +
-        args[2] +
-        " because paymentToken is not supported by this environment " +
-        args[3]
+          args[1] +
+          " and algorithm DID " +
+          args[2] +
+          " because paymentToken is not supported by this environment " +
+          args[3]
       );
       return;
     }
@@ -955,10 +955,10 @@ export class Commands {
     if (!resources) {
       console.error(
         "Error starting paid compute using dataset DID " +
-        args[1] +
-        " and algorithm DID " +
-        args[2] +
-        " because resources for compute were not provided."
+          args[1] +
+          " and algorithm DID " +
+          args[2] +
+          " because resources for compute were not provided."
       );
       return;
     }
@@ -985,11 +985,11 @@ export class Commands {
     if (validationEscrow.isValid === false) {
       console.error(
         "Error starting compute job dataset DID " +
-        args[1] +
-        " and algorithm DID " +
-        args[2] +
-        " because escrow funds check failed: " +
-        validationEscrow.message
+          args[1] +
+          " and algorithm DID " +
+          args[2] +
+          " because escrow funds check failed: " +
+          validationEscrow.message
       );
       return;
     }
@@ -1002,16 +1002,16 @@ export class Commands {
     if (assets.length > 0) {
       console.log(
         "Starting compute job on " +
-        describeAsset(assets[0]) +
-        " with additional datasets:" +
-        (!additionalDatasets ? "none" : describeAsset(additionalDatasets[0]))
+          describeAsset(assets[0]) +
+          " with additional datasets:" +
+          (!additionalDatasets ? "none" : describeAsset(additionalDatasets[0]))
       );
     } else {
       console.log(
         "Starting compute job on " +
-        algo.documentId +
-        " with additional datasets:" +
-        (!additionalDatasets ? "none" : describeAsset(additionalDatasets[0]))
+          algo.documentId +
+          " with additional datasets:" +
+          (!additionalDatasets ? "none" : describeAsset(additionalDatasets[0]))
       );
     }
     // All datasets (primary + additional) are already in `assets` per C2D V2 specs;
@@ -1311,21 +1311,21 @@ export class Commands {
       );
       return;
     }
-    const ddoInstance = DDOManager.getDDOClass(asset);
-    const { indexedMetadata } = ddoInstance.getAssetFields();
-    const { services } = ddoInstance.getDDOFields();
-    if (indexedMetadata.nft.owner !== (await this.signer.getAddress())) {
+		const ddoInstance = DDOManager.getDDOClass(asset);
+		const { indexedMetadata } = ddoInstance.getAssetFields();
+		const { services } = ddoInstance.getDDOFields();
+		if (indexedMetadata.nft.owner !== (await this.signer.getAddress())) {
       console.error(
         "You are not the owner of this asset, and there for you cannot update it."
       );
       return;
     }
 
-    if (services[0].type !== "compute") {
+		if (services[0].type !== "compute") {
       console.error(
         "Error getting computeService for " +
-        args[1] +
-        ".  Does this asset has an computeService?"
+          args[1] +
+          ".  Does this asset has an computeService?"
       );
       return;
     }
@@ -1342,15 +1342,15 @@ export class Commands {
       );
       return;
     }
-    const algoInstance = DDOManager.getDDOClass(algoAsset);
-    const { services: servicesAlgo, metadata: metadataAlgo } = algoInstance.getDDOFields();
+		const algoInstance = DDOManager.getDDOClass(algoAsset);
+		const { services: servicesAlgo, metadata: metadataAlgo } = algoInstance.getDDOFields();
     const encryptDDO = args[3] === "false" ? false : true;
     let filesChecksum;
     try {
       filesChecksum = await ProviderInstance.checkDidFiles(
         algoAsset.id,
-        servicesAlgo[0].id,
-        servicesAlgo[0].serviceEndpoint,
+				servicesAlgo[0].id,
+				servicesAlgo[0].serviceEndpoint,
         true
       );
     } catch (e) {
@@ -1359,18 +1359,18 @@ export class Commands {
     }
 
     const containerChecksum =
-      metadataAlgo.algorithm.container.entrypoint +
-      metadataAlgo.algorithm.container.checksum;
+			metadataAlgo.algorithm.container.entrypoint +
+			metadataAlgo.algorithm.container.checksum;
     const trustedAlgorithm = {
       did: algoAsset.id,
       containerSectionChecksum: getHash(containerChecksum),
       filesChecksum: filesChecksum?.[0]?.checksum,
-      serviceId: servicesAlgo[0].id,
+			serviceId: servicesAlgo[0].id,
     };
-    if (!services[0].compute.publisherTrustedAlgorithms) {
-      services[0].compute.publisherTrustedAlgorithms = [];
-    }
-    services[0].compute.publisherTrustedAlgorithms.push(trustedAlgorithm);
+		if (!services[0].compute.publisherTrustedAlgorithms) {
+			services[0].compute.publisherTrustedAlgorithms = [];
+		}
+		services[0].compute.publisherTrustedAlgorithms.push(trustedAlgorithm);
     try {
       const txid = await updateAssetMetadata(
         this.signer,
@@ -1400,51 +1400,51 @@ export class Commands {
       );
       return;
     }
-    const ddoInstance = DDOManager.getDDOClass(asset);
-    const { indexedMetadata } = ddoInstance.getAssetFields();
-    const { services } = ddoInstance.getDDOFields();
-    if (indexedMetadata.nft.owner !== (await this.signer.getAddress())) {
+		const ddoInstance = DDOManager.getDDOClass(asset);
+		const { indexedMetadata } = ddoInstance.getAssetFields();
+		const { services } = ddoInstance.getDDOFields();
+		if (indexedMetadata.nft.owner !== (await this.signer.getAddress())) {
       console.error(
         "You are not the owner of this asset, and there for you cannot update it."
       );
       return;
     }
-    if (services[0].type !== "compute") {
+		if (services[0].type !== "compute") {
       console.error(
         "Error getting computeService for " +
-        args[1] +
-        ".  Does this asset has an computeService?"
+          args[1] +
+          ".  Does this asset has an computeService?"
       );
       return;
     }
-    if (
-      !services[0].compute.publisherTrustedAlgorithms ||
-      services[0].compute.publisherTrustedAlgorithms.length === 0
-    ) {
+		if (
+			!services[0].compute.publisherTrustedAlgorithms ||
+			services[0].compute.publisherTrustedAlgorithms.length === 0
+		) {
       console.error(
         "Asset " +
-        args[1] +
-        " has no publisherTrustedAlgorithms list to remove an algorithm from."
+          args[1] +
+          " has no publisherTrustedAlgorithms list to remove an algorithm from."
       );
       return;
     }
     const encryptDDO = args[3] === "false" ? false : true;
     const indexToDelete =
-      services[0].compute.publisherTrustedAlgorithms.findIndex(
+			services[0].compute.publisherTrustedAlgorithms.findIndex(
         (item) => item.did === args[2]
       );
 
     if (indexToDelete !== -1) {
-      services[0].compute.publisherTrustedAlgorithms.splice(
+			services[0].compute.publisherTrustedAlgorithms.splice(
         indexToDelete,
         1
       );
     } else {
       console.error(
         " " +
-        args[2] +
-        ".  is not allowed by the publisher to run on " +
-        args[1]
+          args[2] +
+          ".  is not allowed by the publisher to run on " +
+          args[1]
       );
       return;
     }
@@ -1788,7 +1788,7 @@ export class Commands {
       console.log(`Transferable: ${transferable}`);
       console.log(`Owner: ${owner}`);
       console.log(
-        `Initial users: ${initialUsers.length > 0 ? initialUsers.join(", ") : "none"
+				`Initial users: ${initialUsers.length > 0 ? initialUsers.join(", ") : "none"
         }`
       );
 

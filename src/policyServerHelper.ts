@@ -1,5 +1,5 @@
 import { Asset } from "@oceanprotocol/ddo-js"
-import { PolicyServerActions, PolicyServerGetPdAction, PolicyServerInitiateAction, PolicyServerInitiateActionData, PolicyServerInitiateComputeActionData, PolicyServerPresentationDefinition, SsiVerifiableCredential, SsiWalletDid, SsiWalletSession } from "./policyServerInterfaces"
+import { PolicyServerActions, PolicyServerGetPdAction, PolicyServerInitiateAction, PolicyServerInitiateActionData, PolicyServerInitiateComputeActionData, PolicyServerPresentationDefinition, SsiVerifiableCredential, SsiWalletDid, SsiWalletSession } from "./policyServerInterfaces.js"
 import axios from "axios"
 import { Signer } from "ethers"
 
@@ -250,8 +250,15 @@ export async function getPolicyServerOBJ(
   serviceId: string,
   signer: Signer,
   providerUrl: string
-): Promise<PolicyServerInitiateActionData> {
+): Promise<PolicyServerInitiateActionData | null> {
   try {
+    const statusResponse = await axios.post(`${providerUrl}/directCommand`, {
+      command: 'status'
+    })
+    if (statusResponse.data?.isPSConfigured !== true) {
+      return null
+    }
+
     const accountId = await signer.getAddress()
     const presentationResult = await requestCredentialPresentation(
       ddo,
@@ -382,6 +389,9 @@ export async function getPolicyServerOBJs(
         signer,
         providerUrl
       )
+      if (!result) {
+        return null
+      }
       results.push({
         ...result,
         documentId: ddo.documentId,
@@ -400,6 +410,9 @@ export async function getPolicyServerOBJs(
         signer,
         providerUrl
       )
+      if (!algoResult) {
+        return null
+      }
       results.push({
         ...algoResult,
         documentId: algo.documentId,

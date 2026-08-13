@@ -92,10 +92,10 @@ export AVOID_LOOP_RUN='true/false'
 
 - Optional, set SSI_WALLET_API, SSI_WALLET_ID, SSI_WALLET_DID to support v5 DDOs (assets using credentialSubject and SSI policy flows).
 
-```
+```bash
 export SSI_WALLET_API="https://your-ssi-wallet.example/api"
 export SSI_WALLET_ID="did:example:your-wallet-did-or-id"
-export export SSI_WALLET_DID="did:example"
+export SSI_WALLET_DID="did:example"
 ```
 
 
@@ -116,7 +116,7 @@ npm run cli h
 
 E.g. run publish command
 
-Make sure to update chainId and serviceEnpoint from the assets from `metadata` folder.
+Make sure to update chainId and serviceEndpoint from the assets from `metadata` folder.
 
 ```
 npm run cli publish metadata/simpleDownloadDataset.json
@@ -211,7 +211,7 @@ npm run cli <command> [options] <arguments>
   `npm run cli startCompute -- did1,did2 algoDid env1 maxJobDuration paymentToken resources svc1,svc2 algoServiceId`
 
 - **Named Options:**  
-  `npm run cli startCompute --datasets did1,did2 --algo algoDid --env env1 --maxJobDuration maxJobDuration --token paymentToken --resources resources --accept true --services svc1,svc2 ----algo-service algoServiceId`
+  `npm run cli startCompute --datasets did1,did2 --algo algoDid --env env1 --maxJobDuration maxJobDuration --token paymentToken --resources resources --accept true --services svc1,svc2 --algo-service algoServiceId`
   (Options can be provided in any order.)
 
 - **Rules:**
@@ -225,6 +225,17 @@ e.g.: `'[{"id":"cpu","amount":3},{"id":"ram","amount":16772672536},{"id":"disk",
 -  `--accept` option can be set to `true` or `false`. If it is set to `false` a prompt will be displayed to the user for manual accepting the payment before starting a compute job. If it is set to `true`, the compute job starts automatically, without user input.
 - `output` is an optional stringified JSON object specifying a remote storage backend where job results will be uploaded. Supported types include S3, FTP, URL, Arweave, and IPFS. If omitted, results are stored on the node's local disk. e.g.: `'{"remoteStorage":{"type":"s3","s3Access":{"endpoint":"https://s3.amazonaws.com","region":"us-east-1","bucket":"my-results","objectKey":"jobs/result.tar","accessKeyId":"AKIA...","secretAccessKey":"..."}}}'`
 
+**Raw (unpublished) datasets and algorithms:**
+
+Instead of a DID, you can pass a full `ComputeAsset` (datasets) or `ComputeAlgorithm` (algorithm) JSON object with a `fileObject`, to run compute on raw data/algorithms that are not published as assets. Raw entries have no DID and are not ordered (no datatoken). DID-based and raw entries can be mixed within the datasets argument (the value must then be valid JSON, with DIDs quoted). JSON must be single-quoted on the shell.
+
+- Raw algorithm against a published dataset that allows raw algorithms (`allowRawAlgorithm: true`):  
+  `npm run cli startCompute -- did:op:dataset '{"fileObject":{"type":"url","url":"https://example.com/algo.py","method":"GET"},"meta":{"container":{"entrypoint":"python $ALGO","image":"oceanprotocol/algo_dockers","tag":"python-branin","checksum":"sha256:..."}}}' env1 900 paymentToken resources --accept true`
+- Raw dataset(s) against a published algorithm:  
+  `npm run cli startCompute -- '[{"fileObject":{"type":"url","url":"https://example.com/data.csv","method":"GET"}}]' did:op:algo env1 900 paymentToken resources --accept true`
+- Mixed datasets (a published DID and a raw file):  
+  `npm run cli startCompute -- '["did:op:dataset",{"fileObject":{"type":"ipfs","hash":"Qm..."}}]' did:op:algo env1 900 paymentToken resources --accept true`
+
 ---
 
 **Start Free Compute:**
@@ -233,7 +244,7 @@ e.g.: `'[{"id":"cpu","amount":3},{"id":"ram","amount":16772672536},{"id":"disk",
   `npm run cli startFreeCompute did1,did2 algoDid env1`
 
 - **Named Options:**
-  `npm run cli startFreeCompute --datasets did1,did2 --algo algoDid --env env1 --services svc1,svc2 ----algo-service algoServiceId`
+  `npm run cli startFreeCompute --datasets did1,did2 --algo algoDid --env env1 --services svc1,svc2 --algo-service algoServiceId`
   (Options can be provided in any order.)
 
   - `output` is an optional stringified JSON object specifying a remote storage backend where job results will be uploaded. Same format as `startCompute`.
@@ -243,6 +254,8 @@ e.g.: `'[{"id":"cpu","amount":3},{"id":"ram","amount":16772672536},{"id":"disk",
   (Options can be provided in any order.)
 
 - `output` is an optional stringified JSON object specifying a remote storage backend where job results will be uploaded. Same format as `startCompute`.
+- Like `startCompute`, the datasets and algorithm arguments accept raw `ComputeAsset`/`ComputeAlgorithm` JSON objects with a `fileObject` (no DID), and mixed DID + raw datasets. e.g.:  
+  `npm run cli startFreeCompute did:op:dataset '{"fileObject":{"type":"url","url":"https://example.com/algo.py","method":"GET"},"meta":{"container":{"entrypoint":"python $ALGO","image":"oceanprotocol/algo_dockers","tag":"python-branin","checksum":"sha256:..."}}}' env1`
 
 ---
 

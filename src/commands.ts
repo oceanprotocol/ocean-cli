@@ -903,6 +903,60 @@ export class Commands {
       return;
     }
 
+    // verifyFundsForEscrowPayment creates the authorization for this node when none
+    // exists, but it sends that transaction through sendPreparedTransaction, which
+    // logs and swallows a failure (a nonce collision right after the deposit tx is
+    // the common one on a fast local chain) and still reports isValid. The node then
+    // rejects computeStart with "Found 0 authorizations". Confirm it really landed,
+    // and retry once before giving up.
+    const payerAddress = await this.signer.getAddress();
+    const payeeAddress = getAddress(computeEnv.consumerAddress);
+    const minLockSeconds =
+      parsedProviderInitializeComputeJob.payment.minLockSeconds.toString();
+    let authorizations = await escrow.getAuthorizations(
+      getAddress(paymentToken),
+      payerAddress,
+      payeeAddress
+    );
+    if (!authorizations || authorizations.length === 0) {
+      console.log(
+        chalk.yellow(
+          "Escrow authorization for the compute node is missing after the funds check — authorizing explicitly..."
+        )
+      );
+      // Ten times the job cost as the ceiling: locks accumulate against
+      // maxLockedAmount until they are claimed, so a ceiling of exactly one job's
+      // cost would reject the next job started before this one settles.
+      const jobCost = await unitsToAmount(
+        this.signer,
+        paymentToken,
+        parsedProviderInitializeComputeJob.payment.amount
+      );
+      const authorizeTx = await escrow.authorize(
+        getAddress(paymentToken),
+        payeeAddress,
+        (Number(jobCost) * 10).toString(),
+        minLockSeconds,
+        "10"
+      );
+      if (authorizeTx) await authorizeTx.wait();
+      authorizations = await escrow.getAuthorizations(
+        getAddress(paymentToken),
+        payerAddress,
+        payeeAddress
+      );
+    }
+    if (!authorizations || authorizations.length === 0) {
+      console.error(
+        chalk.red(
+          `Could not authorize the compute node ${payeeAddress} to lock escrow funds for token ${paymentToken}. ` +
+            `Authorize it manually and retry:\n` +
+            `  npm run cli authorizeEscrow ${paymentToken} ${payeeAddress} <maxLockedAmount> ${minLockSeconds} 10`
+        )
+      );
+      return;
+    }
+
     console.log("Starting compute job using provider: ", providerURI);
 
     const additionalDatasets = assets.length > 1 ? assets.slice(1) : null;

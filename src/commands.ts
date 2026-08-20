@@ -2358,6 +2358,23 @@ export class Commands {
     maxLockCounts: string
   ) {
     try {
+      // Neither the Escrow contract nor ocean.js rejects a zero/negative limit —
+      // authorize(…, 0, 0) would be mined and leave a payee that can never lock.
+      // Validate here so the CLI is the gate.
+      const limits: [string, string][] = [
+        ["maxLockedAmount", maxLockedAmount],
+        ["maxLockSeconds", maxLockSeconds],
+        ["maxLockCounts", maxLockCounts],
+      ];
+      for (const [name, value] of limits) {
+        if (!(Number(value) > 0)) {
+          console.error(
+            chalk.red(`${name} must be a positive number (got "${value}").`)
+          );
+          return false;
+        }
+      }
+
       const config = await getConfigByChainId(Number(this.config.chainId));
       const escrowAddress = config.Escrow;
 

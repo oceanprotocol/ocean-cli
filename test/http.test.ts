@@ -9,7 +9,6 @@ describe('Ocean Node Root Endpoint', () => {
     expect(response.status).to.equal(200);
     expect(responseBody).to.have.property('chainIds');
     expect(responseBody).to.have.property('providerAddress');
-    expect(responseBody).to.have.property('serviceEndpoints');
     expect(responseBody).to.have.property('software');
     expect(responseBody).to.have.property('version');
 

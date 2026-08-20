@@ -63,6 +63,30 @@ import {
 
 const UPLOAD_TIMEOUT_MS = 30 * 60_000;
 
+// A node log endpoint streams in follow mode: it stays open for as long as the
+// container lives, so reading it to the end never returns. Left unbounded, undici
+// eventually kills the body with UND_ERR_BODY_TIMEOUT and everything buffered so
+// far is lost with it. Read for this window instead, then abort and print what
+// arrived (an idle container legitimately sends nothing at all).
+const LOGS_STREAM_WINDOW_MS = 15_000;
+
+/**
+ * Drains a (possibly endless) log stream into a string. Chunks already received
+ * when the read is aborted are kept — a bounded read is the normal way this ends.
+ */
+async function drainLogStream(stream: any): Promise<string> {
+  const chunks: Uint8Array[] = [];
+  if (!stream[Symbol.asyncIterator]) {
+    return await new Response(stream).text();
+  }
+  try {
+    for await (const chunk of stream) chunks.push(chunk);
+  } catch (error) {
+    if (chunks.length === 0) throw error;
+  }
+  return Buffer.concat(chunks).toString("utf-8");
+}
+
 export class Commands {
   public signer: Signer;
   public config: Config;
@@ -903,18 +927,71 @@ export class Commands {
       return;
     }
 
-    // verifyFundsForEscrowPayment creates the authorization for this node when none
-    // exists, but it sends that transaction through sendPreparedTransaction, which
-    // logs and swallows a failure (a nonce collision right after the deposit tx is
-    // the common one on a fast local chain) and still reports isValid. The node then
-    // rejects computeStart with "Found 0 authorizations". Confirm it really landed,
-    // and retry once before giving up.
+    // verifyFundsForEscrowPayment deposits funds and authorizes this node when
+    // either is missing, but it sends both transactions through
+    // sendPreparedTransaction, which logs and swallows a failure (a nonce collision
+    // between those back-to-back txs is the common one on a fast local chain) and
+    // still reports isValid. The node then rejects computeStart with "User ... does
+    // not have enough funds" or "Found 0 authorizations". Confirm both really
+    // landed, and retry once each before giving up.
     const payerAddress = await this.signer.getAddress();
     const payeeAddress = getAddress(computeEnv.consumerAddress);
+    const tokenAddress = getAddress(paymentToken);
     const minLockSeconds =
       parsedProviderInitializeComputeJob.payment.minLockSeconds.toString();
+
+    const requiredUnits = BigInt(
+      parsedProviderInitializeComputeJob.payment.amount.toString()
+    );
+    const availableUnits = async (): Promise<bigint> => {
+      // ethers returns the userFunds struct; `available` excludes what is locked.
+      const funds = await escrow.getUserFunds(payerAddress, tokenAddress);
+      return BigInt((funds.available ?? funds[0]).toString());
+    };
+    let available = await availableUnits();
+    if (available < requiredUnits) {
+      const shortfallUnits = requiredUnits - available;
+      const shortfall = await unitsToAmount(
+        this.signer,
+        paymentToken,
+        shortfallUnits.toString()
+      );
+      console.log(
+        chalk.yellow(
+          `Escrow balance is short of this job's cost — depositing ${shortfall}...`
+        )
+      );
+      const tokenContract = new ethers.Contract(
+        paymentToken,
+        ["function approve(address spender, uint256 amount) returns (bool)"],
+        this.signer
+      );
+      const approveTx = await tokenContract.approve(
+        getAddress(parsedProviderInitializeComputeJob.payment.escrowAddress),
+        shortfallUnits
+      );
+      await approveTx.wait();
+      const depositTx = await escrow.deposit(paymentToken, shortfall);
+      if (depositTx) await depositTx.wait();
+      available = await availableUnits();
+    }
+    if (available < requiredUnits) {
+      const needed = await unitsToAmount(
+        this.signer,
+        paymentToken,
+        requiredUnits.toString()
+      );
+      console.error(
+        chalk.red(
+          `Escrow balance for token ${paymentToken} is below this job's cost (${needed}) and the deposit did not go through. ` +
+            `Deposit manually and retry:\n` +
+            `  npm run cli depositEscrow ${paymentToken} ${needed}`
+        )
+      );
+      return;
+    }
     let authorizations = await escrow.getAuthorizations(
-      getAddress(paymentToken),
+      tokenAddress,
       payerAddress,
       payeeAddress
     );
@@ -933,7 +1010,7 @@ export class Commands {
         parsedProviderInitializeComputeJob.payment.amount
       );
       const authorizeTx = await escrow.authorize(
-        getAddress(paymentToken),
+        tokenAddress,
         payeeAddress,
         (Number(jobCost) * 10).toString(),
         minLockSeconds,
@@ -941,7 +1018,7 @@ export class Commands {
       );
       if (authorizeTx) await authorizeTx.wait();
       authorizations = await escrow.getAuthorizations(
-        getAddress(paymentToken),
+        tokenAddress,
         payerAddress,
         payeeAddress
       );
@@ -1233,29 +1310,41 @@ export class Commands {
 
   public async computeStreamableLogs(args: string[]) {
     const jobId = args[0];
-    const logsResponse = await ProviderInstance.computeStreamableLogs(
-      this.oceanNodeUrl,
-      this.signer,
-      jobId
-    );
+    const controller = new AbortController();
+    let windowElapsed = false;
+    const timer = setTimeout(() => {
+      windowElapsed = true;
+      controller.abort();
+    }, LOGS_STREAM_WINDOW_MS);
+    try {
+      const logsResponse = await ProviderInstance.computeStreamableLogs(
+        this.oceanNodeUrl,
+        this.signer,
+        jobId,
+        controller.signal
+      );
 
-    if (!logsResponse) {
-      console.error("Error fetching streamable logs. No logs available.");
-      return;
-    }
-
-    let text: string;
-    if (logsResponse[Symbol.asyncIterator]) {
-      const chunks: Uint8Array[] = [];
-      for await (const chunk of logsResponse) {
-        chunks.push(chunk);
+      if (!logsResponse) {
+        console.error("Error fetching streamable logs. No logs available.");
+        return;
       }
-      text = Buffer.concat(chunks).toString("utf-8");
-    } else {
-      text = await new Response(logsResponse).text();
+
+      const text = await drainLogStream(logsResponse);
+      console.log("Streamable Logs:");
+      console.log(text);
+    } catch (error) {
+      if (windowElapsed) {
+        console.error(
+          `No logs streamed for job ${jobId} within ${
+            LOGS_STREAM_WINDOW_MS / 1000
+          }s.`
+        );
+        return;
+      }
+      console.error("Error fetching streamable logs:", error);
+    } finally {
+      clearTimeout(timer);
     }
-    console.log("Streamable Logs:");
-    console.log(text);
   }
 
   // =========================================================================
@@ -1749,12 +1838,19 @@ export class Commands {
   }
 
   public async serviceLogs(serviceId: string, since?: string): Promise<void> {
+    const controller = new AbortController();
+    let windowElapsed = false;
+    const timer = setTimeout(() => {
+      windowElapsed = true;
+      controller.abort();
+    }, LOGS_STREAM_WINDOW_MS);
     try {
       const stream = await ProviderInstance.serviceGetStreamableLogs(
         this.oceanNodeUrl,
         this.signer,
         serviceId,
-        since
+        since,
+        controller.signal
       );
       if (!stream) {
         console.log(
@@ -1762,18 +1858,31 @@ export class Commands {
         );
         return;
       }
-      let text: string;
-      if (stream[Symbol.asyncIterator]) {
-        const chunks: Uint8Array[] = [];
-        for await (const chunk of stream) chunks.push(chunk);
-        text = Buffer.concat(chunks).toString("utf-8");
-      } else {
-        text = await new Response(stream).text();
+      const text = await drainLogStream(stream);
+      if (text.trim().length === 0) {
+        console.log(
+          chalk.yellow(`No logs available for service ${serviceId}`)
+        );
+        return;
       }
       console.log("Service Logs:");
       console.log(text);
     } catch (error) {
+      // Our own deadline firing before anything arrived is not a failure: a
+      // container that has produced no output keeps the stream open and silent.
+      if (windowElapsed) {
+        console.log(
+          chalk.yellow(
+            `No logs available for service ${serviceId} (nothing streamed within ${
+              LOGS_STREAM_WINDOW_MS / 1000
+            }s)`
+          )
+        );
+        return;
+      }
       console.error(chalk.red("Error fetching service logs:"), error);
+    } finally {
+      clearTimeout(timer);
     }
   }
 

@@ -1,53 +1,5 @@
 import { expect } from "chai";
-import { spawn } from "child_process";
-import path from "path";
-import { dirname } from "path";
-import { fileURLToPath } from "url";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const projectRoot = path.resolve(__dirname, "..");
-
-// Recurring prompt string emitted by the REPL (keep in sync with src/index.ts).
-const PROMPT = "Enter command ('exit' | 'quit' or CTRL-C to terminate):\n";
-
-/**
- * Drive the interactive REPL (menu mode) with piped stdin.
- *
- * These tests are infra-free: PRIVATE_KEY/RPC/NODE_URL point at an unreachable
- * port, so a command that actually parses and runs surfaces a "Command error"
- * (connection refused) while a command that is dropped or rejected at parse time
- * does not. AVOID_LOOP_RUN is left unset so the process enters the REPL loop.
- */
-function runRepl(
-  inputLines: string[],
-  extraArgs: string[] = []
-): Promise<{ output: string; code: number | null }> {
-  return new Promise((resolve, reject) => {
-    const env = { ...process.env };
-    delete env.AVOID_LOOP_RUN;
-    env.PRIVATE_KEY =
-      "0x1d751ded5a32226054cd2e71261039b65afb9ee1c746d055dd699b1150a5befc";
-    env.RPC = "http://127.0.0.1:1";
-    env.NODE_URL = "http://127.0.0.1:1";
-
-    const child = spawn("npx", ["tsx", "src/index.ts", ...extraArgs], {
-      cwd: projectRoot,
-      env,
-    });
-
-    let output = "";
-    child.stdout.on("data", (d) => (output += d.toString()));
-    child.stderr.on("data", (d) => (output += d.toString()));
-    child.on("error", reject);
-    child.on("close", (code) => resolve({ output, code }));
-
-    for (const line of inputLines) {
-      child.stdin.write(line + "\n");
-    }
-    child.stdin.end();
-  });
-}
+import { REPL_PROMPT as PROMPT, runRepl } from "./util.js";
 
 describe("Ocean CLI interactive menu (REPL)", function () {
   this.timeout(60000);

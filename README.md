@@ -14,6 +14,7 @@ With the Ocean CLI tool you can:
 - **Edit** existing assets.
 - **Consume** data services, ordering datatokens and downloading data.
 - **Compute to data** on public available datasets using a published algorithm.
+- **Run on-demand services**: launch long-running containers (JupyterLab, inference servers, …) on compute environments, paid via escrow.
 - **Manage access control** with access lists for restricting dataset/algorithm access.
 - **Handle escrow payments** for compute jobs with deposit, withdrawal, and authorization.
 - **Manage authentication** with token generation and invalidation.
@@ -33,12 +34,36 @@ If you run into problems, please open up a [new issue](https://github.com/oceanp
 
 ## 🏗 Installation & Usage
 
-### Clone and install
+### Install globally (recommended)
+
+Install the CLI from npm to get the `ocean-cli` command available everywhere:
 
 ```bash
-$ git clone https://github.com/oceanprotocol/ocean-cli.git
-npm install
+npm install -g @oceanprotocol/cli
 ```
+
+Then invoke it directly (from any directory):
+
+```bash
+ocean-cli h                 # list commands
+ocean-cli --version
+ocean-cli publish metadata/simpleDownloadDataset.json
+```
+
+> `ocean-cli --help`, `ocean-cli -h`, `ocean-cli --version` and `ocean-cli h` work with **no** environment variables set. Every other command requires the env vars described below.
+
+### From source (for contributors)
+
+Clone and install, then run the CLI straight from TypeScript with `npm run cli` (no build step needed):
+
+```bash
+git clone https://github.com/oceanprotocol/ocean-cli.git
+cd ocean-cli
+npm install
+npm run cli h
+```
+
+> **The command examples in this README use the `npm run cli <command>` form. If you installed globally, drop the `npm run cli` prefix and use `ocean-cli <command>` instead — the two are otherwise identical.** In interactive mode you can paste either form; a leading `npm run cli` or `ocean-cli` token is stripped automatically.
 
 ### Set up environment variables
 
@@ -60,10 +85,26 @@ export MNEMONIC="XXXX"
 export RPC='XXXX'
 ```
 
-- Mandatory, Set an Ocean Node URL. Ocean Nodes infrastructure is responsible for handling assets indexing and metadata caching. It replaced old Provider and Aquarius standalone apps.
+- Optional (but recommended), set an Ocean Node URL. Ocean Nodes infrastructure is responsible for handling assets indexing and metadata caching. It replaced old Provider and Aquarius standalone apps.
 
 ```
 export NODE_URL='XXXX'
+```
+
+  `NODE_URL` is the **initial** node only. If it is not set the CLI still starts, but **only `setNode`, `getNode` and `help` are available** — every other command is refused with `No Ocean Node set` until you pick a node:
+
+```bash
+npm run cli            # starts with no node
+# > setNode http://127.0.0.1:8001
+# > getComputeEnvironments        # now works
+```
+
+  You can switch node at any time with [`setNode`](#setnode) without restarting the CLI. See [`getNode`](#getnode) to check which node is active.
+
+- Optional, set DISABLE_P2P to `'true'` to skip starting the libp2p transport. In interactive mode the CLI starts libp2p at startup (in the background, so it does not delay the prompt) even when `NODE_URL` is an HTTP URL, so that a later switch to a P2P node does not have to wait for bootstrap peers and DHT warm-up. One-shot runs (`AVOID_LOOP_RUN='true'`) skip that warm-up — they have no later command to benefit from it — and start libp2p only when the node they target is a P2P one. Set this when you only ever use HTTP nodes and do not want the CLI dialing the public Ocean bootstrap nodes.
+
+```bash
+export DISABLE_P2P='true'
 ```
 
 - Optional, set ADDRESS_FILE if you want to use a custom set of smart contract address
@@ -72,22 +113,22 @@ export NODE_URL='XXXX'
 export ADDRESS_FILE='path-to-address-file'
 ```
 
-- Optional, set INDEXING_MAX_RETRIES to the max number of retries when waiting for an asset to be indexed. Default is 100 retries max.
+- Optional, set INDEXING_MAX_RETRIES to the max number of retries when waiting for an asset to be indexed. Default is 120 retries max.
 
-```
-export INDEXING_MAX_RETRIES='100'
-```
-
-- Optional, set INDEXING_RETRY_INTERVAL to the interval (in miliseconds) for each retry when waiting for an asset to be indexed. Default is 3 seconds.
-
-```
-export INDEXING_RETRY_INTERVAL='3000'
+```bash
+export INDEXING_MAX_RETRIES='120'
 ```
 
-- Optional, set AVOID_LOOP_RUN to 'true' to run each command and exit afterwards (usefull for CI test env and default behaviour). IF not set or set to 'false' the CLI will listen interactively for commands, until exit is manually forced 
+- Optional, set INDEXING_RETRY_INTERVAL to the interval (in milliseconds) for each retry when waiting for an asset to be indexed. Default is 4 seconds (4000 ms).
 
+```bash
+export INDEXING_RETRY_INTERVAL='4000'
 ```
-export AVOID_LOOP_RUN='true/false'
+
+- Optional, set AVOID_LOOP_RUN to `'true'` to run a single command and exit afterwards (one-shot mode — required for CI and scripting). **By default the CLI is interactive**: it runs the command you pass (if any), then keeps reading further commands from a prompt, just like a REPL. Exit the interactive loop with `exit` / `quit`, the **ESC** key, or **CTRL-C**.
+
+```bash
+export AVOID_LOOP_RUN='true'   # one-shot; unset or 'false' = interactive loop
 ```
 
 - Optional, set SSI_WALLET_API, SSI_WALLET_ID, SSI_WALLET_DID to support v5 DDOs (assets using credentialSubject and SSI policy flows).
@@ -137,12 +178,41 @@ npm run cli <command> [options] <arguments>
 #### Help Commands
 
 - **General help:**  
-  `npm run cli --help` or `npm run cli -h`
+  `npm run cli --help` or `npm run cli -h` (globally: `ocean-cli --help` / `ocean-cli -h`)
+
+- **Version:**  
+  `npm run cli --version` (globally: `ocean-cli --version`)
 
 - **Command-specific help:**  
   `npm run cli help <command>`
 
 #### Examples
+
+**Choosing the Ocean Node:**
+
+<a name="setnode"></a>
+
+- **Switch node (works inside the interactive loop, no restart needed):**  
+  `npm run cli setNode http://127.0.0.1:8001`  
+  Also accepts a peer id or a full multiaddr, and `--node`:  
+  `npm run cli setNode --node /dns4/node.example/tcp/9001/ws/p2p/16Uiu2HAm...`  
+  Alias: `useNode`.
+
+  The node is health-checked before the switch: if it cannot be reached, the current node is kept and nothing changes.
+
+<a name="getnode"></a>
+
+- **Show the node in use:**  
+  `npm run cli getNode` (alias `currentNode`) — prints the active node plus its version and the chain(s) it serves.
+
+Notes when switching nodes:
+
+- **Compute jobs live on the node that started them.** After a switch, `getJobStatus` / `downloadJobResults` query the *new* node — switch back to look up older jobs.
+- **For a node on your own machine, prefer the full multiaddr** (`/ip4/127.0.0.1/tcp/9001/ws/p2p/<peerId>`) over a bare peer id: a bare id has to be found via DHT, which may not advertise localhost addresses.
+- **In one-shot mode** (`AVOID_LOOP_RUN='true'`) `setNode` only validates the node and prints the result — the switch dies with the process. Use `NODE_URL` for one-shot runs.
+- `chainId` still comes from `RPC`, never from the node. `setNode` warns when the node does not serve the chain your RPC is on.
+
+---
 
 **Get DDO:**
 
@@ -304,6 +374,78 @@ Instead of a DID, you can pass a full `ComputeAsset` (datasets) or `ComputeAlgor
 
 - **Named Options:**  
   `npm run cli downloadJobResults --job job-123 --index 0 --folder ./results`
+
+---
+
+### Service-on-Demand (long-running containers)
+
+Launch a long-running container (JupyterLab, an inference server, nginx, …) on a
+compute environment. Unlike a compute job — which runs an algorithm to completion
+and exits — an on-demand service stays up until it **expires**, is **stopped**, or
+is **extended**, and is reachable through a forwarded port (`http://<nodeHost>:<hostPort>`).
+
+Full happy path:
+
+```bash
+# 1. Inspect the node's templates and which environments can run them
+npm run cli getServiceTemplates
+
+# 2. Fund escrow and authorize the environment's consumer address as payee
+#    (maxLockSeconds must be at least duration + 3600)
+npm run cli depositEscrow 0x<token> 100
+npm run cli authorizeEscrow 0x<token> 0x<envConsumerAddress> 100 90000 100
+
+# 3a. Start from an operator template
+npm run cli -- startService <envId> 3600 0x<token> --template jupyter-cpu \
+  --user-data '{"JUPYTER_TOKEN":"secret"}'
+
+# 3b. …or bring your own image (pass the tag via --tag, NOT inside --image)
+npm run cli -- startService <envId> 3600 0x<token> \
+  --image nginxinc/nginx-unprivileged --tag alpine --ports 8080
+
+# 4. Inspect / manage
+npm run cli getServiceStatus <serviceId>          # YOUR services, full detail
+npm run cli -- getServices --status 40            # ALL owners' running services on the node (SERVICES_LIST)
+npm run cli -- serviceLogs <serviceId> --since 10m
+npm run cli -- extendService <serviceId> 1800 --accept true
+npm run cli -- restartService <serviceId>                               # REUSE: bounce container unchanged
+npm run cli -- restartService <serviceId> --cmd '["python","app.py"]'   # optional cmd/entrypoint override
+npm run cli -- restartService <serviceId> --image myrepo/algo --tag v2  # RESPEC: rebuild on a new image (#2119)
+npm run cli stopService <serviceId>
+```
+
+Notes:
+
+- **Duration is in seconds.** The CLI prints an **estimated** cost for the payment
+  prompt; the **authoritative** cost is computed by the node and shown as
+  `Node-computed cost:` right after start.
+- **Start is asynchronous.** `startService` returns immediately with a `serviceId`
+  in status `Starting (10)`; the CLI then polls until `Running (40)` (unless
+  `--wait false`) and prints the endpoint URL. If polling is interrupted, resume
+  with `getServiceStatus <serviceId>`.
+- **Escrow must be funded and authorized before start.** Escrow shortfalls do not
+  fail the HTTP call — they surface as the job ending in `Error`/`*Failed` — so the
+  CLI pre-verifies funds/authorization client-side and aborts early with the exact
+  remediation commands.
+- **Image spec:** provide at most one of `--tag`, `--checksum`, `--dockerfile`, and
+  keep the tag in `--tag` (an image reference that already contains a tag makes the
+  node build an invalid `image:tag:latest` reference).
+- **Ports:** containers run with `CapDrop ALL` and cannot bind ports below 1024 —
+  services must listen on a high container port (e.g. 8080).
+- **`--user-data`** is a plain JSON object of container env vars; ocean.js encrypts
+  it to the node's key. The CLI **never logs its values** (keys only).
+- **`getServiceStatus` vs `getServices`:** `getServiceStatus` shows *your* services
+  with full detail; `getServices` (alias `listServices`, the SERVICES_LIST command)
+  lists services across *all* owners on the node, with the docker image spec
+  stripped, and supports `--status` / `--include-all` / `--from` filters.
+- **`restartService` has two modes (#2119):** with **no** container-spec flags the
+  container bounces on its stored spec (REUSE); supplying any image-spec flag
+  (`--image`, `--tag`, `--checksum`, `--dockerfile`, `--additional-docker-files`)
+  rebuilds the container on the new spec (RESPEC), keeping the same ports, expiry
+  and payment window at no extra charge.
+- **`restartService --cmd/--entrypoint`** replace the stored command/entrypoint on
+  the recreated container (an empty array clears them); omit to reuse the stored
+  configuration.
 
 ---
 
@@ -513,6 +655,12 @@ Instead of a DID, you can pass a full `ComputeAsset` (datasets) or `ComputeAlgor
 
 #### Available Named Options Per Command
 
+- **setNode** (alias `useNode`)**:**  
+  `<nodeUrl>` (Positional. HTTP(S) URL, peer id or full multiaddr)  
+  `-n, --node <nodeUrl>` (Same as the positional)
+
+- **getNode** (alias `currentNode`)**:** no arguments
+
 - **getDDO:**  
   `-d, --did <did>`
 
@@ -580,6 +728,58 @@ Instead of a DID, you can pass a full `ComputeAsset` (datasets) or `ComputeAlgor
   `-j, --job <jobId>`  
   `-i, --index <index>`  
   `-f, --folder [destinationFolder]`
+
+- **getServiceTemplates:** (alias `serviceTemplates`)  
+  `[node]` (Optional positional. Ocean Node URL or peer id to query; defaults to `NODE_URL`)  
+  `-n, --node <node>` (Optional. Same as the positional)
+
+- **startService:**  
+  `<computeEnvId>` `<duration>` (seconds) `<paymentToken>` (required positionals)  
+  `--template <templateId>` (Start from an operator-published template)  
+  `-i, --image <image>` (Container image — alternative to `--template`; keep the tag in `--tag`)  
+  `--tag <tag>` / `--checksum <sha256>` / `--dockerfile <path>` (image spec — provide at most one)  
+  `--additional-docker-files <path>` (JSON file of `{filename: content}`, used with `--dockerfile`)  
+  `--cmd <json>` / `--entrypoint <json>` (Docker CMD/ENTRYPOINT override as JSON arrays)  
+  `-p, --ports <ports>` (Comma-separated container ports, e.g. `8888,8080`)  
+  `-r, --resources <resources>` (Stringified JSON `[{"id":"cpu","amount":1},…]`; defaults to template requirements)  
+  `-u, --user-data <json>` / `--user-data-file <path>` (Container env vars; encrypted to the node, never logged)  
+  `--accept [boolean]` (Auto-confirm payment)  
+  `--wait [boolean]` (Poll until Running/failure; default `true`)  
+  `--timeout <seconds>` (Max seconds to wait for Running; default 600)
+
+- **getServiceStatus:** (alias `myServices`)  
+  `[serviceId]` (Optional; omit to list all your services)  
+  `-s, --service <serviceId>`  
+  `-v, --verbose [boolean]` (Dump full job objects)
+
+- **getServices:** (alias `listServices` — the SERVICES_LIST command, all owners)  
+  `[node]` / `-n, --node <node>` (Optional Ocean Node URL or peer id; defaults to `NODE_URL`)  
+  `--status <status>` (Filter by a single status number, e.g. `40` for Running)  
+  `--include-all [boolean]` (Include all statuses, not just active reservations)  
+  `--from <timestamp>` (Only services created at/after this ISO string or Unix timestamp)  
+  `-v, --verbose [boolean]` (Dump full job objects)
+
+- **serviceLogs:** (alias `computeServiceLogs`)  
+  `<serviceId>` / `-s, --service <serviceId>`  
+  `--since <since>` (Unix seconds or a relative duration like `30s` / `2h`)
+
+- **extendService:**  
+  `<serviceId>` `<additionalDuration>` (seconds) `[paymentToken]`  
+  `-s, --service <serviceId>`  
+  `--duration <additionalDuration>`  
+  `-t, --token [paymentToken]` (defaults to the token used at start)  
+  `--accept [boolean]` (Auto-confirm payment)
+
+- **restartService:**  
+  `<serviceId>`  
+  `-u, --user-data <json>` / `--user-data-file <path>` (REPLACE stored env vars)  
+  `--cmd <json>` / `--entrypoint <json>` (REPLACE stored Docker CMD/ENTRYPOINT; empty array clears)  
+  `--image <image>` / `--tag <tag>` / `--checksum <checksum>` / `--dockerfile <dockerfile>` / `--additional-docker-files <json>` (RESPEC: rebuild the container on a new image spec; #2119)  
+  `--wait [boolean]` (Poll until Running; default `true`)  
+  `--timeout <seconds>` (Max seconds to wait; default 600)
+
+- **stopService:**  
+  `<serviceId>` / `-s, --service <serviceId>`
 
 - **mintOcean:**  
   No options/arguments required.

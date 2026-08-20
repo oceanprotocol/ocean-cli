@@ -28,7 +28,14 @@ describe("Ocean CLI Service-on-Demand", function () {
   const IMAGE = "nginxinc/nginx-unprivileged";
   const TAG = "alpine";
   const CONTAINER_PORT = 8080;
-  const START_DURATION = 300; // seconds
+  // The node sets expiresAt = creation + duration (compute_engine_docker.ts,
+  // createServiceJob) — the clock starts BEFORE the image pull, the escrow
+  // lock/claim and the container start, and every later step here costs another
+  // cold `npx tsx` spawn. With a short window the service can be Expired by the
+  // time extend/restart run, and the node then rejects them ("Cannot extend
+  // service ...: it has expired"). Priced at cpu 1 + ram 1 per minute on barge,
+  // 30 minutes costs 60 of the 500 deposited below.
+  const START_DURATION = 1800; // seconds
   const EXTEND_DURATION = 60; // seconds
 
   let skipLifecycle = false;

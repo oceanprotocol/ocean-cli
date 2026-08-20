@@ -1,6 +1,7 @@
 import { exec, spawn } from "child_process";
 import path from "path";
 import util from "util";
+import { config as chaiConfig } from "chai";
 
 import { dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -13,11 +14,29 @@ export const __dirname = dirname(__filename)
 
 
 export const projectRoot = path.resolve(__dirname, "..");
+
+// Never truncate assertion diffs: CLI output is long and a 40-char truncation
+// ("expected '\n> @oceanprotocol/cli@...' to match /extended/i") hides the very
+// text a failure needs to be diagnosed from a CI log.
+chaiConfig.truncateThreshold = 0;
+
+/**
+ * The CLI prints every failure with console.error (stderr) and only successes
+ * with console.log (stdout). runCommand returns stdout — so a command that
+ * exits 0 after printing an error would otherwise look like silent, empty
+ * output. Always echo stderr so the reason is in the log.
+ */
+const logStderr = (stderr?: string) => {
+    if (stderr && stderr.trim().length > 0) {
+        console.error(`[STDERR]:\n${stderr}`);
+    }
+};
 export const runCommand = async (command: string): Promise<string> => {
     console.log(`\n[CMD]: ${command}`);
     try {
-        const { stdout } = await execPromise(command, { cwd: projectRoot });
+        const { stdout, stderr } = await execPromise(command, { cwd: projectRoot });
         console.log(`[OUTPUT]:\n${stdout}`);
+        logStderr(stderr);
         return stdout;
     } catch (error: any) {
         console.error(`[ERROR]:\n${error.stderr || error.message}`);
@@ -31,11 +50,12 @@ export const runCommandAs = async (
 ): Promise<string> => {
     console.log(`\n[CMD as ${privateKey.slice(0, 6)}…]: ${command}`);
     try {
-        const { stdout } = await execPromise(command, {
+        const { stdout, stderr } = await execPromise(command, {
             cwd: projectRoot,
             env: { ...process.env, PRIVATE_KEY: privateKey },
         });
         console.log(`[OUTPUT]:\n${stdout}`);
+        logStderr(stderr);
         return stdout;
     } catch (error: any) {
         console.error(`[ERROR]:\n${error.stderr || error.message}`);

@@ -2,17 +2,35 @@ import { Command } from "commander";
 import { Commands } from "./commands.js";
 import { JsonRpcProvider, Signer, ethers } from "ethers";
 import fs from "fs";
+import { createRequire } from "module";
 import chalk from "chalk";
 import { stdin as input, stdout } from "node:process";
 import { createInterface } from "readline/promises";
 import {
   unitsToAmount,
-  ProviderInstance,
   isP2pUri,
   ServiceStatusNumber,
   ServiceRestartParams,
 } from "@oceanprotocol/lib";
 import { toBoolean } from "./helpers.js";
+import {
+  getCurrentNodeUrl,
+  hasNode,
+  nodeChainIds,
+  setCurrentNodeUrl,
+  startP2P,
+  validateNode,
+} from "./nodeConnection.js";
+
+// Commands usable before any Ocean Node is selected. Everything else is refused by the
+// preAction gate below until `setNode` succeeds. Canonical names only — aliases
+// (useNode, currentNode, h) resolve to these.
+const NODE_FREE_COMMANDS = new Set(["setNode", "getNode", "help"]);
+
+// Single source of truth for the CLI version: read it from package.json instead
+// of hardcoding, so it can't drift. `../package.json` resolves from both src/
+// (dev via tsx) and dist/ (published), since both sit one level below the root.
+const pkg = createRequire(import.meta.url)("../package.json");
 
 // Parse a CLI JSON array-of-strings option (e.g. --cmd '["python","app.py"]').
 // Returns the array, or throws with a clear message for the action to surface.
@@ -59,97 +77,76 @@ async function initializeSigner() {
 }
 
 export async function createCLI() {
-  if (!process.env.MNEMONIC && !process.env.PRIVATE_KEY) {
-    console.error(chalk.red("Have you forgot to set MNEMONIC or PRIVATE_KEY?"));
-    process.exit(1);
-  }
-  if (!process.env.RPC) {
-    console.error(chalk.red("Have you forgot to set env RPC?"));
-    process.exit(1);
-  }
+  // A pure help/version invocation must work with no configuration at all (a
+  // globally installed binary is expected to answer `--help`/`--version`
+  // without credentials). Detect it from argv and skip both env validation and
+  // the P2P bootstrap in that case; every real command still validates below.
+  const argv = process.argv.slice(2);
+  const isHelpOrVersion =
+    argv.includes("--help") ||
+    argv.includes("-h") ||
+    argv.includes("--version") ||
+    argv.includes("-V") ||
+    argv[0] === "help" ||
+    argv[0] === "h";
 
-  if (!process.env.NODE_URL) {
-    console.error(chalk.red("Have you forgot to set env NODE_URL?"));
-    process.exit(1);
-  }
-
-  if (isP2pUri(process.env.NODE_URL)) {
-    const extra = process.env.BOOTSTRAP_PEERS?.split(",").filter(Boolean) || [];
-
-    // Default Ocean bootstrap nodes (must be included explicitly since passing
-    // bootstrapPeers to setupP2P replaces the built-in defaults)
-    const oceanDefaults = [
-      "/dns4/bootstrap1.oncompute.ai/tcp/9001/ws/p2p/16Uiu2HAmLhRDqfufZiQnxvQs2XHhd6hwkLSPfjAQg1gH8wgRixiP",
-      "/dns4/bootstrap2.oncompute.ai/tcp/9001/ws/p2p/16Uiu2HAmHwzeVw7RpGopjZe6qNBJbzDDBdqtrSk7Gcx1emYsfgL4",
-      "/dns4/bootstrap3.oncompute.ai/tcp/9001/ws/p2p/16Uiu2HAmBKSeEP3v4tYEPsZsZv9VELinyMCsrVTJW9BvQeFXx28U",
-      "/dns4/bootstrap4.oncompute.ai/tcp/9001/ws/p2p/16Uiu2HAmSTVTArioKm2wVcyeASHYEsnx2ZNq467Z4GMDU4ErEPom",
-    ];
-
-    const nodeUrl = process.env.NODE_URL;
-    const isFullMultiaddr =
-      nodeUrl.startsWith("/") && nodeUrl.includes("/p2p/");
-    const localPeer = isFullMultiaddr
-      ? [nodeUrl]
-      : [`/ip4/127.0.0.1/tcp/9001/ws/p2p/${nodeUrl}`];
-    const bootstrapPeers = [...localPeer, ...extra, ...oceanDefaults];
-    console.log(chalk.cyan("P2P mode detected. Initializing libp2p..."));
-    console.log(chalk.cyan(`Bootstrap peers: ${bootstrapPeers.length}`));
-
-    for (const peer of localPeer) {
-      console.log(chalk.cyan(`  Local: ${peer}`));
+  if (!isHelpOrVersion) {
+    if (!process.env.MNEMONIC && !process.env.PRIVATE_KEY) {
+      console.error(chalk.red("Have you forgot to set MNEMONIC or PRIVATE_KEY?"));
+      process.exit(1);
     }
-    // Allow localhost connections / local nodes
-    await ProviderInstance.setupP2P({
-      bootstrapPeers,
-      libp2p: {
-        connectionGater: {
-          denyDialMultiaddr: () => false,
-        },
-      },
-    } as any);
-    console.log(
-      chalk.cyan("libp2p node started. Waiting for peer connections...")
-    );
-
-    // Wait for the TARGET peer (the one in NODE_URL) to be connected,
-    // not just any bootstrap peer — otherwise signed commands fail with
-    // "Cannot reach peer ...".
-    const targetPeerId = isFullMultiaddr
-      ? nodeUrl.split("/p2p/").pop()!
-      : nodeUrl;
-    const maxWait = 20_000;
-    const interval = 500;
-    let waited = 0;
-    const libp2p = (ProviderInstance as any).p2pProvider?.libp2pNode;
-    const isTargetConnected = () =>
-      (libp2p?.getPeers() ?? []).some(
-        (p: { toString(): string }) => p.toString() === targetPeerId
-      );
-    while (waited < maxWait) {
-      if (isTargetConnected()) {
-        const total = libp2p?.getConnections()?.length ?? 0;
-        console.log(
-          chalk.green(
-            `Connected to target peer ${targetPeerId.slice(0, 12)}… in ${waited}ms (total peers: ${total})`
-          )
-        );
-        break;
-      }
-      await new Promise((r) => setTimeout(r, interval));
-      waited += interval;
-      if (waited % 3000 === 0) {
-        const total = libp2p?.getConnections()?.length ?? 0;
-        console.log(
-          chalk.yellow(
-            `  Waiting for target peer ${targetPeerId.slice(0, 12)}… (${waited / 1000}s, ${total} other peer(s))`
-          )
-        );
-      }
+    if (!process.env.RPC) {
+      console.error(chalk.red("Have you forgot to set env RPC?"));
+      process.exit(1);
     }
-    if (!isTargetConnected()) {
+  }
+
+  // NODE_URL is optional: without it the CLI still starts, but only the commands in
+  // NODE_FREE_COMMANDS are accepted until `setNode` picks a node (see the gate below).
+  if (!isHelpOrVersion) {
+    if (process.env.DISABLE_P2P === "true" && isP2pUri(getCurrentNodeUrl())) {
       console.error(
         chalk.red(
-          `Target peer ${targetPeerId} not reachable after ${maxWait / 1000}s. Commands will fail.`
+          "NODE_URL is a P2P URI but DISABLE_P2P=true — no command could reach it."
+        )
+      );
+      process.exit(1);
+    }
+
+    // Eager, non-blocking: libp2p warms up (bootstrap dials + DHT) while the user reads
+    // the prompt, so a later switch to a P2P node doesn't pay that cost interactively.
+    //
+    // Only in loop mode. A one-shot run has no "later command" to warm up for, and
+    // starting a libp2p node it never uses would just delay its exit — the process
+    // cannot end until the node is up and stopped again. One-shot runs that *do* target
+    // a P2P node still get it: validateNode() -> ensureP2PReady() starts it on demand.
+    if (process.env.AVOID_LOOP_RUN !== "true") {
+      startP2P(process.env.NODE_URL);
+    }
+
+    if (hasNode()) {
+      // Confirms the startup node is reachable before the user types anything. For a
+      // P2P node the status call dials the peer, which is what the old wait-for-peer
+      // polling loop used to do.
+      const status = await validateNode(getCurrentNodeUrl());
+      if (status) {
+        console.log(
+          chalk.green(
+            `Using node ${getCurrentNodeUrl()} (version ${status.version})`
+          )
+        );
+      } else {
+        console.error(
+          chalk.red(
+            `Node ${getCurrentNodeUrl()} is not reachable. Commands may fail.`
+          )
+        );
+      }
+    } else {
+      console.log(
+        chalk.yellow(
+          "No Ocean Node configured. Run `setNode <nodeUrl>` to choose one — " +
+            `only ${[...NODE_FREE_COMMANDS].join(", ")} are available until then.`
         )
       );
     }
@@ -160,8 +157,25 @@ export async function createCLI() {
   program
     .name("ocean-cli")
     .description("CLI tool to interact with Ocean Protocol")
-    .version("2.0.0")
+    .version(pkg.version)
     .helpOption("-h, --help", "Display help for command");
+
+  // Every command except the node-free ones needs an Ocean Node. A single preAction
+  // hook on the root program runs before *any* subcommand action, so this covers both
+  // the REPL loop and one-shot mode without touching 40 action bodies.
+  //
+  // A plain Error (not a CommanderError) is thrown on purpose: in loop mode index.ts
+  // reports it in red and keeps the REPL alive; in one-shot mode main() reports it and
+  // exits 1, so scripts see a non-zero status.
+  program.hook("preAction", (_thisCommand, actionCommand) => {
+    // actionCommand.name() is the canonical name, so aliases resolve for free.
+    if (!hasNode() && !NODE_FREE_COMMANDS.has(actionCommand.name())) {
+      throw new Error(
+        `No Ocean Node set. Run \`setNode <nodeUrl>\` first ` +
+          `(available now: ${[...NODE_FREE_COMMANDS].join(", ")}).`
+      );
+    }
+  });
 
   // Custom help command to support legacy "h" invocation.
   // Note: We use console.log(program.helpInformation()) to print the full help output.
@@ -171,6 +185,96 @@ export async function createCLI() {
     .description("Display help for all commands")
     .action(() => {
       console.log(program.helpInformation());
+    });
+
+  // setNode command. The switch itself never touches the RPC/signer: choosing a node is
+  // independent of them and must work even when the RPC is slow or wrong. The RPC is
+  // consulted only afterwards, under a timeout, to warn about a chain mismatch.
+  program
+    .command("setNode")
+    .alias("useNode")
+    .description(
+      "Sets / switches the Ocean Node used by subsequent commands, without restarting"
+    )
+    .argument("<nodeUrl>", "HTTP(S) URL, peer id or full multiaddr of the node")
+    .option("-n, --node <nodeUrl>", "Ocean Node to use")
+    .action(async (nodeUrl, options) => {
+      const target = options.node || nodeUrl;
+      const previous = getCurrentNodeUrl();
+      if (target === previous) {
+        console.log(chalk.green(`Node ${target} is already the active one.`));
+        return;
+      }
+
+      const status = await validateNode(target);
+      if (!status) {
+        console.error(
+          chalk.red(
+            previous
+              ? `Cannot reach ${target}. Keeping current node: ${previous}`
+              : `Cannot reach ${target}. Still no node set.`
+          )
+        );
+        return;
+      }
+
+      setCurrentNodeUrl(target);
+      console.log(
+        chalk.green(`Using node: ${target} (version ${status.version})`)
+      );
+
+      // chainId comes from RPC, not from the node, so the two can disagree. The switch
+      // is already committed at this point, so this is a courtesy warning only — bound
+      // it so an unresponsive RPC cannot leave the command hanging.
+      const chainIds = nodeChainIds(status);
+      if (chainIds.length > 0) {
+        let timer: NodeJS.Timeout | undefined;
+        try {
+          const { chainId } = await Promise.race([
+            initializeSigner(),
+            new Promise<never>((_resolve, reject) => {
+              timer = setTimeout(() => reject(new Error("RPC timeout")), 5000);
+            }),
+          ]);
+          if (!chainIds.includes(String(chainId))) {
+            console.log(
+              chalk.yellow(
+                `Warning: this node serves chain(s) ${chainIds.join(", ")} but RPC is on chain ${chainId}. Commands may fail.`
+              )
+            );
+          }
+        } catch {
+          // A bad/slow RPC must not make a successful node switch look like a failure.
+        } finally {
+          // Leaving the loser pending would keep the event loop alive for 5s.
+          clearTimeout(timer);
+        }
+      }
+    });
+
+  // getNode command
+  program
+    .command("getNode")
+    .alias("currentNode")
+    .description("Shows the Ocean Node currently in use")
+    .action(async () => {
+      const current = getCurrentNodeUrl();
+      if (!current) {
+        console.log(
+          chalk.yellow("No Ocean Node set. Run `setNode <nodeUrl>` to pick one.")
+        );
+        return;
+      }
+      console.log(`Current Ocean Node: ${current}`);
+      // Best effort: a node that is down must not fail the command.
+      const status = await validateNode(current);
+      if (status) {
+        console.log(
+          `Version: ${status.version}, chain(s): ${nodeChainIds(status).join(", ") || "none"}`
+        );
+      } else {
+        console.log(chalk.yellow("Node is not reachable right now."));
+      }
     });
 
   // getDDO command

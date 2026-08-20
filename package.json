@@ -1,8 +1,16 @@
 {
-  "name": "ocean-cli",
-  "version": "2.0.0",
+  "name": "@oceanprotocol/cli",
+  "version": "2.0.0-next.4",
   "description": "CLI tool to interact with the oceanprotocol's JavaScript library to privately & securely publish, consume and run compute on data.",
   "type": "module",
+  "bin": {
+    "ocean-cli": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "metadata",
+    "README.md"
+  ],
   "scripts": {
     "build": "npm run clean && npm run build:tsc",
     "build:tsc": "tsc --sourceMap",
@@ -13,20 +21,46 @@
     "cli": "npx tsx src/index.ts",
     "test:system": "npm run mocha 'test/**/*.test.ts'",
     "test": "npm run lint && npm run test:system",
-    "mocha": "NODE_OPTIONS='--experimental-require-module' mocha --config=test/.mocharc.json --node-env=test --exit"
+    "mocha": "NODE_OPTIONS='--experimental-require-module' mocha --config=test/.mocharc.json --node-env=test --exit",
+    "prepublishOnly": "npm run build",
+    "changelog": "auto-changelog -p",
+    "release": "release-it --non-interactive"
   },
   "author": "Ocean Protocol <devops@oceanprotocol.com>",
   "license": "Apache-2.0",
   "engines": {
     "node": ">=22"
   },
-  "bugs": {
-    "url": "https://github.com/oceanprotocol/ocean.js-cli/issues"
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/oceanprotocol/ocean-cli.git"
   },
-  "homepage": "https://github.com/oceanprotocol/ocean.js-cli#readme",
+  "publishConfig": {
+    "access": "public"
+  },
+  "bugs": {
+    "url": "https://github.com/oceanprotocol/ocean-cli/issues"
+  },
+  "homepage": "https://github.com/oceanprotocol/ocean-cli#readme",
+  "release-it": {
+    "hooks": {
+      "after:bump": "npm run build && npm run changelog && git add CHANGELOG.md"
+    },
+    "git": {
+      "tagName": "v${version}",
+      "commitMessage": "Release v${version}"
+    },
+    "github": {
+      "release": true
+    },
+    "npm": {
+      "publish": false
+    }
+  },
   "devDependencies": {
     "@eslint/js": "^9.4.0",
     "@types/chai": "^4.3.5",
+    "auto-changelog": "^2.4.0",
     "@types/mocha": "^10.0.1",
     "@types/node": "^20.2.5",
     "@typescript-eslint/eslint-plugin": "^5.60.1",
@@ -42,6 +76,8 @@
     "mocha": "^10.2.0",
     "prettier": "^2.8.8",
     "pretty-quick": "^3.1.3",
+    "release-it": "^19.2.4",
+    "ts-node": "^10.9.1",
     "tsx": "^4.19.2",
     "typescript": "^5.0.4",
     "typescript-eslint": "^7.12.0"
@@ -52,15 +88,13 @@
     "@oceanprotocol/ddo-js": "^0.3.0",
     "@oceanprotocol/lib": "^9.0.0-next.6",
     "axios": "^1.11.0",
+    "chalk": "^4.1.2",
     "commander": "^13.1.0",
     "cross-fetch": "^3.1.5",
     "crypto-js": "^4.1.1",
     "decimal.js": "^10.4.1",
     "enquirer": "^2.4.1",
-    "esm": "^3.2.25",
     "ethers": "^6.15.0",
-    "figlet": "^1.7.0",
-    "ts-node": "^10.9.1",
-    "tsx": "^4.19.3"
+    "figlet": "^1.7.0"
   }
 }

@@ -1,4 +1,4 @@
-import { exec } from "child_process";
+import { exec, spawn } from "child_process";
 import path from "path";
 import util from "util";
 
@@ -41,4 +41,65 @@ export const runCommandAs = async (
         console.error(`[ERROR]:\n${error.stderr || error.message}`);
         throw error;
     }
+};
+
+/** Recurring prompt string emitted by the REPL (keep in sync with src/index.ts). */
+export const REPL_PROMPT =
+    "Enter command ('exit' | 'quit' | ESC or CTRL-C to terminate):\n";
+
+export interface RunReplOptions {
+    /** Extra argv for the initial command run before the loop starts. */
+    extraArgs?: string[];
+    /**
+     * Env overrides applied on top of the defaults. A key set to undefined is
+     * deleted, which is how a test starts the CLI with no NODE_URL at all.
+     */
+    env?: Record<string, string | undefined>;
+}
+
+/**
+ * Drive the interactive REPL (menu mode) with piped stdin.
+ *
+ * The defaults are infra-free: PRIVATE_KEY/RPC/NODE_URL point at an unreachable
+ * port, so a command that actually parses and runs surfaces a "Command error"
+ * (connection refused) while a command that is dropped, rejected at parse time or
+ * refused by the node gate does not. AVOID_LOOP_RUN is unset so the process enters
+ * the REPL loop.
+ */
+export const runRepl = (
+    inputLines: string[],
+    options: RunReplOptions = {}
+): Promise<{ output: string; code: number | null }> => {
+    return new Promise((resolve, reject) => {
+        const env: Record<string, string | undefined> = { ...process.env };
+        delete env.AVOID_LOOP_RUN;
+        env.PRIVATE_KEY =
+            "0x1d751ded5a32226054cd2e71261039b65afb9ee1c746d055dd699b1150a5befc";
+        env.RPC = "http://127.0.0.1:1";
+        env.NODE_URL = "http://127.0.0.1:1";
+        // These tests must not dial the public Ocean bootstrap nodes.
+        env.DISABLE_P2P = "true";
+
+        for (const [key, value] of Object.entries(options.env || {})) {
+            if (value === undefined) delete env[key];
+            else env[key] = value;
+        }
+
+        const child = spawn(
+            "npx",
+            ["tsx", "src/index.ts", ...(options.extraArgs || [])],
+            { cwd: projectRoot, env }
+        );
+
+        let output = "";
+        child.stdout.on("data", (d) => (output += d.toString()));
+        child.stderr.on("data", (d) => (output += d.toString()));
+        child.on("error", reject);
+        child.on("close", (code) => resolve({ output, code }));
+
+        for (const line of inputLines) {
+            child.stdin.write(line + "\n");
+        }
+        child.stdin.end();
+    });
 };

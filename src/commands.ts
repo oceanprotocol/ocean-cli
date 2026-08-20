@@ -2371,6 +2371,32 @@ export class Commands {
         maxLockSeconds,
         maxLockCounts
       );
+      // ocean.js sends NO transaction when an authorization already exists for
+      // (payer, token, payee) — authorizeTx is null and the existing limits stay
+      // as they are. Say so explicitly: dereferencing null here used to surface
+      // as a TypeError under "Authorization failed", which reads like a chain
+      // error and hides the fact that the old, possibly lower, maxLockSeconds /
+      // maxLockedAmount / maxLockCounts are still in force.
+      if (!authorizeTx) {
+        const existing = await escrow.getAuthorizations(
+          getAddress(token),
+          await this.signer.getAddress(),
+          getAddress(payee)
+        );
+        console.log(
+          chalk.yellow(
+            `Payee ${payee} is already authorized for token ${token} — the existing ` +
+              `authorization was left untouched (it cannot be raised or lowered here).`
+          )
+        );
+        if (existing?.length) {
+          const a = existing[0];
+          console.log(
+            `  maxLockedAmount (wei): ${a.maxLockedAmount}   maxLockSeconds: ${a.maxLockSeconds}   maxLockCounts: ${a.maxLockCounts}`
+          );
+        }
+        return true;
+      }
       await authorizeTx.wait();
       console.log(`Successfully authorized payee ${payee} for token ${token}`);
 

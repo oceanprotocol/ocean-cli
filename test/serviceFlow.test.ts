@@ -28,14 +28,17 @@ describe("Ocean CLI Service-on-Demand", function () {
   const IMAGE = "nginxinc/nginx-unprivileged";
   const TAG = "alpine";
   const CONTAINER_PORT = 8080;
-  // The node sets expiresAt = creation + duration (compute_engine_docker.ts,
-  // createServiceJob) — the clock starts BEFORE the image pull, the escrow
-  // lock/claim and the container start, and every later step here costs another
-  // cold `npx tsx` spawn. With a short window the service can be Expired by the
-  // time extend/restart run, and the node then rejects them ("Cannot extend
-  // service ...: it has expired"). Priced at cpu 1 + ram 1 per minute on barge,
-  // 30 minutes costs 60 of the 500 deposited below.
-  const START_DURATION = 1800; // seconds
+  // Bounded by the escrow authorization ceiling, NOT by what the node would allow.
+  // The node locks funds for getMinLockTime(duration) = duration + claimDurationTimeout
+  // (3600 by default) and refuses to start when that exceeds the authorization's
+  // maxLockSeconds ("No valid escrow auths found(maxLockSeconds too low)").
+  // paidComputeFlow runs before this suite and, via ocean.js
+  // verifyFundsForEscrowPayment, auto-creates the authorization for this same
+  // (payer, token, node) at maxJobDuration + queueMaxWaitTime + 3600 = 4500s — and
+  // ocean.js sends no tx for a payee that is already authorized, so the
+  // authorizeEscrow call below CANNOT raise that ceiling. Keep duration + 3600
+  // comfortably under it.
+  const START_DURATION = 600; // seconds
   const EXTEND_DURATION = 60; // seconds
 
   let skipLifecycle = false;
@@ -133,15 +136,33 @@ describe("Ocean CLI Service-on-Demand", function () {
     expect(deposit.toLowerCase()).to.match(/deposit/);
 
     // Authorize the env's consumerAddress as payee. maxLockSeconds must exceed
-    // duration + 3600; maxLockCounts covers start + extends. Tolerate the SDK's
-    // "authorization already exists" no-op on reruns.
+    // duration + 3600; maxLockCounts covers start + extends. This is a no-op when
+    // an authorization already exists (ocean.js sends no tx for a known payee), so
+    // the values below are a floor for a fresh chain, not a guarantee.
     try {
       const auth = await runCommand(
         `npm run cli authorizeEscrow ${oceanToken} ${servicesEnv.consumerAddress} 500 90000 100`
       );
-      expect(auth.toLowerCase()).to.match(/authoriz/);
+      // "Authorization failed" also contains "authoriz" — match the outcome, not the word.
+      expect(auth).to.match(/Successfully authorized|already authorized/i);
     } catch (e) {
       console.log("authorizeEscrow non-fatal (may already be authorized):", e);
+    }
+
+    // Always echo the authorization actually in force: it caps START_DURATION
+    // (the node needs maxLockSeconds >= duration + 3600) and every later failure
+    // in this suite is read against it.
+    const auths = await runCommand(
+      `npm run cli getAuthorizationsEscrow ${oceanToken} ${servicesEnv.consumerAddress}`
+    );
+    const ceiling = auths.match(/Max lock seconds:\s*(\d+)/);
+    if (ceiling) {
+      const maxLockSeconds = Number(ceiling[1]);
+      expect(
+        maxLockSeconds,
+        `escrow authorization allows only ${maxLockSeconds}s of lock time; ` +
+          `START_DURATION ${START_DURATION}s needs ${START_DURATION + 3600}s`
+      ).to.be.at.least(START_DURATION + 3600);
     }
   });
 

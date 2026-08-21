@@ -20,10 +20,10 @@ const SILENCED = new Set(["DeprecationWarning", "ExperimentalWarning"]);
 process.removeAllListeners("warning");
 
 process.on("warning", (warning: Error & { code?: string }) => {
-	if (SILENCED.has(warning.name)) return;
-	// Reproduce Node's default one-line format for everything else.
-	const code = warning.code ? ` [${warning.code}]` : "";
-	console.error(
-		`(node:${process.pid})${code} ${warning.stack ?? `${warning.name}: ${warning.message}`}`
-	);
+  if (SILENCED.has(warning.name)) return;
+  // Reproduce Node's default one-line format for everything else.
+  const code = warning.code ? ` [${warning.code}]` : "";
+  console.error(
+    `(node:${process.pid})${code} ${warning.stack ?? `${warning.name}: ${warning.message}`}`,
+  );
 });

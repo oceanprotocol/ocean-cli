@@ -1,9 +1,6 @@
 import { expect } from "chai";
 import { Aquarius } from "@oceanprotocol/lib";
-import {
-  resolveComputeInputs,
-  IndexerWaitParams,
-} from "../src/helpers.js";
+import { resolveComputeInputs, IndexerWaitParams } from "../src/helpers.js";
 
 // A fake Aquarius whose waitForIndexer returns a deterministic DDO per DID,
 // so the resolver can be exercised without a live indexer.
@@ -32,10 +29,18 @@ const indexingParams: IndexerWaitParams = {
 const FALLBACK = "http://node-fallback";
 
 const RAW_DATASET = {
-  fileObject: { type: "url", url: "https://example.com/data.csv", method: "GET" },
+  fileObject: {
+    type: "url",
+    url: "https://example.com/data.csv",
+    method: "GET",
+  },
 };
 const RAW_ALGO = {
-  fileObject: { type: "url", url: "https://example.com/algo.py", method: "GET" },
+  fileObject: {
+    type: "url",
+    url: "https://example.com/algo.py",
+    method: "GET",
+  },
   meta: { container: { image: "oceanprotocol/algo_dockers" } },
 };
 
@@ -46,7 +51,7 @@ describe("resolveComputeInputs", function () {
       "did:op:algo1",
       makeAquarius(),
       indexingParams,
-      FALLBACK
+      FALLBACK,
     );
     expect(res).to.not.equal(null);
     expect(res.assets).to.have.length(1);
@@ -64,7 +69,7 @@ describe("resolveComputeInputs", function () {
       "did:op:algo1",
       makeAquarius(),
       indexingParams,
-      FALLBACK
+      FALLBACK,
     );
     expect(res.assets).to.have.length(2);
     expect(res.assets.map((a) => a.documentId)).to.deep.equal([
@@ -80,7 +85,7 @@ describe("resolveComputeInputs", function () {
       "did:op:algo1",
       makeAquarius(),
       indexingParams,
-      FALLBACK
+      FALLBACK,
     );
     expect(res.assets).to.have.length(2);
     expect(res.assets.map((a) => a.documentId)).to.deep.equal([
@@ -96,7 +101,7 @@ describe("resolveComputeInputs", function () {
       "did:op:algo1",
       makeAquarius(),
       indexingParams,
-      FALLBACK
+      FALLBACK,
     );
     expect(res.assets).to.have.length(1);
     expect(res.assets[0].fileObject).to.not.equal(undefined);
@@ -111,7 +116,7 @@ describe("resolveComputeInputs", function () {
       "did:op:algo1",
       makeAquarius(),
       indexingParams,
-      FALLBACK
+      FALLBACK,
     );
     expect(res.assets).to.have.length(2);
     expect(res.ddos[0]).to.not.equal(null);
@@ -127,7 +132,7 @@ describe("resolveComputeInputs", function () {
       "did:op:algo1",
       makeAquarius(),
       indexingParams,
-      FALLBACK
+      FALLBACK,
     );
     expect(res.ddos[0]).to.equal(null);
     expect(res.ddos[1]).to.not.equal(null);
@@ -140,7 +145,7 @@ describe("resolveComputeInputs", function () {
       JSON.stringify(RAW_ALGO),
       makeAquarius(),
       indexingParams,
-      FALLBACK
+      FALLBACK,
     );
     expect(res.algoDdo).to.equal(null);
     expect(res.algo.fileObject).to.not.equal(undefined);
@@ -153,7 +158,7 @@ describe("resolveComputeInputs", function () {
       "did:op:algo1",
       makeAquarius(),
       indexingParams,
-      FALLBACK
+      FALLBACK,
     );
     expect(res.assets).to.have.length(0);
     expect(res.providerURI).to.equal(FALLBACK);
@@ -165,7 +170,7 @@ describe("resolveComputeInputs", function () {
       "did:op:algo1",
       makeAquarius(),
       indexingParams,
-      FALLBACK
+      FALLBACK,
     );
     expect(res).to.equal(null);
   });
@@ -176,7 +181,7 @@ describe("resolveComputeInputs", function () {
       JSON.stringify({ meta: { container: {} } }),
       makeAquarius(),
       indexingParams,
-      FALLBACK
+      FALLBACK,
     );
     expect(res).to.equal(null);
   });
@@ -187,7 +192,7 @@ describe("resolveComputeInputs", function () {
       "did:op:algo1",
       makeAquarius(new Set(["did:op:algo1"])),
       indexingParams,
-      FALLBACK
+      FALLBACK,
     );
     expect(res).to.equal(null);
   });

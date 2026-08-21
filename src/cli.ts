@@ -92,7 +92,9 @@ export async function createCLI() {
 
   if (!isHelpOrVersion) {
     if (!process.env.MNEMONIC && !process.env.PRIVATE_KEY) {
-      console.error(chalk.red("Have you forgot to set MNEMONIC or PRIVATE_KEY?"));
+      console.error(
+        chalk.red("Have you forgot to set MNEMONIC or PRIVATE_KEY?"),
+      );
       process.exit(1);
     }
     if (!process.env.RPC) {
@@ -107,8 +109,8 @@ export async function createCLI() {
     if (process.env.DISABLE_P2P === "true" && isP2pUri(getCurrentNodeUrl())) {
       console.error(
         chalk.red(
-          "NODE_URL is a P2P URI but DISABLE_P2P=true — no command could reach it."
-        )
+          "NODE_URL is a P2P URI but DISABLE_P2P=true — no command could reach it.",
+        ),
       );
       process.exit(1);
     }
@@ -132,22 +134,22 @@ export async function createCLI() {
       if (status) {
         console.log(
           chalk.green(
-            `Using node ${getCurrentNodeUrl()} (version ${status.version})`
-          )
+            `Using node ${getCurrentNodeUrl()} (version ${status.version})`,
+          ),
         );
       } else {
         console.error(
           chalk.red(
-            `Node ${getCurrentNodeUrl()} is not reachable. Commands may fail.`
-          )
+            `Node ${getCurrentNodeUrl()} is not reachable. Commands may fail.`,
+          ),
         );
       }
     } else {
       console.log(
         chalk.yellow(
           "No Ocean Node configured. Run `setNode <nodeUrl>` to choose one — " +
-            `only ${[...NODE_FREE_COMMANDS].join(", ")} are available until then.`
-        )
+            `only ${[...NODE_FREE_COMMANDS].join(", ")} are available until then.`,
+        ),
       );
     }
   }
@@ -172,7 +174,7 @@ export async function createCLI() {
     if (!hasNode() && !NODE_FREE_COMMANDS.has(actionCommand.name())) {
       throw new Error(
         `No Ocean Node set. Run \`setNode <nodeUrl>\` first ` +
-          `(available now: ${[...NODE_FREE_COMMANDS].join(", ")}).`
+          `(available now: ${[...NODE_FREE_COMMANDS].join(", ")}).`,
       );
     }
   });
@@ -194,7 +196,7 @@ export async function createCLI() {
     .command("setNode")
     .alias("useNode")
     .description(
-      "Sets / switches the Ocean Node used by subsequent commands, without restarting"
+      "Sets / switches the Ocean Node used by subsequent commands, without restarting",
     )
     .argument("<nodeUrl>", "HTTP(S) URL, peer id or full multiaddr of the node")
     .option("-n, --node <nodeUrl>", "Ocean Node to use")
@@ -212,15 +214,15 @@ export async function createCLI() {
           chalk.red(
             previous
               ? `Cannot reach ${target}. Keeping current node: ${previous}`
-              : `Cannot reach ${target}. Still no node set.`
-          )
+              : `Cannot reach ${target}. Still no node set.`,
+          ),
         );
         return;
       }
 
       setCurrentNodeUrl(target);
       console.log(
-        chalk.green(`Using node: ${target} (version ${status.version})`)
+        chalk.green(`Using node: ${target} (version ${status.version})`),
       );
 
       // chainId comes from RPC, not from the node, so the two can disagree. The switch
@@ -239,8 +241,8 @@ export async function createCLI() {
           if (!chainIds.includes(String(chainId))) {
             console.log(
               chalk.yellow(
-                `Warning: this node serves chain(s) ${chainIds.join(", ")} but RPC is on chain ${chainId}. Commands may fail.`
-              )
+                `Warning: this node serves chain(s) ${chainIds.join(", ")} but RPC is on chain ${chainId}. Commands may fail.`,
+              ),
             );
           }
         } catch {
@@ -261,7 +263,9 @@ export async function createCLI() {
       const current = getCurrentNodeUrl();
       if (!current) {
         console.log(
-          chalk.yellow("No Ocean Node set. Run `setNode <nodeUrl>` to pick one.")
+          chalk.yellow(
+            "No Ocean Node set. Run `setNode <nodeUrl>` to pick one.",
+          ),
         );
         return;
       }
@@ -270,7 +274,7 @@ export async function createCLI() {
       const status = await validateNode(current);
       if (status) {
         console.log(
-          `Version: ${status.version}, chain(s): ${nodeChainIds(status).join(", ") || "none"}`
+          `Version: ${status.version}, chain(s): ${nodeChainIds(status).join(", ") || "none"}`,
         );
       } else {
         console.log(chalk.yellow("Node is not reachable right now."));
@@ -368,7 +372,7 @@ export async function createCLI() {
     .option("-s, --service <serviceId>", "Service ID")
     .action(async (did, folder, serviceId, options) => {
       const assetDid = options.did || did;
-      const destFolder = options.folder || folder || '.';
+      const destFolder = options.folder || folder || ".";
       const svcId = options.service || serviceId;
       if (!assetDid) {
         console.error(chalk.red("DID is required"));
@@ -408,11 +412,11 @@ export async function createCLI() {
     .description("Starts a compute job")
     .argument(
       "<datasetDids>",
-      "Dataset DIDs (comma-separated), an empty array for none, OR a JSON ComputeAsset object/array with a fileObject (raw datasets, no DID). Mixed input must be valid JSON, e.g. '[\"did:op:abc\",{\"fileObject\":{...}}]'"
+      'Dataset DIDs (comma-separated), an empty array for none, OR a JSON ComputeAsset object/array with a fileObject (raw datasets, no DID). Mixed input must be valid JSON, e.g. \'["did:op:abc",{"fileObject":{...}}]\'',
     )
     .argument(
       "<algoDid>",
-      "Algorithm DID, OR a JSON ComputeAlgorithm object with a fileObject and meta (raw algorithm, no DID)"
+      "Algorithm DID, OR a JSON ComputeAlgorithm object with a fileObject and meta (raw algorithm, no DID)",
     )
     .argument("<computeEnvId>", "Compute environment ID")
     .argument("<maxJobDuration>", "maxJobDuration for compute job")
@@ -420,30 +424,55 @@ export async function createCLI() {
     .argument("<resources>", "Resources of compute environment stringified")
     .argument(
       "[output]",
-      "Output backend to save job results to. Supported types include S3, FTP, URL, Arweave, etc. Defaults to node local disk if omitted."
+      "Output backend to save job results to. Supported types include S3, FTP, URL, Arweave, etc. Defaults to node local disk if omitted.",
     )
-    .argument("[serviceIds]", "Service IDs (comma-separated; positional mapping with datasetDIDs)")
+    .argument(
+      "[serviceIds]",
+      "Service IDs (comma-separated; positional mapping with datasetDIDs)",
+    )
     .argument("[algoServiceId]", "Algorithm Service ID (optional)")
     .option(
       "-d, --datasets <datasetDids>",
-      "Dataset DIDs (comma-separated), an empty array for none, OR a JSON ComputeAsset object/array with a fileObject (raw datasets, no DID)"
+      "Dataset DIDs (comma-separated), an empty array for none, OR a JSON ComputeAsset object/array with a fileObject (raw datasets, no DID)",
     )
     .option(
       "-a, --algo <algoDid>",
-      "Algorithm DID, OR a JSON ComputeAlgorithm object with a fileObject and meta (raw algorithm, no DID)"
+      "Algorithm DID, OR a JSON ComputeAlgorithm object with a fileObject and meta (raw algorithm, no DID)",
     )
     .option("-e, --env <computeEnvId>", "Compute environment ID")
     .option("--maxJobDuration <maxJobDuration>", "Compute maxJobDuration")
     .option("-t, --token <paymentToken>", "Compute payment token")
-    .option("-s, --services [serviceIds]", "Service IDs (comma-separated; positional mapping with datasetDIDs)")
-    .option("-x, --algo-service [algoServiceId]", "Algorithm Service ID (optional)")
+    .option(
+      "-s, --services [serviceIds]",
+      "Service IDs (comma-separated; positional mapping with datasetDIDs)",
+    )
+    .option(
+      "-x, --algo-service [algoServiceId]",
+      "Algorithm Service ID (optional)",
+    )
     .option("--resources <resources>", "Compute resources")
-    .option("--accept [boolean]", "Auto-confirm payment for compute job (true/false)", toBoolean)
+    .option(
+      "--accept [boolean]",
+      "Auto-confirm payment for compute job (true/false)",
+      toBoolean,
+    )
     .option(
       "-o, --output [output]",
-      "Output backend to save job results to. Supported types include S3, FTP, URL, Arweave, etc. Defaults to node local disk if omitted."
+      "Output backend to save job results to. Supported types include S3, FTP, URL, Arweave, etc. Defaults to node local disk if omitted.",
     )
-    .action(async (datasetDids, algoDid, computeEnvId, maxJobDuration, paymentToken, resources, output, serviceIds, algoServiceId, options) => {
+    .action(
+      async (
+        datasetDids,
+        algoDid,
+        computeEnvId,
+        maxJobDuration,
+        paymentToken,
+        resources,
+        output,
+        serviceIds,
+        algoServiceId,
+        options,
+      ) => {
         const dsDids = options.datasets || datasetDids;
         const aDid = options.algo || algoDid;
         const envId = options.env || computeEnvId;
@@ -451,38 +480,55 @@ export async function createCLI() {
         const token = options.token || paymentToken;
         const res = options.resources || resources;
         const outputLocation = options.output || output;
-      const svcIds = options.services ?? serviceIds ?? '';
-      const algoSvcId = options.algoService ?? algoServiceId ?? '';
+        const svcIds = options.services ?? serviceIds ?? "";
+        const algoSvcId = options.algoService ?? algoServiceId ?? "";
         if (!dsDids || !aDid || !envId || !jobDuration || !token || !res) {
-        console.error(chalk.red('Missing required arguments'));
+          console.error(chalk.red("Missing required arguments"));
           // process.exit(1);
-        return
-      }
+          return;
+        }
 
-      const dsArr =
-        dsDids === '[]'
-          ? []
-          : dsDids.split(',').map(s => s.trim()).filter(Boolean);
+        const dsArr =
+          dsDids === "[]"
+            ? []
+            : dsDids
+                .split(",")
+                .map((s) => s.trim())
+                .filter(Boolean);
 
-      const svArr = svcIds
-        ? svcIds.split(',').map(s => s.trim()).filter(Boolean)
-        : undefined;
+        const svArr = svcIds
+          ? svcIds
+              .split(",")
+              .map((s) => s.trim())
+              .filter(Boolean)
+          : undefined;
 
-      // Optional check: serviceIds must match length if provided
-      if (svArr && svArr.length !== dsArr.length) {
-        console.error(
-          chalk.red(
-            `Length mismatch: datasetDids=${dsArr.length} vs serviceIds=${svArr.length}. ` +
-            'If serviceIds is provided, it must match datasetDids length (positional 1–1).'
-          )
-        );
+        // Optional check: serviceIds must match length if provided
+        if (svArr && svArr.length !== dsArr.length) {
+          console.error(
+            chalk.red(
+              `Length mismatch: datasetDids=${dsArr.length} vs serviceIds=${svArr.length}. ` +
+                "If serviceIds is provided, it must match datasetDids length (positional 1–1).",
+            ),
+          );
           return;
         }
         const { signer, chainId } = await initializeSigner();
         const commands = new Commands(signer, chainId);
 
-      const initArgs = [null, dsDids, aDid, envId, jobDuration, token, res, outputLocation, svcIds, algoSvcId];
-      console.log('initArgs:', initArgs);
+        const initArgs = [
+          null,
+          dsDids,
+          aDid,
+          envId,
+          jobDuration,
+          token,
+          res,
+          outputLocation,
+          svcIds,
+          algoSvcId,
+        ];
+        console.log("initArgs:", initArgs);
         const initResp = await commands.initializeCompute(initArgs);
 
         if (!initResp) {
@@ -495,7 +541,7 @@ export async function createCLI() {
         const amount = await unitsToAmount(
           signer,
           initResp.payment.token,
-          initResp.payment.amount.toString()
+          initResp.payment.amount.toString(),
         );
 
         const proceed = options.accept;
@@ -503,14 +549,14 @@ export async function createCLI() {
           if (!process.stdin.isTTY) {
             console.error(
               chalk.red(
-                'Cannot prompt for confirmation (non-TTY). Use "--accept true" to skip.'
-              )
+                'Cannot prompt for confirmation (non-TTY). Use "--accept true" to skip.',
+              ),
             );
             process.exit(1);
           }
           const rl = createInterface({ input, output: stdout });
           const confirmation = await rl.question(
-            `\nProceed with payment for starting compute job at price ${amount} in tokens from address ${initResp.payment.token}? (y/n): `
+            `\nProceed with payment for starting compute job at price ${amount} in tokens from address ${initResp.payment.token}? (y/n): `,
           );
           rl.close();
           if (
@@ -524,11 +570,23 @@ export async function createCLI() {
           console.log(chalk.cyan("Auto-confirm enabled with --yes flag."));
         }
 
-      const computeArgs = [null, dsDids, aDid, envId, JSON.stringify(initResp), jobDuration, token, res, outputLocation, svcIds, algoSvcId];
+        const computeArgs = [
+          null,
+          dsDids,
+          aDid,
+          envId,
+          JSON.stringify(initResp),
+          jobDuration,
+          token,
+          res,
+          outputLocation,
+          svcIds,
+          algoSvcId,
+        ];
 
         await commands.computeStart(computeArgs);
         console.log(chalk.green("Compute job started successfully."));
-      }
+      },
     );
 
   // startFreeCompute command
@@ -537,71 +595,104 @@ export async function createCLI() {
     .description("Starts a FREE compute job")
     .argument(
       "<datasetDids>",
-      "Dataset DIDs (comma-separated), an empty array for none, OR a JSON ComputeAsset object/array with a fileObject (raw datasets, no DID). Mixed input must be valid JSON, e.g. '[\"did:op:abc\",{\"fileObject\":{...}}]'"
+      'Dataset DIDs (comma-separated), an empty array for none, OR a JSON ComputeAsset object/array with a fileObject (raw datasets, no DID). Mixed input must be valid JSON, e.g. \'["did:op:abc",{"fileObject":{...}}]\'',
     )
     .argument(
       "<algoDid>",
-      "Algorithm DID, OR a JSON ComputeAlgorithm object with a fileObject and meta (raw algorithm, no DID)"
+      "Algorithm DID, OR a JSON ComputeAlgorithm object with a fileObject and meta (raw algorithm, no DID)",
     )
     .argument("<computeEnvId>", "Compute environment ID")
     .argument(
       "[output]",
-      "Output backend to save job results to. Supported types include S3, FTP, URL, Arweave, etc. Defaults to node local disk if omitted."
+      "Output backend to save job results to. Supported types include S3, FTP, URL, Arweave, etc. Defaults to node local disk if omitted.",
     )
-    .argument("[serviceIds]", "Service IDs (comma-separated; positional mapping with datasetDIDs)")
+    .argument(
+      "[serviceIds]",
+      "Service IDs (comma-separated; positional mapping with datasetDIDs)",
+    )
     .argument("[algoServiceId]", "Algorithm Service ID (optional)")
     .option(
       "-d, --datasets <datasetDids>",
-      "Dataset DIDs (comma-separated), an empty array for none, OR a JSON ComputeAsset object/array with a fileObject (raw datasets, no DID)"
+      "Dataset DIDs (comma-separated), an empty array for none, OR a JSON ComputeAsset object/array with a fileObject (raw datasets, no DID)",
     )
     .option(
       "-a, --algo <algoDid>",
-      "Algorithm DID, OR a JSON ComputeAlgorithm object with a fileObject and meta (raw algorithm, no DID)"
+      "Algorithm DID, OR a JSON ComputeAlgorithm object with a fileObject and meta (raw algorithm, no DID)",
     )
     .option("-e, --env <computeEnvId>", "Compute environment ID")
     .option(
       "-o, --output [output]",
-      "Output backend to save job results to. Supported types include S3, FTP, URL, Arweave, etc. Defaults to node local disk if omitted."
+      "Output backend to save job results to. Supported types include S3, FTP, URL, Arweave, etc. Defaults to node local disk if omitted.",
     )
-    .option("-s, --services [serviceIds]", "Service IDs (comma-separated; positional mapping with datasetDIDs)")
-    .option("-x, --algo-service [algoServiceId]", "Algorithm Service ID (optional)")
-    .action(async (datasetDids, algoDid, computeEnvId, output, serviceIds, algoServiceId, options) => {
-      const dsDids = options.datasets || datasetDids;
-      const aDid = options.algo || algoDid;
-      const envId = options.env || computeEnvId;
-      const outputLocation = options.output || output;
-      const svcIds = options.services ?? serviceIds ?? '';
-      const algoSvcId = options.algoService ?? algoServiceId ?? '';
+    .option(
+      "-s, --services [serviceIds]",
+      "Service IDs (comma-separated; positional mapping with datasetDIDs)",
+    )
+    .option(
+      "-x, --algo-service [algoServiceId]",
+      "Algorithm Service ID (optional)",
+    )
+    .action(
+      async (
+        datasetDids,
+        algoDid,
+        computeEnvId,
+        output,
+        serviceIds,
+        algoServiceId,
+        options,
+      ) => {
+        const dsDids = options.datasets || datasetDids;
+        const aDid = options.algo || algoDid;
+        const envId = options.env || computeEnvId;
+        const outputLocation = options.output || output;
+        const svcIds = options.services ?? serviceIds ?? "";
+        const algoSvcId = options.algoService ?? algoServiceId ?? "";
 
-      if (!dsDids || !aDid || !envId) {
-        console.error(chalk.red("Missing required arguments"));
-        // process.exit(1);
-        return
-      }
+        if (!dsDids || !aDid || !envId) {
+          console.error(chalk.red("Missing required arguments"));
+          // process.exit(1);
+          return;
+        }
 
-      const dsArr =
-        dsDids === '[]'
-          ? []
-          : dsDids.split(',').map(s => s.trim()).filter(Boolean);
+        const dsArr =
+          dsDids === "[]"
+            ? []
+            : dsDids
+                .split(",")
+                .map((s) => s.trim())
+                .filter(Boolean);
 
-      const svArr = svcIds
-        ? svcIds.split(',').map(s => s.trim()).filter(Boolean)
-        : undefined;
+        const svArr = svcIds
+          ? svcIds
+              .split(",")
+              .map((s) => s.trim())
+              .filter(Boolean)
+          : undefined;
 
-      // Optional check: serviceIds must match length if provided
-      if (svArr && svArr.length !== dsArr.length) {
-        console.error(
-          chalk.red(
-            `Length mismatch: datasetDids=${dsArr.length} vs serviceIds=${svArr.length}. ` +
-            'If serviceIds is provided, it must match datasetDids length (positional 1–1).'
-          )
-        );
-        return;
-      }
-      const { signer, chainId } = await initializeSigner();
-      const commands = new Commands(signer, chainId);
-      await commands.freeComputeStart([null, dsDids, aDid, envId, outputLocation, svcIds, algoSvcId]);
-    });
+        // Optional check: serviceIds must match length if provided
+        if (svArr && svArr.length !== dsArr.length) {
+          console.error(
+            chalk.red(
+              `Length mismatch: datasetDids=${dsArr.length} vs serviceIds=${svArr.length}. ` +
+                "If serviceIds is provided, it must match datasetDids length (positional 1–1).",
+            ),
+          );
+          return;
+        }
+        const { signer, chainId } = await initializeSigner();
+        const commands = new Commands(signer, chainId);
+        await commands.freeComputeStart([
+          null,
+          dsDids,
+          aDid,
+          envId,
+          outputLocation,
+          svcIds,
+          algoSvcId,
+        ]);
+      },
+    );
 
   // getComputeEnvironments command
   program
@@ -609,7 +700,7 @@ export async function createCLI() {
     .alias("getC2DEnvs")
     .argument(
       "[node]",
-      "Optional Ocean Node URL or peer id to query (defaults to NODE_URL)"
+      "Optional Ocean Node URL or peer id to query (defaults to NODE_URL)",
     )
     .option("-n, --node <node>", "Ocean Node URL or peer id to query")
     .description("Gets the existing compute environments")
@@ -711,11 +802,11 @@ export async function createCLI() {
     .command("getServiceTemplates")
     .alias("serviceTemplates")
     .description(
-      "Lists the node's Service-on-Demand templates and compatible environments"
+      "Lists the node's Service-on-Demand templates and compatible environments",
     )
     .argument(
       "[node]",
-      "Optional Ocean Node URL or peer id to query (defaults to NODE_URL)"
+      "Optional Ocean Node URL or peer id to query (defaults to NODE_URL)",
     )
     .option("-n, --node <node>", "Ocean Node URL or peer id to query")
     .action(async (node, options) => {
@@ -728,48 +819,93 @@ export async function createCLI() {
   program
     .command("startService")
     .description(
-      "Starts an on-demand service (long-running container) on a compute environment, paid via escrow"
+      "Starts an on-demand service (long-running container) on a compute environment, paid via escrow",
     )
-    .argument("<computeEnvId>", "Compute environment ID (must have services enabled)")
+    .argument(
+      "<computeEnvId>",
+      "Compute environment ID (must have services enabled)",
+    )
     .argument("<duration>", "Requested duration in seconds", parseInt)
     .argument("<paymentToken>", "Payment token address")
-    .option("--template <templateId>", "Start from an operator-published template")
-    .option("-i, --image <image>", "Container image (alternative to --template)")
-    .option("--tag <tag>", "Image tag (mutually exclusive with --checksum/--dockerfile)")
+    .option(
+      "--template <templateId>",
+      "Start from an operator-published template",
+    )
+    .option(
+      "-i, --image <image>",
+      "Container image (alternative to --template)",
+    )
+    .option(
+      "--tag <tag>",
+      "Image tag (mutually exclusive with --checksum/--dockerfile)",
+    )
     .option("--checksum <sha256>", "Image digest, e.g. sha256:<64 hex>")
-    .option("--dockerfile <path>", "Path to a local Dockerfile (node must allow image builds)")
+    .option(
+      "--dockerfile <path>",
+      "Path to a local Dockerfile (node must allow image builds)",
+    )
     .option(
       "--additional-docker-files <path>",
-      "Path to JSON file of {filename: content} used with --dockerfile"
+      "Path to JSON file of {filename: content} used with --dockerfile",
     )
-    .option("--cmd <json>", 'Docker CMD override as JSON array, e.g. \'["python","app.py"]\'')
+    .option(
+      "--cmd <json>",
+      'Docker CMD override as JSON array, e.g. \'["python","app.py"]\'',
+    )
     .option("--entrypoint <json>", "Docker ENTRYPOINT override as JSON array")
-    .option("-p, --ports <ports>", "Comma-separated container ports to expose, e.g. 8888,8080")
+    .option(
+      "-p, --ports <ports>",
+      "Comma-separated container ports to expose, e.g. 8888,8080",
+    )
     .option(
       "-r, --resources <resources>",
-      'Stringified JSON [{"id":"cpu","amount":1},...]; defaults to template requirements'
+      'Stringified JSON [{"id":"cpu","amount":1},...]; defaults to template requirements',
     )
     .option(
       "-u, --user-data <json>",
-      "JSON object of container env vars (encrypted to the node; never logged)"
+      "JSON object of container env vars (encrypted to the node; never logged)",
     )
-    .option("--user-data-file <path>", "Path to JSON file with container env vars")
-    .option("--accept [boolean]", "Auto-confirm payment (true/false)", toBoolean)
-    .option("--wait [boolean]", "Poll until Running or failure (default true)", toBoolean, true)
-    .option("--timeout <seconds>", "Max seconds to wait for Running (default 600)", parseInt)
+    .option(
+      "--user-data-file <path>",
+      "Path to JSON file with container env vars",
+    )
+    .option(
+      "--accept [boolean]",
+      "Auto-confirm payment (true/false)",
+      toBoolean,
+    )
+    .option(
+      "--wait [boolean]",
+      "Poll until Running or failure (default true)",
+      toBoolean,
+      true,
+    )
+    .option(
+      "--timeout <seconds>",
+      "Max seconds to wait for Running (default 600)",
+      parseInt,
+    )
     .action(async (computeEnvId, duration, paymentToken, options) => {
       const envId = options.env || computeEnvId;
       const token = paymentToken;
       if (!envId || !duration || !token) {
-        console.error(chalk.red("Missing required arguments: <computeEnvId> <duration> <paymentToken>"));
+        console.error(
+          chalk.red(
+            "Missing required arguments: <computeEnvId> <duration> <paymentToken>",
+          ),
+        );
         return;
       }
       if (!Number.isInteger(duration) || duration <= 0) {
-        console.error(chalk.red("Duration must be a positive integer number of seconds."));
+        console.error(
+          chalk.red("Duration must be a positive integer number of seconds."),
+        );
         return;
       }
       if (options.template && options.image) {
-        console.error(chalk.red("Provide either --template or --image, not both."));
+        console.error(
+          chalk.red("Provide either --template or --image, not both."),
+        );
         return;
       }
 
@@ -821,7 +957,10 @@ export async function createCLI() {
     .action(async (serviceId, options) => {
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
-      await commands.getServiceStatus(options.service || serviceId, options.verbose);
+      await commands.getServiceStatus(
+        options.service || serviceId,
+        options.verbose,
+      );
     });
 
   // getServices command (SERVICES_LIST — node-wide, all owners)
@@ -829,20 +968,27 @@ export async function createCLI() {
     .command("getServices")
     .alias("listServices")
     .description(
-      "Lists on-demand services across ALL owners on the node (docker spec hidden)"
+      "Lists on-demand services across ALL owners on the node (docker spec hidden)",
     )
     .argument(
       "[node]",
-      "Optional Ocean Node URL or peer id to query (defaults to NODE_URL)"
+      "Optional Ocean Node URL or peer id to query (defaults to NODE_URL)",
     )
     .option("-n, --node <node>", "Ocean Node URL or peer id to query")
     .option(
       "--status <status>",
       "Filter by a single service status number (e.g. 40 for Running)",
-      parseInt
+      parseInt,
     )
-    .option("--include-all [boolean]", "Include all statuses, not just active reservations", toBoolean)
-    .option("--from <timestamp>", "Only services created at/after this time (ISO string or Unix timestamp)")
+    .option(
+      "--include-all [boolean]",
+      "Include all statuses, not just active reservations",
+      toBoolean,
+    )
+    .option(
+      "--from <timestamp>",
+      "Only services created at/after this time (ISO string or Unix timestamp)",
+    )
     .option("-v, --verbose [boolean]", "Dump full job objects", toBoolean)
     .action(async (node, options) => {
       if (
@@ -851,8 +997,8 @@ export async function createCLI() {
       ) {
         console.error(
           chalk.red(
-            `Unknown --status ${options.status}. Valid values: 10,11,12,13,14,15,20,30,40,50,70,75,99`
-          )
+            `Unknown --status ${options.status}. Valid values: 10,11,12,13,14,15,20,30,40,50,70,75,99`,
+          ),
         );
         return;
       }
@@ -868,7 +1014,11 @@ export async function createCLI() {
 
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
-      await commands.getServices(options.node || node, filters, options.verbose);
+      await commands.getServices(
+        options.node || node,
+        filters,
+        options.verbose,
+      );
     });
 
   // serviceLogs command (streamable logs)
@@ -880,7 +1030,7 @@ export async function createCLI() {
     .option("-s, --service <serviceId>", "Service ID")
     .option(
       "--since <since>",
-      "Only logs since this time — Unix seconds or a relative duration like 30s / 2h"
+      "Only logs since this time — Unix seconds or a relative duration like 30s / 2h",
     )
     .action(async (serviceId, options) => {
       const id = options.service || serviceId;
@@ -896,24 +1046,49 @@ export async function createCLI() {
   // extendService command
   program
     .command("extendService")
-    .description("Extends a running on-demand service's expiry (paid via escrow)")
+    .description(
+      "Extends a running on-demand service's expiry (paid via escrow)",
+    )
     .argument("<serviceId>", "Service ID")
-    .argument("<additionalDuration>", "Additional duration in seconds", parseInt)
-    .argument("[paymentToken]", "Payment token (defaults to the token used at start)")
+    .argument(
+      "<additionalDuration>",
+      "Additional duration in seconds",
+      parseInt,
+    )
+    .argument(
+      "[paymentToken]",
+      "Payment token (defaults to the token used at start)",
+    )
     .option("-s, --service <serviceId>", "Service ID")
-    .option("--duration <additionalDuration>", "Additional duration in seconds", parseInt)
+    .option(
+      "--duration <additionalDuration>",
+      "Additional duration in seconds",
+      parseInt,
+    )
     .option("-t, --token [paymentToken]", "Payment token")
-    .option("--accept [boolean]", "Auto-confirm payment (true/false)", toBoolean)
+    .option(
+      "--accept [boolean]",
+      "Auto-confirm payment (true/false)",
+      toBoolean,
+    )
     .action(async (serviceId, additionalDuration, paymentToken, options) => {
       const id = options.service || serviceId;
       const addl = options.duration || additionalDuration;
       const token = options.token || paymentToken;
       if (!id || !addl) {
-        console.error(chalk.red("Missing required arguments: <serviceId> <additionalDuration>"));
+        console.error(
+          chalk.red(
+            "Missing required arguments: <serviceId> <additionalDuration>",
+          ),
+        );
         return;
       }
       if (!Number.isInteger(addl) || addl <= 0) {
-        console.error(chalk.red("additionalDuration must be a positive integer number of seconds."));
+        console.error(
+          chalk.red(
+            "additionalDuration must be a positive integer number of seconds.",
+          ),
+        );
         return;
       }
       const { signer, chainId } = await initializeSigner();
@@ -928,23 +1103,50 @@ export async function createCLI() {
       "Restarts a running service (same ports & expiry; no extra charge). " +
         "With no container-spec flags the container bounces unchanged (REUSE); " +
         "supplying any image-spec flag (--image/--tag/--checksum/--dockerfile/" +
-        "--additional-docker-files) rebuilds it on the new spec (RESPEC, #2119)"
+        "--additional-docker-files) rebuilds it on the new spec (RESPEC, #2119)",
     )
     .argument("<serviceId>", "Service ID")
-    .option("-u, --user-data <json>", "REPLACE stored container env vars (JSON object)")
-    .option("--user-data-file <path>", "Path to JSON file with replacement env vars")
-    .option("--cmd <json>", "REPLACE stored Docker CMD as JSON array (#2114); empty array clears it")
-    .option("--entrypoint <json>", "REPLACE stored Docker ENTRYPOINT as JSON array (#2114)")
-    .option("--image <image>", "RESPEC: rebuild on this container image (#2119)")
+    .option(
+      "-u, --user-data <json>",
+      "REPLACE stored container env vars (JSON object)",
+    )
+    .option(
+      "--user-data-file <path>",
+      "Path to JSON file with replacement env vars",
+    )
+    .option(
+      "--cmd <json>",
+      "REPLACE stored Docker CMD as JSON array (#2114); empty array clears it",
+    )
+    .option(
+      "--entrypoint <json>",
+      "REPLACE stored Docker ENTRYPOINT as JSON array (#2114)",
+    )
+    .option(
+      "--image <image>",
+      "RESPEC: rebuild on this container image (#2119)",
+    )
     .option("--tag <tag>", "RESPEC: rebuild on this image tag (#2119)")
     .option("--checksum <checksum>", "RESPEC: image digest/checksum (#2119)")
-    .option("--dockerfile <dockerfile>", "RESPEC: dockerfile contents to build from (#2119)")
+    .option(
+      "--dockerfile <dockerfile>",
+      "RESPEC: dockerfile contents to build from (#2119)",
+    )
     .option(
       "--additional-docker-files <json>",
-      "RESPEC: extra build files as a JSON object { path: contents } (#2119)"
+      "RESPEC: extra build files as a JSON object { path: contents } (#2119)",
     )
-    .option("--wait [boolean]", "Poll until Running (default true)", toBoolean, true)
-    .option("--timeout <seconds>", "Max seconds to wait (default 600)", parseInt)
+    .option(
+      "--wait [boolean]",
+      "Poll until Running (default true)",
+      toBoolean,
+      true,
+    )
+    .option(
+      "--timeout <seconds>",
+      "Max seconds to wait (default 600)",
+      parseInt,
+    )
     .action(async (serviceId, options) => {
       if (!serviceId) {
         console.error(chalk.red("Missing required argument: <serviceId>"));
@@ -954,13 +1156,23 @@ export async function createCLI() {
       try {
         if (options.userData) {
           const parsed = JSON.parse(options.userData);
-          if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+          if (
+            typeof parsed !== "object" ||
+            parsed === null ||
+            Array.isArray(parsed)
+          ) {
             throw new Error("--user-data must be a JSON object");
           }
           params.userData = parsed;
         } else if (options.userDataFile) {
-          const parsed = JSON.parse(fs.readFileSync(options.userDataFile, "utf8"));
-          if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+          const parsed = JSON.parse(
+            fs.readFileSync(options.userDataFile, "utf8"),
+          );
+          if (
+            typeof parsed !== "object" ||
+            parsed === null ||
+            Array.isArray(parsed)
+          ) {
             throw new Error("--user-data-file must contain a JSON object");
           }
           params.userData = parsed;
@@ -968,14 +1180,22 @@ export async function createCLI() {
         if (options.cmd !== undefined)
           params.dockerCmd = parseJsonStringArray("--cmd", options.cmd);
         if (options.entrypoint !== undefined)
-          params.dockerEntrypoint = parseJsonStringArray("--entrypoint", options.entrypoint);
+          params.dockerEntrypoint = parseJsonStringArray(
+            "--entrypoint",
+            options.entrypoint,
+          );
         if (options.image !== undefined) params.image = options.image;
         if (options.tag !== undefined) params.tag = options.tag;
         if (options.checksum !== undefined) params.checksum = options.checksum;
-        if (options.dockerfile !== undefined) params.dockerfile = options.dockerfile;
+        if (options.dockerfile !== undefined)
+          params.dockerfile = options.dockerfile;
         if (options.additionalDockerFiles !== undefined) {
           const parsed = JSON.parse(options.additionalDockerFiles);
-          if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+          if (
+            typeof parsed !== "object" ||
+            parsed === null ||
+            Array.isArray(parsed)
+          ) {
             throw new Error("--additional-docker-files must be a JSON object");
           }
           params.additionalDockerFiles = parsed;
@@ -990,7 +1210,7 @@ export async function createCLI() {
         serviceId,
         Object.keys(params).length > 0 ? params : undefined,
         options.wait,
-        options.timeout
+        options.timeout,
       );
     });
 
@@ -1060,7 +1280,7 @@ export async function createCLI() {
         signer,
         tokenAddress,
         amountToDeposit,
-        chainId
+        chainId,
       );
       if (!success) {
         console.log(chalk.red("Deposit failed"));
@@ -1109,15 +1329,15 @@ export async function createCLI() {
     .option("-p, --payee <payee>", "Address of the payee to authorize")
     .option(
       "-m, --maxLockedAmount <maxLockedAmount>",
-      "Maximum amount that can be locked by payee"
+      "Maximum amount that can be locked by payee",
     )
     .option(
       "-s, --maxLockSeconds <maxLockSeconds>",
-      "Maximum lock duration in seconds"
+      "Maximum lock duration in seconds",
     )
     .option(
       "-c, --maxLockCounts <maxLockCounts>",
-      "Maximum number of locks allowed"
+      "Maximum number of locks allowed",
     )
     .action(
       async (
@@ -1126,7 +1346,7 @@ export async function createCLI() {
         maxLockedAmount,
         maxLockSeconds,
         maxLockCounts,
-        options
+        options,
       ) => {
         const { signer, chainId } = await initializeSigner();
         const commands = new Commands(signer, chainId);
@@ -1141,7 +1361,7 @@ export async function createCLI() {
           payeeAddress,
           maxLockedAmountValue,
           maxLockSecondsValue,
-          maxLockCountsValue
+          maxLockCountsValue,
         );
 
         if (!success) {
@@ -1150,7 +1370,7 @@ export async function createCLI() {
         }
 
         console.log(chalk.green("Authorization successful"));
-      }
+      },
     );
 
   program
@@ -1165,7 +1385,7 @@ export async function createCLI() {
       const commands = new Commands(signer, chainId);
       await commands.getAuthorizationsEscrow(
         token || options.token,
-        payee || options.payee
+        payee || options.payee,
       );
     });
 
@@ -1177,24 +1397,24 @@ export async function createCLI() {
     .argument(
       "[initialUsers]",
       "Comma-separated list of initial user addresses",
-      ""
+      "",
     )
     .argument(
       "[transferable]",
       "Whether tokens are transferable (true/false)",
-      "false"
+      "false",
     )
     .option("-n, --name <name>", "Name for the access list")
     .option("-s, --symbol <symbol>", "Symbol for the access list")
     .option(
       "-u, --initial-users [initialUsers]",
       "Comma-separated list of initial user addresses",
-      ""
+      "",
     )
     .option(
       "-t, --transferable [transferable]",
       "Whether tokens are transferable (true/false)",
-      "false"
+      "false",
     )
     .action(async (name, symbol, initialUsers, transferable, options) => {
       const { signer, chainId } = await initializeSigner();
@@ -1214,11 +1434,11 @@ export async function createCLI() {
     .argument("<users>", "Comma-separated list of user addresses to add")
     .option(
       "-a, --address <accessListAddress>",
-      "Address of the access list contract"
+      "Address of the access list contract",
     )
     .option(
       "-u, --users <users>",
-      "Comma-separated list of user addresses to add"
+      "Comma-separated list of user addresses to add",
     )
     .action(async (accessListAddress, users, options) => {
       const { signer, chainId } = await initializeSigner();
@@ -1236,11 +1456,11 @@ export async function createCLI() {
     .argument("<users>", "Comma-separated list of user addresses to check")
     .option(
       "-a, --address <accessListAddress>",
-      "Address of the access list contract"
+      "Address of the access list contract",
     )
     .option(
       "-u, --users <users>",
-      "Comma-separated list of user addresses to check"
+      "Comma-separated list of user addresses to check",
     )
     .action(async (accessListAddress, users, options) => {
       const { signer, chainId } = await initializeSigner();
@@ -1258,11 +1478,11 @@ export async function createCLI() {
     .argument("<users>", "Comma-separated list of user addresses to remove")
     .option(
       "-a, --address <accessListAddress>",
-      "Address of the access list contract"
+      "Address of the access list contract",
     )
     .option(
       "-u, --users <users>",
-      "Comma-separated list of user addresses to remove"
+      "Comma-separated list of user addresses to remove",
     )
     .action(async (accessListAddress, users, options) => {
       const { signer, chainId } = await initializeSigner();
@@ -1279,24 +1499,24 @@ export async function createCLI() {
     .argument("<output>", "Output directory to save the logs")
     .argument(
       "[last]",
-      "Period of time to get logs from now (in hours). Use either last or from-to"
+      "Period of time to get logs from now (in hours). Use either last or from-to",
     )
     .argument("[from]", "Start time (epoch ms) to get logs from")
     .argument("[to]", "End time (epoch ms) to get logs to")
     .argument(
       "[maxLogs]",
-      "Maximum number of logs to retrieve (default: 100, max: 1000)"
+      "Maximum number of logs to retrieve (default: 100, max: 1000)",
     )
     .option("-o, --output <output>", "Output directory to save the logs")
     .option(
       "-l, --last [last]",
-      "Period of time to get logs from now (in hours)"
+      "Period of time to get logs from now (in hours)",
     )
     .option("-f, --from [from]", "Start time (epoch ms) to get logs from")
     .option("-t, --to [to]", "End time (epoch ms) to get logs to")
     .option(
       "-m, --maxLogs [maxLogs]",
-      "Maximum number of logs to retrieve (default: 100, max: 1000)"
+      "Maximum number of logs to retrieve (default: 100, max: 1000)",
     )
     .action(async (output, last, from, to, options) => {
       const { signer, chainId } = await initializeSigner();
@@ -1312,8 +1532,13 @@ export async function createCLI() {
 
   program
     .command("createBucket")
-    .description("Create a new persistent-storage bucket. Pass an access list to gate it; omit for owner-only access (chain inferred from RPC)")
-    .argument("[accessListAddress]", "Access list contract address (0x…); omit for owner-only access")
+    .description(
+      "Create a new persistent-storage bucket. Pass an access list to gate it; omit for owner-only access (chain inferred from RPC)",
+    )
+    .argument(
+      "[accessListAddress]",
+      "Access list contract address (0x…); omit for owner-only access",
+    )
     .action(async (accessListAddress) => {
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
@@ -1325,7 +1550,10 @@ export async function createCLI() {
     .description("Upload a local file into a bucket")
     .argument("<bucketId>", "Bucket id")
     .argument("<filePath>", "Path to local file")
-    .argument("[fileName]", "Name under which to store the file (defaults to basename)")
+    .argument(
+      "[fileName]",
+      "Name under which to store the file (defaults to basename)",
+    )
     .action(async (bucketId, filePath, fileName) => {
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);

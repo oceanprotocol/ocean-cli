@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 `ocean-cli` (npm package `@oceanprotocol/cli`, version 2.0.0; installs a `bin` named `ocean-cli`) is a TypeScript CLI that wraps the Ocean Protocol JavaScript library (`@oceanprotocol/lib`, a.k.a. ocean.js) to publish, edit, consume/download, and run compute-to-data (C2D) on assets, plus manage escrow payments, access lists, persistent-storage buckets, auth tokens, and admin node logs. It talks to an **Ocean Node** (the single service that replaced the old standalone Provider and Aquarius apps — it does metadata caching, indexing, encryption, ordering, and compute) and to an EVM chain via an RPC endpoint.
 
-The package is pure ESM (`"type": "module"` in `package.json`). All relative imports MUST carry an explicit `.js` extension even though the source is `.ts` (e.g. `import { Commands } from "./commands.js"`). Node 22 is expected (`.nvmrc` = `22`; CI uses `22.5.1`).
+The package is pure ESM (`"type": "module"` in `package.json`). All relative imports MUST carry an explicit `.js` extension even though the source is `.ts` (e.g. `import { Commands } from "./commands.js"`). Node 22 is expected (`.nvmrc` = `22.23.1`; CI pins the same). The dev toolchain sets the floor: `eslint@10` needs `>=22.13.0` and `release-it@21` needs `>=22.21.0`, so an older 22.x will fail `npm run lint` / `npm run release` even though `engines.node` is only `>=22` (that bound is for consumers of the published package, who get `dependencies` only).
 
 ## Commands
 
@@ -15,16 +15,16 @@ Scripts (from `package.json`):
 
 - `npm run build` — `npm run clean && tsc --sourceMap` (clean wipes `./dist ./doc ./.nyc_output`, then compile to `./dist`).
 - `npm run build:tsc` — compile only.
-- `npm run lint` — `eslint .` (flat config in `eslint.config.mjs`; only custom rule is `@typescript-eslint/no-explicit-any: warn`).
+- `npm run lint` — `eslint .` (ESLint 10, flat config in `eslint.config.mjs`). Custom rules: `@typescript-eslint/no-explicit-any: warn` everywhere, plus a `test/**/*.ts` override turning off `@typescript-eslint/no-unused-expressions` (chai's `expect(x).to.be.true` is a bare expression by design) and `preserve-caught-error`. Both stay enforced in `src/`.
 - `npm run lint:fix` — eslint with `--fix`.
 - `npm run format` — Prettier over `**/*.{js,jsx,ts,tsx}`.
 - `npm run cli` — runs the CLI from source with `npx tsx src/index.ts` (no build step needed for local use).
 - `npm run test` — `npm run lint && npm run test:system` (lint is part of "test").
 - `npm run test:system` — `npm run mocha 'test/**/*.test.ts'`.
-- `npm run mocha` — `NODE_OPTIONS='--experimental-require-module' mocha --config=test/.mocharc.json --node-env=test --exit`.
+- `npm run mocha` — `npx tsx ./node_modules/mocha/bin/mocha.js --config=test/.mocharc.json --node-env=test --exit`. Runs mocha under `tsx`; there is no `ts-node` and no `NODE_OPTIONS` flag any more.
 - `npm run release` — `release-it --non-interactive`: bumps version, builds, regenerates the changelog (`npm run changelog` = `auto-changelog -p`), commits, tags `v${version}`, pushes, and cuts a GitHub Release. Does **not** publish to npm (`release-it` config `npm.publish: false`) — pushing the tag triggers `.github/workflows/publish.yml`, which runs `npm publish` (`--tag next` for tags containing `next`, else `latest`). Mirrors `@oceanprotocol/lib`'s release flow.
 
-Mocha config (`test/.mocharc.json`): loader `ts-node/esm`, `bail: true` (stops at first failure), `timeout: 20000`, `exit: true`.
+Mocha config (`test/.mocharc.json`): `bail: true` (stops at first failure), `timeout: 20000`, `exit: true`. No `loader` key — TypeScript is handled by `tsx` from the `mocha` script, so nothing type-checks at test time (run `tsc` separately to catch type errors in `test/`, which the build's `include` does not cover).
 
 ### Running a single test
 
@@ -126,7 +126,7 @@ One big class holding all command logic. The constructor:
 
 `helpers.ts` is the seam between the CLI and ocean.js:
 
-- `createAssetUtil(...)` wraps ocean.js `createAsset` (used by publish/publishAlgo and the interactive publisher). It resolves the active ERC20 template (`calculateActiveTemplateIndex` reads and `JSON.parse`s the `@oceanprotocol/contracts` `ERC20Template.json` ABI, resolved via `createRequire`/`require.resolve` so it works from any cwd — e.g. a global install — not a cwd-relative `node_modules` path), and for **Oasis Sapphire** (`config.sdk === 'oasis'`) wraps the signer with `@oasisprotocol/sapphire-paratime` (`getSignerAccordingSdk`) and deploys an allow access list before creating the asset.
+- `createAssetUtil(...)` wraps ocean.js `createAsset` (used by publish/publishAlgo and the interactive publisher). It resolves the active ERC20 template (`calculateActiveTemplateIndex` reads and `JSON.parse`s the `@oceanprotocol/contracts` `ERC20Template.json` ABI, resolved via `createRequire`/`require.resolve` so it works from any cwd — e.g. a global install — not a cwd-relative `node_modules` path), and for **Oasis Sapphire** (`config.sdk === 'oasis'`) wraps the signer with `wrapEthersSigner` from `@oasisprotocol/sapphire-ethers-v6` (`getSignerAccordingSdk`; sapphire-paratime v2 moved its ethers integration into that package, and it throws `SignerHasNoProviderError` for a provider-less signer) and deploys an allow access list before creating the asset.
 - `updateAssetMetadata(...)` — used by `editAsset`, `allowAlgo`, `disallowAlgo` and the interactive publisher. It validates the DDO via `aquarius.validate`, then either `ProviderInstance.encrypt`s the DDO (flags = 2) or hexlifies raw JSON (flags = 0) depending on the `encryptDDO` flag, then calls `nft.setMetadata`.
 - `handleComputeOrder(...)` — the ordering state machine used in compute: validOrder + no fees → reuse as-is; validOrder + fees → `datatoken.reuseOrder` paying only provider fees; no order → `orderAsset` (pay 1 datatoken + fees). Approves provider-fee tokens first when the fee amount > 0.
 - `resolveComputeInputs(...)` + `parseComputeInput(...)` — parse the datasets/algo CLI strings (DID | JSON object | array | mixed | legacy `[did:a,did:b]`), resolve DID entries through `aquarius.waitForIndexer`, pass raw `fileObject` entries through (aligned with a `null` DDO slot), and pick `providerURI` from the first DID-based DDO's `serviceEndpoint` (else fall back to `NODE_URL`).

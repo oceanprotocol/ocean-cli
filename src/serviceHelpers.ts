@@ -42,7 +42,9 @@ export const TERMINAL_FAILURE_STATUSES = [12, 14, 15, 99];
 
 // Any status the poller should stop on (failure or benign end state).
 export function isTerminal(status: number): boolean {
-  return TERMINAL_FAILURE_STATUSES.includes(status) || [70, 75].includes(status);
+  return (
+    TERMINAL_FAILURE_STATUSES.includes(status) || [70, 75].includes(status)
+  );
 }
 
 export function statusLabel(status: number, statusText?: string): string {
@@ -64,7 +66,7 @@ function colorForStatus(status: number, text: string): string {
 
 export function availableFor(
   env: ComputeEnvironment,
-  req: TemplateResourceRequirement
+  req: TemplateResourceRequirement,
 ): number {
   const resources: ComputeResource[] = env.resources ?? [];
   if (req.id) {
@@ -78,7 +80,7 @@ export function availableFor(
 
 export function envSatisfiesTemplate(
   env: ComputeEnvironment,
-  reqs?: TemplateResourceRequirement[]
+  reqs?: TemplateResourceRequirement[],
 ): boolean {
   return (reqs ?? []).every((req) => availableFor(env, req) >= req.min);
 }
@@ -86,13 +88,14 @@ export function envSatisfiesTemplate(
 // Human-readable reason a template does not fit an env (or null when it fits).
 export function templateMismatchReason(
   env: ComputeEnvironment,
-  template?: ServiceTemplatePublic
+  template?: ServiceTemplatePublic,
 ): string | null {
   if (!template) return null;
   for (const req of template.requiredResources ?? []) {
     const have = availableFor(env, req);
     if (have < req.min) {
-      const what = req.id ?? `${req.kind ?? "resource"}${req.type ? `/${req.type}` : ""}`;
+      const what =
+        req.id ?? `${req.kind ?? "resource"}${req.type ? `/${req.type}` : ""}`;
       return `${what}: need ${req.min}, have ${have}`;
     }
   }
@@ -101,12 +104,12 @@ export function templateMismatchReason(
 
 export function findServiceEnvironments(
   envs: ComputeEnvironment[],
-  template?: ServiceTemplatePublic
+  template?: ServiceTemplatePublic,
 ): ComputeEnvironment[] {
   return (envs ?? []).filter(
     (e) =>
       e.features?.services !== false &&
-      (!template || envSatisfiesTemplate(e, template.requiredResources))
+      (!template || envSatisfiesTemplate(e, template.requiredResources)),
   );
 }
 
@@ -116,10 +119,10 @@ export function findServiceEnvironments(
 
 export function resolveServiceResources(
   template: ServiceTemplatePublic | undefined,
-  env: ComputeEnvironment
+  env: ComputeEnvironment,
 ): ComputeResourceRequest[] {
   const requiredById = (template?.requiredResources ?? []).filter(
-    (r) => typeof r.id === "string"
+    (r) => typeof r.id === "string",
   );
   if (requiredById.length) {
     return requiredById.map((r) => ({ id: r.id as string, amount: r.min }));
@@ -140,11 +143,11 @@ export function estimateServiceCost(
   chainId: number,
   token: string,
   resources: { id: string; amount: number }[],
-  durationSeconds: number
+  durationSeconds: number,
 ): number | null {
   const schedules = env.fees?.[String(chainId)];
   const schedule = schedules?.find(
-    (f) => f.feeToken.toLowerCase() === token.toLowerCase()
+    (f) => f.feeToken.toLowerCase() === token.toLowerCase(),
   );
   if (!schedule) return null;
   const priceFor = (id: string) =>
@@ -152,7 +155,7 @@ export function estimateServiceCost(
   const minutes = Math.ceil(durationSeconds / 60);
   return resources.reduce(
     (sum, r) => sum + priceFor(r.id) * r.amount * minutes,
-    0
+    0,
   );
 }
 
@@ -165,7 +168,7 @@ export function estimateServiceCost(
 export function parseUserData(
   inlineJson?: string,
   parsedFromFile?: Record<string, unknown>,
-  template?: ServiceTemplatePublic
+  template?: ServiceTemplatePublic,
 ): Record<string, unknown> | undefined {
   let data: Record<string, unknown> | undefined;
   if (typeof inlineJson === "string" && inlineJson.trim().length > 0) {
@@ -180,7 +183,9 @@ export function parseUserData(
       parsed === null ||
       Array.isArray(parsed)
     ) {
-      throw new Error("--user-data must be a JSON object (not an array or primitive)");
+      throw new Error(
+        "--user-data must be a JSON object (not an array or primitive)",
+      );
     }
     data = parsed as Record<string, unknown>;
   } else if (parsedFromFile) {
@@ -205,8 +210,8 @@ export function parseUserData(
         // Warn (don't fail) about keys the template does not advertise.
         console.log(
           chalk.yellow(
-            `Warning: userData key "${key}" is not listed in the template's userConfigurableEnvVars.`
-          )
+            `Warning: userData key "${key}" is not listed in the template's userConfigurableEnvVars.`,
+          ),
         );
         continue;
       }
@@ -221,7 +226,7 @@ export function parseUserData(
         const val = data[key];
         if (re && typeof val === "string" && !re.test(val)) {
           throw new Error(
-            `userData value for "${key}" does not match the template's validation pattern`
+            `userData value for "${key}" does not match the template's validation pattern`,
           );
         }
       }
@@ -233,7 +238,7 @@ export function parseUserData(
 
 // Safe echo of userData: keys only, never values (may contain secrets).
 export function describeUserDataKeys(
-  data?: Record<string, unknown>
+  data?: Record<string, unknown>,
 ): string | undefined {
   if (!data) return undefined;
   const keys = Object.keys(data);
@@ -252,35 +257,35 @@ export async function verifyServiceEscrow(
   token: string,
   payee: string, // env.consumerAddress
   costHuman: number, // from estimateServiceCost
-  durationSeconds: number
+  durationSeconds: number,
 ): Promise<boolean> {
   try {
     const config = await getConfigByChainId(chainId);
     if (!config?.Escrow) {
       console.error(
         chalk.red(
-          `Escrow contract address not found for chain ${chainId} in the address file.`
-        )
+          `Escrow contract address not found for chain ${chainId} in the address file.`,
+        ),
       );
       return false;
     }
     const escrow = new EscrowContract(
       getAddress(config.Escrow),
       signer,
-      chainId
+      chainId,
     );
     const decimals = await getTokenDecimals(signer, token);
     const amountUnits = await amountToUnits(
       signer,
       token,
       String(costHuman),
-      decimals
+      decimals,
     );
     const availableHuman = await unitsToAmount(
       signer,
       token,
       amountUnits.toString(),
-      decimals
+      decimals,
     );
     const minLockSeconds = durationSeconds + 3600; // node getMinLockTime margin
 
@@ -290,7 +295,7 @@ export async function verifyServiceEscrow(
       availableHuman,
       amountUnits.toString(),
       String(minLockSeconds),
-      "10"
+      "10",
     );
 
     if (validation.isValid === false) {
@@ -299,8 +304,8 @@ export async function verifyServiceEscrow(
         chalk.yellow(
           `  → deposit funds:  npm run cli depositEscrow ${token} <amount>\n` +
             `  → authorize node: npm run cli authorizeEscrow ${token} ${payee} <maxLockedAmount> <maxLockSeconds> <maxLockCounts>\n` +
-            `    (maxLockSeconds must be at least ${minLockSeconds} = duration + 3600)`
-        )
+            `    (maxLockSeconds must be at least ${minLockSeconds} = duration + 3600)`,
+        ),
       );
       return false;
     }
@@ -321,7 +326,7 @@ export async function pollServiceStatus(
   serviceId: string,
   target: ServiceStatusNumber,
   timeoutMs = 600_000,
-  notContainerId?: string
+  notContainerId?: string,
 ): Promise<ServiceJob> {
   const started = Date.now();
   let lastStatus: number | undefined;
@@ -333,7 +338,7 @@ export async function pollServiceStatus(
       jobs = await ProviderInstance.getServiceStatus(
         nodeUrl,
         signer,
-        serviceId
+        serviceId,
       );
     } catch (error) {
       // Transient errors while polling should not abort the whole wait.
@@ -341,8 +346,8 @@ export async function pollServiceStatus(
         chalk.yellow(
           `  (temporary error fetching status: ${
             (error as Error)?.message ?? error
-          })`
-        )
+          })`,
+        ),
       );
     }
 
@@ -353,8 +358,8 @@ export async function pollServiceStatus(
         console.log(
           `  Status: ${colorForStatus(
             job.status,
-            statusLabel(job.status, job.statusText)
-          )} (${job.status})`
+            statusLabel(job.status, job.statusText),
+          )} (${job.status})`,
         );
       }
 
@@ -369,8 +374,8 @@ export async function pollServiceStatus(
         throw new Error(
           `Service ${serviceId} failed: ${statusLabel(
             job.status,
-            job.statusText
-          )} (${job.status})`
+            job.statusText,
+          )} (${job.status})`,
         );
       }
     }
@@ -378,8 +383,8 @@ export async function pollServiceStatus(
     if (Date.now() - started > timeoutMs) {
       throw new Error(
         `Timed out after ${Math.round(
-          timeoutMs / 1000
-        )}s waiting for service ${serviceId} to reach ${statusLabel(target)}`
+          timeoutMs / 1000,
+        )}s waiting for service ${serviceId} to reach ${statusLabel(target)}`,
       );
     }
 
@@ -409,22 +414,20 @@ function relativeTime(ms: number): string {
 
 export function printServiceJob(
   job: ServiceJob,
-  opts?: { verbose?: boolean }
+  opts?: { verbose?: boolean },
 ): void {
   const header = colorForStatus(
     job.status,
-    statusLabel(job.status, job.statusText)
+    statusLabel(job.status, job.statusText),
   );
   console.log(`\nService ${chalk.bold(job.serviceId)}   [${header}]`);
-  console.log(
-    `  environment: ${job.environment}    owner: ${job.owner}`
-  );
+  console.log(`  environment: ${job.environment}    owner: ${job.owner}`);
 
   const imageSpec = job.tag
     ? `${job.image}:${job.tag}`
     : job.checksum
-    ? `${job.image}@${job.checksum}`
-    : job.image;
+      ? `${job.image}@${job.checksum}`
+      : job.image;
   console.log(`  image: ${imageSpec}`);
 
   const expires =
@@ -437,7 +440,7 @@ export function printServiceJob(
     console.log("  endpoints:");
     for (const ep of job.endpoints) {
       console.log(
-        `    → ${chalk.green(ep.url)}   (container port ${ep.containerPort})`
+        `    → ${chalk.green(ep.url)}   (container port ${ep.containerPort})`,
       );
     }
   } else {
@@ -455,7 +458,7 @@ export function printServiceJob(
   console.log(
     `  payment: ${paymentBits.join(" ") || "n/a"}${
       extendCount ? `   extends: ${extendCount}` : ""
-    }`
+    }`,
   );
 
   if (opts?.verbose) {

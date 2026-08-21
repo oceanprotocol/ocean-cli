@@ -46,7 +46,7 @@ describe("Ocean CLI node selection", function () {
     it("keeps the CLI node-less when setNode cannot reach the node", async function () {
       const { output } = await runRepl(
         ["setNode http://127.0.0.1:1", "getComputeEnvironments", "exit"],
-        { env: { NODE_URL: undefined } }
+        { env: { NODE_URL: undefined } },
       );
       expect(output).to.contain("Still no node set");
       // The gate is still closed: no half-switch.
@@ -106,7 +106,7 @@ describe("Ocean CLI node selection", function () {
     it("switches from no node to a live node, opening the gate", async function () {
       const { output } = await runRepl(
         [`setNode ${LIVE_NODE}`, "getNode", "getComputeEnvironments", "exit"],
-        { env: { NODE_URL: undefined } }
+        { env: { NODE_URL: undefined } },
       );
       expect(output).to.contain(`Using node: ${LIVE_NODE}`);
       expect(output).to.contain(`Current Ocean Node: ${LIVE_NODE}`);
@@ -126,7 +126,7 @@ describe("Ocean CLI node selection", function () {
     it("keeps the current node when the new one is unreachable", async function () {
       const { output } = await runRepl(
         ["setNode http://127.0.0.1:9999", "getNode", "exit"],
-        { env: { NODE_URL: LIVE_NODE } }
+        { env: { NODE_URL: LIVE_NODE } },
       );
       expect(output).to.contain(`Keeping current node: ${LIVE_NODE}`);
       expect(output).to.contain(`Current Ocean Node: ${LIVE_NODE}`);

@@ -1,6 +1,6 @@
 {
   "name": "@oceanprotocol/cli",
-  "version": "2.0.0-next.4",
+  "version": "2.0.0",
   "description": "CLI tool to interact with the oceanprotocol's JavaScript library to privately & securely publish, consume and run compute on data.",
   "type": "module",
   "bin": {

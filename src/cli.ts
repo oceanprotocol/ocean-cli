@@ -12,7 +12,7 @@ import {
   ServiceStatusNumber,
   ServiceRestartParams,
 } from "@oceanprotocol/lib";
-import { toBoolean } from "./helpers.js";
+import { parseComputeInput, toBoolean } from "./helpers.js";
 import {
   getCurrentNodeUrl,
   hasNode,
@@ -488,27 +488,24 @@ export async function createCLI() {
           return;
         }
 
-        const dsArr =
-          dsDids === "[]"
-            ? []
-            : dsDids
-                .split(",")
-                .map((s) => s.trim())
-                .filter(Boolean);
+        // Count datasets with the same tokenizer the resolver uses. Splitting
+        // the raw string on "," breaks every JSON form (a single
+        // '[{"fileObject":{...}}]' contains commas), which made this check
+        // reject valid input.
+        const dsCount = parseComputeInput(dsDids).length;
 
+        // Empty entries are kept: they are positional placeholders, so
+        // `svc0,,svc2` is three slots, not two.
         const svArr = svcIds
-          ? svcIds
-              .split(",")
-              .map((s) => s.trim())
-              .filter(Boolean)
+          ? svcIds.split(",").map((s) => s.trim())
           : undefined;
 
         // Optional check: serviceIds must match length if provided
-        if (svArr && svArr.length !== dsArr.length) {
+        if (svArr && svArr.length !== dsCount) {
           console.error(
             chalk.red(
-              `Length mismatch: datasetDids=${dsArr.length} vs serviceIds=${svArr.length}. ` +
-                "If serviceIds is provided, it must match datasetDids length (positional 1–1).",
+              `Length mismatch: datasets=${dsCount} vs serviceIds=${svArr.length}. ` +
+                "If serviceIds is provided, it must match the dataset count (positional 1–1).",
             ),
           );
           return;
@@ -655,27 +652,24 @@ export async function createCLI() {
           return;
         }
 
-        const dsArr =
-          dsDids === "[]"
-            ? []
-            : dsDids
-                .split(",")
-                .map((s) => s.trim())
-                .filter(Boolean);
+        // Count datasets with the same tokenizer the resolver uses. Splitting
+        // the raw string on "," breaks every JSON form (a single
+        // '[{"fileObject":{...}}]' contains commas), which made this check
+        // reject valid input.
+        const dsCount = parseComputeInput(dsDids).length;
 
+        // Empty entries are kept: they are positional placeholders, so
+        // `svc0,,svc2` is three slots, not two.
         const svArr = svcIds
-          ? svcIds
-              .split(",")
-              .map((s) => s.trim())
-              .filter(Boolean)
+          ? svcIds.split(",").map((s) => s.trim())
           : undefined;
 
         // Optional check: serviceIds must match length if provided
-        if (svArr && svArr.length !== dsArr.length) {
+        if (svArr && svArr.length !== dsCount) {
           console.error(
             chalk.red(
-              `Length mismatch: datasetDids=${dsArr.length} vs serviceIds=${svArr.length}. ` +
-                "If serviceIds is provided, it must match datasetDids length (positional 1–1).",
+              `Length mismatch: datasets=${dsCount} vs serviceIds=${svArr.length}. ` +
+                "If serviceIds is provided, it must match the dataset count (positional 1–1).",
             ),
           );
           return;

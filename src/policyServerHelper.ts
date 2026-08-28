@@ -368,7 +368,9 @@ export async function getPolicyServerOBJ(
       presentationDefinitionUri: "",
     };
   } catch (error: any) {
-    console.error("getPolicyServerOBJ error:", error);
+    // Log the message only: an axios error carries the full request config,
+    // including the Authorization bearer token for the SSI wallet.
+    console.error(`getPolicyServerOBJ error: ${error?.message}`);
     if (error?.message) {
       throw new Error(`getPolicyServerOBJ failed: ${error.message}`, {
         cause: error,
@@ -438,7 +440,9 @@ export async function getPolicyServerOBJs(
 
     return results;
   } catch (error: any) {
-    console.error("getPolicyServerOBJs error:", error);
+    // Log the message only: an axios error carries the full request config,
+    // including the Authorization bearer token for the SSI wallet.
+    console.error(`getPolicyServerOBJs error: ${error?.message}`);
     if (error?.message) {
       throw new Error(`getPolicyServerOBJs failed: ${error.message}`, {
         cause: error,

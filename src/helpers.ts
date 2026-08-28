@@ -62,13 +62,22 @@ export async function downloadFile(
     filename = defaultName;
   }
 
+  // The header is remote-controlled, so reduce it to a bare file name before
+  // joining: a value like "../../.ssh/authorized_keys" would otherwise escape
+  // downloadPath. basename also strips any directory component, and a name that
+  // is empty or only dots ("." / "..") is no name at all.
+  filename = path.basename(filename);
+  if (filename.length === 0 || /^\.+$/.test(filename)) {
+    filename = defaultName;
+  }
+
   const filePath = path.join(downloadPath, filename);
   const data = await response.arrayBuffer();
 
   try {
     await fs.writeFile(filePath, Buffer.from(data));
   } catch (err) {
-    throw new Error("Error while saving the file:", err.message);
+    throw new Error("Error while saving the file:", { cause: err });
   }
 
   return { data, filename };
@@ -346,7 +355,11 @@ export interface ResolvedComputeInputs {
 // Each token is either a DID string or a raw ComputeAsset/ComputeAlgorithm object.
 // Supports: a bare DID, a JSON object, a JSON array of DIDs and/or objects, and the
 // legacy unquoted `[did:a,did:b]` form (kept for backward compatibility).
-function parseComputeInput(raw: string): (string | Record<string, unknown>)[] {
+// Exported so the CLI layer can count datasets the same way the resolver does,
+// without re-implementing (and drifting from) the JSON / mixed / legacy parsing.
+export function parseComputeInput(
+  raw: string,
+): (string | Record<string, unknown>)[] {
   if (raw === undefined || raw === null) return [];
   const trimmed = String(raw).trim();
   if (trimmed.length === 0) return [];

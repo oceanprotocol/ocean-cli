@@ -209,10 +209,15 @@ describe("Ocean CLI Access List", function () {
     it("should fail to remove with invalid address", async function () {
       const invalidAddress = "invalid-address";
 
+      // A bare try/catch would pass vacuously if the command succeeded. Note a
+      // thrown sentinel is no good here either: the predicate below accepts any
+      // message containing "error", which a sentinel would satisfy.
+      let succeeded = false;
       try {
         await runCommand(
           `npm run cli removeFromAccessList ${accessListAddress} ${invalidAddress}`,
         );
+        succeeded = true;
       } catch (error: any) {
         expect(error.stderr || error.message).to.satisfy(
           (msg: string) =>
@@ -221,6 +226,8 @@ describe("Ocean CLI Access List", function () {
             msg.includes("invalid address"),
         );
       }
+      expect(succeeded, "command was expected to fail but succeeded").to.be
+        .false;
     });
   });
 
@@ -259,10 +266,12 @@ describe("Ocean CLI Access List", function () {
     });
 
     it("should fail with invalid address format", async function () {
+      let succeeded = false;
       try {
         await runCommand(
           `npm run cli checkAccessList ${accessListAddress} invalid-address`,
         );
+        succeeded = true;
       } catch (error: any) {
         expect(error.stderr || error.message).to.satisfy(
           (msg: string) =>
@@ -271,6 +280,8 @@ describe("Ocean CLI Access List", function () {
             msg.includes("invalid address"),
         );
       }
+      expect(succeeded, "command was expected to fail but succeeded").to.be
+        .false;
     });
   });
 

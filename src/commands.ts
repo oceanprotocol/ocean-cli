@@ -357,15 +357,15 @@ export class Commands {
       typeof inputServicesString === "string" &&
       inputServicesString.trim().length > 0
     ) {
-      inputServices = inputServicesString
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
+      // Empty entries are NOT filtered out: they are positional placeholders.
+      // `svc0,,svc2` means "default service for dataset 1", so dropping the
+      // blank would shift svc2 onto dataset 1. The consumer below skips
+      // falsy entries via `if (expectedServiceId)`.
+      inputServices = inputServicesString.split(",").map((s) => s.trim());
     } else if (Array.isArray(inputServicesString)) {
       inputServices = (inputServicesString as string[])
         .map(String)
-        .map((s) => s.trim())
-        .filter(Boolean);
+        .map((s) => s.trim());
     }
 
     const computeEnvs = await ProviderInstance.getComputeEnvironments(
@@ -539,7 +539,7 @@ export class Commands {
           " because chainId is not supported by compute environment. " +
           args[3] +
           ". Supported chain IDs: " +
-          computeEnv.fees.keys(),
+          Object.keys(computeEnv.fees).join(", "),
       );
       return;
     }
@@ -628,15 +628,15 @@ export class Commands {
       typeof inputServicesString === "string" &&
       inputServicesString.trim().length > 0
     ) {
-      inputServices = inputServicesString
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
+      // Empty entries are NOT filtered out: they are positional placeholders.
+      // `svc0,,svc2` means "default service for dataset 1", so dropping the
+      // blank would shift svc2 onto dataset 1. The consumer below skips
+      // falsy entries via `if (expectedServiceId)`.
+      inputServices = inputServicesString.split(",").map((s) => s.trim());
     } else if (Array.isArray(inputServicesString)) {
       inputServices = (inputServicesString as string[])
         .map(String)
-        .map((s) => s.trim())
-        .filter(Boolean);
+        .map((s) => s.trim());
     }
 
     const computeEnvs = await ProviderInstance.getComputeEnvironments(
@@ -907,7 +907,7 @@ export class Commands {
           " because chainId is not supported by compute environment. " +
           args[3] +
           ". Supported chain IDs: " +
-          computeEnv.fees.keys(),
+          Object.keys(computeEnv.fees).join(", "),
       );
       return;
     }
@@ -1158,15 +1158,15 @@ export class Commands {
       typeof inputServicesString === "string" &&
       inputServicesString.trim().length > 0
     ) {
-      inputServices = inputServicesString
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
+      // Empty entries are NOT filtered out: they are positional placeholders.
+      // `svc0,,svc2` means "default service for dataset 1", so dropping the
+      // blank would shift svc2 onto dataset 1. The consumer below skips
+      // falsy entries via `if (expectedServiceId)`.
+      inputServices = inputServicesString.split(",").map((s) => s.trim());
     } else if (Array.isArray(inputServicesString)) {
       inputServices = (inputServicesString as string[])
         .map(String)
-        .map((s) => s.trim())
-        .filter(Boolean);
+        .map((s) => s.trim());
     }
 
     const computeEnvs = await ProviderInstance.getComputeEnvironments(

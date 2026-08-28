@@ -46,7 +46,7 @@ export const runCommandAs = async (
   privateKey: string,
   command: string,
 ): Promise<string> => {
-  console.log(`\n[CMD as ${privateKey.slice(0, 6)}…]: ${command}`);
+  console.log(`\n[CMD as alt-account]: ${command}`);
   try {
     const { stdout, stderr } = await execPromise(command, {
       cwd: projectRoot,

@@ -136,7 +136,11 @@ describe("Ocean CLI Paid Compute", function () {
 
     let environments;
     try {
-      environments = eval(jsonMatch[1]);
+      // The CLI prints JSON.stringify(computeEnvs) on a single line, so the
+      // first line of the capture is the whole payload; the rest of the match
+      // is trailing CLI output. JSON.parse, never eval: this is process output,
+      // not code.
+      environments = JSON.parse(jsonMatch[1].split("\n")[0].trim());
     } catch (error) {
       console.error(
         `Extracted output: ${jsonMatch[0]} and final result: ${jsonMatch[1]}`,

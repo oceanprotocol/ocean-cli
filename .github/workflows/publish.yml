@@ -20,7 +20,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "22.5.1"
+          node-version: "22.23.1"
           registry-url: "https://registry.npmjs.org/"
 
       # Only publish a tag whose version matches package.json, so a stray or

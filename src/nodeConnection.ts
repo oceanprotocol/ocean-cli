@@ -73,7 +73,7 @@ export function startP2P(initialNodeUrl?: string): void {
 
   const bootstrapPeers = buildBootstrapPeers(initialNodeUrl);
   console.log(
-    chalk.cyan(`Starting libp2p (${bootstrapPeers.length} bootstrap peers)...`)
+    chalk.cyan(`Starting libp2p (${bootstrapPeers.length} bootstrap peers)...`),
   );
 
   // The promise is stored, not awaited, so it MUST swallow its own rejection here:
@@ -94,9 +94,9 @@ export function startP2P(initialNodeUrl?: string): void {
     (error) => {
       p2pFailure = error instanceof Error ? error : new Error(String(error));
       console.error(
-        chalk.yellow(`libp2p failed to start: ${p2pFailure.message}`)
+        chalk.yellow(`libp2p failed to start: ${p2pFailure.message}`),
       );
-    }
+    },
   );
 }
 
@@ -160,7 +160,7 @@ export async function stopP2P(waitForStartMs = 15_000): Promise<boolean> {
     } catch (error) {
       // Shutting down is best effort — never turn it into a command failure.
       console.error(
-        chalk.yellow(`libp2p did not stop cleanly: ${error?.message ?? error}`)
+        chalk.yellow(`libp2p did not stop cleanly: ${error?.message ?? error}`),
       );
     }
   }
@@ -188,7 +188,7 @@ export function hasNode(): boolean {
  * Returns the node status (for display), or null when the node cannot be reached.
  */
 export async function validateNode(
-  nodeUrl: string
+  nodeUrl: string,
 ): Promise<NodeStatus | null> {
   try {
     let timeout = HTTP_STATUS_TIMEOUT_MS;
@@ -201,14 +201,14 @@ export async function validateNode(
     }
     const status = await ProviderInstance.getNodeStatus(
       nodeUrl,
-      AbortSignal.timeout(timeout)
+      AbortSignal.timeout(timeout),
     );
     return status || null;
   } catch (error) {
     console.error(
       chalk.yellow(
-        `Could not get status of ${nodeUrl}: ${error?.message ?? error}`
-      )
+        `Could not get status of ${nodeUrl}: ${error?.message ?? error}`,
+      ),
     );
     return null;
   }

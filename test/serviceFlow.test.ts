@@ -52,8 +52,8 @@ describe("Ocean CLI Service-on-Demand", function () {
       fs.readFileSync(
         process.env.ADDRESS_FILE ||
           `${homedir()}/.ocean/ocean-contracts/artifacts/address.json`,
-        "utf8"
-      )
+        "utf8",
+      ),
     );
     return data.development;
   };
@@ -93,7 +93,7 @@ describe("Ocean CLI Service-on-Demand", function () {
 
     const templates = parseTrailingArray(output, "Service templates:");
     expect(templates, "could not parse 'Service templates:' output").to.be.an(
-      "array"
+      "array",
     ).that.is.not.empty;
     template = templates[0];
     expect(template).to.have.property("id").that.is.a("string");
@@ -108,7 +108,9 @@ describe("Ocean CLI Service-on-Demand", function () {
     const envs = parseTrailingArray(output, "Existing compute environments:");
     expect(envs, "could not parse compute environments").to.be.an("array").that
       .is.not.empty;
-    servicesEnv = (envs || []).find((e: any) => e?.features?.services !== false);
+    servicesEnv = (envs || []).find(
+      (e: any) => e?.features?.services !== false,
+    );
     if (!servicesEnv) {
       console.log("No services-enabled environment — skipping lifecycle.");
       skipLifecycle = true;
@@ -131,7 +133,7 @@ describe("Ocean CLI Service-on-Demand", function () {
     }
 
     const deposit = await runCommand(
-      `npm run cli depositEscrow ${oceanToken} 500`
+      `npm run cli depositEscrow ${oceanToken} 500`,
     );
     expect(deposit.toLowerCase()).to.match(/deposit/);
 
@@ -141,7 +143,7 @@ describe("Ocean CLI Service-on-Demand", function () {
     // the values below are a floor for a fresh chain, not a guarantee.
     try {
       const auth = await runCommand(
-        `npm run cli authorizeEscrow ${oceanToken} ${servicesEnv.consumerAddress} 500 90000 100`
+        `npm run cli authorizeEscrow ${oceanToken} ${servicesEnv.consumerAddress} 500 90000 100`,
       );
       // "Authorization failed" also contains "authoriz" — match the outcome, not the word.
       expect(auth).to.match(/Successfully authorized|already authorized/i);
@@ -153,7 +155,7 @@ describe("Ocean CLI Service-on-Demand", function () {
     // (the node needs maxLockSeconds >= duration + 3600) and every later failure
     // in this suite is read against it.
     const auths = await runCommand(
-      `npm run cli getAuthorizationsEscrow ${oceanToken} ${servicesEnv.consumerAddress}`
+      `npm run cli getAuthorizationsEscrow ${oceanToken} ${servicesEnv.consumerAddress}`,
     );
     const ceiling = auths.match(/Max lock seconds:\s*(\d+)/);
     if (ceiling) {
@@ -161,7 +163,7 @@ describe("Ocean CLI Service-on-Demand", function () {
       expect(
         maxLockSeconds,
         `escrow authorization allows only ${maxLockSeconds}s of lock time; ` +
-          `START_DURATION ${START_DURATION}s needs ${START_DURATION + 3600}s`
+          `START_DURATION ${START_DURATION}s needs ${START_DURATION + 3600}s`,
       ).to.be.at.least(START_DURATION + 3600);
     }
   });
@@ -171,7 +173,7 @@ describe("Ocean CLI Service-on-Demand", function () {
     const output = await runCommand(
       `npm run cli -- startService ${servicesEnv.id} ${START_DURATION} ${oceanToken} ` +
         `--image ${IMAGE} --tag ${TAG} --ports ${CONTAINER_PORT} ` +
-        `--accept true --wait true --timeout 480`
+        `--accept true --wait true --timeout 480`,
     );
 
     const idMatch = output.match(/ServiceID:\s*([^\s]+)/);
@@ -179,7 +181,9 @@ describe("Ocean CLI Service-on-Demand", function () {
     serviceId = idMatch![1];
     expect(serviceId).to.be.a("string").with.length.greaterThan(0);
 
-    expect(output, "service never reached Running").to.match(/\[Running\]|Running \(40\)/);
+    expect(output, "service never reached Running").to.match(
+      /\[Running\]|Running \(40\)/,
+    );
     expect(output, "no endpoint URL printed").to.match(/http:\/\//);
     console.log(`Service running: ${serviceId}`);
   });
@@ -187,7 +191,9 @@ describe("Ocean CLI Service-on-Demand", function () {
   it("shows the service via getServiceStatus (single + list)", async function () {
     if (skipLifecycle) this.skip();
 
-    const single = await runCommand(`npm run cli getServiceStatus ${serviceId}`);
+    const single = await runCommand(
+      `npm run cli getServiceStatus ${serviceId}`,
+    );
     expect(single).to.contain(serviceId);
     expect(single).to.match(/http:\/\//);
     expect(single).to.not.contain("userData");
@@ -214,10 +220,10 @@ describe("Ocean CLI Service-on-Demand", function () {
     const filtered = await runCommand(`npm run cli -- getServices --status 40`);
     const running = parseTrailingArray(filtered, "Services list:");
     expect(running, "could not parse filtered 'Services list:'").to.be.an(
-      "array"
+      "array",
     );
     expect(
-      (running || []).some((j: any) => j.serviceId === serviceId)
+      (running || []).some((j: any) => j.serviceId === serviceId),
     ).to.equal(true);
   });
 
@@ -226,7 +232,7 @@ describe("Ocean CLI Service-on-Demand", function () {
     // Logs may be empty or unavailable for a freshly started container; only
     // assert the command runs and produces a recognizable line.
     const output = await runCommand(
-      `npm run cli -- serviceLogs ${serviceId} --since 10m`
+      `npm run cli -- serviceLogs ${serviceId} --since 10m`,
     );
     expect(output).to.match(/Service Logs:|No logs available/);
   });
@@ -234,7 +240,7 @@ describe("Ocean CLI Service-on-Demand", function () {
   it("extends the service expiry with extendService", async function () {
     if (skipLifecycle) this.skip();
     const output = await runCommand(
-      `npm run cli -- extendService ${serviceId} ${EXTEND_DURATION} --accept true`
+      `npm run cli -- extendService ${serviceId} ${EXTEND_DURATION} --accept true`,
     );
     expect(output).to.match(/extended/i);
     expect(output).to.match(/extendPayments:\s*[1-9]/);
@@ -243,7 +249,7 @@ describe("Ocean CLI Service-on-Demand", function () {
   it("restarts the container with restartService", async function () {
     if (skipLifecycle) this.skip();
     const output = await runCommand(
-      `npm run cli -- restartService ${serviceId} --wait true --timeout 300`
+      `npm run cli -- restartService ${serviceId} --wait true --timeout 300`,
     );
     expect(output).to.match(/restarting/i);
     expect(output).to.match(/\[Running\]|Running \(40\)/);

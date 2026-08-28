@@ -2877,8 +2877,14 @@ export class Commands {
           continue;
         }
 
-        const balanceNum = Number(balance);
         const contract = accessList.contract;
+
+        // accessList.balance() formats the ERC721 count with 18 decimals (1
+        // token -> "0.000000000000000001"), so Number(balance) is a tiny
+        // fraction — unusable as a loop bound (0 < 2e-18 is true but 1 < 2e-18
+        // is false, so the loop would run exactly once regardless of how many
+        // tokens the user holds). Read the raw integer count from the contract.
+        const balanceNum = Number(await contract.balanceOf(user));
 
         // Snapshot every token id the user holds BEFORE burning any of them.
         // Burning shifts the enumerable index down, so reading

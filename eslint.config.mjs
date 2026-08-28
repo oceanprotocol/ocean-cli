@@ -10,5 +10,14 @@ export default [
   ...tseslint.configs.recommended,
   {rules: {
     '@typescript-eslint/no-explicit-any': 'warn',
-  }}
+  }},
+  {
+    // Test files: chai assertions (`expect(x).to.be.true`) are bare expressions
+    // by design, and rethrow-with-cause adds nothing to test scaffolding.
+    files: ["test/**/*.ts"],
+    rules: {
+      '@typescript-eslint/no-unused-expressions': 'off',
+      'preserve-caught-error': 'off',
+    }
+  }
 ];

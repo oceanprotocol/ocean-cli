@@ -2,8 +2,9 @@ name: Test Flow
 
 on:
   pull_request:
-    branches:
-      - main
+
+permissions:
+  contents: read
 
 jobs:
   build:
@@ -16,7 +17,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v2
         with:
-          node-version: "22.5.1"
+          node-version: "22.23.1"
 
       - name: Install dependencies
         run: npm install
@@ -34,13 +35,64 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v2
         with:
-          node-version: "22.5.1"
+          node-version: "22.23.1"
 
       - name: Install dependencies
         run: npm install
 
       - name: Run lint
         run: npm run lint
+
+  pack_smoke:
+    # Guards the global-install contract without needing a full Ocean stack:
+    # a broken bin, cwd-dependent module loading, or env-gated --help/--version
+    # would all fail here. Also asserts the publish tarball excludes sources.
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.23.1"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Pack tarball
+        run: |
+          TARBALL=$(npm pack | tail -1)
+          echo "TARBALL=$TARBALL" >> $GITHUB_ENV
+          echo "Packed $TARBALL"
+
+      - name: Assert tarball contents (dist/metadata/README in; src/test out)
+        run: |
+          FILES=$(tar -tzf "$TARBALL")
+          echo "$FILES"
+          echo "$FILES" | grep -q '^package/dist/index.js$'      || { echo "MISSING dist/index.js"; exit 1; }
+          echo "$FILES" | grep -q '^package/README.md$'          || { echo "MISSING README.md"; exit 1; }
+          echo "$FILES" | grep -q '^package/metadata/'           || { echo "MISSING metadata/"; exit 1; }
+          if echo "$FILES" | grep -qE '^package/(src|test)/'; then
+            echo "Tarball must not ship src/ or test/"; exit 1
+          fi
+
+      - name: Install globally from tarball
+        run: npm i -g "./$TARBALL"
+
+      - name: Run bin from a foreign cwd with NO env vars
+        working-directory: ${{ runner.temp }}
+        run: |
+          ocean-cli --version
+          ocean-cli --help > /dev/null
+          ocean-cli -h > /dev/null
+          ocean-cli -V > /dev/null
 
   test_system:
     runs-on: ubuntu-latest
@@ -56,7 +108,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v2
         with:
-          node-version: "22.5.1"
+          node-version: "22.23.1"
 
       - name: Cache node_modules
         uses: actions/cache@v3
@@ -75,6 +127,7 @@ jobs:
         with:
           repository: 'oceanprotocol/barge'
           path: 'barge'
+          ref: "feature/node-v4"
 
       - name: Login to Docker Hub
         if: ${{ env.DOCKERHUB_PASSWORD && env.DOCKERHUB_USERNAME }}
@@ -89,21 +142,12 @@ jobs:
         working-directory: ${{ github.workspace }}/barge
         run: |
           bash -x start_ocean.sh --with-typesense 2>&1 > start_ocean.log &
+        env:
+          CONTRACTS_VERSION: '2.9.0'
+          NODE_VERSION: "pr-1408"
       - run: npm ci
       - run: npm run build
       - run: docker image ls
-      - name: Delete default runner images
-        run: |
-          docker image rm -f node:20
-          docker image rm -f node:20-alpine
-          docker image rm -f node:18
-          docker image rm -f node:18-alpine
-          docker image rm -f debian:10
-          docker image rm -f debian:11
-          docker image rm -f ubuntu:22.04
-          docker image rm -f ubuntu:20.04
-          docker image rm -f moby/buildkit:latest
-          rm -rf /usr/share/swift/
       - name: Wait for node to be ready
         run: |
           max_attempts=60

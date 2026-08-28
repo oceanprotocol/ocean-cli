@@ -1,5 +1,4 @@
 {
-  "loader": "ts-node/esm",
   "full-trace": true,
   "bail": true,
   "exit": true,

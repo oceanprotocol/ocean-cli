@@ -41,11 +41,11 @@ describe("Ocean CLI Persistent Storage", function () {
 
   it("should create an access list and add Alice and Bob", async function () {
     const createOutput = await runCommand(
-      `npm run cli createAccessList StorageTestACL STACL`
+      `npm run cli createAccessList StorageTestACL STACL`,
     );
     expect(createOutput).to.include("Access list created successfully");
     const addressMatch = createOutput.match(
-      /Contract address: (0x[a-fA-F0-9]{40})/
+      /Contract address: (0x[a-fA-F0-9]{40})/,
     );
     if (!addressMatch) {
       throw new Error("Could not extract access list address");
@@ -53,18 +53,18 @@ describe("Ocean CLI Persistent Storage", function () {
     accessListAddress = addressMatch[1];
 
     const addOutput = await runCommand(
-      `npm run cli addToAccessList ${accessListAddress} ${alice.address},${bob.address}`
+      `npm run cli addToAccessList ${accessListAddress} ${alice.address},${bob.address}`,
     );
     expect(addOutput).to.include("Successfully added");
   });
 
   it("should create a bucket gated by the access list", async function () {
     const output = await runCommand(
-      `npm run cli createBucket ${accessListAddress}`
+      `npm run cli createBucket ${accessListAddress}`,
     );
     expect(output).to.include("Bucket created.");
     const idMatch = output.match(
-      /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/
+      /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/,
     );
     if (!idMatch) {
       throw new Error("Could not extract bucketId from output");
@@ -75,7 +75,7 @@ describe("Ocean CLI Persistent Storage", function () {
 
   it("Alice should upload a file to the bucket", async function () {
     const output = await runCommand(
-      `npm run cli addFileToBucket ${bucketId} ${tempFilePath}`
+      `npm run cli addFileToBucket ${bucketId} ${tempFilePath}`,
     );
     expect(output).to.include(fileName);
     expect(output).to.include("size:");
@@ -83,7 +83,7 @@ describe("Ocean CLI Persistent Storage", function () {
 
   it("Alice should list files and see the uploaded file", async function () {
     const output = await runCommand(
-      `npm run cli listFilesInBucket ${bucketId}`
+      `npm run cli listFilesInBucket ${bucketId}`,
     );
     expect(output).to.include(fileName);
   });
@@ -96,7 +96,7 @@ describe("Ocean CLI Persistent Storage", function () {
 
   it("Alice should get the file-object descriptor", async function () {
     const output = await runCommand(
-      `npm run cli getFileObject ${bucketId} ${fileName}`
+      `npm run cli getFileObject ${bucketId} ${fileName}`,
     );
     expect(output).to.include('"type": "nodePersistentStorage"');
     expect(output).to.include(bucketId);
@@ -106,19 +106,19 @@ describe("Ocean CLI Persistent Storage", function () {
   it("Bob (on the ACL) should list files in the bucket", async function () {
     const output = await runCommandAs(
       BOB_KEY,
-      `npm run cli listFilesInBucket ${bucketId}`
+      `npm run cli listFilesInBucket ${bucketId}`,
     );
     expect(output).to.include(fileName);
   });
 
   it("Alice should delete the file from the bucket", async function () {
     const output = await runCommand(
-      `npm run cli deleteFile ${bucketId} ${fileName}`
+      `npm run cli deleteFile ${bucketId} ${fileName}`,
     );
     expect(output).to.match(/deleted|success/i);
 
     const listOutput = await runCommand(
-      `npm run cli listFilesInBucket ${bucketId}`
+      `npm run cli listFilesInBucket ${bucketId}`,
     );
     expect(listOutput).to.not.include(fileName);
   });
@@ -130,7 +130,7 @@ describe("Ocean CLI Persistent Storage", function () {
       const output = await runCommand(`npm run cli createBucket`);
       expect(output).to.include("Bucket created.");
       const idMatch = output.match(
-        /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/
+        /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/,
       );
       if (!idMatch) {
         throw new Error("Could not extract bucketId from output");
@@ -141,12 +141,12 @@ describe("Ocean CLI Persistent Storage", function () {
 
     it("Alice (owner) should upload and list files in the no-ACL bucket", async function () {
       const uploadOutput = await runCommand(
-        `npm run cli addFileToBucket ${ownerOnlyBucketId} ${tempFilePath}`
+        `npm run cli addFileToBucket ${ownerOnlyBucketId} ${tempFilePath}`,
       );
       expect(uploadOutput).to.include(fileName);
 
       const listOutput = await runCommand(
-        `npm run cli listFilesInBucket ${ownerOnlyBucketId}`
+        `npm run cli listFilesInBucket ${ownerOnlyBucketId}`,
       );
       expect(listOutput).to.include(fileName);
       expect(listOutput).to.not.match(/Error listing files/i);
@@ -155,7 +155,7 @@ describe("Ocean CLI Persistent Storage", function () {
     it("Bob (not the owner) should not see Alice's files in the no-ACL bucket", async function () {
       const bobOutput = await runCommandAs(
         BOB_KEY,
-        `npm run cli listFilesInBucket ${ownerOnlyBucketId}`
+        `npm run cli listFilesInBucket ${ownerOnlyBucketId}`,
       );
       expect(bobOutput).to.not.include(fileName);
     });

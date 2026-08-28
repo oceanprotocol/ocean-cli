@@ -24,7 +24,7 @@
     "mocha": "npx tsx ./node_modules/mocha/bin/mocha.js --config=test/.mocharc.json --node-env=test --exit",
     "prepublishOnly": "npm run build",
     "changelog": "auto-changelog -p",
-    "release": "release-it --non-interactive"
+    "release": "release-it"
   },
   "author": "Ocean Protocol <devops@oceanprotocol.com>",
   "license": "Apache-2.0",

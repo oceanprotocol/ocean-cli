@@ -2880,11 +2880,21 @@ export class Commands {
         const balanceNum = Number(balance);
         const contract = accessList.contract;
 
-        let removedCount = 0;
+        // Snapshot every token id the user holds BEFORE burning any of them.
+        // Burning shifts the enumerable index down, so reading
+        // tokenOfOwnerByIndex(user, index) inside the burn loop would skip
+        // tokens whenever a user holds more than one (removing only every other
+        // token and leaving the user with residual access).
+        const tokenIds: number[] = [];
         for (let index = 0; index < balanceNum; index++) {
-          try {
-            const tokenId = await contract.tokenOfOwnerByIndex(user, index);
+          tokenIds.push(
+            Number(await contract.tokenOfOwnerByIndex(user, index)),
+          );
+        }
 
+        let removedCount = 0;
+        for (const tokenId of tokenIds) {
+          try {
             // burn() already waits for the receipt internally and returns null
             // on a send failure — ocean.js's sendPreparedTransaction swallows
             // the error. The common one here is a nonce collision between
@@ -2894,7 +2904,7 @@ export class Commands {
             // a null result a few times before giving up.
             let receipt = null;
             for (let attempt = 0; attempt < 3 && !receipt; attempt++) {
-              receipt = await accessList.burn(Number(tokenId));
+              receipt = await accessList.burn(tokenId);
             }
             if (!receipt) {
               throw new Error(
@@ -2911,7 +2921,7 @@ export class Commands {
           } catch (e: any) {
             console.log(
               chalk.yellow(
-                `⚠ Could not remove token at index ${index} for user ${user}: ${e.message}`,
+                `⚠ Could not remove token ${tokenId} for user ${user}: ${e.message}`,
               ),
             );
           }

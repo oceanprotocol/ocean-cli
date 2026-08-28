@@ -19,7 +19,7 @@ describe("Ocean CLI Escrow", function () {
     process.env.PRIVATE_KEY =
       "0xc594c6e5def4bab63ac29eed19a134c130388f74f019bc74b8f4389df2837a58";
     process.env.RPC = "http://localhost:8545";
-    process.env.NODE_URL = "http://localhost:8000";
+    process.env.NODE_URL = "http://127.0.0.1:8001";
     process.env.ADDRESS_FILE = `${homedir}/.ocean/ocean-contracts/artifacts/address.json`;
 
     chainConfig = await getConfigByChainId(8996);

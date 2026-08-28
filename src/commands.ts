@@ -2835,6 +2835,10 @@ export class Commands {
       }
     } catch (error) {
       console.error(chalk.red("Error checking access list:"), error);
+      // Rethrow so the process exits non-zero on a genuine failure (e.g. an
+      // invalid address). The REPL's runTokens() catches this and stays alive;
+      // one-shot mode surfaces it as exit 1.
+      throw error;
     }
   }
 
@@ -2912,6 +2916,10 @@ export class Commands {
       }
     } catch (error) {
       console.error(chalk.red("Error removing users from access list:"), error);
+      // Rethrow so the process exits non-zero on a genuine failure (e.g. an
+      // invalid address). The REPL's runTokens() catches this and stays alive;
+      // one-shot mode surfaces it as exit 1.
+      throw error;
     }
   }
 

@@ -194,6 +194,19 @@ describe("Ocean CLI Access List", function () {
       );
 
       expect(output).to.include("Successfully removed user");
+
+      // "Successfully removed user" appears once even if only one of the two was
+      // removed, so assert on-chain that BOTH are gone. This guards the
+      // nonce-collision bug where a back-to-back burn was silently dropped
+      // (sendPreparedTransaction returns null), leaving the second user on the
+      // list while the command still reported success.
+      const accessList = new AccessListContract(
+        accessListAddress,
+        owner,
+        chainConfig.chainId,
+      );
+      expect(Number(await accessList.balance(testUser1.address))).to.equal(0);
+      expect(Number(await accessList.balance(testUser2.address))).to.equal(0);
     });
 
     it("should handle removing a user not on the access list", async function () {

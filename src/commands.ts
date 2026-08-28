@@ -2884,8 +2884,23 @@ export class Commands {
         for (let index = 0; index < balanceNum; index++) {
           try {
             const tokenId = await contract.tokenOfOwnerByIndex(user, index);
-            const tx = await accessList.burn(Number(tokenId));
-            await tx.wait();
+
+            // burn() already waits for the receipt internally and returns null
+            // on a send failure — ocean.js's sendPreparedTransaction swallows
+            // the error. The common one here is a nonce collision between
+            // back-to-back burns on a fast local chain: the rejected tx leaves
+            // the account nonce advanced, so simply rebuilding the tx (a fresh
+            // populateTransaction picks up the corrected nonce) succeeds. Retry
+            // a null result a few times before giving up.
+            let receipt = null;
+            for (let attempt = 0; attempt < 3 && !receipt; attempt++) {
+              receipt = await accessList.burn(Number(tokenId));
+            }
+            if (!receipt) {
+              throw new Error(
+                "burn transaction was not confirmed (possible nonce collision)",
+              );
+            }
 
             console.log(
               chalk.green(

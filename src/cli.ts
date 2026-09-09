@@ -1083,8 +1083,11 @@ export async function createCLI() {
 
         console.log(chalk.yellow("\n--- Payment Details ---"));
         console.log(JSON.stringify(initResp, null, 2));
+        // The payment token lives on the payment chain, which may differ from the active
+        // chain — read its decimals with that chain's signer, not the default one.
+        const paymentSigner = await commands.signerFor(paymentChainId);
         const amount = await unitsToAmount(
-          signer,
+          paymentSigner,
           initResp.payment.token,
           initResp.payment.amount.toString(),
         );

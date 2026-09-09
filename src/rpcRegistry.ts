@@ -440,6 +440,15 @@ export async function addChain(
   urls: string[],
 ): Promise<void> {
   if (!loaded) loadRegistry();
+  // If a legacy single-URL `RPC` hasn't been probed yet, resolve it first so adding a
+  // new chain neither orphans the legacy chain nor steals its default slot.
+  if (pendingLegacyUrl) {
+    try {
+      await ensureDefaultChain();
+    } catch {
+      // Legacy URL unreachable right now — proceed; the new chain can still register.
+    }
+  }
   if (!Number.isInteger(chainId) || chainId <= 0) {
     throw new Error(`Invalid chainId ${chainId}: must be a positive integer.`);
   }
@@ -472,7 +481,9 @@ export async function addChain(
   signerCache.delete(chainId);
   configCache.delete(chainId);
   verifiedChains.add(chainId); // just verified above
-  if (chainUrls.size === 1) defaultChainId = chainId;
+  // Only become the default when there isn't one already (a recovered legacy chain, or a
+  // prior setChain, keeps precedence).
+  if (defaultChainId === undefined) defaultChainId = chainId;
   persistConfig();
 }
 
@@ -546,7 +557,19 @@ export function listChains(): ChainRpc[] {
 // getTransactionCount("pending"), so back-to-back transactions on a fast chain (e.g.
 // ocean.js orderAsset's dispense+order, or batched access-list burns) would otherwise
 // reuse a stale nonce and be rejected. See PROVIDER_OPTS.
-export function buildFallbackConfigs(urls: string[], chainId: number) {
+export function buildFallbackConfigs(
+  urls: string[],
+  chainId: number,
+): {
+  configs: {
+    provider: JsonRpcProvider;
+    priority: number;
+    stallTimeout: number;
+    weight: number;
+  }[];
+  options: { quorum: number };
+  network: Network;
+} {
   const network = Network.from(chainId);
   const configs = urls.map((url, index) => ({
     provider: new JsonRpcProvider(url, network, providerOpts(network)),

@@ -98,8 +98,10 @@ When a chain lists **two or more** URLs they are used as an ethers v6 `FallbackP
 dead endpoint no longer breaks the session. A malformed `RPC` value fails fast at startup with a
 message showing the expected shape. Contract addresses (escrow / access-list factory / Ocean
 token) are resolved by ocean.js `ConfigHelper` — from `ADDRESS_FILE` when set (Barge / custom
-deployments) else the multi-chain set bundled with the library — so escrow / mint / access-list now
-work off-Barge on any supported chain without a local `address.json`.
+deployments) else the multi-chain set bundled with the library — so escrow / access-list now work
+off-Barge on any supported chain without a local `address.json`. `mintOcean` additionally needs a
+configured `oceanTokenAddress` or an explicit `--token <address>` (some chains, e.g. Base, ship no
+bundled Ocean token).
 
 **Multiple chains, added at runtime, and the default chain.** When `RPC` lists more than one chain
 you can also register/unregister chains at runtime with [`addChain`](#chain-management) /

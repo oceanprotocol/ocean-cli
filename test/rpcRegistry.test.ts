@@ -187,12 +187,28 @@ describe("rpcRegistry — registry from env", function () {
 
 describe("rpcRegistry — verifyChain (mocked probe)", function () {
   const origRpc = process.env.RPC;
+  const origFile = process.env.RPC_CONFIG_FILE;
+  const origChainId = process.env.CHAIN_ID;
+
+  beforeEach(function () {
+    // Point persistence at a fresh temp file (and clear CHAIN_ID) so loadRegistry(true)
+    // can't merge a real ~/.ocean/cli/rpc.json into these listChains() assertions.
+    process.env.RPC_CONFIG_FILE = path.join(
+      fs.mkdtempSync(path.join(os.tmpdir(), "rpcreg-")),
+      "rpc.json",
+    );
+    delete process.env.CHAIN_ID;
+  });
 
   afterEach(function () {
     __resetRegistryForTests();
     __setChainProbeForTests(null);
     if (origRpc === undefined) delete process.env.RPC;
     else process.env.RPC = origRpc;
+    if (origFile === undefined) delete process.env.RPC_CONFIG_FILE;
+    else process.env.RPC_CONFIG_FILE = origFile;
+    if (origChainId === undefined) delete process.env.CHAIN_ID;
+    else process.env.CHAIN_ID = origChainId;
   });
 
   it("drops a backend that reports the wrong chainId and keeps the good one", async function () {
@@ -242,6 +258,7 @@ describe("rpcRegistry — verifyChain (mocked probe)", function () {
 describe("rpcRegistry — addChain / removeChain (mocked probe)", function () {
   const origRpc = process.env.RPC;
   const origFile = process.env.RPC_CONFIG_FILE;
+  const origChainId = process.env.CHAIN_ID;
   let tmpFile: string;
 
   beforeEach(function () {
@@ -265,6 +282,8 @@ describe("rpcRegistry — addChain / removeChain (mocked probe)", function () {
     else process.env.RPC = origRpc;
     if (origFile === undefined) delete process.env.RPC_CONFIG_FILE;
     else process.env.RPC_CONFIG_FILE = origFile;
+    if (origChainId === undefined) delete process.env.CHAIN_ID;
+    else process.env.CHAIN_ID = origChainId;
   });
 
   it("registers a chain whose URL serves it, and persists to the config file", async function () {
@@ -274,6 +293,17 @@ describe("rpcRegistry — addChain / removeChain (mocked probe)", function () {
     expect(hasChain(137)).to.equal(true);
     const written = JSON.parse(fs.readFileSync(tmpFile, "utf-8"));
     expect(written["137"]).to.deep.equal(["http://cid-137.example"]);
+  });
+
+  it("resolves a pending legacy URL before adding, keeping legacy as default", async function () {
+    process.env.RPC = "http://cid-8996.example"; // legacy single URL, not yet probed
+    loadRegistry(true);
+    await addChain(137, ["http://cid-137.example"]);
+    const ids = listChains()
+      .map((c) => c.chainId)
+      .sort((a, b) => a - b);
+    expect(ids).to.deep.equal([137, 8996]); // legacy not orphaned
+    expect(getDefaultChainId()).to.equal(8996); // legacy keeps the default slot
   });
 
   it("rejects a URL that serves a different chain", async function () {

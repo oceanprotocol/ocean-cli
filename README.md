@@ -110,8 +110,10 @@ file and **env wins on conflict**. The default chain is resolved as: `setChain` 
 persisted default → the sole configured chain → the one chain both the node serves and the registry
 knows. Commands then pick their chain as follows:
 
-- **Chain-agnostic** commands (reads, jobs, storage, auth, node/chain management) just sign on the
-  default (or any registered) chain.
+- **Chain-agnostic** commands (reads, jobs, storage, auth) just sign on the default (or any
+  registered) chain. The node/chain-management commands (`setNode`/`getNode`, `addChain`,
+  `removeChain`, `listChains`, `setChain`, `getChain`) are node-free registry operations that do not
+  sign at all.
 - **Chain-implied** commands (`publish`, `publishAlgo`, `editAsset`, `allowAlgo`, `download`) use the
   **DDO's own `chainId`** — publishing now honours the `chainId` in your metadata file.
 - **Chain-explicit** commands (`mintOcean`, all escrow, all access-list, and the escrow-paid

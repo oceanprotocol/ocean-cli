@@ -3,13 +3,16 @@
 // `nodeConnection.ts` uses for the Ocean Node: seeded from the environment at
 // startup, memoized, torn down on exit.
 //
-// Phase 1 scope: one active chain (legacy single-URL preserved byte-for-byte), plus
-// multi-URL `FallbackProvider` fallback and off-Barge contract-address resolution via
-// ocean.js `ConfigHelper`. Runtime chain-management commands + persistence land in
-// Phase 2.
+// Multi-chain: `RPC` is either a legacy single URL (preserved byte-for-byte) or a JSON
+// map keyed by chainId; a chain with ≥2 URLs is served by a `FallbackProvider`, and
+// contract addresses resolve off-Barge via ocean.js `ConfigHelper`. Runtime `addChain`,
+// `removeChain`, and `setDefaultChainId` mutate the registry and persist to
+// `~/.ocean/cli/rpc.json` (`RPC_CONFIG_FILE` override; env `RPC` merged first, env wins).
+// The chain-management commands are exposed node-free through `cli.ts`.
 import {
   AbstractProvider,
   FallbackProvider,
+  FetchRequest,
   JsonRpcProvider,
   Network,
   Signer,
@@ -23,6 +26,10 @@ import path from "path";
 
 // Per-backend stall timeout: a slow endpoint hands off to the next instead of hanging.
 const STALL_TIMEOUT_MS = 1000;
+
+// Timeout for a one-off chainId probe (startup legacy resolution, verifyChain, addChain),
+// so an unreachable RPC fails fast instead of hanging the CLI.
+const PROBE_TIMEOUT_MS = 5000;
 
 const RPC_EXAMPLE =
   'a single URL (e.g. "http://localhost:8545") or a JSON map keyed by chainId ' +
@@ -57,7 +64,12 @@ let loadedRpcRaw: string | undefined;
 // exercise the verification logic without a live network.
 export type ChainProbe = (url: string) => Promise<number>;
 async function defaultChainProbe(url: string): Promise<number> {
-  const probe = new JsonRpcProvider(url);
+  // Wrap the URL in a FetchRequest with an explicit timeout so an unresponsive or
+  // blackholed endpoint fails in seconds instead of hanging the CLI (default network
+  // timeouts can stall startup / addChain for minutes).
+  const req = new FetchRequest(url);
+  req.timeout = PROBE_TIMEOUT_MS;
+  const probe = new JsonRpcProvider(req);
   try {
     const hex = await probe.send("eth_chainId", []);
     return Number(hex);
@@ -325,26 +337,27 @@ export function loadRegistry(force = false): void {
 }
 
 // Resolve the default (active) chain. For a legacy single URL the chainId is
-// discovered by probing `getNetwork()` exactly as the old initializeSigner did, then
-// the URL is registered under it. For a single-entry map, that entry is the default.
+// discovered by probing it (via the mockable, timeout-protected `chainProbe`), then the
+// URL is registered under it. For a single-entry map, that entry is the default.
 export async function ensureDefaultChain(): Promise<number> {
   if (!loaded) loadRegistry();
   if (defaultChainId !== undefined) return defaultChainId;
 
   if (pendingLegacyUrl) {
     const url = pendingLegacyUrl;
-    const probe = new JsonRpcProvider(url);
     try {
-      const { chainId } = await probe.getNetwork();
-      const cid = Number(chainId);
+      const cid = await chainProbe(url);
       chainUrls.set(cid, [url]);
-      // getNetwork() just confirmed the chain — no need to re-verify on first use.
+      // chainProbe just confirmed the chain — no need to re-verify on first use.
       verifiedChains.add(cid);
       defaultChainId = cid;
       pendingLegacyUrl = undefined;
       return cid;
-    } finally {
-      probe.destroy?.();
+    } catch (e) {
+      throw new Error(
+        `Could not verify legacy RPC URL ${url}: ${(e as Error).message}`,
+        { cause: e },
+      );
     }
   }
 
@@ -634,7 +647,9 @@ export async function getSigner(chainId: number): Promise<Signer> {
 // Per-chain ocean.js config. `ConfigHelper` already resolves contract addresses from
 // ADDRESS_FILE (Barge / custom) else the bundled multi-chain contracts, so this is the
 // single source for escrow / accessListFactory / oceanTokenAddress.
-export function getConfigFor(chainId: number): Config {
+// Returns null for a chain ocean.js ConfigHelper does not know and no ADDRESS_FILE
+// entry supplies — callers must guard (see `requireAddress` / `Commands.configFor`).
+export function getConfigFor(chainId: number): Config | null {
   const cached = configCache.get(chainId);
   if (cached) return cached;
 

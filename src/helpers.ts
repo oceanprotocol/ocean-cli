@@ -629,11 +629,27 @@ export function toBoolean(value) {
 // Multi-chain compute helpers (Phase 3).
 // ---------------------------------------------------------------------------
 
-// The set of chainIds a compute job actually touches: the payment/escrow chain plus
-// every DID-based dataset/algorithm DDO's own chain (a job may mix assets across
-// chains, and pay on yet another). Raw `fileObject` entries have a null DDO slot and
-// no chain (no order is placed for them), so they contribute nothing. Pure + ordered
-// (payment chain first) so it is unit-testable and its error listing is deterministic.
+// A DDO's chainId lives at the top level in 4.1.0 DDOs but under
+// `credentialSubject.chainId` in v5 DDOs — read whichever is present so both metadata
+// versions resolve to the right chain (publish/edit routing and compute ordering alike).
+export function getDdoChainId(ddo: unknown): unknown {
+  const d = ddo as {
+    chainId?: unknown;
+    credentialSubject?: { chainId?: unknown };
+  };
+  return d?.chainId ?? d?.credentialSubject?.chainId;
+}
+
+/**
+ * The set of chainIds a compute job actually touches: the payment/escrow chain plus
+ * every DID-based dataset/algorithm DDO's own chain (a job may mix assets across
+ * chains, and pay on yet another). Raw `fileObject` entries have a null DDO slot and
+ * no chain (no order is placed for them), so they contribute nothing. Pure + ordered
+ * (payment chain first) so it is unit-testable and its error listing is deterministic.
+ * A *non-null* DDO with no resolvable chainId is malformed — throw with a clear label
+ * rather than silently omitting it (which would bypass the up-front registry validation
+ * and later crash as `orderCtxFor(NaN)` deep in the ordering loop).
+ */
 export function computeJobChainIds(
   paymentChainId: number,
   ddos: (Asset | DDO | null | undefined)[],
@@ -641,24 +657,31 @@ export function computeJobChainIds(
 ): number[] {
   const out: number[] = [];
   const seen = new Set<number>();
-  const add = (raw: unknown) => {
+  const add = (raw: unknown, label: string) => {
     const id = Number(raw);
-    if (Number.isInteger(id) && id > 0 && !seen.has(id)) {
+    if (!Number.isInteger(id) || id <= 0) {
+      throw new Error(`Invalid or missing chainId for ${label} (got ${raw}).`);
+    }
+    if (!seen.has(id)) {
       seen.add(id);
       out.push(id);
     }
   };
-  add(paymentChainId);
-  for (const d of ddos || []) if (d) add((d as { chainId?: unknown }).chainId);
-  if (algoDdo) add((algoDdo as { chainId?: unknown }).chainId);
+  add(paymentChainId, "payment chain");
+  (ddos || []).forEach((d, i) => {
+    if (d) add(getDdoChainId(d), `dataset ${i}`);
+  });
+  if (algoDdo) add(getDdoChainId(algoDdo), "algorithm");
   return out;
 }
 
-// A readable, per-env summary of where a compute env accepts payment: whether it is a
-// free env, and for a paid one each fee chainId with its accepted fee-token addresses.
-// Lets a user pick `--chainId` / `--paymentToken` without reading raw JSON. Pure so it
-// can be unit-tested; operates structurally on the ComputeEnvironment fee shape
-// (`env.fees[chainId] = [{ feeToken }, ...]`).
+/**
+ * A readable, per-env summary of where a compute env accepts payment: whether it is a
+ * free env, and for a paid one each fee chainId with its accepted fee-token addresses.
+ * Lets a user pick `--chainId` / `--paymentToken` without reading raw JSON. Pure so it
+ * can be unit-tested; operates structurally on the ComputeEnvironment fee shape
+ * (`env.fees[chainId] = [{ feeToken }, ...]`).
+ */
 export function summarizeComputeEnvFees(env: {
   id?: string;
   // `free` is truthy (an object/flag) on a free env in ocean.js, not a strict boolean.

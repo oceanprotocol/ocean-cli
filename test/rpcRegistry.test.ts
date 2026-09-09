@@ -123,12 +123,28 @@ describe("rpcRegistry — buildFallbackConfigs", function () {
 
 describe("rpcRegistry — registry from env", function () {
   const origRpc = process.env.RPC;
+  const origFile = process.env.RPC_CONFIG_FILE;
+  const origChainId = process.env.CHAIN_ID;
+
+  beforeEach(function () {
+    // Isolate from a leaked persisted file / default-chain override so listChains()
+    // and getDefaultChainId() assertions here are deterministic.
+    process.env.RPC_CONFIG_FILE = path.join(
+      fs.mkdtempSync(path.join(os.tmpdir(), "rpcreg-")),
+      "rpc.json",
+    );
+    delete process.env.CHAIN_ID;
+  });
 
   afterEach(function () {
     __resetRegistryForTests();
     __setChainProbeForTests(null);
     if (origRpc === undefined) delete process.env.RPC;
     else process.env.RPC = origRpc;
+    if (origFile === undefined) delete process.env.RPC_CONFIG_FILE;
+    else process.env.RPC_CONFIG_FILE = origFile;
+    if (origChainId === undefined) delete process.env.CHAIN_ID;
+    else process.env.CHAIN_ID = origChainId;
   });
 
   it("seeds a single-chain map and marks it the default", function () {

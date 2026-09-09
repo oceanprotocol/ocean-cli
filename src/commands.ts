@@ -13,6 +13,7 @@ import {
   isOrderable,
   computeJobChainIds,
   summarizeComputeEnvFees,
+  getDdoChainId,
 } from "./helpers.js";
 import {
   getConfigFor,
@@ -180,6 +181,13 @@ export class Commands {
     this.config = this.configFor(chainId);
   }
 
+  // A DDO's chainId lives at the top level in 4.1.0 DDOs but under
+  // `credentialSubject.chainId` in v5 DDOs. Delegates to the shared `getDdoChainId`
+  // helper so routing and compute ordering read the chain the same way.
+  private ddoChainId(ddo: unknown): unknown {
+    return getDdoChainId(ddo);
+  }
+
   // Category (b): re-point at the chain the asset lives on (its DDO's chainId). Returns
   // false (already logged) if the chainId is missing/invalid or not configured, so the
   // caller can bail. Also fixes the old bug where publish ignored the DDO's chainId.
@@ -219,7 +227,15 @@ export class Commands {
     ddos: (Asset | null | undefined)[],
     algoDdo: Asset | null,
   ): boolean {
-    const needed = computeJobChainIds(paymentChainId, ddos, algoDdo);
+    let needed: number[];
+    try {
+      needed = computeJobChainIds(paymentChainId, ddos, algoDdo);
+    } catch (e) {
+      // A malformed DDO (non-null but no resolvable chainId) — fail clearly here rather
+      // than crashing later as orderCtxFor(NaN) mid-ordering.
+      console.error(chalk.red((e as Error).message));
+      return false;
+    }
     const missing = needed.filter((c) => !hasChain(c));
     if (missing.length > 0) {
       console.error(
@@ -281,7 +297,10 @@ export class Commands {
     const encryptDDO = args[2] === "false" ? false : true;
     // The chain is the one the DDO declares — publish on that chain, not the RPC's
     // default. (Previously the DDO's chainId was ignored.)
-    if (!(await this.routeToAssetChain(asset.chainId, "Metadata file"))) return;
+    if (
+      !(await this.routeToAssetChain(this.ddoChainId(asset), "Metadata file"))
+    )
+      return;
     try {
       const ddoInstance = DDOManager.getDDOClass(asset);
       const { indexedMetadata } = ddoInstance.getAssetFields();
@@ -316,7 +335,12 @@ export class Commands {
       return;
     }
     const encryptDDO = args[2] === "false" ? false : true;
-    if (!(await this.routeToAssetChain(algoAsset.chainId, "Metadata file")))
+    if (
+      !(await this.routeToAssetChain(
+        this.ddoChainId(algoAsset),
+        "Metadata file",
+      ))
+    )
       return;
     // add some more checks
     try {
@@ -373,7 +397,7 @@ export class Commands {
       asset[key] = updateJson[key];
     }
 
-    if (!(await this.routeToAssetChain(asset.chainId, "DDO"))) return;
+    if (!(await this.routeToAssetChain(this.ddoChainId(asset), "DDO"))) return;
 
     const updateAssetTx = await updateAssetMetadata(
       this.signer,
@@ -417,7 +441,8 @@ export class Commands {
       return;
     }
 
-    if (!(await this.routeToAssetChain(dataDdo.chainId, "DDO"))) return;
+    if (!(await this.routeToAssetChain(this.ddoChainId(dataDdo), "DDO")))
+      return;
 
     const ddoInstance = DDOManager.getDDOClass(dataDdo);
     const { services, version } = ddoInstance.getDDOFields();
@@ -821,7 +846,9 @@ export class Commands {
       number,
       { signer: Signer; config: Config; datatoken: Datatoken }
     >();
-    const orderCtxFor = async (chainId: number) => {
+    const orderCtxFor = async (
+      chainId: number,
+    ): Promise<{ signer: Signer; config: Config; datatoken: Datatoken }> => {
       const cached = orderCtxCache.get(chainId);
       if (cached) return cached;
       const s = await this.signerFor(chainId);
@@ -1019,7 +1046,7 @@ export class Commands {
     );
     // Only order DID-based algorithms; raw (fileObject) algorithms have no datatoken.
     if (algoDdo) {
-      const algoCtx = await orderCtxFor(Number((algoDdo as Asset).chainId));
+      const algoCtx = await orderCtxFor(Number(getDdoChainId(algoDdo)));
       console.log("Ordering algorithm: ", args[2]);
       algo.transferTxId = await handleComputeOrder(
         parsedProviderInitializeComputeJob?.algorithm,
@@ -1050,7 +1077,7 @@ export class Commands {
       if (!dataDdo) continue;
       const feeEntry = parsedProviderInitializeComputeJob?.datasets?.[i];
       if (!feeEntry) continue;
-      const dsCtx = await orderCtxFor(Number((dataDdo as Asset).chainId));
+      const dsCtx = await orderCtxFor(Number(getDdoChainId(dataDdo)));
       assets[i].transferTxId = await handleComputeOrder(
         feeEntry,
         dataDdo as Asset,
@@ -2607,7 +2634,7 @@ export class Commands {
       return;
     }
     // Route to the dataset's chain before the owner check / metadata update.
-    if (!(await this.routeToAssetChain(asset.chainId, "DDO"))) return;
+    if (!(await this.routeToAssetChain(this.ddoChainId(asset), "DDO"))) return;
     const ddoInstance = DDOManager.getDDOClass(asset);
     const { indexedMetadata } = ddoInstance.getAssetFields();
     const { services } = ddoInstance.getDDOFields();
@@ -2699,7 +2726,7 @@ export class Commands {
       return;
     }
     // Route to the dataset's chain before the owner check / metadata update.
-    if (!(await this.routeToAssetChain(asset.chainId, "DDO"))) return;
+    if (!(await this.routeToAssetChain(this.ddoChainId(asset), "DDO"))) return;
     const ddoInstance = DDOManager.getDDOClass(asset);
     const { indexedMetadata } = ddoInstance.getAssetFields();
     const { services } = ddoInstance.getDDOFields();

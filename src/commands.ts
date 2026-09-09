@@ -59,6 +59,7 @@ import chalk from "chalk";
 import {
   getPolicyServerOBJ,
   getPolicyServerOBJs,
+  isPolicyServerConfigured,
   isVersionGte,
 } from "./policyServerHelper.js";
 import {
@@ -447,7 +448,14 @@ export class Commands {
     accountId: string,
     providerUrl: string,
   ): Promise<ProviderInitialize> {
-    if (process.env.SSI_WALLET_API?.trim()) {
+    // Only run SSI/policy-server verification when a wallet is configured AND
+    // the node confirms it has a policy server. This mirrors getPolicyServerOBJ's
+    // skip behavior, so a download against a node without a policy server
+    // proceeds instead of failing in initializePSVerification.
+    if (
+      process.env.SSI_WALLET_API?.trim() &&
+      (await isPolicyServerConfigured(providerUrl))
+    ) {
       const command = {
         documentId: asset.id,
         serviceId,
@@ -507,7 +515,9 @@ export class Commands {
     const serviceId = args[3] ? args[3] : services[0].id;
     const service = services.find((s) => s.id === serviceId);
     if (!service) {
-      console.error(`Service ID "${serviceId}" not found in DDO ${did}.`);
+      console.error(
+        chalk.red(`Service ID "${serviceId}" not found in DDO ${did}.`),
+      );
       return;
     }
 
@@ -522,7 +532,7 @@ export class Commands {
         );
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error);
-        console.error("Error initializing Provider:", message);
+        console.error(chalk.red("Error initializing Provider:"), message);
         return;
       }
       try {
@@ -534,7 +544,7 @@ export class Commands {
         );
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error);
-        console.error("Error getting Policy Server Object:", message);
+        console.error(chalk.red("Error getting Policy Server Object:"), message);
         return;
       }
     }
@@ -564,7 +574,7 @@ export class Commands {
       );
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
-      console.error("Error ordering asset:", message);
+      console.error(chalk.red("Error ordering asset:"), message);
       return;
     }
 

@@ -13,6 +13,32 @@ import {
 import axios from "axios";
 import { Signer } from "ethers";
 
+// Bounded timeout for the node `status` probe. Without it an unresponsive node
+// would hang the probe (and any download/compute waiting on it) indefinitely.
+const PS_STATUS_PROBE_TIMEOUT_MS = 10_000;
+
+/**
+ * Probe whether the target node has a policy server configured, via the
+ * `status` directCommand. Returns `true` only when the node explicitly reports
+ * `isPSConfigured === true`. On a `false` report, a probe error, or a timeout it
+ * returns `false`, so callers can skip policy-server verification and proceed
+ * rather than hanging or hard-failing on an unresponsive node.
+ */
+export async function isPolicyServerConfigured(
+  providerUrl: string,
+): Promise<boolean> {
+  try {
+    const statusResponse = await axios.post(
+      `${providerUrl}/directCommand`,
+      { command: "status" },
+      { timeout: PS_STATUS_PROBE_TIMEOUT_MS },
+    );
+    return statusResponse.data?.isPSConfigured === true;
+  } catch {
+    return false;
+  }
+}
+
 // Semver-aware "version >= minimum" comparison (numeric, dot-separated). Avoids
 // the lexicographic pitfalls of comparing version strings directly (e.g.
 // '5.10.0' < '5.9.0' as strings). A missing/empty version is treated as below
@@ -274,6 +300,15 @@ export function extractURLSearchParams(
   return params;
 }
 
+/**
+ * Resolve the policy-server object for a single asset/service.
+ *
+ * Returns `null` when policy-server support is unavailable — i.e. the node
+ * reports it has no policy server configured (`isPSConfigured !== true`) — so
+ * callers must treat `null` as "no policy server" and proceed without one. A
+ * probe that fails or times out falls through to the normal flow instead of
+ * masking a real error with `null`.
+ */
 export async function getPolicyServerOBJ(
   ddo: Asset,
   serviceId: string,
@@ -282,9 +317,11 @@ export async function getPolicyServerOBJ(
 ): Promise<PolicyServerInitiateActionData | null> {
   try {
     try {
-      const statusResponse = await axios.post(`${providerUrl}/directCommand`, {
-        command: "status",
-      });
+      const statusResponse = await axios.post(
+        `${providerUrl}/directCommand`,
+        { command: "status" },
+        { timeout: PS_STATUS_PROBE_TIMEOUT_MS },
+      );
       if (statusResponse.data?.isPSConfigured !== true) {
         return null;
       }
@@ -391,6 +428,16 @@ export async function getPolicyServerOBJ(
   }
 }
 
+/**
+ * Resolve policy-server objects for a set of datasets plus an optional
+ * algorithm (compute flows).
+ *
+ * Returns `null` when policy-server support is unavailable for the job — any
+ * entry below DDO v5, or any entry whose per-asset lookup yields `null` (node
+ * has no policy server configured). Callers must treat `null` as "no policy
+ * server" and pass it straight through to the provider (which accepts a
+ * nullable `policyServer`).
+ */
 export async function getPolicyServerOBJs(
   ddos: {
     documentId: string;

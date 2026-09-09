@@ -20,6 +20,7 @@ import {
   nodeChainIds,
   setCurrentNodeUrl,
   setCurrentEnvId,
+  clearCurrentEnvId,
   startP2P,
   validateNode,
 } from "./nodeConnection.js";
@@ -403,6 +404,9 @@ export async function createCLI() {
       }
 
       setCurrentNodeUrl(target);
+      // The node changed (equal targets returned early above), so any env remembered by
+      // setNodeEnv belonged to the previous node and no longer applies.
+      clearCurrentEnvId();
       console.log(
         chalk.green(`Using node: ${target} (version ${status.version})`),
       );
@@ -661,7 +665,7 @@ export async function createCLI() {
     )
     .argument(
       "[computeEnvId]",
-      "Compute environment ID (optional if one was selected via setNodeEnv)",
+      "Compute environment ID (optional if one was selected via setNodeEnv). If omitted, pass the later values (maxJobDuration, paymentToken, resources, ...) as named options rather than positionally, since they would otherwise fill this slot.",
     )
     .argument("[maxJobDuration]", "maxJobDuration for compute job")
     .argument("[paymentToken]", "Payment token for compute")
@@ -727,6 +731,21 @@ export async function createCLI() {
         const outputLocation = options.output || output;
         const svcIds = options.services ?? serviceIds ?? "";
         const algoSvcId = options.algoService ?? algoServiceId ?? "";
+
+        // A compute env id is never a bare number, so a numeric positional here almost
+        // always means the user omitted the env (relying on setNodeEnv) and let the next
+        // value — maxJobDuration — shift up into this slot. Catch that early with an
+        // actionable message instead of failing later with a misleading env error.
+        if (!options.env && computeEnvId && /^\d+$/.test(computeEnvId.trim())) {
+          console.error(
+            chalk.red(
+              `"${computeEnvId}" looks like maxJobDuration, not a compute environment ID. ` +
+                "If you meant to use the env selected via setNodeEnv, pass the remaining values as named options " +
+                "(--maxJobDuration, --token, --resources). Otherwise provide the environment ID explicitly (--env <id>).",
+            ),
+          );
+          return;
+        }
         if (!dsDids || !aDid || !envId || !jobDuration || !token || !res) {
           console.error(chalk.red("Missing required arguments"));
           // process.exit(1);

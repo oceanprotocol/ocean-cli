@@ -198,6 +198,14 @@ export function setCurrentEnvId(envId: string): void {
 }
 
 /**
+ * Forget any remembered compute environment. Called when the active node changes, since an env id
+ * belongs to a specific node and is meaningless (or wrong) once a different node is selected.
+ */
+export function clearCurrentEnvId(): void {
+  delete process.env.COMPUTE_ENV_ID;
+}
+
+/**
  * A P2P node handle to seed a `findComputeProviders` DHT search from. The search is
  * network-wide — it consults this peer's DHT — so the seed only needs to be *some*
  * reachable P2P node, not the node the user ultimately wants to compute on. Prefer the

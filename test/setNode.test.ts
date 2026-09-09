@@ -36,7 +36,9 @@ describe("Ocean CLI node selection", function () {
       const { output } = await runRepl(["help", "getNode", "exit"], {
         env: { NODE_URL: undefined },
       });
-      expect(output).to.contain("Usage: ocean-cli");
+      // Help renders the custom grouped menu (not Commander's default "Usage:" line).
+      expect(output).to.contain("Ocean CLI");
+      expect(output).to.contain("— commands");
       // Both new commands must be discoverable from the menu.
       expect(output).to.contain("setNode");
       expect(output).to.contain("getNode");

@@ -403,7 +403,7 @@ Instead of a DID, you can pass a full `ComputeAsset` (datasets) or `ComputeAlgor
   Copy-paste that first line to select both the node and the compute env in one step, then just
   run `startCompute …` — the env is remembered, no `--env` needed.
 
-  ```
+  ```text
   setNodeEnv 16Uiu2HAmR9z4…|0xff10…-0xc92e…
     [paid]  cpu: need 1, max 4
     estimated cost: 0.003 0x1c7D…7238 on chain 8996

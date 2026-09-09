@@ -179,7 +179,8 @@ export async function interactiveResourceSearch(
           name: "manual",
           message: chalk.green("Enter a chainId:\n"),
           validate: (v: string) =>
-            Number.isInteger(Number(v)) || "Enter an integer chainId.",
+            (/^\d+$/.test(v.trim()) && Number(v) > 0) ||
+            "Enter a positive integer chainId.",
         });
         chainIds.push(Number(manual));
         const { again } = await prompt<{ again: boolean }>({

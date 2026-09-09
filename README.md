@@ -335,7 +335,9 @@ Notes when switching nodes:
   (Order of `--did` and `--folder` does not matter.)
 
 - **Rules:**
-  serviceId is optional. If omitted, the CLI defaults to the first available download service.
+  serviceId is optional. If omitted, the CLI defaults to the first available download service. If you pass a `serviceId` that does not exist in the DDO, the command now fails fast with a clear error instead of silently ordering the first service.
+
+  For **v5 DDOs** (version ≥ 5.0.0) the download first runs a provider-initialization step against the asset's service endpoint. When `SSI_WALLET_API` is set (see the env vars above) this also performs the SSI / policy-server verification flow; when the target node reports it has no policy server configured, that step is skipped automatically.
 
 ---
 

@@ -279,8 +279,19 @@ export async function getPolicyServerOBJ(
   serviceId: string,
   signer: Signer,
   providerUrl: string,
-): Promise<PolicyServerInitiateActionData> {
+): Promise<PolicyServerInitiateActionData | null> {
   try {
+    try {
+      const statusResponse = await axios.post(`${providerUrl}/directCommand`, {
+        command: "status",
+      });
+      if (statusResponse.data?.isPSConfigured !== true) {
+        return null;
+      }
+    } catch {
+      // Node did not answer the status probe; fall through and attempt the
+      // normal flow rather than masking a real error with a null.
+    }
     const accountId = await signer.getAddress();
     const presentationResult = await requestCredentialPresentation(
       ddo,
@@ -410,6 +421,9 @@ export async function getPolicyServerOBJs(
         signer,
         providerUrl,
       );
+      if (!result) {
+        return null;
+      }
       results.push({
         ...result,
         documentId: ddo.documentId,
@@ -430,6 +444,9 @@ export async function getPolicyServerOBJs(
           signer,
           providerUrl,
         );
+        if (!algoResult) {
+          return null;
+        }
         results.push({
           ...algoResult,
           documentId: algo.documentId,

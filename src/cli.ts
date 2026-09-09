@@ -1129,8 +1129,10 @@ export async function createCLI() {
           algoSvcId,
         ];
 
-        await commands.computeStart(computeArgs, paymentChainId);
-        console.log(chalk.green("Compute job started successfully."));
+        const started = await commands.computeStart(computeArgs, paymentChainId);
+        if (started) {
+          console.log(chalk.green("Compute job started successfully."));
+        }
       },
     );
 

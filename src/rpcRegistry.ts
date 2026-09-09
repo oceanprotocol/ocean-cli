@@ -31,6 +31,16 @@ const STALL_TIMEOUT_MS = 1000;
 // so an unreachable RPC fails fast instead of hanging the CLI.
 const PROBE_TIMEOUT_MS = 5000;
 
+// Options for every JsonRpcProvider the registry builds. `cacheTimeout: -1` disables
+// ethers' 250ms request cache — it also caches getTransactionCount("pending"), so
+// consecutive transactions on a fast chain (ocean.js orderAsset's dispense+order,
+// batched access-list burns, per-asset compute orders) would otherwise reuse a stale
+// nonce and be rejected ("tx doesn't have the correct nonce"). `staticNetwork` skips a
+// per-call eth_chainId (the chainId is known from the map key).
+function providerOpts(network: Network) {
+  return { staticNetwork: network, cacheTimeout: -1 };
+}
+
 const RPC_EXAMPLE =
   'a single URL (e.g. "http://localhost:8545") or a JSON map keyed by chainId ' +
   '(e.g. {"1":"https://eth.example","8453":["https://a","https://b"]}).';
@@ -532,10 +542,14 @@ export function listChains(): ChainRpc[] {
 // opposite of fallback), priority=index (declaration order = preference), a per-backend
 // stallTimeout, and a staticNetwork on every inner provider (chainId is known from the
 // map key, so construction doesn't depend on a backend being up right now).
+// `cacheTimeout: -1` disables ethers' 250ms request cache: it also caches
+// getTransactionCount("pending"), so back-to-back transactions on a fast chain (e.g.
+// ocean.js orderAsset's dispense+order, or batched access-list burns) would otherwise
+// reuse a stale nonce and be rejected. See PROVIDER_OPTS.
 export function buildFallbackConfigs(urls: string[], chainId: number) {
   const network = Network.from(chainId);
   const configs = urls.map((url, index) => ({
-    provider: new JsonRpcProvider(url, network, { staticNetwork: network }),
+    provider: new JsonRpcProvider(url, network, providerOpts(network)),
     priority: index,
     stallTimeout: STALL_TIMEOUT_MS,
     weight: 1,
@@ -561,9 +575,7 @@ export function getProvider(chainId: number): AbstractProvider {
   const network = Network.from(chainId);
   let provider: AbstractProvider;
   if (urls.length === 1) {
-    provider = new JsonRpcProvider(urls[0], network, {
-      staticNetwork: network,
-    });
+    provider = new JsonRpcProvider(urls[0], network, providerOpts(network));
   } else {
     const { configs, options } = buildFallbackConfigs(urls, chainId);
     provider = new FallbackProvider(configs, network, options);

@@ -270,6 +270,19 @@ export class Commands {
     return true;
   }
 
+  // Place an order (via `handleComputeOrder`) with a bounded retry. On a fast chain the
+  // first order after prior transactions can hit a transient stale/lagged nonce — the
+  // rejected send places no order and returns a falsy tx id, so retrying after a short
+  // delay (which lets the node's pending nonce catch up) is safe and never double-orders.
+  private async orderWithRetry<T>(place: () => Promise<T>): Promise<T> {
+    let result = await place();
+    for (let attempt = 1; attempt < 3 && !result; attempt++) {
+      await this.sleep(2000);
+      result = await place();
+    }
+    return result;
+  }
+
   public async start() {
     console.log("Starting the interactive CLI flow...\n\n");
     const data = await interactiveFlow(this.oceanNodeUrl); // Collect data via CLI
@@ -469,18 +482,20 @@ export class Commands {
     );
     // Order the same service that policy retrieval and getDownloadUrl target.
     const serviceIndex = services.findIndex((s) => s.id === serviceId);
-    const tx = await orderAsset(
-      dataDdo,
-      this.signer,
-      this.config,
-      datatoken,
-      this.oceanNodeUrl,
-      undefined, // consumerAddress
-      undefined, // consumeMarketOrderFee
-      undefined, // providerFees
-      undefined, // consumeMarketFixedSwapFee
-      undefined, // datatokenIndex
-      serviceIndex < 0 ? 0 : serviceIndex,
+    const tx = await this.orderWithRetry(() =>
+      orderAsset(
+        dataDdo,
+        this.signer,
+        this.config,
+        datatoken,
+        this.oceanNodeUrl,
+        undefined, // consumerAddress
+        undefined, // consumeMarketOrderFee
+        undefined, // providerFees
+        undefined, // consumeMarketFixedSwapFee
+        undefined, // datatokenIndex
+        serviceIndex < 0 ? 0 : serviceIndex,
+      ),
     );
 
     if (!tx) {
@@ -1048,16 +1063,18 @@ export class Commands {
     if (algoDdo) {
       const algoCtx = await orderCtxFor(Number(getDdoChainId(algoDdo)));
       console.log("Ordering algorithm: ", args[2]);
-      algo.transferTxId = await handleComputeOrder(
-        parsedProviderInitializeComputeJob?.algorithm,
-        algoDdo as Asset,
-        algoCtx.signer,
-        computeEnv.consumerAddress,
-        algoServiceIndex,
-        algoCtx.datatoken,
-        algoCtx.config,
-        parsedProviderInitializeComputeJob?.algorithm?.providerFee,
-        providerURI,
+      algo.transferTxId = await this.orderWithRetry(() =>
+        handleComputeOrder(
+          parsedProviderInitializeComputeJob?.algorithm,
+          algoDdo as Asset,
+          algoCtx.signer,
+          computeEnv.consumerAddress,
+          algoServiceIndex,
+          algoCtx.datatoken,
+          algoCtx.config,
+          parsedProviderInitializeComputeJob?.algorithm?.providerFee,
+          providerURI,
+        ),
       );
       if (!algo.transferTxId) {
         console.error(
@@ -1078,16 +1095,18 @@ export class Commands {
       const feeEntry = parsedProviderInitializeComputeJob?.datasets?.[i];
       if (!feeEntry) continue;
       const dsCtx = await orderCtxFor(Number(getDdoChainId(dataDdo)));
-      assets[i].transferTxId = await handleComputeOrder(
-        feeEntry,
-        dataDdo as Asset,
-        dsCtx.signer,
-        computeEnv.consumerAddress,
-        datasetServiceIndex[i] ?? 0,
-        dsCtx.datatoken,
-        dsCtx.config,
-        feeEntry.providerFee,
-        providerURI,
+      assets[i].transferTxId = await this.orderWithRetry(() =>
+        handleComputeOrder(
+          feeEntry,
+          dataDdo as Asset,
+          dsCtx.signer,
+          computeEnv.consumerAddress,
+          datasetServiceIndex[i] ?? 0,
+          dsCtx.datatoken,
+          dsCtx.config,
+          feeEntry.providerFee,
+          providerURI,
+        ),
       );
       if (!assets[i].transferTxId) {
         console.error(
@@ -1376,9 +1395,10 @@ export class Commands {
       const { jobId, payment } = computeJobs[0];
       console.log("Compute started.  JobID: " + jobId);
       console.log("Agreement ID: " + payment.lockTx);
-    } else {
-      console.log("Error while starting the compute job: ", computeJobs);
+      return true;
     }
+    console.log("Error while starting the compute job: ", computeJobs);
+    return false;
   }
 
   public async freeComputeStart(args: string[]) {

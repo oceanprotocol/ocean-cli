@@ -31,6 +31,7 @@ import {
   AccesslistFactory,
   AccessListContract,
   ComputeResourceRequest,
+  ComputeSearchDimensionResult,
   ServiceJob,
   ServiceJobListed,
   ServiceRestartParams,
@@ -64,8 +65,25 @@ import {
   statusLabel,
   isTerminal,
 } from "./serviceHelpers.js";
+import { ensureP2PReady, getSearchSeedNode } from "./nodeConnection.js";
+import {
+  ResourceSearchParams,
+  ProviderEnvRow,
+  buildRows,
+  filterMatches,
+  applyMaxPrice,
+  orderRows,
+  printRows,
+  printDimensionDiagnostics,
+} from "./searchResourcesHelpers.js";
 
 const UPLOAD_TIMEOUT_MS = 30 * 60_000;
+
+// Upper bound for a single compute-provider DHT search (per tier). A DHT lookup keeps querying
+// the network for the full window rather than returning early, so in practice this is also how
+// long each tier takes. 60s matches the lib's per-query DHT timeout default; overridable via
+// SEARCH_TIMEOUT_MS.
+const SEARCH_TIMEOUT_MS = 60_000;
 
 // A node log endpoint streams in follow mode: it stays open for as long as the
 // container lives, so reading it to the end never returns. Left unbounded, undici
@@ -1367,6 +1385,176 @@ export class Commands {
     }
 
     console.log("Existing compute environments: ", JSON.stringify(computeEnvs));
+  }
+
+  /**
+   * Discover compute providers across the network that can run a job needing the given
+   * resources, via `ProviderInstance.findComputeProviders` (a P2P/DHT lookup with no HTTP
+   * equivalent). "both" runs a free and a paid search and merges the results, tagging each
+   * environment's tier. Results are filtered/priced/ordered by the helpers and printed; an
+   * empty tier prints a per-dimension breakdown instead of an opaque empty list.
+   */
+  public async searchComputeResources(params: ResourceSearchParams) {
+    await ensureP2PReady();
+    const seed = getSearchSeedNode();
+    const resourceList = params.resources
+      .map((d) => `${d.resource}=${d.value}`)
+      .join(", ");
+
+    const tiers: ("free" | "paid")[] =
+      params.mode === "both" ? ["free", "paid"] : [params.mode];
+
+    console.log(
+      chalk.cyan(
+        `Searching the network for compute providers (seed ${seed.slice(0, 24)}…).`,
+      ),
+    );
+    console.log(
+      chalk.gray(
+        `Requested: ${resourceList}. Tiers to search: ${
+          tiers.length > 1 ? `${tiers.join(" and ")} (concurrently)` : tiers[0]
+        }. Each is a DHT lookup and can take up to ~1 minute — please wait, do not type ` +
+          `until results appear.`,
+      ),
+    );
+    console.log(
+      chalk.yellow(
+        "Tip: each result starts with a ready-to-run  setNodeEnv <node>|<env>  command — copy-paste " +
+          "that whole line to select the node and compute env for your next compute command.",
+      ),
+    );
+
+    const request = {
+      resources: params.resources.map((d) => ({
+        resource: d.resource,
+        value: d.value,
+      })),
+      models: params.models,
+    };
+
+    // A DHT lookup with no answering peers never completes on its own, so bound each tier with
+    // a timeout instead of hanging forever. `findComputeProviders` accepts the signal and aborts
+    // the underlying query. Override with SEARCH_TIMEOUT_MS.
+    const timeout = Number(process.env.SEARCH_TIMEOUT_MS) || SEARCH_TIMEOUT_MS;
+
+    process.stdout.write(
+      chalk.cyan(
+        `\nSearching ${tiers.map((t) => t.toUpperCase()).join(" + ")}...`,
+      ),
+    );
+    // One shared heartbeat while any tier is in flight — the tiers run concurrently, so a
+    // per-tier inline spinner would interleave into noise. Each tier prints its own completion
+    // line (on a fresh line) as it finishes.
+    const heartbeat = setInterval(() => {
+      process.stdout.write(chalk.gray("."));
+    }, 3000);
+
+    interface TierOutcome {
+      tier: "free" | "paid";
+      rows: ProviderEnvRow[];
+      dimensions?: ComputeSearchDimensionResult[];
+    }
+
+    // Run every tier concurrently: they are independent DHT lookups on the same libp2p node, so
+    // "both" finishes in ~one tier's time instead of the sum. Promise.all preserves tier order.
+    const outcomes = await Promise.all(
+      tiers.map(async (tier): Promise<TierOutcome> => {
+        const started = Date.now();
+        try {
+          const result = await ProviderInstance.findComputeProviders(seed, {
+            free: tier === "free",
+            ...request,
+            signal: AbortSignal.timeout(timeout),
+          });
+          const secs = ((Date.now() - started) / 1000).toFixed(0);
+          const tierRows = buildRows(result.providers, tier, params);
+          console.log(
+            chalk.cyan(
+              `\n  ${tier.toUpperCase()} done in ${secs}s (${result.providers.length} provider(s), ${tierRows.length} match(es))`,
+            ),
+          );
+          return {
+            tier,
+            rows: tierRows,
+            dimensions: tierRows.length === 0 ? result.dimensions : undefined,
+          };
+        } catch (error) {
+          const secs = ((Date.now() - started) / 1000).toFixed(0);
+          const timedOut =
+            error?.name === "TimeoutError" || error?.name === "AbortError";
+          console.log(
+            chalk.yellow(
+              `\n  ${tier.toUpperCase()} ${
+                timedOut
+                  ? `timed out after ${secs}s (no providers answered the DHT lookup)`
+                  : `failed after ${secs}s: ${error?.message ?? error}`
+              }`,
+            ),
+          );
+          // A failed/timed-out tier just contributes no rows; the other tier still stands.
+          return { tier, rows: [] };
+        }
+      }),
+    );
+    clearInterval(heartbeat);
+
+    // Aggregate in tier order (Promise.all kept it) for deterministic output.
+    let rows: ProviderEnvRow[] = [];
+    const emptyTiers: {
+      tier: "free" | "paid";
+      dimensions: ComputeSearchDimensionResult[];
+    }[] = [];
+    for (const outcome of outcomes) {
+      rows = rows.concat(outcome.rows);
+      if (outcome.rows.length === 0 && outcome.dimensions) {
+        emptyTiers.push({ tier: outcome.tier, dimensions: outcome.dimensions });
+      }
+    }
+
+    // Drop everything that doesn't match the request (wrong chain, unaccepted token, or
+    // resources that fall short — the DHT returns all of a matching node's envs), then apply the
+    // optional price cap, then order.
+    const built = rows.length;
+    rows = filterMatches(rows, params);
+    const droppedUnmatched = built - rows.length;
+
+    const beforeCap = rows.length;
+    rows = applyMaxPrice(rows, params.maxPrice);
+    const droppedByCap = beforeCap - rows.length;
+
+    rows = orderRows(rows, params.orderBy);
+
+    if (droppedUnmatched > 0) {
+      console.log(
+        chalk.gray(
+          `\nFiltered out ${droppedUnmatched} non-matching result(s) (wrong chain, unaccepted token, or insufficient resources).`,
+        ),
+      );
+    }
+    if (droppedByCap > 0) {
+      console.log(
+        chalk.gray(`Filtered out ${droppedByCap} result(s) over --max-price.`),
+      );
+    }
+
+    if (rows.length === 0) {
+      console.log(chalk.yellow("\nNo matching compute providers found."));
+      // Per-tier DHT breakdown when a tier found nothing at all; otherwise everything the
+      // search returned was filtered out by the criteria above.
+      for (const { tier, dimensions } of emptyTiers) {
+        printDimensionDiagnostics(tier, dimensions);
+      }
+      if (emptyTiers.length === 0 && built > 0) {
+        console.log(
+          chalk.yellow(
+            `All ${built} result(s) the search returned were filtered out by your chain/token/price/resource criteria — try relaxing them.`,
+          ),
+        );
+      }
+      return;
+    }
+
+    printRows(rows, params);
   }
 
   public async computeStreamableLogs(args: string[]) {

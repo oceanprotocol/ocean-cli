@@ -11,6 +11,7 @@ import {
   ComputeEnvironment,
   ComputeProviderMatch,
   ComputeResource,
+  ComputeSearchDimensionResult,
 } from "@oceanprotocol/lib";
 import { estimateServiceCost } from "./serviceHelpers.js";
 
@@ -26,18 +27,33 @@ export interface ResourceDimension {
   value: number;
 }
 
+// One chain to price/pay against, with an optional set of payment-token addresses to restrict
+// to on THAT chain. An empty/absent `tokens` means "any token the env accepts on this chain".
+export interface ChainFilter {
+  chainId: number;
+  tokens?: string[];
+}
+
 export interface ResourceSearchParams {
   // One entry per requested resource dimension (AND-ed together by the DHT lookup).
   resources: ResourceDimension[];
   // Optional per-resource verification qualifier, e.g. { gpu: "A100" }.
   models?: Record<string, string>;
   mode: SearchMode;
-  // Paid/both only. Defaults to the RPC chainId when the user does not override it.
-  chainId?: number;
-  token?: string; // optional payment-token filter
+  // Paid/both only. One or more chains, each with an optional per-chain token filter. Pricing
+  // is computed across all of them and the cheapest (chain, token) wins. Defaults to the RPC
+  // chainId (no token filter) when the user does not override it.
+  chains?: ChainFilter[];
   maxPrice?: number; // optional cap on estimated cost (human units)
   durationSeconds?: number; // assumed job duration for cost estimate/ordering
   orderBy: SearchOrderBy;
+}
+
+// Payment tokens an env accepts on one requested chain (already narrowed by that chain's token
+// filter, if any), carried on a row for display.
+export interface ChainTokens {
+  chainId: number;
+  tokens: string[];
 }
 
 // A single (provider, environment) pairing, decorated with the values we order/print by.
@@ -46,9 +62,10 @@ export interface ProviderEnvRow {
   multiaddrs: string[];
   env: ComputeEnvironment;
   tier: "free" | "paid";
-  estCost: number | null; // estimated cost in human units (paid), or null when unpriced
+  estCost: number | null; // cheapest estimated cost across requested chains/tokens, or null
   token?: string; // the token estCost was computed for
-  acceptedTokens: string[]; // payment-token addresses the env accepts on the requested chain
+  chainId?: number; // the chain estCost was computed on
+  acceptedByChain: ChainTokens[]; // per requested chain, the (filtered) tokens the env accepts
   pricedOnChains: string[]; // every chainId the env advertises pricing for
   freeCapacity: number; // sum of available capacity for requested dims (free tier)
   availableResources: number; // sum of (max - inUse) for requested dims
@@ -168,14 +185,45 @@ export function buildParamsFromFlags(
     resources,
     models,
     mode,
-    chainId: flags.chain ? Number(flags.chain) : defaultChainId,
-    token: flags.token,
+    chains: buildChainsFromFlags(flags, defaultChainId),
     maxPrice: flags.maxPrice ? toPositiveNumber("--max-price", flags.maxPrice) : undefined,
     durationSeconds: flags.duration
       ? toPositiveNumber("--duration", flags.duration)
       : undefined,
     orderBy: resolveOrderBy(flags.orderBy, mode),
   };
+}
+
+// Split a comma-separated list into trimmed, non-empty entries.
+function splitList(raw: string | undefined): string[] {
+  if (!raw) return [];
+  return raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+// Build the chain filters from flags. `--chain` is a comma-separated list of chainIds (each an
+// integer); `--token` is a comma-separated list of token addresses applied as the filter on
+// EVERY requested chain (per-chain token sets are only expressible through the wizard). With no
+// `--chain`, fall back to the RPC chain. The `--token` filter still applies to that fallback.
+function buildChainsFromFlags(
+  flags: SearchFlags,
+  defaultChainId: number,
+): ChainFilter[] {
+  const tokens = splitList(flags.token);
+  const chainIds = splitList(flags.chain).map((c) => {
+    const n = Number(c);
+    if (!Number.isInteger(n)) {
+      throw new Error(`--chain "${c}" is not an integer chainId`);
+    }
+    return n;
+  });
+  const ids = chainIds.length > 0 ? chainIds : [defaultChainId];
+  return ids.map((chainId) => ({
+    chainId,
+    tokens: tokens.length > 0 ? tokens : undefined,
+  }));
 }
 
 // ---------------------------------------------------------------------------
@@ -215,56 +263,57 @@ function sumFor(
 // Row building + ordering
 // ---------------------------------------------------------------------------
 
-// Cost of an env for the requested dims, in human units, or null when it cannot be priced
-// in the requested/each accepted token. When no token is fixed, returns the cheapest.
-function priceEnv(
+// The payment tokens an env accepts on one chain, narrowed to that chain's token filter when it
+// has one (case-insensitive). Empty when the env does not price on the chain, or none match.
+function acceptedTokensOnChain(
   env: ComputeEnvironment,
+  chain: ChainFilter,
+): string[] {
+  const onChain = (env.fees?.[String(chain.chainId)] ?? []).map((s) => s.feeToken);
+  if (!chain.tokens || chain.tokens.length === 0) return onChain;
+  const want = new Set(chain.tokens.map((t) => t.toLowerCase()));
+  return onChain.filter((t) => want.has(t.toLowerCase()));
+}
+
+// The cheapest priceable (token, cost) for an env on ONE chain, respecting that chain's token
+// filter — or null when the env prices on the chain with no allowed token.
+function priceEnvOnChain(
+  env: ComputeEnvironment,
+  chain: ChainFilter,
   params: ResourceSearchParams,
-): { cost: number | null; token?: string } {
-  if (params.chainId === undefined) return { cost: null };
+): { cost: number; token: string } | null {
   const duration = params.durationSeconds ?? 3600;
   const amounts = params.resources.map((d) => ({ id: d.resource, amount: d.value }));
-
-  const schedules = env.fees?.[String(params.chainId)] ?? [];
-  const tokens = params.token
-    ? [params.token]
-    : schedules.map((s) => s.feeToken);
-
   let best: { cost: number; token: string } | null = null;
-  for (const token of tokens) {
-    const cost = estimateServiceCost(env, params.chainId, token, amounts, duration);
+  for (const token of acceptedTokensOnChain(env, chain)) {
+    const cost = estimateServiceCost(env, chain.chainId, token, amounts, duration);
     if (cost === null) continue;
     if (best === null || cost < best.cost) best = { cost, token };
   }
-  return best ? { cost: best.cost, token: best.token } : { cost: null };
+  return best;
 }
 
 // Flatten one search's provider matches into decorated rows for the given tier.
+//
+// Fan-out: a PAID env is emitted once PER requested chain it can be priced on (each row carrying
+// that chain's cheapest token/cost), so the same env can be compared across chains side by side.
+// An env that prices on none of the requested chains still yields a single row (estCost null) so
+// it surfaces with the "prices elsewhere" hint. Free envs are one row each.
 export function buildRows(
   matches: ComputeProviderMatch[],
   tier: "free" | "paid",
   params: ResourceSearchParams,
 ): ProviderEnvRow[] {
   const rows: ProviderEnvRow[] = [];
+  const chains = params.chains ?? [];
   for (const match of matches) {
     const multiaddrs = (match.node.multiaddress ?? []).map((m) => m.toString());
     for (const env of match.environments) {
-      const { cost, token } = tier === "paid" ? priceEnv(env, params) : { cost: null, token: undefined };
-      const chainKey = params.chainId !== undefined ? String(params.chainId) : undefined;
-      const acceptedTokens =
-        tier === "paid" && chainKey
-          ? (env.fees?.[chainKey] ?? []).map((s) => s.feeToken)
-          : [];
-      const pricedOnChains = tier === "paid" ? Object.keys(env.fees ?? {}) : [];
-      rows.push({
+      const shared = {
         nodeId: match.node.nodeId,
         multiaddrs,
         env,
         tier,
-        estCost: cost,
-        token,
-        acceptedTokens,
-        pricedOnChains,
         freeCapacity: sumFor(env, "free", params.resources, (r) => r.max ?? 0),
         availableResources: sumFor(
           env,
@@ -274,25 +323,90 @@ export function buildRows(
         ),
         runningJobs: env.runningJobs ?? 0,
         queuedJobs: env.queuedJobs ?? 0,
+      };
+
+      if (tier === "free") {
+        rows.push({
+          ...shared,
+          estCost: null,
+          token: undefined,
+          chainId: undefined,
+          acceptedByChain: [],
+          pricedOnChains: [],
+        });
+        continue;
+      }
+
+      const pricedOnChains = Object.keys(env.fees ?? {});
+      // One row per requested chain the env can actually be priced on.
+      const pricedRows = chains.flatMap((chain) => {
+        const priced = priceEnvOnChain(env, chain, params);
+        if (!priced) return [];
+        return [
+          {
+            ...shared,
+            estCost: priced.cost,
+            token: priced.token,
+            chainId: chain.chainId,
+            acceptedByChain: [
+              { chainId: chain.chainId, tokens: acceptedTokensOnChain(env, chain) },
+            ] as ChainTokens[],
+            pricedOnChains,
+          },
+        ];
       });
+
+      if (pricedRows.length > 0) {
+        rows.push(...pricedRows);
+      } else {
+        // Not priceable on any requested chain: a single row that surfaces the env anyway.
+        rows.push({
+          ...shared,
+          estCost: null,
+          token: undefined,
+          chainId: undefined,
+          acceptedByChain: [],
+          pricedOnChains,
+        });
+      }
     }
   }
   return rows;
 }
 
-// When the user pins a specific payment token, keep only paid envs that actually accept it
-// on the requested chain. Free rows have no token concept and are left untouched.
-export function filterByToken(
+// Does an env actually satisfy every requested resource dimension in its tier? The DHT lookup
+// returns *all* of a matching node's environments — including ones whose resources fall short of
+// the request (max < need) — so this is what drops those non-matching envs.
+function rowMeetsResources(
+  row: ProviderEnvRow,
+  dims: ResourceDimension[],
+): boolean {
+  const resources = tierResources(row.env, row.tier);
+  return dims.every((dim) => {
+    const have = resources
+      .filter((r) => resourceMatches(r, dim.resource))
+      .reduce((s, r) => s + (r.max ?? 0), 0);
+    return have >= dim.value;
+  });
+}
+
+// Keep only rows that genuinely match the request, dropping everything that does not:
+//   - any env whose resources do not meet the requested amounts (both tiers);
+//   - any PAID env that could not be priced on one of the requested chains with an allowed token
+//     (wrong chain, or the specified token(s) are not accepted) — its estCost is null.
+// A "both" search's free rows are still kept regardless of chain/token, since those are paid-only
+// concepts. When no chains are requested (defensive; paid always has at least the RPC chain),
+// the chain/token check is skipped.
+export function filterMatches(
   rows: ProviderEnvRow[],
-  token?: string,
+  params: ResourceSearchParams,
 ): ProviderEnvRow[] {
-  if (!token) return rows;
-  const want = token.toLowerCase();
-  return rows.filter(
-    (row) =>
-      row.tier !== "paid" ||
-      row.acceptedTokens.some((t) => t.toLowerCase() === want),
-  );
+  const hasChains = (params.chains?.length ?? 0) > 0;
+  return rows.filter((row) => {
+    if (!rowMeetsResources(row, params.resources)) return false;
+    if (row.tier === "paid" && hasChains && row.estCost === null) return false;
+    return true;
+  });
 }
 
 // Apply the optional maxPrice cap. Only meaningful for priced rows.
@@ -342,8 +456,33 @@ export function orderRows(
 // so tests and scripts can assert on results without parsing the pretty block.
 export function providerSummaryLine(row: ProviderEnvRow): string {
   const price =
-    row.estCost !== null ? `${row.estCost}${row.token ? ` ${row.token}` : ""}` : "n/a";
+    row.estCost !== null
+      ? `${row.estCost}${row.token ? ` ${row.token}` : ""}${
+          row.chainId !== undefined ? `@${row.chainId}` : ""
+        }`
+      : "n/a";
   return `PROVIDER node=${row.nodeId} env=${row.env.id} tier=${row.tier} price=${price} freeCapacity=${row.freeCapacity} available=${row.availableResources} running=${row.runningJobs} queued=${row.queuedJobs}`;
+}
+
+// When a search tier returns nothing, explain *why* per requested dimension instead of an
+// opaque empty list: the bucket the lookup actually used and how many providers announced it
+// (before verification/intersection). A dimension with zero announcers is the culprit; one
+// with announcers that still yields no matches was dropped by verification or intersection.
+export function printDimensionDiagnostics(
+  tier: "free" | "paid",
+  dimensions: ComputeSearchDimensionResult[] | undefined,
+): void {
+  console.log(
+    chalk.yellow(`\nNo ${tier} providers matched. Per-resource breakdown:`),
+  );
+  for (const dim of dimensions ?? []) {
+    const count = dim.providerIds?.length ?? 0;
+    const partial = dim.partial ? ` (partial: ${dim.error ?? "lookup ended early"})` : "";
+    console.log(
+      `  ${dim.resource}: requested ${dim.value}, searched bucket ${dim.bucket}, ` +
+        `${count} announcer(s)${partial}`,
+    );
+  }
 }
 
 // Generic resource `kind`s that only say whether a resource is a divisible pool
@@ -386,39 +525,36 @@ export function printRows(
   symbols?: Map<string, string>,
 ): void {
   if (rows.length === 0) return;
-  console.log(chalk.cyan(`\nFound ${rows.length} matching environment(s):\n`));
+  // Rows are (environment × chain) matches, so a paid env priced on several requested chains
+  // appears once per chain — count matches, not distinct environments.
+  console.log(chalk.cyan(`\nFound ${rows.length} match(es):\n`));
   for (const row of rows) {
+    // First line is a ready-to-run command and NOTHING else (unstyled, no trailing tag) so the
+    // whole line can be copy-pasted verbatim — a trailing token would become an extra argument.
+    // The tier tag goes on the following line instead.
+    console.log(`setNodeEnv ${row.nodeId}|${row.env.id}`);
     console.log(
-      `${chalk.bold(row.nodeId)}  ${chalk.gray(`[${row.tier}]`)}  env ${chalk.green(row.env.id)}`,
+      `  ${chalk.gray(`[${row.tier}]`)}  ${describeRowResources(row, params)}`,
     );
-    console.log(`  ${describeRowResources(row, params)}`);
     if (row.tier === "paid") {
       if (row.estCost !== null) {
+        // This row is one chain; the cost is the cheapest token on it.
         console.log(
-          `  estimated cost: ${row.estCost} ${tokenDisplay(row.token ?? "", symbols)}`,
+          `  estimated cost: ${row.estCost} ${tokenDisplay(
+            row.token ?? "",
+            symbols,
+          )} on chain ${row.chainId}`,
         );
       }
-      if (row.acceptedTokens.length) {
-        // Show every token the env accepts on this chain (address + symbol) so the
-        // user knows their payment options — required when they searched "all tokens".
+      // The (filtered) tokens the env accepts on this row's chain, so the user sees their full
+      // payment options — not just the cheapest one named in the cost line above. Displayed rows
+      // are always priced on a requested chain (non-matching rows were filtered out upstream).
+      const onChain = row.acceptedByChain.find((c) => c.chainId === row.chainId);
+      if (onChain && onChain.tokens.length) {
         console.log(
-          `  accepted tokens (chain ${params.chainId}): ${row.acceptedTokens
+          `  accepted tokens (chain ${onChain.chainId}): ${onChain.tokens
             .map((t) => tokenDisplay(t, symbols))
             .join(", ")}`,
-        );
-      } else {
-        // No fee schedule for the requested chain: point at the chains it does price on.
-        const others = row.pricedOnChains.filter(
-          (c) => c !== String(params.chainId),
-        );
-        console.log(
-          others.length
-            ? chalk.yellow(
-                `  no pricing on chain ${params.chainId}; this env prices on chain(s): ${others.join(
-                  ", ",
-                )} — re-run with --chain <id>`,
-              )
-            : chalk.yellow("  no pricing information advertised"),
         );
       }
     }
@@ -433,7 +569,7 @@ export function printRows(
   }
   console.log(
     chalk.yellow(
-      "Tip: select a provider with  setNode <peerId>  then run compute with  startCompute --env <envId> ...",
+      "Tip: copy-paste a result's first line (the  setNodeEnv <node>|<env>  command) to select both at once, then run  startCompute ...  (the env is remembered, no --env needed).",
     ),
   );
 }

@@ -9,7 +9,7 @@ import {
   hasSearchFlags,
   buildRows,
   applyMaxPrice,
-  filterByToken,
+  filterMatches,
   orderRows,
   providerSummaryLine,
   describeRowResources,
@@ -68,8 +68,19 @@ describe("searchResources flag parsing", () => {
     ]);
     expect(params.models).to.deep.equal({ gpu: "A100" });
     expect(params.mode).to.equal("both"); // default tier
-    expect(params.chainId).to.equal(137); // default chain = RPC chainId
+    expect(params.chains).to.deep.equal([{ chainId: 137, tokens: undefined }]); // default chain = RPC chainId
     expect(params.orderBy).to.equal("price"); // default for non-free
+  });
+
+  it("parses multiple chains and applies token list to each", () => {
+    const params = buildParamsFromFlags(
+      { cpu: "1", chain: "8996, 137", token: "0xA,0xB" },
+      1,
+    );
+    expect(params.chains).to.deep.equal([
+      { chainId: 8996, tokens: ["0xA", "0xB"] },
+      { chainId: 137, tokens: ["0xA", "0xB"] },
+    ]);
   });
 
   it("defaults orderBy to freeCapacity for free-only searches", () => {
@@ -87,7 +98,7 @@ describe("searchResources row building and ordering", () => {
   const params = {
     resources: [{ resource: "cpu", value: 2 }],
     mode: "paid" as const,
-    chainId: 8996,
+    chains: [{ chainId: 8996 }],
     durationSeconds: 60,
     orderBy: "price" as const,
   };
@@ -106,6 +117,65 @@ describe("searchResources row building and ordering", () => {
     // cheapest token B: price 1 * amount 2 * ceil(60/60)=1 minute = 2
     expect(rows[0].estCost).to.equal(2);
     expect(rows[0].token).to.equal("0xTOKEN_B");
+    expect(rows[0].chainId).to.equal(8996);
+  });
+
+  it("fans out one row per requested chain the env prices on", () => {
+    const env = makeEnv({
+      fees: {
+        "8996": [{ feeToken: "0xA", prices: [{ id: "cpu", price: 5 }] }],
+        "137": [{ feeToken: "0xB", prices: [{ id: "cpu", price: 1 }] }],
+      },
+    });
+    const multi = {
+      ...params,
+      chains: [{ chainId: 8996 }, { chainId: 137 }],
+    };
+    const rows = buildRows([makeMatch("n", [env])], "paid", multi);
+    // One row per chain (same env, compared side by side), in requested-chain order.
+    expect(rows).to.have.length(2);
+    expect(rows[0].chainId).to.equal(8996);
+    expect(rows[0].estCost).to.equal(10); // 5 * 2 * 1
+    expect(rows[0].token).to.equal("0xA");
+    expect(rows[1].chainId).to.equal(137);
+    expect(rows[1].estCost).to.equal(2); // 1 * 2 * 1
+    expect(rows[1].token).to.equal("0xB");
+    // Ordering by price then interleaves them across envs as usual.
+    const ordered = orderRows(rows, "price");
+    expect(ordered[0].chainId).to.equal(137); // cheapest first
+  });
+
+  it("emits a single unpriced row when the env prices on no requested chain", () => {
+    const env = makeEnv({
+      id: "elsewhere",
+      fees: { "8453": [{ feeToken: "0xB", prices: [{ id: "cpu", price: 1 }] }] },
+    });
+    const rows = buildRows([makeMatch("n", [env])], "paid", {
+      ...params,
+      chains: [{ chainId: 8996 }, { chainId: 137 }],
+    });
+    expect(rows).to.have.length(1);
+    expect(rows[0].estCost).to.equal(null);
+    expect(rows[0].pricedOnChains).to.deep.equal(["8453"]); // surfaced for the "prices elsewhere" hint
+  });
+
+  it("honors a per-chain token filter when pricing", () => {
+    const env = makeEnv({
+      fees: {
+        "8996": [
+          { feeToken: "0xCHEAP", prices: [{ id: "cpu", price: 1 }] },
+          { feeToken: "0xWANT", prices: [{ id: "cpu", price: 4 }] },
+        ],
+      },
+    });
+    const filtered = {
+      ...params,
+      chains: [{ chainId: 8996, tokens: ["0xwant"] }], // case-insensitive
+    };
+    const rows = buildRows([makeMatch("n", [env])], "paid", filtered);
+    // 0xCHEAP is excluded by the filter, so 0xWANT wins: 4 * 2 * 1 = 8
+    expect(rows[0].estCost).to.equal(8);
+    expect(rows[0].token).to.equal("0xWANT");
   });
 
   it("leaves estCost null when the env cannot be priced", () => {
@@ -166,7 +236,7 @@ describe("searchResources row building and ordering", () => {
     const gpuParams = {
       resources: [{ resource: "gpu", value: 2 }],
       mode: "paid" as const,
-      chainId: 8996,
+      chains: [{ chainId: 8996 }],
       orderBy: "resources" as const,
     };
     const rows = buildRows([makeMatch("gpuNode", [env])], "paid", gpuParams);
@@ -177,7 +247,7 @@ describe("searchResources row building and ordering", () => {
     expect(describeRowResources(rows[0], gpuParams)).to.contain("(A100)");
   });
 
-  it("records accepted tokens and priced chains on paid rows", () => {
+  it("records accepted tokens per requested chain and all priced chains", () => {
     const env = makeEnv({
       fees: {
         "8996": [
@@ -188,11 +258,14 @@ describe("searchResources row building and ordering", () => {
       },
     });
     const rows = buildRows([makeMatch("n", [env])], "paid", params);
-    expect(rows[0].acceptedTokens).to.deep.equal(["0xTOKEN_A", "0xTOKEN_B"]);
+    expect(rows[0].acceptedByChain).to.deep.equal([
+      { chainId: 8996, tokens: ["0xTOKEN_A", "0xTOKEN_B"] },
+    ]);
     expect(rows[0].pricedOnChains).to.have.members(["8996", "137"]);
   });
 
-  it("filterByToken keeps only envs accepting the chosen token", () => {
+  it("filterMatches drops paid envs not priceable under the per-chain token filter", () => {
+    const p = { ...params, chains: [{ chainId: 8996, tokens: ["0xwant"] }] }; // case-insensitive
     const a = makeEnv({
       id: "accepts",
       fees: { "8996": [{ feeToken: "0xWANT", prices: [{ id: "cpu", price: 1 }] }] },
@@ -201,15 +274,40 @@ describe("searchResources row building and ordering", () => {
       id: "rejects",
       fees: { "8996": [{ feeToken: "0xOTHER", prices: [{ id: "cpu", price: 1 }] }] },
     });
-    const rows = buildRows(
-      [makeMatch("n1", [a]), makeMatch("n2", [b])],
-      "paid",
-      params,
-    );
-    const kept = filterByToken(rows, "0xwant"); // case-insensitive
-    expect(kept.map((r) => r.env.id)).to.deep.equal(["accepts"]);
-    // No token filter -> everything kept.
-    expect(filterByToken(rows, undefined)).to.have.length(2);
+    const rows = buildRows([makeMatch("n1", [a]), makeMatch("n2", [b])], "paid", p);
+    expect(filterMatches(rows, p).map((r) => r.env.id)).to.deep.equal(["accepts"]);
+    // No token filter -> both price on the requested chain, so both kept.
+    const p2 = { ...params, chains: [{ chainId: 8996 }] };
+    const rows2 = buildRows([makeMatch("n1", [a]), makeMatch("n2", [b])], "paid", p2);
+    expect(filterMatches(rows2, p2)).to.have.length(2);
+  });
+
+  it("filterMatches drops paid envs that price on no requested chain", () => {
+    const env = makeEnv({
+      id: "elsewhere",
+      fees: { "8453": [{ feeToken: "0xB", prices: [{ id: "cpu", price: 1 }] }] },
+    });
+    const p = { ...params, chains: [{ chainId: 8996 }] };
+    const rows = buildRows([makeMatch("n", [env])], "paid", p);
+    expect(rows).to.have.length(1); // buildRows keeps the unpriced fallback row
+    expect(filterMatches(rows, p)).to.have.length(0); // ...which filterMatches then drops
+  });
+
+  it("filterMatches drops envs whose resources fall short of the request", () => {
+    const enough = makeEnv({
+      id: "enough",
+      resources: [{ id: "cpu", type: "cpu", max: 4 }],
+      fees: { "8996": [{ feeToken: "0xT", prices: [{ id: "cpu", price: 1 }] }] },
+    });
+    const short = makeEnv({
+      id: "short",
+      resources: [{ id: "cpu", type: "cpu", max: 0 }], // max 0 < requested 2
+      fees: { "8996": [{ feeToken: "0xT", prices: [{ id: "cpu", price: 1 }] }] },
+    });
+    const rows = buildRows([makeMatch("n", [enough, short])], "paid", params);
+    expect(filterMatches(rows, params).map((r) => r.env.id)).to.deep.equal([
+      "enough",
+    ]);
   });
 
   it("hides generic fungible/non-fungible kinds but keeps real descriptions", () => {
@@ -225,7 +323,7 @@ describe("searchResources row building and ordering", () => {
         { resource: "disk", value: 1 },
       ],
       mode: "paid" as const,
-      chainId: 8996,
+      chains: [{ chainId: 8996 }],
       orderBy: "resources" as const,
     };
     const rows = buildRows([makeMatch("n", [env])], "paid", p);

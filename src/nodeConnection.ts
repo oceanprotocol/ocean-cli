@@ -183,6 +183,35 @@ export function hasNode(): boolean {
 }
 
 /**
+ * The compute environment remembered by `setNodeEnv`, so a following `startCompute` /
+ * `startFreeCompute` can default its `--env` to it — the user pastes the node+env token from a
+ * search result once instead of repeating the env id on every compute command. Like NODE_URL it
+ * lives in an env var so it survives across REPL commands and is read fresh each time; "" = none.
+ */
+export function getCurrentEnvId(): string {
+  return process.env.COMPUTE_ENV_ID || "";
+}
+
+/** Remember the compute environment id for subsequent compute commands (see getCurrentEnvId). */
+export function setCurrentEnvId(envId: string): void {
+  process.env.COMPUTE_ENV_ID = envId;
+}
+
+/**
+ * A P2P node handle to seed a `findComputeProviders` DHT search from. The search is
+ * network-wide — it consults this peer's DHT — so the seed only needs to be *some*
+ * reachable P2P node, not the node the user ultimately wants to compute on. Prefer the
+ * active node when it is a P2P URI (so a local Barge peer is used directly), otherwise
+ * fall back to an Ocean bootstrap peer so the search works even for an HTTP-configured
+ * user who has no P2P node selected. Callers must `ensureP2PReady()` first.
+ */
+export function getSearchSeedNode(): string {
+  const active = getCurrentNodeUrl();
+  if (active && isP2pUri(active)) return active;
+  return OCEAN_BOOTSTRAP_PEERS[0];
+}
+
+/**
  * Health-check a candidate node without touching any existing state. Over HTTP this is
  * a plain status request; over P2P the on-demand dial *is* the reachability check.
  * Returns the node status (for display), or null when the node cannot be reached.

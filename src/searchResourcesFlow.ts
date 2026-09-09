@@ -12,6 +12,7 @@ import figlet from "figlet";
 import {
   ResourceSearchParams,
   ResourceDimension,
+  ChainFilter,
   SearchMode,
   SearchOrderBy,
 } from "./searchResourcesHelpers.js";
@@ -135,51 +136,88 @@ export async function interactiveResourceSearch(
     },
   });
 
-  let chainId: number | undefined;
-  let token: string | undefined;
+  let chains: ChainFilter[] | undefined;
   let maxPrice: number | undefined;
   let durationSeconds: number | undefined;
 
   // 4-6. Paid filters.
   if (mode === "paid" || mode === "both") {
-    const chainChoices = [
+    const OTHER = "Other (type chainId(s))";
+    // Map the human-readable choice labels back to chainIds.
+    const known: { name: string; id: number }[] = [
       ...(defaultChainId
-        ? [{ name: `Current RPC chain (${defaultChainId})`, value: defaultChainId }]
+        ? [{ name: `Current RPC chain (${defaultChainId})`, id: defaultChainId }]
         : []),
-      { name: "Ethereum (1)", value: 1 },
-      { name: "Polygon (137)", value: 137 },
-      { name: "Oasis Sapphire (23294)", value: 23294 },
-      { name: "Other (type a chainId)", value: -1 },
+      { name: "Ethereum (1)", id: 1 },
+      { name: "Polygon (137)", id: 137 },
+      { name: "Base (8453)", id: 8453 },
+      { name: "Oasis Sapphire (23294)", id: 23294 },
     ];
-    const { chain } = await prompt<{ chain: number }>({
-      type: "select",
-      name: "chain",
-      message: chalk.green("Which chain should pricing use?\n"),
-      choices: chainChoices,
-      result(value: string) {
-        return this.choices.find((choice) => choice.name === value).value;
-      },
-    });
-    if (chain === -1) {
-      const { manual } = await prompt<{ manual: string }>({
-        type: "input",
-        name: "manual",
-        message: chalk.green("Enter the chainId:\n"),
-        validate: (v: string) => Number.isInteger(Number(v)) || "Enter an integer chainId.",
-      });
-      chainId = Number(manual);
-    } else {
-      chainId = chain;
+    const { pickedChains } = await prompt<{ pickedChains: string[] }>({
+      type: "multiselect",
+      name: "pickedChains",
+      message: chalk.green(
+        "Which chain(s) should pricing use? (space to toggle, enter to confirm)\n",
+      ),
+      indicator: { on: "◉", off: "◯" },
+      choices: [...known.map((k) => ({ name: k.name })), { name: OTHER }],
+    } as never);
+
+    const chainIds: number[] = [];
+    for (const name of pickedChains) {
+      if (name === OTHER) continue;
+      const hit = known.find((k) => k.name === name);
+      if (hit) chainIds.push(hit.id);
     }
 
-    const { tokenIn } = await prompt<{ tokenIn: string }>({
-      type: "input",
-      name: "tokenIn",
-      message: chalk.green(
-        "Restrict to a payment-token address? (leave blank for any)\n",
-      ),
-    });
-    if (tokenIn && tokenIn.trim()) token = tokenIn.trim();
+    // Custom chainIds — allow adding several.
+    if (pickedChains.includes(OTHER)) {
+      let addMore = true;
+      while (addMore) {
+        const { manual } = await prompt<{ manual: string }>({
+          type: "input",
+          name: "manual",
+          message: chalk.green("Enter a chainId:\n"),
+          validate: (v: string) =>
+            Number.isInteger(Number(v)) || "Enter an integer chainId.",
+        });
+        chainIds.push(Number(manual));
+        const { again } = await prompt<{ again: boolean }>({
+          type: "toggle",
+          name: "again",
+          message: chalk.green("Add another chain?\n"),
+          enabled: "Yes",
+          disabled: "No",
+        });
+        addMore = again;
+      }
+    }
+
+    // Deduplicate; fall back to the RPC chain if nothing was chosen.
+    let uniqueIds = [...new Set(chainIds)];
+    if (uniqueIds.length === 0) {
+      if (defaultChainId === undefined) {
+        throw new Error("Select at least one chain to price against.");
+      }
+      uniqueIds = [defaultChainId];
+    }
+
+    // Per chain, ask which payment tokens to restrict to (blank = any token on that chain).
+    chains = [];
+    for (const chainId of uniqueIds) {
+      const { tokensIn } = await prompt<{ tokensIn: string }>({
+        type: "input",
+        name: "tokensIn",
+        message: chalk.green(
+          `Restrict chain ${chainId} to specific payment-token address(es)? (comma-separated, blank for any)\n`,
+        ),
+      });
+      const tokens = tokensIn
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean);
+      chains.push({ chainId, tokens: tokens.length ? tokens : undefined });
+    }
 
     const { priceIn } = await prompt<{ priceIn: string }>({
       type: "input",
@@ -224,8 +262,7 @@ export async function interactiveResourceSearch(
     resources,
     models,
     mode,
-    chainId,
-    token,
+    chains,
     maxPrice,
     durationSeconds,
     orderBy,

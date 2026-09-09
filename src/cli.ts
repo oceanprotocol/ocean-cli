@@ -15,17 +15,183 @@ import {
 import { parseComputeInput, toBoolean } from "./helpers.js";
 import {
   getCurrentNodeUrl,
+  getCurrentEnvId,
   hasNode,
   nodeChainIds,
   setCurrentNodeUrl,
+  setCurrentEnvId,
   startP2P,
   validateNode,
 } from "./nodeConnection.js";
+import {
+  buildParamsFromFlags,
+  hasSearchFlags,
+  SearchFlags,
+} from "./searchResourcesHelpers.js";
+import { interactiveResourceSearch } from "./searchResourcesFlow.js";
 
 // Commands usable before any Ocean Node is selected. Everything else is refused by the
 // preAction gate below until `setNode` succeeds. Canonical names only — aliases
 // (useNode, currentNode, h) resolve to these.
-const NODE_FREE_COMMANDS = new Set(["setNode", "getNode", "help"]);
+const NODE_FREE_COMMANDS = new Set([
+  "setNode",
+  "setNodeEnv",
+  "getNode",
+  "help",
+  // A network-wide DHT search — a natural way to *find* a node to select, so it must work
+  // before `setNode` picks one.
+  "searchComputeResources",
+]);
+
+// Topic grouping for the help listing. Purely presentational: it only changes how the command
+// list is printed (`help`, bare `--help`, and the no-arg startup banner), never behavior. Names
+// are canonical (aliases are looked up and shown from each command). `assertHelpGroupsCoverAll`
+// keeps this in lockstep with the registered commands, so adding a command without grouping it
+// fails at startup rather than dropping it silently from help.
+interface HelpSubgroup {
+  subheading: string;
+  commands: string[];
+}
+interface HelpGroup {
+  heading: string;
+  commands?: string[];
+  subgroups?: HelpSubgroup[];
+}
+const HELP_GROUPS: HelpGroup[] = [
+  {
+    heading: "Node & session",
+    commands: ["setNode", "setNodeEnv", "getNode", "help"],
+  },
+  {
+    heading: "Discover compute providers",
+    commands: ["searchComputeResources", "getComputeEnvironments"],
+  },
+  {
+    heading: "Assets — publish, edit, consume",
+    commands: ["publish", "publishAlgo", "editAsset", "allowAlgo", "getDDO", "download"],
+  },
+  {
+    heading: "Compute",
+    subgroups: [
+      {
+        subheading: "Jobs (C2D)",
+        commands: [
+          "startCompute",
+          "startFreeCompute",
+          "getJobStatus",
+          "computeStreamableLogs",
+          "downloadJobResults",
+          "stopCompute",
+        ],
+      },
+      {
+        subheading: "Services on demand",
+        commands: [
+          "getServiceTemplates",
+          "startService",
+          "getServiceStatus",
+          "getServices",
+          "serviceLogs",
+          "extendService",
+          "restartService",
+          "stopService",
+        ],
+      },
+    ],
+  },
+  {
+    heading: "Tokens & auth",
+    commands: ["mintOcean", "generateAuthToken", "invalidateAuthToken"],
+  },
+  {
+    heading: "Escrow payments",
+    commands: [
+      "depositEscrow",
+      "getUserFundsEscrow",
+      "withdrawFromEscrow",
+      "authorizeEscrow",
+      "getAuthorizationsEscrow",
+    ],
+  },
+  {
+    heading: "Access lists",
+    commands: [
+      "createAccessList",
+      "addToAccessList",
+      "checkAccessList",
+      "removeFromAccessList",
+    ],
+  },
+  {
+    heading: "Persistent storage (buckets)",
+    commands: [
+      "createBucket",
+      "addFileToBucket",
+      "listBuckets",
+      "listFilesInBucket",
+      "getFileObject",
+      "deleteFile",
+    ],
+  },
+  { heading: "Admin", commands: ["downloadNodeLogs"] },
+];
+
+// Every command name mentioned across all groups/subgroups, in listing order.
+function groupedCommandNames(): string[] {
+  const names: string[] = [];
+  for (const g of HELP_GROUPS) {
+    for (const n of g.commands ?? []) names.push(n);
+    for (const s of g.subgroups ?? []) names.push(...s.commands);
+  }
+  return names;
+}
+
+// Fail fast if the groups drift from the registered commands: a command in no group (would
+// vanish from help), one grouped twice, or a group naming a command that no longer exists.
+function assertHelpGroupsCoverAll(program: Command): void {
+  const grouped = groupedCommandNames();
+  const dupes = [...new Set(grouped.filter((n, i) => grouped.indexOf(n) !== i))];
+  const registered = program.commands.map((c) => c.name());
+  const missing = registered.filter((n) => !grouped.includes(n));
+  const unknown = grouped.filter((n) => !registered.includes(n));
+  const problems: string[] = [];
+  if (dupes.length) problems.push(`listed in more than one group: ${dupes.join(", ")}`);
+  if (missing.length) problems.push(`not in any help group: ${missing.join(", ")}`);
+  if (unknown.length) problems.push(`grouped but not registered: ${unknown.join(", ")}`);
+  if (problems.length) {
+    throw new Error(`Help groups out of sync — ${problems.join("; ")}`);
+  }
+}
+
+// Render the topic-grouped command listing used by `help` and the startup banner.
+export function formatGroupedHelp(program: Command): string {
+  const byName = new Map(program.commands.map((c) => [c.name(), c] as const));
+  const line = (name: string): string => {
+    const cmd = byName.get(name);
+    const aliases = cmd?.aliases() ?? [];
+    const label = aliases.length ? `${name} (${aliases.join(", ")})` : name;
+    const desc = cmd?.description() ?? "";
+    const gap = label.length < 38 ? " ".repeat(38 - label.length) : "  ";
+    return `  ${label}${gap}${desc}`;
+  };
+
+  const out: string[] = [chalk.bold(`Ocean CLI v${pkg.version} — commands`), ""];
+  for (const group of HELP_GROUPS) {
+    out.push(chalk.cyan.bold(group.heading));
+    for (const n of group.commands ?? []) out.push(line(n));
+    for (const sub of group.subgroups ?? []) {
+      out.push(chalk.cyan(`  ${sub.subheading}:`));
+      for (const n of sub.commands) out.push(line(n));
+    }
+    out.push("");
+  }
+  out.push(
+    chalk.gray(
+      "Both positional args and named options work for every command. Add -h/--help after a command for its options, e.g.  publish --help",
+    ),
+  );
+  return out.join("\n");
+}
 
 // Single source of truth for the CLI version: read it from package.json instead
 // of hardcoding, so it can't drift. `../package.json` resolves from both src/
@@ -60,6 +226,23 @@ function parsePorts(value: string): number[] {
       }
       return n;
     });
+}
+
+// Commander collector for a repeatable `--resource name:amount` option.
+function collectResource(value: string, previous: string[]): string[] {
+  return previous.concat([value]);
+}
+
+// Run the interactive resource-search wizard, but only when we have a TTY — a wizard with
+// no stdin would hang. In a non-interactive context, tell the user to pass filter flags.
+async function runResourceWizard(chainId: number) {
+  if (!input.isTTY) {
+    throw new Error(
+      "searchComputeResources needs either filter flags (e.g. --cpu 4 --paid) or an " +
+        "interactive terminal for the wizard. Run with --help to see the flags.",
+    );
+  }
+  return interactiveResourceSearch(chainId);
 }
 
 async function initializeSigner() {
@@ -179,14 +362,13 @@ export async function createCLI() {
     }
   });
 
-  // Custom help command to support legacy "h" invocation.
-  // Note: We use console.log(program.helpInformation()) to print the full help output.
+  // Custom help command to support legacy "h" invocation. Prints the topic-grouped listing.
   program
     .command("help")
     .alias("h")
     .description("Display help for all commands")
     .action(() => {
-      console.log(program.helpInformation());
+      console.log(formatGroupedHelp(program));
     });
 
   // setNode command. The switch itself never touches the RPC/signer: choosing a node is
@@ -254,6 +436,61 @@ export async function createCLI() {
       }
     });
 
+  // setNodeEnv command: paste a search result's "node|env" token to select BOTH the Ocean Node
+  // and the compute environment for subsequent compute commands in one step. Mirrors setNode
+  // (validate then switch the node) and additionally remembers the env id.
+  program
+    .command("setNodeEnv")
+    .alias("useNodeEnv")
+    .description(
+      "Select both an Ocean Node and a compute environment from a search result's 'node|env' token",
+    )
+    .argument(
+      "<nodeEnv>",
+      "A 'node|env' token from a searchComputeResources result (node URL/peer id, a '|', then the env id)",
+    )
+    .action(async (nodeEnv) => {
+      // Tolerate a pasted "Node+env: <node>|<env>" line, not just the bare token.
+      const raw = nodeEnv.replace(/^\s*Node\+env:\s*/i, "").trim();
+      const sep = raw.indexOf("|");
+      if (sep <= 0 || sep === raw.length - 1) {
+        console.error(
+          chalk.red(
+            "Expected a 'node|env' token (node, a '|', then the compute env id), e.g. 16Uiu2…|0xabc…-0xdef…",
+          ),
+        );
+        return;
+      }
+      const target = raw.slice(0, sep).trim();
+      const envId = raw.slice(sep + 1).trim();
+
+      const status = await validateNode(target);
+      if (!status) {
+        const previous = getCurrentNodeUrl();
+        console.error(
+          chalk.red(
+            previous
+              ? `Cannot reach ${target}. Keeping current node: ${previous} (env unchanged)`
+              : `Cannot reach ${target}. Still no node set.`,
+          ),
+        );
+        return;
+      }
+
+      setCurrentNodeUrl(target);
+      setCurrentEnvId(envId);
+      console.log(
+        chalk.green(
+          `Using node: ${target} (version ${status.version})\nUsing compute env: ${envId}`,
+        ),
+      );
+      console.log(
+        chalk.yellow(
+          "startCompute / startFreeCompute will use this env by default (override with --env).",
+        ),
+      );
+    });
+
   // getNode command
   program
     .command("getNode")
@@ -270,6 +507,10 @@ export async function createCLI() {
         return;
       }
       console.log(`Current Ocean Node: ${current}`);
+      const envId = getCurrentEnvId();
+      if (envId) {
+        console.log(`Selected compute env: ${envId}`);
+      }
       // Best effort: a node that is down must not fail the command.
       const status = await validateNode(current);
       if (status) {
@@ -418,10 +659,13 @@ export async function createCLI() {
       "<algoDid>",
       "Algorithm DID, OR a JSON ComputeAlgorithm object with a fileObject and meta (raw algorithm, no DID)",
     )
-    .argument("<computeEnvId>", "Compute environment ID")
-    .argument("<maxJobDuration>", "maxJobDuration for compute job")
-    .argument("<paymentToken>", "Payment token for compute")
-    .argument("<resources>", "Resources of compute environment stringified")
+    .argument(
+      "[computeEnvId]",
+      "Compute environment ID (optional if one was selected via setNodeEnv)",
+    )
+    .argument("[maxJobDuration]", "maxJobDuration for compute job")
+    .argument("[paymentToken]", "Payment token for compute")
+    .argument("[resources]", "Resources of compute environment stringified")
     .argument(
       "[output]",
       "Output backend to save job results to. Supported types include S3, FTP, URL, Arweave, etc. Defaults to node local disk if omitted.",
@@ -475,7 +719,8 @@ export async function createCLI() {
       ) => {
         const dsDids = options.datasets || datasetDids;
         const aDid = options.algo || algoDid;
-        const envId = options.env || computeEnvId;
+        // Fall back to the env remembered by setNodeEnv when none is given explicitly.
+        const envId = options.env || computeEnvId || getCurrentEnvId();
         const jobDuration = options.maxJobDuration || maxJobDuration;
         const token = options.token || paymentToken;
         const res = options.resources || resources;
@@ -598,7 +843,10 @@ export async function createCLI() {
       "<algoDid>",
       "Algorithm DID, OR a JSON ComputeAlgorithm object with a fileObject and meta (raw algorithm, no DID)",
     )
-    .argument("<computeEnvId>", "Compute environment ID")
+    .argument(
+      "[computeEnvId]",
+      "Compute environment ID (optional if one was selected via setNodeEnv)",
+    )
     .argument(
       "[output]",
       "Output backend to save job results to. Supported types include S3, FTP, URL, Arweave, etc. Defaults to node local disk if omitted.",
@@ -641,7 +889,8 @@ export async function createCLI() {
       ) => {
         const dsDids = options.datasets || datasetDids;
         const aDid = options.algo || algoDid;
-        const envId = options.env || computeEnvId;
+        // Fall back to the env remembered by setNodeEnv when none is given explicitly.
+        const envId = options.env || computeEnvId || getCurrentEnvId();
         const outputLocation = options.output || output;
         const svcIds = options.services ?? serviceIds ?? "";
         const algoSvcId = options.algoService ?? algoServiceId ?? "";
@@ -1595,6 +1844,54 @@ export async function createCLI() {
       const commands = new Commands(signer, chainId);
       await commands.deleteFile([null, bucketId, fileName]);
     });
+
+  program
+    .command("searchComputeResources")
+    .alias("findComputeNodes")
+    .description(
+      "Search the network for compute providers that can run a job with the resources you need. " +
+        "Runs an interactive wizard when no filter flags are given, otherwise uses the flags.",
+    )
+    .option("--cpu <cores>", "CPU cores needed")
+    .option("--ram <gb>", "RAM needed")
+    .option("--disk <gb>", "Disk needed")
+    .option("--gpu <count>", "GPU devices needed")
+    .option("--gpu-model <name>", "GPU kind/description to match (e.g. A100)")
+    .option(
+      "--resource <name:amount>",
+      "Arbitrary resource (e.g. fpga:2); repeatable",
+      collectResource,
+      [] as string[],
+    )
+    .option("--free", "Search only free compute environments")
+    .option("--paid", "Search only paid compute environments")
+    .option("--both", "Search both free and paid (default)")
+    .option(
+      "--chain <chainIds>",
+      "Chain(s) to price against, comma-separated (defaults to the RPC chain)",
+    )
+    .option(
+      "--token <addresses>",
+      "Restrict to payment-token address(es), comma-separated; applied to every --chain",
+    )
+    .option("--max-price <amount>", "Drop paid results costing more than this (human units)")
+    .option("--duration <seconds>", "Assumed job duration for the cost estimate")
+    .option(
+      "--order-by <key>",
+      "Order results: price | freeCapacity | resources | leastBusy",
+    )
+    .action(async (options) => {
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
+      const flags = options as SearchFlags;
+      const params = hasSearchFlags(flags)
+        ? buildParamsFromFlags(flags, chainId)
+        : await runResourceWizard(chainId);
+      await commands.searchComputeResources(params);
+    });
+
+  // Every registered command must belong to exactly one help group (see HELP_GROUPS).
+  assertHelpGroupsCoverAll(program);
 
   return program;
 }

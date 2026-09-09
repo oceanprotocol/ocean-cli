@@ -3318,11 +3318,16 @@ export class Commands {
             // on a send failure — ocean.js's sendPreparedTransaction swallows
             // the error. The common one here is a nonce collision between
             // back-to-back burns on a fast local chain: the rejected tx leaves
-            // the account nonce advanced, so simply rebuilding the tx (a fresh
+            // the account nonce advanced, so rebuilding the tx (a fresh
             // populateTransaction picks up the corrected nonce) succeeds. Retry
-            // a null result a few times before giving up.
+            // a null result a few times before giving up — but WAIT between
+            // attempts: ethers caches getTransactionCount("pending") for
+            // ~cacheTimeout (250ms default), so an immediate retry re-reads the
+            // same stale nonce and fails again. A short delay lets that cache
+            // expire so the retry sees the advanced nonce.
             let receipt = null;
-            for (let attempt = 0; attempt < 3 && !receipt; attempt++) {
+            for (let attempt = 0; attempt < 5 && !receipt; attempt++) {
+              if (attempt > 0) await this.sleep(1000);
               receipt = await accessList.burn(tokenId);
             }
             if (!receipt) {

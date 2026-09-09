@@ -152,4 +152,32 @@ describe("Ocean CLI Setup", function () {
       },
     );
   });
+
+  it("should reject a malformed JSON RPC map with a clear message", function (done) {
+    const projectRoot = path.resolve(__dirname, "..");
+    process.env.PRIVATE_KEY =
+      "0x1d751ded5a32226054cd2e71261039b65afb9ee1c746d055dd699b1150a5befc";
+    delete process.env.MNEMONIC;
+    // A top-level array is a valid RPC-shaped input that must be rejected.
+    process.env.RPC = '["http://127.0.0.1:8545"]';
+
+    exec(
+      "npm run cli getDDO did:op:123",
+      { cwd: projectRoot },
+      (error, stdout, stderr) => {
+        try {
+          const out = `${stdout}${stderr}`;
+          expect(out).to.match(/not an array/i);
+          // The old "Have you forgot to set env RPC?" message must NOT appear for a
+          // set-but-malformed value.
+          expect(out).to.not.contain("Have you forgot to set env RPC?");
+          done();
+        } catch (assertionError) {
+          done(assertionError);
+        } finally {
+          process.env.RPC = "http://127.0.0.1:8545";
+        }
+      },
+    );
+  });
 });

@@ -60,13 +60,13 @@ Important behavior of the entry point (`src/index.ts`): after running the comman
 Validated at startup in `createCLI()` (`src/cli.ts`), which `process.exit(1)`s with a red message if missing:
 
 - `PRIVATE_KEY` **or** `MNEMONIC` — signer credentials (private key preferred; mnemonic via `ethers.Wallet.fromPhrase`).
-- `RPC` — JSON-RPC endpoint; chainId is read from `provider.getNetwork()`, not configured manually.
+- `RPC` — JSON-RPC endpoint(s). **Either** a single URL (legacy, chainId read from `provider.getNetwork()`) **or** a JSON map keyed by chainId whose values are a URL or an ordered list of URLs (e.g. `{"1":"https://…","8453":["https://a","https://b"]}`). A chain with ≥2 URLs is served by an ethers v6 `FallbackProvider` (`quorum:1`, priority = declaration order, per-backend `stallTimeout`). The shape is parsed and validated up front in `createCLI()` (a malformed value `exit(1)`s with an example); the unset message stays the test-asserted `"Have you forgot to set env RPC?"`. All RPC/provider/signer/config lifecycle lives in `src/rpcRegistry.ts` (the single source of truth, mirroring `nodeConnection.ts`); `initializeSigner()` is a thin wrapper over it. A default/active chain is resolved (`setChain`/`CHAIN_ID` → sole configured chain → the single chain both the node serves and the registry knows → none); chain-explicit and compute commands additionally accept `--chainId` (see "CLI commands exposed" and "Compute flow"). Runtime-added chains persist to `~/.ocean/cli/rpc.json` (override with `RPC_CONFIG_FILE`); env `RPC` is merged first and wins on conflict.
 
 ### Optional environment variables
 
 - `NODE_URL` — the **initial** Ocean Node. An `http(s)://` URL, a raw libp2p peer id, or a full `/dns4/.../p2p/...` multiaddr. **Not required to start:** without it the CLI runs in a node-less state where the `preAction` gate in `createCLI()` refuses every command except `setNode` / `getNode` / `help` (see "Node selection"). Switchable at runtime with `setNode`.
 - `DISABLE_P2P` — `true` skips starting libp2p entirely. Combined with a P2P `NODE_URL` it is a fatal contradiction (`exit(1)` at startup).
-- `ADDRESS_FILE` — path to a contracts `address.json`. Defaults to `${homedir}/.ocean/ocean-contracts/artifacts/address.json`. Needed by escrow / mint / access-list commands (see "Config & chain selection").
+- `ADDRESS_FILE` — path to a contracts `address.json`. Defaults to `${homedir}/.ocean/ocean-contracts/artifacts/address.json`. Consumed by ocean.js `ConfigHelper` for **Barge / custom-deployed** contract addresses. No longer strictly required for escrow / mint / access-list: `ConfigHelper` falls back to the multi-chain contract set bundled with `@oceanprotocol/lib`, so those commands now work on supported public chains without a local `address.json` (see "Config & chain selection").
 - `INDEXING_MAX_RETRIES` / `INDEXING_RETRY_INTERVAL` — how long to wait for an asset to be indexed. **Code defaults are 120 retries × 4000 ms** (`getIndexingWaitSettings()` in `helpers.ts`); the README's "100 / 3000" figures are stale.
 - `AVOID_LOOP_RUN` — `true` = one-shot (no REPL loop). Unset/`false` = interactive loop.
 - `BOOTSTRAP_PEERS` — comma-separated extra libp2p multiaddrs, added to the bootstrap list built in `nodeConnection.ts`.
@@ -83,11 +83,14 @@ All registered in `src/cli.ts` via Commander (`commander` v13). Every command su
 - Persistent storage buckets: `createBucket`, `addFileToBucket`, `listBuckets`, `listFilesInBucket`, `getFileObject`, `deleteFile`.
 - Admin: `downloadNodeLogs`.
 - Node selection: `setNode` (alias `useNode`), `getNode` (alias `currentNode`).
+- Chain/RPC management: `addChain` (alias `addRpc`), `removeChain` (alias `removeRpc`), `listChains` (aliases `getRpcs`/`chains`), `setChain` (alias `useChain`), `getChain` (alias `currentChain`). Node-free (in `NODE_FREE_COMMANDS`); implemented directly in `cli.ts` actions (no `Commands` instance), mutating the `rpcRegistry` singleton the way `setNode`/`getNode` mutate `process.env.NODE_URL`.
 - `help` / `h`.
+
+**`--chainId` routing.** Chain-explicit commands (`mintOcean`, all escrow, all access-list, and the escrow-paid `startService`/`extendService`) take a single `--chainId <id>` option: flag → default chain → error listing configured chains. Chain-implied commands (`publish`/`publishAlgo`/`editAsset`/`allowAlgo`/`download`) route to the **DDO's own `chainId`** (via `Commands.useChain` / `routeToAssetChain`). Category-agnostic commands sign on the default chain. Services are **single-chain** (no asset DDO), so `--chainId` is just the payment/escrow chain and must also be one the compute env prices on (`env.fees[chainId]`).
 
 Per-command flags and examples are exhaustively documented in `README.md` ("Command Usage" / "Available Named Options Per Command"). A few load-bearing notes:
 
-- `startCompute` requires `maxJobDuration` (seconds, drives payment), `paymentToken` (must be listed by the chosen compute env — get it from `getComputeEnvironments`), and `resources` (stringified JSON like `'[{"id":"cpu","amount":3},{"id":"ram","amount":16772672536},{"id":"disk","amount":0}]'`). `--accept true` skips the interactive payment confirmation prompt (mandatory when stdin is not a TTY). Optional `--output` is a stringified JSON remote-storage backend (S3/FTP/URL/Arweave/IPFS); omit to store results on the node's disk.
+- `startCompute` requires `maxJobDuration` (seconds, drives payment), `paymentToken` (must be listed by the chosen compute env for the payment chain — get it from `getComputeEnvironments`, which now prints fee chains + tokens per env), and `resources` (stringified JSON like `'[{"id":"cpu","amount":3},{"id":"ram","amount":16772672536},{"id":"disk","amount":0}]'`). Optional `--chainId` is the **payment/escrow chain** (flag → default → error); each dataset/algorithm is still ordered on its own DDO chain, so a job can mix asset chains and pay on another — every chain used must be a registered RPC. `--accept true` skips the interactive payment confirmation prompt (mandatory when stdin is not a TTY). Optional `--output` is a stringified JSON remote-storage backend (S3/FTP/URL/Arweave/IPFS); omit to store results on the node's disk.
 - Datasets/algorithm arguments accept a DID, a JSON `ComputeAsset`/`ComputeAlgorithm` with a `fileObject` (raw, unpublished, no datatoken order), a JSON array, mixed DID+raw entries, or the legacy `[did:a,did:b]` form. When passing JSON on the shell, single-quote it and use `-- ` to stop Commander option parsing.
 - `startFreeCompute` targets a compute env with `free === true` and does no ordering/payment.
 
@@ -117,10 +120,36 @@ One big class holding all command logic. The constructor:
 - creates `this.aquarius = new Aquarius(this.oceanNodeUrl)` (the Ocean Node also serves the Aquarius/indexer API),
 - loads `this.indexingParams` from `getIndexingWaitSettings()`.
 
-### Config & chain selection — two mechanisms (important)
+### Config & chain selection — one mechanism (important)
 
-1. **`ConfigHelper().getConfig(chainId)`** from ocean.js — used as `this.config` for the general publish/consume/compute flows.
-2. **`getConfigByChainId(chainId)`** in `helpers.ts` — reads the local `ADDRESS_FILE` (`address.json`), finds the network entry whose `chainId` matches, and returns its contract addresses. This is the source of `Ocean` (mintOcean), `Escrow` (all escrow commands), and `AccessListFactory` (createAccessList) addresses. **These commands therefore require a local `address.json`** (i.e. a Barge / local-contracts deployment) and will fail if the chain isn't present in that file. Chain selection is otherwise implicit — derived from the RPC's network, never passed as a flag.
+**`ConfigHelper().getConfig(chainId)`** from ocean.js is the single source of both the general
+publish/consume/compute config (`this.config`) **and** the contract addresses. The CLI's old
+hand-rolled `getConfigByChainId()` (which parsed a Barge-only `address.json` and returned the
+capitalized `Ocean`/`Escrow`/`AccessListFactory` keys) has been **deleted**. All address reads now
+go through `getConfigFor(chainId)` in `src/rpcRegistry.ts` (a memoized `ConfigHelper().getConfig`
+with `nodeUri` set) and use the lib's **lowercase** field names:
+
+- `config.oceanTokenAddress` — `mintOcean` (resolved as `--token` flag → `oceanTokenAddress` → error asking for `--token`, since some chains e.g. Base have no bundled Ocean token).
+- `config.escrow` — all escrow commands **and** the on-demand-service escrow path (`startService`/`extendService`, via `serviceHelpers.ts`).
+- `config.accessListFactory` — `createAccessList`.
+
+`ConfigHelper` reads `ADDRESS_FILE` when set (Barge / custom) else the multi-chain contracts bundled
+with `@oceanprotocol/lib`, so these commands now work off-Barge. `requireAddress(chainId, field, label)`
+in `rpcRegistry.ts` centralizes the "address missing for this chain" error.
+
+**Multi-chain (the RPC registry).** `RPC` is now **either** a single URL (legacy, chainId probed via
+`getNetwork()`) **or** a JSON map `{ "<chainId>": "url" | ["url", …] }`. `src/rpcRegistry.ts` is the
+single source of truth for all RPC/provider/signer/config lifecycle (mirrors `nodeConnection.ts`):
+`getProvider` builds a `JsonRpcProvider` (1 URL) or a `FallbackProvider` (`quorum:1`, priority = order,
+`stallTimeout`, `staticNetwork`; ≥2 URLs), `getSigner`/`getConfigFor` are memoized per chain, and
+`verifyChain` lazily checks each backend's real `eth_chainId` on first use (dropping confirmed
+mismatches, keeping merely-unreachable ones for failover). Runtime-added chains persist to
+`~/.ocean/cli/rpc.json` (override `RPC_CONFIG_FILE`); on load the env map is merged with that file and
+**env wins**. Default (active) chain resolution: `setChain`/`CHAIN_ID` → persisted default → sole
+configured chain → node∩registry. `Commands` pins the **default** chain in its constructor but routes
+per command: `useChain(chainId)` re-points `this.signer`/`this.config` (safe — a fresh instance per CLI
+invocation, methods run one at a time), `configFor`/`signerFor` are the per-chain accessors Phase 3
+uses directly. `destroyProviders()` tears providers down on exit (next to `stopP2P`).
 
 ### ocean.js integration and helpers (`src/helpers.ts`)
 
@@ -143,13 +172,15 @@ One big class holding all command logic. The constructor:
 
 ### Compute flow
 
-The `startCompute` **action in `cli.ts`** orchestrates a two-phase flow (not a single `Commands` method):
+The `startCompute` **action in `cli.ts`** orchestrates a two-phase flow (not a single `Commands` method). It first resolves the **payment/escrow chain** with `resolveChainId(options.chainId)` (`--chainId` flag → default chain → error) and passes it as an explicit trailing param to both compute methods:
 
-1. `commands.initializeCompute([...])` — resolves inputs, fetches compute envs (`ProviderInstance.getComputeEnvironments`), matches the env by id, validates chainId/paymentToken/resources/maxJobDuration (capping to `env.maxJobDuration`), and returns the provider `initializeCompute` response (payment + provider fees).
+1. `commands.initializeCompute([...], paymentChainId)` — resolves inputs, fetches compute envs (`ProviderInstance.getComputeEnvironments`), matches the env by id, validates that the **payment chain** is in both `computeEnv.fees` and the RPC registry, plus paymentToken/resources/maxJobDuration (capping to `env.maxJobDuration`), and returns the provider `initializeCompute` response (payment + provider fees). Signs against the payment chain (`signerFor(paymentChainId)`).
 2. Prints payment details, converts amount with `unitsToAmount`, and asks for confirmation unless `--accept true` (hard error on non-TTY).
-3. `commands.computeStart([...])` — orders the algorithm (if DID-based) and each DID-based dataset via `handleComputeOrder`, verifies escrow funds (`EscrowContract.verifyFundsForEscrowPayment`), then calls `ProviderInstance.computeStart` (C2D V2: all datasets passed together in `assets`; the old `additionalDatasets` param is unused). Prints `JobID` and the agreement id (`payment.lockTx`).
+3. `commands.computeStart([...], paymentChainId)` — **per-asset ordering**: each DID-based dataset/algorithm DDO is ordered on **its own** chain via a per-chain `{ signer, config, Datatoken }` context (`orderCtxFor(ddo.chainId)`, memoized within the call), replacing the old single `Datatoken` on the signer's one chain. Escrow funds (`EscrowContract.verifyFundsForEscrowPayment`), deposit/authorize, and `ProviderInstance.computeStart` all run on the **payment chain** (`paymentSigner` = `signerFor(paymentChainId)`), independent of where the assets live (C2D V2: all datasets passed together in `assets`; the old `additionalDatasets` param is unused). Prints `JobID` and the agreement id (`payment.lockTx`).
 
-`startFreeCompute` → `freeComputeStart` calls `ProviderInstance.freeComputeStart` against a `free` env with no ordering/escrow. `stopCompute`, `getJobStatus`, `downloadJobResults`, `computeStreamableLogs`, `getComputeEnvironments` are thin wrappers over the corresponding `ProviderInstance` methods.
+**Multi-chain compute (category d).** A single job may mix datasets/algorithm on different chains and pay/escrow on yet another. `--chainId` is **only** the payment chain; asset chains are always taken from each DDO, never passed by the user. `Commands.ensureComputeChainsRegistered(paymentChainId, ddos, algoDdo)` validates up front — via the pure `computeJobChainIds()` helper (`helpers.ts`) — that every chain the job touches (payment + each DID asset/algo chain) has a registered RPC, and errors listing the missing chain(s) before any paid order. In the common **single-chain** case every asset shares the payment chain, so ordering/escrow/`computeStart` are equivalent to before.
+
+`startFreeCompute` → `freeComputeStart` calls `ProviderInstance.freeComputeStart` against a `free` env with no ordering/escrow; its `--chainId` just routes the signing chain (`routeExplicit`/`useChain`, like a category (c) command). `stopCompute`, `getJobStatus`, `downloadJobResults`, `computeStreamableLogs` are thin wrappers over the corresponding `ProviderInstance` methods. `getComputeEnvironments` additionally prints a per-env **payment summary** (fee chains + accepted tokens, via the pure `summarizeComputeEnvFees()` helper) so `--chainId`/`--paymentToken` are choosable without reading raw JSON.
 
 ### Escrow, access lists, persistent storage, auth, node logs
 
@@ -198,8 +229,12 @@ CI (`.github/workflows/ci.yml`) has three jobs: `build`, `lint`, and `test_syste
 ## Notable gotchas
 
 - ESM + `.js` import extensions are mandatory; forgetting them breaks the build/runtime.
-- Chain is inferred from the RPC network, never passed explicitly; escrow/mint/access-list commands additionally need the chain present in `address.json`.
-- The two config paths (`ConfigHelper` vs `getConfigByChainId`/`address.json`) are separate — a chain working for publish/consume can still fail escrow if it's missing from `address.json`.
+- `RPC` may be a single URL or a JSON map keyed by chainId; a chain with ≥2 URLs becomes a `FallbackProvider` (`quorum:1`). All RPC/provider/signer/config lifecycle lives in `src/rpcRegistry.ts`.
+- **Chain routing is per command, not global.** Chain-agnostic commands sign on the default chain; chain-implied commands (`publish`/`publishAlgo`/`editAsset`/`allowAlgo`/`download`) route to the **DDO's `chainId`** (fixing the old publish-ignores-DDO-chainId bug); chain-explicit commands (`mintOcean` + escrow + access-list + `startService`/`extendService`) take **`--chainId`** (flag → default → error). `Commands.useChain(chainId)` re-points `this.signer`/`this.config` (mutation is safe: one fresh instance per invocation, sequential methods). **Compute is the exception** — `startCompute`/`startFreeCompute` genuinely need several chains inside one call, so they do **not** use `useChain`: they take `configFor(chainId)`/`signerFor(chainId)` explicitly per asset (each DDO's chain) and per payment (`--chainId`). `startFreeCompute` has no ordering/escrow, so its `--chainId` just routes the signing chain via `useChain`.
+- **Default-chain resolution:** `setChain`/`CHAIN_ID` env → persisted default → sole configured chain → the one chain both the node serves and the registry knows. `getActiveChainId()` is the lenient variant (falls back to *any* registered chain for signing, without committing a default); `resolveChainId()`/`routeExplicit()` in `cli.ts` do the strict flag→default→error for `--chainId`.
+- **Runtime chains persist** to `~/.ocean/cli/rpc.json` (`RPC_CONFIG_FILE` override); env `RPC` is merged with it and **env wins**. `addChain`/`removeChain`/`setChain` rewrite the file; all persistence I/O is defensive (a failure warns, never breaks a command).
+- The five chain commands (`addChain`/`removeChain`/`listChains`/`setChain`/`getChain`) are in `NODE_FREE_COMMANDS` **and** a `HELP_GROUPS` entry — `assertHelpGroupsCoverAll` fails startup if a registered command is ungrouped.
+- Contract addresses come **only** from ocean.js `ConfigHelper` (via `getConfigFor`), using lowercase keys (`escrow`/`accessListFactory`/`oceanTokenAddress`). The old CLI-local `getConfigByChainId` is gone. Addresses resolve from `ADDRESS_FILE` (Barge/custom) else the bundled multi-chain set; a chain with no address for the needed contract errors via `requireAddress`.
 - The 1-indexed vs 0-indexed args-array split between `Commands` methods is easy to get wrong when adding/renaming commands.
 - Running the CLI without `AVOID_LOOP_RUN=true` drops into a stdin REPL after the first command — surprising in scripts.
 - `fixAndParseProviderFees` is a regex JSON patcher for the initialize→start round trip; prefer fixing the data shape over extending the regex.

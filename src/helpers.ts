@@ -24,7 +24,6 @@ import {
   createAsset,
   LoggerInstance,
 } from "@oceanprotocol/lib";
-import { homedir } from "os";
 import { createRequire } from "module";
 
 // Resolve the ERC20 template ABI through the module system rather than a
@@ -626,20 +625,62 @@ export function toBoolean(value) {
   return Boolean(value);
 }
 
-export async function getConfigByChainId(chainId: number) {
-  const addressFilePath =
-    process.env.ADDRESS_FILE ||
-    `${homedir}/.ocean/ocean-contracts/artifacts/address.json`;
-  const addressFile = await fs.readFile(addressFilePath, "utf8");
+// ---------------------------------------------------------------------------
+// Multi-chain compute helpers (Phase 3).
+// ---------------------------------------------------------------------------
 
-  const data = JSON.parse(addressFile);
-  const chainConfig = Object.values(data).find(
-    (network: any) => network.chainId === chainId,
-  ) as any;
-
-  if (!chainConfig) {
-    throw new Error(`Chain ${chainId} not found in address file`);
-  }
-
-  return chainConfig;
+// The set of chainIds a compute job actually touches: the payment/escrow chain plus
+// every DID-based dataset/algorithm DDO's own chain (a job may mix assets across
+// chains, and pay on yet another). Raw `fileObject` entries have a null DDO slot and
+// no chain (no order is placed for them), so they contribute nothing. Pure + ordered
+// (payment chain first) so it is unit-testable and its error listing is deterministic.
+export function computeJobChainIds(
+  paymentChainId: number,
+  ddos: (Asset | DDO | null | undefined)[],
+  algoDdo?: Asset | DDO | null,
+): number[] {
+  const out: number[] = [];
+  const seen = new Set<number>();
+  const add = (raw: unknown) => {
+    const id = Number(raw);
+    if (Number.isInteger(id) && id > 0 && !seen.has(id)) {
+      seen.add(id);
+      out.push(id);
+    }
+  };
+  add(paymentChainId);
+  for (const d of ddos || []) if (d) add((d as { chainId?: unknown }).chainId);
+  if (algoDdo) add((algoDdo as { chainId?: unknown }).chainId);
+  return out;
 }
+
+// A readable, per-env summary of where a compute env accepts payment: whether it is a
+// free env, and for a paid one each fee chainId with its accepted fee-token addresses.
+// Lets a user pick `--chainId` / `--paymentToken` without reading raw JSON. Pure so it
+// can be unit-tested; operates structurally on the ComputeEnvironment fee shape
+// (`env.fees[chainId] = [{ feeToken }, ...]`).
+export function summarizeComputeEnvFees(env: {
+  id?: string;
+  // `free` is truthy (an object/flag) on a free env in ocean.js, not a strict boolean.
+  free?: unknown;
+  fees?: Record<string, { feeToken?: string }[]>;
+}): string {
+  const isFree = Boolean(env?.free);
+  const header = `Env ${env?.id ?? "?"}${isFree ? " (free)" : ""}`;
+  const fees = env?.fees || {};
+  const chains = Object.keys(fees);
+  if (chains.length === 0) {
+    return isFree
+      ? `${header}: no payment required.`
+      : `${header}: no payment chains advertised.`;
+  }
+  const lines = chains.map((chainId) => {
+    const tokens = (fees[chainId] || [])
+      .map((f) => f?.feeToken)
+      .filter((t): t is string => typeof t === "string" && t.length > 0);
+    const tokenList = tokens.length > 0 ? tokens.join(", ") : "(no tokens listed)";
+    return `    chain ${chainId}: ${tokenList}`;
+  });
+  return `${header}: pays on\n${lines.join("\n")}`;
+}
+

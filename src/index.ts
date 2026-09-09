@@ -6,6 +6,7 @@ import { stdin as input, stdout as output } from "node:process";
 import { createInterface } from "readline/promises";
 import { createCLI, formatGroupedHelp } from "./cli.js";
 import { stopP2P } from "./nodeConnection.js";
+import { destroyProviders } from "./rpcRegistry.js";
 
 let program: Command;
 const supportedCommands: string[] = [];
@@ -335,6 +336,7 @@ async function main(): Promise<void> {
     // still has buffered, which could swallow the message just written. Exiting
     // here (rather than falling through to the finally) keeps failures immediate —
     // the process is going away, so libp2p needs no orderly shutdown.
+    await destroyProviders();
     await flushOutput();
     process.exit(1);
   } finally {
@@ -345,6 +347,9 @@ async function main(): Promise<void> {
     // process.exit() would discard. Reached on every non-throwing path out of the
     // try above; when nothing was started, Node exits on its own and drains the
     // streams as part of that.
+    // Providers hold poller timers that also keep the event loop alive — tear them
+    // down too, the same class of problem as the libp2p MessagePort below.
+    await destroyProviders();
     if (await stopP2P()) {
       await flushOutput();
       process.exit(process.exitCode ?? 0);

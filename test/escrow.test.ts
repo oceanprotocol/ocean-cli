@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { homedir } from "os";
 import { runCommand } from "./util.js";
-import { getConfigByChainId } from "../src/helpers.js";
+import { getConfigFor } from "../src/rpcRegistry.js";
 import { JsonRpcProvider, ethers, formatEther, getAddress } from "ethers";
 import { EscrowContract } from "@oceanprotocol/lib";
 
@@ -22,9 +22,9 @@ describe("Ocean CLI Escrow", function () {
     process.env.NODE_URL = "http://127.0.0.1:8001";
     process.env.ADDRESS_FILE = `${homedir}/.ocean/ocean-contracts/artifacts/address.json`;
 
-    chainConfig = await getConfigByChainId(8996);
-    tokenAddress = chainConfig.Ocean;
-    escrowAddress = chainConfig.Escrow;
+    chainConfig = getConfigFor(8996);
+    tokenAddress = chainConfig.oceanTokenAddress;
+    escrowAddress = chainConfig.escrow;
 
     const provider = new JsonRpcProvider(process.env.RPC);
     payer = new ethers.Wallet(process.env.PRIVATE_KEY, provider);

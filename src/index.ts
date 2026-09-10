@@ -4,8 +4,9 @@ import { Command, CommanderError } from "commander";
 import chalk from "chalk";
 import { stdin as input, stdout as output } from "node:process";
 import { createInterface } from "readline/promises";
-import { createCLI } from "./cli.js";
+import { createCLI, formatGroupedHelp } from "./cli.js";
 import { stopP2P } from "./nodeConnection.js";
+import { destroyProviders } from "./rpcRegistry.js";
 
 let program: Command;
 const supportedCommands: string[] = [];
@@ -116,6 +117,40 @@ const PROMPT =
   "Enter command ('exit' | 'quit' | ESC or CTRL-C to terminate):\n";
 
 /**
+ * Discard whatever the user typed while a command was running and no prompt was visible.
+ *
+ * A command can run for a long time (a DHT search, a chain call, an interactive enquirer
+ * wizard), during which the REPL's readline is paused and the terminal buffers every
+ * keystroke. Left in place, that blind type-ahead is delivered to the REPL the moment it
+ * resumes — so an impatient key-mash, an up-arrow+enter recalling the previous command, or a
+ * line an enquirer wizard fed back re-runs a command the user never meant to submit (e.g.
+ * re-launching the search wizard). Draining first makes every command one the user actually
+ * saw the prompt for and typed.
+ *
+ * Must be async: on a TTY, buffered input is delivered through asynchronous `data` events, not
+ * synchronous `read()` — a `read()` loop returns null and drains nothing. So we briefly put
+ * the stream in flowing mode, swallow whatever `data` arrives, then pause again.
+ *
+ * TTY-only: piped stdin (tests, scripts) is never drained, so scripted input is untouched.
+ */
+const INPUT_FLUSH_MS = 80;
+async function discardBufferedInput(): Promise<void> {
+  if (!input.isTTY) return;
+  await new Promise<void>((resolve) => {
+    const onData = (): void => {
+      /* swallow buffered keystrokes */
+    };
+    input.on("data", onData);
+    input.resume();
+    setTimeout(() => {
+      input.pause();
+      input.off("data", onData);
+      resolve();
+    }, INPUT_FLUSH_MS);
+  });
+}
+
+/**
  * Tab-completion for the command name (the first token only). readline completes
  * to the longest common prefix of the matches, or lists them when there is more
  * than one. Returns all known commands when the line is still empty.
@@ -130,46 +165,88 @@ function completer(line: string): [string[], string] {
 /**
  * Read commands from stdin until the user exits or input is exhausted (EOF).
  *
- * A single persistent readline interface is consumed via its async iterator so
- * that backpressure is respected and no buffered lines are dropped — creating a
- * fresh interface per prompt silently discards piped input beyond the first
- * line. The interface is paused around command execution so it never competes
- * for stdin with an interface a command opens itself (e.g. the payment
- * confirmation prompt in cli.ts).
+ * Two shapes, because an interactive terminal and a pipe have opposite needs:
+ *
+ * - Interactive (TTY): a fresh readline interface per prompt, fully closed around command
+ *   execution. This matters because a command may open its OWN stdin reader — notably the
+ *   enquirer search wizard — and a persistent readline keeps its `data`/`keypress` listeners
+ *   attached even when paused, so it competes for keystrokes and captures blind type-ahead (or
+ *   a line the wizard fed back) into its queue, which then replays as a command. Closing it
+ *   first gives the command exclusive stdin; the async flush after runs with no reader
+ *   attached, so anything typed blind is actually discarded instead of re-run.
+ * - Piped (scripts/tests): a single persistent interface consumed via its async iterator, so
+ *   backpressure is respected and no buffered line is dropped — recreating per prompt would
+ *   silently discard piped input beyond the first line. No drain (there is no blind wait).
  */
 async function runLoop(): Promise<void> {
+  if (input.isTTY) {
+    await runInteractiveLoop();
+  } else {
+    await runPipedLoop();
+  }
+}
+
+/** REPL for an interactive terminal. See runLoop for why the interface is recreated per line. */
+async function runInteractiveLoop(): Promise<void> {
+  // Drop any type-ahead buffered while the initial argv command ran (before any readline
+  // existed), so a blind key-mash during a slow first command doesn't replay as a command.
+  await discardBufferedInput();
+
+  // Command history is carried across prompts even though the interface is recreated each
+  // time: readline references (does not copy) this array as its history and mutates it in
+  // place on each committed line, so passing the same array back preserves ↑/↓ recall.
+  let history: string[] = [];
+
+  for (;;) {
+    const rl = createInterface({ input, output, completer, history });
+    // Escape exits the REPL (Ctrl-C terminates via SIGINT; `exit`/`quit`/`\q`/EOF also work).
+    const onKeypress = (_str: string, key?: { name?: string }): void => {
+      if (key?.name === "escape") {
+        output.write("\n");
+        rl.close();
+      }
+    };
+    input.on("keypress", onKeypress);
+    rl.setPrompt(PROMPT);
+    rl.prompt();
+
+    // Resolve on the first line, or null when the interface closes (EOF or Escape).
+    const rawLine = await new Promise<string | null>((resolve) => {
+      rl.once("line", (l) => resolve(l));
+      rl.once("close", () => resolve(null));
+    });
+    // Re-capture the history array in case readline swapped in a new one (it normally mutates
+    // the passed array in place, but this keeps recall correct regardless).
+    history = (rl as unknown as { history?: string[] }).history ?? history;
+    input.off("keypress", onKeypress);
+    rl.close();
+
+    if (rawLine === null) break; // EOF or Escape
+    const line = rawLine.trim();
+    if (line === "quit" || line === "exit" || line === "\\q") break;
+    if (line === "") continue;
+
+    const tokens = stripNpmPrefix(tokenize(line));
+    // The interface is closed, so a command's own prompt (the enquirer wizard) and the flush
+    // below both get exclusive, un-intercepted stdin.
+    await runTokens(tokens);
+    await discardBufferedInput();
+  }
+}
+
+/** REPL for piped stdin (scripts/tests). Persistent interface; see runLoop. */
+async function runPipedLoop(): Promise<void> {
   const rl = createInterface({ input, output, completer });
-
-  // On a TTY, let the Escape key exit the REPL (Ctrl-C already terminates via
-  // SIGINT; `exit`/`quit`/`\q`/EOF still work). readline already emits keypress
-  // events on the input stream in terminal mode, so a listener is enough — no
-  // raw-mode juggling. Guarded by isTTY so piped stdin (tests, scripts) is
-  // unaffected.
-  const onKeypress = (_str: string, key?: { name?: string }): void => {
-    if (key?.name === "escape") {
-      output.write("\n");
-      rl.close();
-    }
-  };
-  if (input.isTTY) input.on("keypress", onKeypress);
-
   rl.setPrompt(PROMPT);
   rl.prompt();
-
   try {
     for await (const rawLine of rl) {
       const line = rawLine.trim();
-
-      if (line === "quit" || line === "exit" || line === "\\q") {
-        break;
-      }
-
-      // Empty input: re-prompt instead of busy-waiting or dropping the session.
+      if (line === "quit" || line === "exit" || line === "\\q") break;
       if (line === "") {
         rl.prompt();
         continue;
       }
-
       const tokens = stripNpmPrefix(tokenize(line));
       rl.pause();
       await runTokens(tokens);
@@ -177,7 +254,6 @@ async function runLoop(): Promise<void> {
       rl.prompt();
     }
   } finally {
-    if (input.isTTY) input.off("keypress", onKeypress);
     rl.close();
   }
 }
@@ -224,7 +300,7 @@ async function main(): Promise<void> {
       process.argv.includes("-h") ||
       isBareHelp
     ) {
-      program.outputHelp();
+      console.log(formatGroupedHelp(program));
       return;
     }
     if (process.argv.includes("--version") || process.argv.includes("-V")) {
@@ -249,7 +325,7 @@ async function main(): Promise<void> {
     if (initialTokens.length > 0) {
       await runTokens(initialTokens);
     } else {
-      console.log(program.helpInformation());
+      console.log(formatGroupedHelp(program));
     }
 
     // Then loop on stdin until the user exits or input is exhausted.
@@ -260,6 +336,7 @@ async function main(): Promise<void> {
     // still has buffered, which could swallow the message just written. Exiting
     // here (rather than falling through to the finally) keeps failures immediate —
     // the process is going away, so libp2p needs no orderly shutdown.
+    await destroyProviders();
     await flushOutput();
     process.exit(1);
   } finally {
@@ -270,6 +347,9 @@ async function main(): Promise<void> {
     // process.exit() would discard. Reached on every non-throwing path out of the
     // try above; when nothing was started, Node exits on its own and drains the
     // streams as part of that.
+    // Providers hold poller timers that also keep the event loop alive — tear them
+    // down too, the same class of problem as the libp2p MessagePort below.
+    await destroyProviders();
     if (await stopP2P()) {
       await flushOutput();
       process.exit(process.exitCode ?? 0);

@@ -85,6 +85,43 @@ export MNEMONIC="XXXX"
 export RPC='XXXX'
 ```
 
+`RPC` accepts **either** a single URL (unchanged, legacy behaviour) **or** a JSON map keyed by
+chainId, where each chain's value is one URL or an ordered list of URLs:
+
+```bash
+export RPC='http://localhost:8545'                                   # single URL
+export RPC='{"1":"https://eth.example","8453":["https://a","https://b"]}'
+```
+
+When a chain lists **two or more** URLs they are used as an ethers v6 `FallbackProvider`
+(`quorum: 1`, declaration order = preference, a slow endpoint hands off to the next), so a single
+dead endpoint no longer breaks the session. A malformed `RPC` value fails fast at startup with a
+message showing the expected shape. Contract addresses (escrow / access-list factory / Ocean
+token) are resolved by ocean.js `ConfigHelper` — from `ADDRESS_FILE` when set (Barge / custom
+deployments) else the multi-chain set bundled with the library — so escrow / access-list now work
+off-Barge on any supported chain without a local `address.json`. `mintOcean` additionally needs a
+configured `oceanTokenAddress` or an explicit `--token <address>` (some chains, e.g. Base, ship no
+bundled Ocean token).
+
+**Multiple chains, added at runtime, and the default chain.** When `RPC` lists more than one chain
+you can also register/unregister chains at runtime with [`addChain`](#chain-management) /
+`removeChain`, list them with `listChains`, and pick the **default (active) chain** with `setChain`.
+Runtime-added chains are persisted to `~/.ocean/cli/rpc.json` (override with `RPC_CONFIG_FILE`, same
+JSON-map shape, hand-editable) so they survive a restart; on load the env `RPC` is merged with that
+file and **env wins on conflict**. The default chain is resolved as: `setChain` / `CHAIN_ID` env →
+persisted default → the sole configured chain → the one chain both the node serves and the registry
+knows. Commands then pick their chain as follows:
+
+- **Chain-agnostic** commands (reads, jobs, storage, auth) just sign on the default (or any
+  registered) chain. The node/chain-management commands (`setNode`/`getNode`, `addChain`,
+  `removeChain`, `listChains`, `setChain`, `getChain`) are node-free registry operations that do not
+  sign at all.
+- **Chain-implied** commands (`publish`, `publishAlgo`, `editAsset`, `allowAlgo`, `download`) use the
+  **DDO's own `chainId`** — publishing now honours the `chainId` in your metadata file.
+- **Chain-explicit** commands (`mintOcean`, all escrow, all access-list, and the escrow-paid
+  `startService` / `extendService`) take a single **`--chainId <id>`** flag; without it they fall back
+  to the default chain, and error (listing the configured chains) when there is none.
+
 - Optional (but recommended), set an Ocean Node URL. Ocean Nodes infrastructure is responsible for handling assets indexing and metadata caching. It replaced old Provider and Aquarius standalone apps.
 
 ```
@@ -200,6 +237,16 @@ npm run cli <command> [options] <arguments>
 
   The node is health-checked before the switch: if it cannot be reached, the current node is kept and nothing changes.
 
+<a name="setnodeenv"></a>
+
+- **Select a node *and* a compute env in one step (from a search result):**  
+  `npm run cli setNodeEnv 16Uiu2HAm...|0xff10...-0xc92e...` (alias `useNodeEnv`).  
+  Paste the `Node+env: <node>|<env>` token printed by `searchComputeResources` (the leading
+  `Node+env:` label is tolerated). It validates and switches to the node exactly like `setNode`,
+  and additionally **remembers the compute env** so a following `startCompute` / `startFreeCompute`
+  uses it by default — you don't repeat `--env`. Override any time with an explicit `--env`. Like
+  `setNode`, on an unreachable node nothing changes (node and env are both left as they were).
+
 <a name="getnode"></a>
 
 - **Show the node in use:**  
@@ -210,7 +257,24 @@ Notes when switching nodes:
 - **Compute jobs live on the node that started them.** After a switch, `getJobStatus` / `downloadJobResults` query the *new* node — switch back to look up older jobs.
 - **For a node on your own machine, prefer the full multiaddr** (`/ip4/127.0.0.1/tcp/9001/ws/p2p/<peerId>`) over a bare peer id: a bare id has to be found via DHT, which may not advertise localhost addresses.
 - **In one-shot mode** (`AVOID_LOOP_RUN='true'`) `setNode` only validates the node and prints the result — the switch dies with the process. Use `NODE_URL` for one-shot runs.
-- `chainId` still comes from `RPC`, never from the node. `setNode` warns when the node does not serve the chain your RPC is on.
+- `chainId` still comes from `RPC`, never from the node. `setNode` warns when the node does not serve the chain your RPC is on. `getNode` also flags any chain the node serves for which **no RPC is configured**.
+
+---
+
+<a name="chain-management"></a>
+
+**Chain / RPC management** (node-free — these work before `setNode` picks a node):
+
+- **Register a chain at runtime:**  
+  `npm run cli addChain 137 https://polygon-rpc.com` (alias `addRpc`; positional or `--chainId`/`--url`). Give more than one URL for a `FallbackProvider`: `addChain 137 https://a https://b`. Each URL is verified to actually serve the given chain (a URL on a different chain is rejected), then the chain is persisted to `~/.ocean/cli/rpc.json`.
+- **Unregister a chain:**  
+  `npm run cli removeChain 137` (alias `removeRpc`). Refuses to remove the only configured chain; clears the default if it pointed there.
+- **List configured chains:**  
+  `npm run cli listChains` (aliases `getRpcs`, `chains`) — prints each chain, its URLs, which is the default, and (if a node is set) which chains the node serves / lacks an RPC for.
+- **Set / show the default chain:**  
+  `npm run cli setChain 137` (alias `useChain`) sets the default (must be registered; persisted). `npm run cli getChain` (alias `currentChain`) prints it.
+
+`--chainId` on the chain-explicit commands overrides the default for a single command; `CHAIN_ID` env sets it for the session; `setChain` persists it.
 
 ---
 
@@ -271,7 +335,9 @@ Notes when switching nodes:
   (Order of `--did` and `--folder` does not matter.)
 
 - **Rules:**
-  serviceId is optional. If omitted, the CLI defaults to the first available download service.
+  serviceId is optional. If omitted, the CLI defaults to the first service listed in the DDO (`services[0]`). If you pass a `serviceId` that does not exist in the DDO, the command now fails fast with a clear error instead of silently ordering the first service.
+
+  For **v5 DDOs** (version ≥ 5.0.0) the download first runs a provider-initialization step against the asset's service endpoint. When `SSI_WALLET_API` is set (see the env vars above) this also performs the SSI / policy-server verification flow; when the target node reports it has no policy server configured, that step is skipped automatically.
 
 ---
 
@@ -289,7 +355,8 @@ Notes when switching nodes:
 
 
 - `maxJobDuration` is a required parameter an represents the time measured in seconds for job maximum execution, the payment is based on this maxJobDuration value, user needs to provide this.
-- `paymentToken` is required and represents the address of the token that is supported by the environment for processing the compute job payment. It can be retrieved from `getComputeEnvironments` command output.
+- `--chainId` is optional and selects the **payment/escrow chain** for the job (flag → active/default chain → error). It is independent of where the assets live: each dataset and the algorithm are ordered on **their own** DDO chain, so one job can span multiple chains and pay on another. Every chain the job touches (the payment chain plus each asset's chain) must be a registered RPC — add any missing one with `addChain <chainId> <rpcUrl>`. In the common single-chain case you can omit `--chainId` entirely.
+- `paymentToken` is required and represents the address of the token that is supported by the environment **on the payment chain** for processing the compute job payment. It can be retrieved from `getComputeEnvironments` command output, which lists the fee chains and their accepted tokens per environment.
 - `resources` is required and represents a stringified JSON object obtained from `getComputeEnvironments` command output. `getComputeEnvironments` command shows the available resources and the selected resources by the user need to be within the available limits.
 e.g.: `'[{"id":"cpu","amount":3},{"id":"ram","amount":16772672536},{"id":"disk","amount":0}]'`
 -  `--accept` option can be set to `true` or `false`. If it is set to `false` a prompt will be displayed to the user for manual accepting the payment before starting a compute job. If it is set to `true`, the compute job starts automatically, without user input.
@@ -324,6 +391,7 @@ Instead of a DID, you can pass a full `ComputeAsset` (datasets) or `ComputeAlgor
   (Options can be provided in any order.)
 
 - `output` is an optional stringified JSON object specifying a remote storage backend where job results will be uploaded. Same format as `startCompute`.
+- `--chainId` is optional. A free environment does no ordering or payment, so this only selects which registered chain the request is signed on (flag → active/default chain). Omit it to use the active chain.
 - Like `startCompute`, the datasets and algorithm arguments accept raw `ComputeAsset`/`ComputeAlgorithm` JSON objects with a `fileObject` (no DID), and mixed DID + raw datasets. e.g.:  
   `npm run cli startFreeCompute did:op:dataset '{"fileObject":{"type":"url","url":"https://example.com/algo.py","method":"GET"},"meta":{"container":{"entrypoint":"python $ALGO","image":"oceanprotocol/algo_dockers","tag":"python-branin","checksum":"sha256:..."}}}' env1`
 
@@ -344,9 +412,63 @@ Instead of a DID, you can pass a full `ComputeAsset` (datasets) or `ComputeAlgor
 
   `npm run cli getComputeEnvironments`
 
+  Prints, per environment, a **payment summary** — whether it is free, and for a paid env each fee chain with its accepted payment-token addresses — so you can pick `--chainId` and `--paymentToken` for `startCompute` without reading the raw JSON (the full JSON is still printed below the summary).
+
   Optionally pass a specific Ocean Node URL or peer id to query instead of `NODE_URL`:
 
   `npm run cli getComputeEnvironments <nodeUrlOrPeerId>`
+
+---
+
+**Search Compute Resources (alias `findComputeNodes`):**
+
+  Discover which nodes on the network can run your compute job, filtered by the resources you
+  need, by free vs paid, and — for paid — by chain / token / price, with matches ordered by
+  your preference. This is a **P2P/DHT search** (no HTTP equivalent), so it needs libp2p and
+  cannot run with `DISABLE_P2P=true`; it works even on an HTTP-configured node and **before**
+  `setNode` (it's a natural way to *find* a node to select).
+
+- **Interactive wizard** (default — run with no filter flags):
+
+  `npm run cli searchComputeResources`
+
+- **Scripted (non-interactive) with flags:**
+
+  ```bash
+  npm run cli searchComputeResources --cpu 4 --ram 16 --gpu 1 --gpu-model A100 \
+    --paid --chain 8996 --token 0x... --max-price 5 --duration 3600 --order-by price
+  ```
+
+  `--chain` and `--token` accept comma-separated lists. Pricing is computed per chain, and a
+  paid environment that prices on several of the requested chains is **listed once per chain**
+  (each with that chain's cheapest token) so you can compare the same env across chains. The
+  `--token` list is applied as the filter on each chain (per-chain token sets are only
+  expressible through the wizard):
+
+  ```bash
+  npm run cli searchComputeResources --cpu 4 --paid --chain 8996,137 --token 0xOCEAN,0xUSDC
+  ```
+
+- **Open-ended resource, free tier:**
+
+  `npm run cli searchComputeResources --resource fpga:2 --free --order-by leastBusy`
+
+  `cpu | ram | disk | gpu` are the known resource names; `--resource name:amount` (repeatable)
+  accepts any other resource name (e.g. `fpga`, `tpu`). With no tier flag, both free and paid
+  are searched. Results are filtered to genuine matches — environments whose resources fall short
+  of the request, or (paid) that don't price on one of the requested chains with an accepted
+  token, are dropped, and a note reports how many were filtered out. Each match's **first line is
+  a ready-to-run `setNodeEnv <node>|<env>` command**, followed by per-resource `need`/`max`,
+  accepted tokens + estimated cost (paid), running/queued jobs, and a stable `PROVIDER …` line.
+  Copy-paste that first line to select both the node and the compute env in one step, then just
+  run `startCompute …` — the env is remembered, no `--env` needed.
+
+  ```text
+  setNodeEnv 16Uiu2HAmR9z4…|0xff10…-0xc92e…
+    [paid]  cpu: need 1, max 4
+    estimated cost: 0.003 0x1c7D…7238 on chain 8996
+    ...
+  ```
 
 ---
 
@@ -659,7 +781,10 @@ Notes:
   `<nodeUrl>` (Positional. HTTP(S) URL, peer id or full multiaddr)  
   `-n, --node <nodeUrl>` (Same as the positional)
 
-- **getNode** (alias `currentNode`)**:** no arguments
+- **setNodeEnv** (alias `useNodeEnv`)**:**  
+  `<nodeEnv>` (Positional. A `node|env` token from a `searchComputeResources` result; a leading `Node+env:` label is tolerated. Sets the node and remembers the compute env for later `startCompute`.)
+
+- **getNode** (alias `currentNode`)**:** no arguments (prints the active node and, if set, the remembered compute env)
 
 - **getDDO:**  
   `-d, --did <did>`
@@ -691,11 +816,12 @@ Notes:
 - **startCompute:**
   `-d, --datasets <datasetDids>`
   `-a, --algo <algoDid>`
-  `-e, --env <computeEnvId>`
+  `-e, --env <computeEnvId>` (Optional if a compute env was selected via `setNodeEnv`; explicit value wins)
   `--init <initializeResponse>`
   `--maxJobDuration <maxJobDuration>`
   `-t, --token <paymentToken>`
   `--resources <resources>`
+  `--chainId <chainId>` (Optional. Payment/escrow chain; flag → active/default chain → error. Assets are still ordered on their own DDO chains.)
   `--amountToDeposit <amountToDeposit>` (Id `''`, it will fallback to initialize compute payment amount.)
   `-o, --output [output]` (Optional. Stringified JSON object specifying a remote storage backend for job results.)
   `-s, --services [serviceIds]` (Optional, comma-separated; must match datasetDids length, positional 1–1)
@@ -704,13 +830,25 @@ Notes:
 - **startFreeCompute:**  
   `-d, --datasets <datasetDids>`  
   `-a, --algo <algoDid>`  
-  `-e, --env <computeEnvId>`
+  `-e, --env <computeEnvId>` (Optional if a compute env was selected via `setNodeEnv`; explicit value wins)
   `-o, --output [output]` (Optional. Stringified JSON object specifying a remote storage backend for job results.)
   `-s, --services [serviceIds]` (Optional, comma-separated; must match datasetDids length, positional 1–1)
   `-x, --algo-service [algoServiceId]` (Optional, override algorithm service)
+  `--chainId <chainId>` (Optional. Chain to sign the free request on; free envs do no ordering/payment.)
 
 - **getComputeEnvironments:**  
   `-n, --node [node]` (Optional. Ocean Node URL or peer id to query; defaults to `NODE_URL`)
+
+- **searchComputeResources:** (alias `findComputeNodes`)  
+  `--cpu <cores>` `--ram <gb>` `--disk <gb>` `--gpu <count>` (each optional; at least one resource required to skip the wizard)  
+  `--gpu-model <name>` (Optional. GPU kind/description to match, e.g. A100)  
+  `--resource <name:amount>` (Optional, repeatable. Any resource name, e.g. `fpga:2`)  
+  `--free` / `--paid` / `--both` (Optional tier; default both)  
+  `--chain <chainIds>` (Optional. Comma-separated chainIds to price against; defaults to the RPC chain)  
+  `--token <addresses>` (Optional. Comma-separated payment-token addresses; applied to every `--chain`)  
+  `--max-price <amount>` (Optional. Drop paid results above this, in human units)  
+  `--duration <seconds>` (Optional. Assumed job duration for the cost estimate)  
+  `--order-by <key>` (Optional. `price` | `freeCapacity` | `resources` | `leastBusy`)
 
 - **computeStreamableLogs:**  
 

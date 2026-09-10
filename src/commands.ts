@@ -30,6 +30,7 @@ import {
   ConfigHelper,
   Datatoken,
   ProviderInstance,
+  ProviderInitialize,
   amountToUnits,
   getHash,
   orderAsset,
@@ -58,6 +59,7 @@ import chalk from "chalk";
 import {
   getPolicyServerOBJ,
   getPolicyServerOBJs,
+  isPolicyServerConfigured,
   isVersionGte,
 } from "./policyServerHelper.js";
 import {
@@ -440,6 +442,57 @@ export class Commands {
     } else console.log(util.inspect(resolvedDDO, false, null, true));
   }
 
+  private async initializeProvider(
+    asset: Asset,
+    serviceId: string,
+    accountId: string,
+    providerUrl: string,
+  ): Promise<ProviderInitialize> {
+    // Only run SSI/policy-server verification when a wallet is configured AND
+    // the node confirms it has a policy server. This mirrors getPolicyServerOBJ's
+    // skip behavior, so a download against a node without a policy server
+    // proceeds instead of failing in initializePSVerification.
+    if (
+      process.env.SSI_WALLET_API?.trim() &&
+      (await isPolicyServerConfigured(providerUrl))
+    ) {
+      const command = {
+        documentId: asset.id,
+        serviceId,
+        consumerAddress: accountId,
+        policyServer: {
+          sessionId: "",
+          successRedirectUri: "",
+          errorRedirectUri: "",
+          responseRedirectUri: "",
+          presentationDefinitionUri: "",
+        },
+      };
+      const initializePs = await ProviderInstance.initializePSVerification(
+        providerUrl,
+        this.signer,
+        command,
+      );
+      if (!initializePs?.success) {
+        throw new Error(
+          `Provider initialization failed: ${initializePs?.error || "Policy Server verification failed"}`,
+        );
+      }
+    }
+    try {
+      return await ProviderInstance.initialize(
+        asset.id,
+        serviceId,
+        0,
+        accountId,
+        providerUrl,
+      );
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(message.replace(/^Error:\s*/i, ""), { cause: error });
+    }
+  }
+
   public async download(args: string[]) {
     const did = args[1];
     const dataDdo = await this.aquarius.waitForIndexer(
@@ -460,20 +513,40 @@ export class Commands {
     const ddoInstance = DDOManager.getDDOClass(dataDdo);
     const { services, version } = ddoInstance.getDDOFields();
     const serviceId = args[3] ? args[3] : services[0].id;
+    const service = services.find((s) => s.id === serviceId);
+    if (!service) {
+      console.error(
+        chalk.red(`Service ID "${serviceId}" not found in DDO ${did}.`),
+      );
+      return;
+    }
+
     let policyServer = null;
-    try {
-      if (isVersionGte(version, "5.0.0")) {
+    if (isVersionGte(version, "5.0.0")) {
+      try {
+        await this.initializeProvider(
+          dataDdo,
+          serviceId,
+          await this.signer.getAddress(),
+          service.serviceEndpoint || this.oceanNodeUrl,
+        );
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error(chalk.red("Error initializing Provider:"), message);
+        return;
+      }
+      try {
         policyServer = await getPolicyServerOBJ(
           dataDdo,
           serviceId,
           this.signer,
           this.oceanNodeUrl,
         );
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error(chalk.red("Error getting Policy Server Object:"), message);
+        return;
       }
-    } catch (error) {
-      throw new Error("Error getting Policy Server Object: " + error.message, {
-        cause: error,
-      });
     }
     const datatoken = new Datatoken(
       this.signer,
@@ -482,21 +555,28 @@ export class Commands {
     );
     // Order the same service that policy retrieval and getDownloadUrl target.
     const serviceIndex = services.findIndex((s) => s.id === serviceId);
-    const tx = await this.orderWithRetry(() =>
-      orderAsset(
-        dataDdo,
-        this.signer,
-        this.config,
-        datatoken,
-        this.oceanNodeUrl,
-        undefined, // consumerAddress
-        undefined, // consumeMarketOrderFee
-        undefined, // providerFees
-        undefined, // consumeMarketFixedSwapFee
-        undefined, // datatokenIndex
-        serviceIndex < 0 ? 0 : serviceIndex,
-      ),
-    );
+    let tx;
+    try {
+      tx = await this.orderWithRetry(() =>
+        orderAsset(
+          dataDdo,
+          this.signer,
+          this.config,
+          datatoken,
+          this.oceanNodeUrl,
+          undefined, // consumerAddress
+          undefined, // consumeMarketOrderFee
+          undefined, // providerFees
+          undefined, // consumeMarketFixedSwapFee
+          undefined, // datatokenIndex
+          serviceIndex < 0 ? 0 : serviceIndex,
+        ),
+      );
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(chalk.red("Error ordering asset:"), message);
+      return;
+    }
 
     if (!tx) {
       console.error(

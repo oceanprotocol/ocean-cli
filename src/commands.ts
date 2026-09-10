@@ -9,10 +9,19 @@ import {
   getIndexingWaitSettings,
   IndexerWaitParams,
   fixAndParseProviderFees,
-  getConfigByChainId,
   resolveComputeInputs,
   isOrderable,
+  computeJobChainIds,
+  summarizeComputeEnvFees,
+  getDdoChainId,
 } from "./helpers.js";
+import {
+  getConfigFor,
+  getSigner,
+  requireAddress,
+  hasChain,
+  listChains,
+} from "./rpcRegistry.js";
 import {
   Aquarius,
   ComputeAsset,
@@ -21,6 +30,7 @@ import {
   ConfigHelper,
   Datatoken,
   ProviderInstance,
+  ProviderInitialize,
   amountToUnits,
   getHash,
   orderAsset,
@@ -49,6 +59,7 @@ import chalk from "chalk";
 import {
   getPolicyServerOBJ,
   getPolicyServerOBJs,
+  isPolicyServerConfigured,
   isVersionGte,
 } from "./policyServerHelper.js";
 import {
@@ -120,11 +131,158 @@ export class Commands {
   constructor(signer: Signer, network: string | number, config?: Config) {
     this.signer = signer;
     this.config = config || new ConfigHelper().getConfig(network);
+    if (!this.config) {
+      // No bundled ocean.js config for the active chain and no ADDRESS_FILE entry.
+      // Fail clearly here rather than crashing on the `this.config.nodeUri` write below.
+      throw new Error(
+        `Chain ${network} has no ocean.js contract config (unknown to ConfigHelper ` +
+          `and absent from ADDRESS_FILE). Point ADDRESS_FILE at a deployment for this ` +
+          `chain, set a supported default chain with 'setChain <chainId>', or use a ` +
+          `chain ocean.js supports.`,
+      );
+    }
     this.oceanNodeUrl = process.env.NODE_URL;
     this.indexingParams = getIndexingWaitSettings();
     console.log("Using Ocean Node URL :", this.oceanNodeUrl);
     this.config.nodeUri = this.oceanNodeUrl;
     this.aquarius = new Aquarius(this.oceanNodeUrl);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Chain parameterization. The constructor pins a *default* chain (so commands that
+  // don't opt in are unchanged); routed commands re-point the instance at the chain the
+  // request actually targets. A fresh Commands instance is built per CLI invocation and
+  // methods run one at a time, so mutating this.signer/this.config here is safe.
+  // Phase 3 (multi-chain compute) uses configFor/signerFor directly, per asset, instead.
+  // ---------------------------------------------------------------------------
+  public configFor(chainId: number): Config {
+    const cfg = getConfigFor(chainId);
+    if (!cfg) {
+      // ocean.js ConfigHelper has no bundled config for this chain and no
+      // ADDRESS_FILE entry supplies one. Fail with a clear, actionable message
+      // instead of letting a null config crash deep in a later `.chainId` read.
+      throw new Error(
+        `Chain ${chainId} has a registered RPC but no ocean.js contract config ` +
+          `(unknown to ConfigHelper and absent from ADDRESS_FILE). Point ADDRESS_FILE ` +
+          `at a deployment for this chain, or use a chain ocean.js supports.`,
+      );
+    }
+    cfg.nodeUri = this.oceanNodeUrl;
+    return cfg;
+  }
+
+  public async signerFor(chainId: number): Promise<Signer> {
+    return getSigner(chainId);
+  }
+
+  // Re-point this instance at `chainId`: its signer and config become that chain's.
+  // Used by category (b) (chain implied by the asset's DDO) and category (c) (explicit
+  // --chainId) commands.
+  public async useChain(chainId: number): Promise<void> {
+    this.signer = await this.signerFor(chainId);
+    this.config = this.configFor(chainId);
+  }
+
+  // A DDO's chainId lives at the top level in 4.1.0 DDOs but under
+  // `credentialSubject.chainId` in v5 DDOs. Delegates to the shared `getDdoChainId`
+  // helper so routing and compute ordering read the chain the same way.
+  private ddoChainId(ddo: unknown): unknown {
+    return getDdoChainId(ddo);
+  }
+
+  // Category (b): re-point at the chain the asset lives on (its DDO's chainId). Returns
+  // false (already logged) if the chainId is missing/invalid or not configured, so the
+  // caller can bail. Also fixes the old bug where publish ignored the DDO's chainId.
+  private async routeToAssetChain(
+    rawChainId: unknown,
+    label: string,
+  ): Promise<boolean> {
+    const cid = Number(rawChainId);
+    if (!Number.isInteger(cid) || cid <= 0) {
+      console.error(
+        chalk.red(
+          `${label} has no valid chainId (got ${JSON.stringify(
+            rawChainId,
+          )}); cannot determine which chain to use.`,
+        ),
+      );
+      return false;
+    }
+    try {
+      await this.useChain(cid);
+    } catch (e) {
+      console.error(chalk.red((e as Error).message));
+      return false;
+    }
+    return true;
+  }
+
+  // Category (d) — multi-chain compute. A single compute job may order datasets and the
+  // algorithm on different chains from each other while paying/escrowing on yet another
+  // (see `computeJobChainIds`). Every one of those chains needs a registered RPC so it
+  // has a signer/config for its own ordering (or the escrow payment). Validate up front,
+  // before any paid order is placed, and error listing the missing chain(s) — the same
+  // shape as the category (c) "chain not configured" errors. Returns false (already
+  // logged) so the caller bails. Raw fileObject assets (null DDO) add no chain.
+  private ensureComputeChainsRegistered(
+    paymentChainId: number,
+    ddos: (Asset | null | undefined)[],
+    algoDdo: Asset | null,
+  ): boolean {
+    let needed: number[];
+    try {
+      needed = computeJobChainIds(paymentChainId, ddos, algoDdo);
+    } catch (e) {
+      // A malformed DDO (non-null but no resolvable chainId) — fail clearly here rather
+      // than crashing later as orderCtxFor(NaN) mid-ordering.
+      console.error(chalk.red((e as Error).message));
+      return false;
+    }
+    const missing = needed.filter((c) => !hasChain(c));
+    if (missing.length > 0) {
+      console.error(
+        chalk.red(
+          `Compute job needs RPC chain(s) ${missing.join(", ")} but they are not ` +
+            `configured. Add each with 'addChain <chainId> <rpcUrl>'. Configured ` +
+            `chains: ${
+              listChains()
+                .map((c) => c.chainId)
+                .join(", ") || "none"
+            }.`,
+        ),
+      );
+      return false;
+    }
+    // Also require an ocean.js contract config for every chain up front — a registered
+    // RPC alone is not enough to order/escrow on it. Checking here, before any order is
+    // placed, avoids crashing mid-job (e.g. after the algorithm was already ordered and
+    // paid) when a later asset's chain has no config.
+    const unconfigured = needed.filter((c) => !getConfigFor(c));
+    if (unconfigured.length > 0) {
+      console.error(
+        chalk.red(
+          `Compute job needs ocean.js contract config for chain(s) ` +
+            `${unconfigured.join(", ")}, but ConfigHelper has none and ADDRESS_FILE ` +
+            `supplies none. Point ADDRESS_FILE at a deployment for these chains, or use ` +
+            `chains ocean.js supports.`,
+        ),
+      );
+      return false;
+    }
+    return true;
+  }
+
+  // Place an order (via `handleComputeOrder`) with a bounded retry. On a fast chain the
+  // first order after prior transactions can hit a transient stale/lagged nonce — the
+  // rejected send places no order and returns a falsy tx id, so retrying after a short
+  // delay (which lets the node's pending nonce catch up) is safe and never double-orders.
+  private async orderWithRetry<T>(place: () => Promise<T>): Promise<T> {
+    let result = await place();
+    for (let attempt = 1; attempt < 3 && !result; attempt++) {
+      await this.sleep(2000);
+      result = await place();
+    }
+    return result;
   }
 
   public async start() {
@@ -152,6 +310,12 @@ export class Commands {
       return;
     }
     const encryptDDO = args[2] === "false" ? false : true;
+    // The chain is the one the DDO declares — publish on that chain, not the RPC's
+    // default. (Previously the DDO's chainId was ignored.)
+    if (
+      !(await this.routeToAssetChain(this.ddoChainId(asset), "Metadata file"))
+    )
+      return;
     try {
       const ddoInstance = DDOManager.getDDOClass(asset);
       const { indexedMetadata } = ddoInstance.getAssetFields();
@@ -186,6 +350,13 @@ export class Commands {
       return;
     }
     const encryptDDO = args[2] === "false" ? false : true;
+    if (
+      !(await this.routeToAssetChain(
+        this.ddoChainId(algoAsset),
+        "Metadata file",
+      ))
+    )
+      return;
     // add some more checks
     try {
       const ddoInstance = DDOManager.getDDOClass(algoAsset);
@@ -241,6 +412,8 @@ export class Commands {
       asset[key] = updateJson[key];
     }
 
+    if (!(await this.routeToAssetChain(this.ddoChainId(asset), "DDO"))) return;
+
     const updateAssetTx = await updateAssetMetadata(
       this.signer,
       asset,
@@ -269,6 +442,57 @@ export class Commands {
     } else console.log(util.inspect(resolvedDDO, false, null, true));
   }
 
+  private async initializeProvider(
+    asset: Asset,
+    serviceId: string,
+    accountId: string,
+    providerUrl: string,
+  ): Promise<ProviderInitialize> {
+    // Only run SSI/policy-server verification when a wallet is configured AND
+    // the node confirms it has a policy server. This mirrors getPolicyServerOBJ's
+    // skip behavior, so a download against a node without a policy server
+    // proceeds instead of failing in initializePSVerification.
+    if (
+      process.env.SSI_WALLET_API?.trim() &&
+      (await isPolicyServerConfigured(providerUrl))
+    ) {
+      const command = {
+        documentId: asset.id,
+        serviceId,
+        consumerAddress: accountId,
+        policyServer: {
+          sessionId: "",
+          successRedirectUri: "",
+          errorRedirectUri: "",
+          responseRedirectUri: "",
+          presentationDefinitionUri: "",
+        },
+      };
+      const initializePs = await ProviderInstance.initializePSVerification(
+        providerUrl,
+        this.signer,
+        command,
+      );
+      if (!initializePs?.success) {
+        throw new Error(
+          `Provider initialization failed: ${initializePs?.error || "Policy Server verification failed"}`,
+        );
+      }
+    }
+    try {
+      return await ProviderInstance.initialize(
+        asset.id,
+        serviceId,
+        0,
+        accountId,
+        providerUrl,
+      );
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(message.replace(/^Error:\s*/i, ""), { cause: error });
+    }
+  }
+
   public async download(args: string[]) {
     const did = args[1];
     const dataDdo = await this.aquarius.waitForIndexer(
@@ -283,23 +507,46 @@ export class Commands {
       return;
     }
 
+    if (!(await this.routeToAssetChain(this.ddoChainId(dataDdo), "DDO")))
+      return;
+
     const ddoInstance = DDOManager.getDDOClass(dataDdo);
     const { services, version } = ddoInstance.getDDOFields();
     const serviceId = args[3] ? args[3] : services[0].id;
+    const service = services.find((s) => s.id === serviceId);
+    if (!service) {
+      console.error(
+        chalk.red(`Service ID "${serviceId}" not found in DDO ${did}.`),
+      );
+      return;
+    }
+
     let policyServer = null;
-    try {
-      if (isVersionGte(version, "5.0.0")) {
+    if (isVersionGte(version, "5.0.0")) {
+      try {
+        await this.initializeProvider(
+          dataDdo,
+          serviceId,
+          await this.signer.getAddress(),
+          service.serviceEndpoint || this.oceanNodeUrl,
+        );
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error(chalk.red("Error initializing Provider:"), message);
+        return;
+      }
+      try {
         policyServer = await getPolicyServerOBJ(
           dataDdo,
           serviceId,
           this.signer,
           this.oceanNodeUrl,
         );
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error(chalk.red("Error getting Policy Server Object:"), message);
+        return;
       }
-    } catch (error) {
-      throw new Error("Error getting Policy Server Object: " + error.message, {
-        cause: error,
-      });
     }
     const datatoken = new Datatoken(
       this.signer,
@@ -308,19 +555,28 @@ export class Commands {
     );
     // Order the same service that policy retrieval and getDownloadUrl target.
     const serviceIndex = services.findIndex((s) => s.id === serviceId);
-    const tx = await orderAsset(
-      dataDdo,
-      this.signer,
-      this.config,
-      datatoken,
-      this.oceanNodeUrl,
-      undefined, // consumerAddress
-      undefined, // consumeMarketOrderFee
-      undefined, // providerFees
-      undefined, // consumeMarketFixedSwapFee
-      undefined, // datatokenIndex
-      serviceIndex < 0 ? 0 : serviceIndex,
-    );
+    let tx;
+    try {
+      tx = await this.orderWithRetry(() =>
+        orderAsset(
+          dataDdo,
+          this.signer,
+          this.config,
+          datatoken,
+          this.oceanNodeUrl,
+          undefined, // consumerAddress
+          undefined, // consumeMarketOrderFee
+          undefined, // providerFees
+          undefined, // consumeMarketFixedSwapFee
+          undefined, // datatokenIndex
+          serviceIndex < 0 ? 0 : serviceIndex,
+        ),
+      );
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(chalk.red("Error ordering asset:"), message);
+      return;
+    }
 
     if (!tx) {
       console.error(
@@ -356,7 +612,7 @@ export class Commands {
     }
   }
 
-  public async initializeCompute(args: string[]) {
+  public async initializeCompute(args: string[], paymentChainId?: number) {
     const resolved = await resolveComputeInputs(
       args[1],
       args[2],
@@ -367,6 +623,23 @@ export class Commands {
     if (!resolved) return;
     const { assets, algo, ddos, algoDdo } = resolved;
     let { providerURI } = resolved;
+
+    // The payment/escrow chain (category d): the `--chainId` the caller resolved, else
+    // the signer's own chain (single-chain back-compat). Independent of where the assets
+    // live — each asset is ordered on its own DDO chain further below.
+    const payChain =
+      paymentChainId ??
+      Number((await this.signer.provider.getNetwork()).chainId);
+    // Every chain the job touches (payment + each DID asset/algo chain) must have an RPC.
+    if (
+      !this.ensureComputeChainsRegistered(
+        payChain,
+        ddos as (Asset | null)[],
+        (algoDdo as Asset) ?? null,
+      )
+    )
+      return;
+    const paymentSigner = await this.signerFor(payChain);
 
     // Optional per-dataset service selection (positional, 1-1 with datasets).
     const inputServicesString = args[8];
@@ -547,14 +820,18 @@ export class Commands {
       );
       return;
     }
-    const { chainId } = await this.signer.provider.getNetwork();
+    // The payment chain must be advertised by the compute env (in `computeEnv.fees`) AND
+    // registered in the RPC registry (already checked above via ensureComputeChainsRegistered).
+    const chainId = payChain;
     if (!Object.keys(computeEnv.fees).includes(chainId.toString())) {
       console.error(
         "Error starting paid compute using dataset DID " +
           args[1] +
           " and algorithm DID " +
           args[2] +
-          " because chainId is not supported by compute environment. " +
+          " because the payment chain " +
+          chainId +
+          " is not supported by compute environment " +
           args[3] +
           ". Supported chain IDs: " +
           Object.keys(computeEnv.fees).join(", "),
@@ -593,7 +870,7 @@ export class Commands {
     const policiesServer = await getPolicyServerOBJs(
       assetsForPolicy,
       assetAlgo,
-      this.signer,
+      paymentSigner,
       this.oceanNodeUrl,
     );
     const parsedResources = JSON.parse(resources);
@@ -605,7 +882,7 @@ export class Commands {
         paymentToken,
         supportedMaxJobDuration,
         providerURI,
-        await this.signer.getAddress(),
+        await paymentSigner.getAddress(),
         parsedResources,
         Number(chainId),
         policiesServer,
@@ -627,7 +904,7 @@ export class Commands {
     return providerInitializeComputeJob;
   }
 
-  public async computeStart(args: string[]) {
+  public async computeStart(args: string[], paymentChainId?: number) {
     const resolved = await resolveComputeInputs(
       args[1],
       args[2],
@@ -638,6 +915,47 @@ export class Commands {
     if (!resolved) return;
     const { assets, algo, ddos, algoDdo } = resolved;
     let { providerURI } = resolved;
+
+    // Payment/escrow chain (category d): the caller-resolved `--chainId`, else the
+    // signer's own chain (single-chain back-compat). Assets are ordered on their own
+    // DDO chains below; payment/escrow/computeStart all run against this chain.
+    const payChain =
+      paymentChainId ??
+      Number((await this.signer.provider.getNetwork()).chainId);
+    if (
+      !this.ensureComputeChainsRegistered(
+        payChain,
+        ddos as (Asset | null)[],
+        (algoDdo as Asset) ?? null,
+      )
+    )
+      return;
+    const paymentSigner = await this.signerFor(payChain);
+
+    // Per-asset ordering context: each DID-based asset is ordered on ITS OWN chain, with
+    // that chain's signer + config + Datatoken. A job may mix asset chains and pay on a
+    // different one; the old single Datatoken on the signer's one chain could only order
+    // same-chain assets. In the common single-chain case every asset shares the payment
+    // chain, so this is equivalent to before. Memoized per chain within this call.
+    const orderCtxCache = new Map<
+      number,
+      { signer: Signer; config: Config; datatoken: Datatoken }
+    >();
+    const orderCtxFor = async (
+      chainId: number,
+    ): Promise<{ signer: Signer; config: Config; datatoken: Datatoken }> => {
+      const cached = orderCtxCache.get(chainId);
+      if (cached) return cached;
+      const s = await this.signerFor(chainId);
+      const c = this.configFor(chainId);
+      const ctx = {
+        signer: s,
+        config: c,
+        datatoken: new Datatoken(s, String(chainId), c),
+      };
+      orderCtxCache.set(chainId, ctx);
+      return ctx;
+    };
 
     // Optional per-dataset service selection (positional, 1-1 with datasets).
     const inputServicesString = args[9];
@@ -813,7 +1131,7 @@ export class Commands {
     const policiesServer = await getPolicyServerOBJs(
       assetsForPolicy,
       assetAlgo,
-      this.signer,
+      paymentSigner,
       this.oceanNodeUrl,
     );
 
@@ -821,24 +1139,22 @@ export class Commands {
     const parsedProviderInitializeComputeJob = fixAndParseProviderFees(
       providerInitializeComputeJob,
     );
-    const datatoken = new Datatoken(
-      this.signer,
-      (await this.signer.provider.getNetwork()).chainId.toString(),
-      this.config,
-    );
     // Only order DID-based algorithms; raw (fileObject) algorithms have no datatoken.
     if (algoDdo) {
+      const algoCtx = await orderCtxFor(Number(getDdoChainId(algoDdo)));
       console.log("Ordering algorithm: ", args[2]);
-      algo.transferTxId = await handleComputeOrder(
-        parsedProviderInitializeComputeJob?.algorithm,
-        algoDdo as Asset,
-        this.signer,
-        computeEnv.consumerAddress,
-        algoServiceIndex,
-        datatoken,
-        this.config,
-        parsedProviderInitializeComputeJob?.algorithm?.providerFee,
-        providerURI,
+      algo.transferTxId = await this.orderWithRetry(() =>
+        handleComputeOrder(
+          parsedProviderInitializeComputeJob?.algorithm,
+          algoDdo as Asset,
+          algoCtx.signer,
+          computeEnv.consumerAddress,
+          algoServiceIndex,
+          algoCtx.datatoken,
+          algoCtx.config,
+          parsedProviderInitializeComputeJob?.algorithm?.providerFee,
+          providerURI,
+        ),
       );
       if (!algo.transferTxId) {
         console.error(
@@ -858,16 +1174,19 @@ export class Commands {
       if (!dataDdo) continue;
       const feeEntry = parsedProviderInitializeComputeJob?.datasets?.[i];
       if (!feeEntry) continue;
-      assets[i].transferTxId = await handleComputeOrder(
-        feeEntry,
-        dataDdo as Asset,
-        this.signer,
-        computeEnv.consumerAddress,
-        datasetServiceIndex[i] ?? 0,
-        datatoken,
-        this.config,
-        feeEntry.providerFee,
-        providerURI,
+      const dsCtx = await orderCtxFor(Number(getDdoChainId(dataDdo)));
+      assets[i].transferTxId = await this.orderWithRetry(() =>
+        handleComputeOrder(
+          feeEntry,
+          dataDdo as Asset,
+          dsCtx.signer,
+          computeEnv.consumerAddress,
+          datasetServiceIndex[i] ?? 0,
+          dsCtx.datatoken,
+          dsCtx.config,
+          feeEntry.providerFee,
+          providerURI,
+        ),
       );
       if (!assets[i].transferTxId) {
         console.error(
@@ -904,7 +1223,9 @@ export class Commands {
     if (maxJobDuration > computeEnv.maxJobDuration) {
       supportedMaxJobDuration = computeEnv.maxJobDuration;
     }
-    const { chainId } = await this.signer.provider.getNetwork();
+    // Payment chain must be advertised by the env AND registered (registry already
+    // validated at method entry via ensureComputeChainsRegistered).
+    const chainId = payChain;
     const paymentToken = args[6];
     if (!paymentToken) {
       console.error(
@@ -922,7 +1243,9 @@ export class Commands {
           args[1] +
           " and algorithm DID " +
           args[2] +
-          " because chainId is not supported by compute environment. " +
+          " because the payment chain " +
+          chainId +
+          " is not supported by compute environment " +
           args[3] +
           ". Supported chain IDs: " +
           Object.keys(computeEnv.fees).join(", "),
@@ -961,7 +1284,7 @@ export class Commands {
 
     const escrow = new EscrowContract(
       getAddress(parsedProviderInitializeComputeJob.payment.escrowAddress),
-      this.signer,
+      paymentSigner,
     );
     console.log("Verifying payment...");
     await new Promise((resolve) => setTimeout(resolve, 3000));
@@ -970,7 +1293,7 @@ export class Commands {
       paymentToken,
       computeEnv.consumerAddress,
       await unitsToAmount(
-        this.signer,
+        paymentSigner,
         paymentToken,
         parsedProviderInitializeComputeJob.payment.amount,
       ),
@@ -997,7 +1320,7 @@ export class Commands {
     // still reports isValid. The node then rejects computeStart with "User ... does
     // not have enough funds" or "Found 0 authorizations". Confirm both really
     // landed, and retry once each before giving up.
-    const payerAddress = await this.signer.getAddress();
+    const payerAddress = await paymentSigner.getAddress();
     const payeeAddress = getAddress(computeEnv.consumerAddress);
     const tokenAddress = getAddress(paymentToken);
     const minLockSeconds =
@@ -1015,7 +1338,7 @@ export class Commands {
     if (available < requiredUnits) {
       const shortfallUnits = requiredUnits - available;
       const shortfall = await unitsToAmount(
-        this.signer,
+        paymentSigner,
         paymentToken,
         shortfallUnits.toString(),
       );
@@ -1027,7 +1350,7 @@ export class Commands {
       const tokenContract = new ethers.Contract(
         paymentToken,
         ["function approve(address spender, uint256 amount) returns (bool)"],
-        this.signer,
+        paymentSigner,
       );
       const approveTx = await tokenContract.approve(
         getAddress(parsedProviderInitializeComputeJob.payment.escrowAddress),
@@ -1040,7 +1363,7 @@ export class Commands {
     }
     if (available < requiredUnits) {
       const needed = await unitsToAmount(
-        this.signer,
+        paymentSigner,
         paymentToken,
         requiredUnits.toString(),
       );
@@ -1068,7 +1391,7 @@ export class Commands {
       // maxLockedAmount until they are claimed, so a ceiling of exactly one job's
       // cost would reject the next job started before this one settles.
       const jobCost = await unitsToAmount(
-        this.signer,
+        paymentSigner,
         paymentToken,
         parsedProviderInitializeComputeJob.payment.amount,
       );
@@ -1131,14 +1454,14 @@ export class Commands {
     }
     const computeJobs = await ProviderInstance.computeStart(
       providerURI,
-      this.signer,
+      paymentSigner,
       computeEnv.id,
       assets, // assets[0] // only c2d v1,
       algo,
       supportedMaxJobDuration,
       paymentToken,
       JSON.parse(resources),
-      Number((await this.signer.provider.getNetwork()).chainId),
+      Number(payChain),
       null,
       null,
       // additionalDatasets, only c2d v1
@@ -1152,9 +1475,10 @@ export class Commands {
       const { jobId, payment } = computeJobs[0];
       console.log("Compute started.  JobID: " + jobId);
       console.log("Agreement ID: " + payment.lockTx);
-    } else {
-      console.log("Error while starting the compute job: ", computeJobs);
+      return true;
     }
+    console.log("Error while starting the compute job: ", computeJobs);
+    return false;
   }
 
   public async freeComputeStart(args: string[]) {
@@ -1382,6 +1706,14 @@ export class Commands {
         "Error fetching compute environments. No compute environments available.",
       );
       return;
+    }
+
+    // Readable per-env summary of where each env accepts payment (fee chains + tokens),
+    // so a user can pick `--chainId` / `--paymentToken` for startCompute without reading
+    // the raw JSON below.
+    console.log(chalk.yellow("--- Payment options per environment ---"));
+    for (const env of computeEnvs) {
+      console.log(summarizeComputeEnvFees(env));
     }
 
     console.log("Existing compute environments: ", JSON.stringify(computeEnvs));
@@ -2401,6 +2733,8 @@ export class Commands {
       );
       return;
     }
+    // Route to the dataset's chain before the owner check / metadata update.
+    if (!(await this.routeToAssetChain(this.ddoChainId(asset), "DDO"))) return;
     const ddoInstance = DDOManager.getDDOClass(asset);
     const { indexedMetadata } = ddoInstance.getAssetFields();
     const { services } = ddoInstance.getDDOFields();
@@ -2491,6 +2825,8 @@ export class Commands {
       );
       return;
     }
+    // Route to the dataset's chain before the owner check / metadata update.
+    if (!(await this.routeToAssetChain(this.ddoChainId(asset), "DDO"))) return;
     const ddoInstance = DDOManager.getDDOClass(asset);
     const { indexedMetadata } = ddoInstance.getAssetFields();
     const { services } = ddoInstance.getDDOFields();
@@ -2603,9 +2939,22 @@ export class Commands {
     }
   }
 
-  public async mintOceanTokens() {
+  public async mintOceanTokens(tokenOverride?: string) {
     try {
-      const config = await getConfigByChainId(Number(this.config.chainId));
+      const chainId = Number(this.config.chainId);
+      // Token resolution: --token flag → chain's configured oceanTokenAddress → bail.
+      // oceanTokenAddress is absent for some chains (e.g. Base), so a clear error
+      // beats failing deep inside an ethers call.
+      const tokenAddress =
+        tokenOverride || getConfigFor(chainId)?.oceanTokenAddress;
+      if (!tokenAddress) {
+        console.error(
+          chalk.red(
+            `No Ocean token address configured for chain ${chainId}. Pass --token <address> to mint on this chain.`,
+          ),
+        );
+        return;
+      }
       const minAbi = [
         {
           constant: false,
@@ -2622,7 +2971,7 @@ export class Commands {
       ];
 
       const tokenContract = new ethers.Contract(
-        config?.Ocean,
+        tokenAddress,
         minAbi,
         this.signer,
       );
@@ -2668,11 +3017,11 @@ export class Commands {
   }
 
   public async getEscrowBalance(token: string): Promise<number> {
-    const config = await getConfigByChainId(Number(this.config.chainId));
+    const chainId = Number(this.config.chainId);
     const escrow = new EscrowContract(
-      getAddress(config.Escrow),
+      getAddress(requireAddress(chainId, "escrow", "Escrow")),
       this.signer,
-      Number(this.config.chainId),
+      chainId,
     );
 
     try {
@@ -2699,11 +3048,11 @@ export class Commands {
     token: string,
     amount: string,
   ): Promise<void> {
-    const config = await getConfigByChainId(Number(this.config.chainId));
+    const chainId = Number(this.config.chainId);
     const escrow = new EscrowContract(
-      getAddress(config.Escrow),
+      getAddress(requireAddress(chainId, "escrow", "Escrow")),
       this.signer,
-      Number(this.config.chainId),
+      chainId,
     );
 
     const balance = await this.getEscrowBalance(token);
@@ -2725,8 +3074,7 @@ export class Commands {
   ) {
     try {
       const amountInUnits = await amountToUnits(signer, token, amount, 18);
-      const config = await getConfigByChainId(chainId);
-      const escrowAddress = config.Escrow;
+      const escrowAddress = requireAddress(chainId, "escrow", "Escrow");
 
       const tokenContract = new ethers.Contract(
         token,
@@ -2783,8 +3131,11 @@ export class Commands {
         }
       }
 
-      const config = await getConfigByChainId(Number(this.config.chainId));
-      const escrowAddress = config.Escrow;
+      const escrowAddress = requireAddress(
+        Number(this.config.chainId),
+        "escrow",
+        "Escrow",
+      );
 
       const escrow = new EscrowContract(getAddress(escrowAddress), this.signer);
 
@@ -2833,16 +3184,16 @@ export class Commands {
   }
 
   public async getAuthorizationsEscrow(token: string, payee: string) {
-    const config = await getConfigByChainId(Number(this.config.chainId));
+    const chainId = Number(this.config.chainId);
     const payer = await this.signer.getAddress();
     const tokenAddress = getAddress(token);
     const payerAddress = getAddress(payer);
     const payeeAddress = getAddress(payee);
     const decimals = await getTokenDecimals(this.signer, token);
     const escrow = new EscrowContract(
-      getAddress(config.Escrow),
+      getAddress(requireAddress(chainId, "escrow", "Escrow")),
       this.signer,
-      Number(this.config.chainId),
+      chainId,
     );
 
     const authorizations = await escrow.getAuthorizations(
@@ -2893,19 +3244,20 @@ export class Commands {
         return;
       }
 
-      const config = await getConfigByChainId(Number(this.config.chainId));
-      if (!config.AccessListFactory) {
+      const chainId = Number(this.config.chainId);
+      const config = getConfigFor(chainId);
+      if (!config?.accessListFactory) {
         console.error(
           chalk.red(
-            "Access list factory not found. Check local address.json file",
+            `Access list factory address not found for chain ${chainId}. Set ADDRESS_FILE to a deployment for this chain, or use a supported chain.`,
           ),
         );
         return;
       }
       const accessListFactory = new AccesslistFactory(
-        config.AccessListFactory,
+        config.accessListFactory,
         this.signer,
-        Number(this.config.chainId),
+        chainId,
       );
 
       const owner = await this.signer.getAddress();
@@ -3093,11 +3445,16 @@ export class Commands {
             // on a send failure — ocean.js's sendPreparedTransaction swallows
             // the error. The common one here is a nonce collision between
             // back-to-back burns on a fast local chain: the rejected tx leaves
-            // the account nonce advanced, so simply rebuilding the tx (a fresh
+            // the account nonce advanced, so rebuilding the tx (a fresh
             // populateTransaction picks up the corrected nonce) succeeds. Retry
-            // a null result a few times before giving up.
+            // a null result a few times before giving up — but WAIT between
+            // attempts: ethers caches getTransactionCount("pending") for
+            // ~cacheTimeout (250ms default), so an immediate retry re-reads the
+            // same stale nonce and fails again. A short delay lets that cache
+            // expire so the retry sees the advanced nonce.
             let receipt = null;
-            for (let attempt = 0; attempt < 3 && !receipt; attempt++) {
+            for (let attempt = 0; attempt < 5 && !receipt; attempt++) {
+              if (attempt > 0) await this.sleep(1000);
               receipt = await accessList.burn(tokenId);
             }
             if (!receipt) {

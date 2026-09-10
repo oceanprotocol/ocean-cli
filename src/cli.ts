@@ -1,6 +1,5 @@
 import { Command } from "commander";
 import { Commands } from "./commands.js";
-import { JsonRpcProvider, Signer, ethers } from "ethers";
 import fs from "fs";
 import { createRequire } from "module";
 import chalk from "chalk";
@@ -30,6 +29,19 @@ import {
   SearchFlags,
 } from "./searchResourcesHelpers.js";
 import { interactiveResourceSearch } from "./searchResourcesFlow.js";
+import {
+  loadRegistry,
+  getActiveChainId,
+  getSigner,
+  parseRpcEnv,
+  getDefaultChainId,
+  setDefaultChainId,
+  resolveDefaultChain,
+  hasChain,
+  listChains,
+  addChain,
+  removeChain,
+} from "./rpcRegistry.js";
 
 // Commands usable before any Ocean Node is selected. Everything else is refused by the
 // preAction gate below until `setNode` succeeds. Canonical names only — aliases
@@ -42,6 +54,12 @@ const NODE_FREE_COMMANDS = new Set([
   // A network-wide DHT search — a natural way to *find* a node to select, so it must work
   // before `setNode` picks one.
   "searchComputeResources",
+  // Chain/RPC management is independent of the node and must work before one is chosen.
+  "addChain",
+  "removeChain",
+  "listChains",
+  "setChain",
+  "getChain",
 ]);
 
 // Topic grouping for the help listing. Purely presentational: it only changes how the command
@@ -66,6 +84,16 @@ const HELP_GROUPS: HelpGroup[] = [
   {
     heading: "Discover compute providers",
     commands: ["searchComputeResources", "getComputeEnvironments"],
+  },
+  {
+    heading: "Chains & RPC",
+    commands: [
+      "addChain",
+      "removeChain",
+      "listChains",
+      "setChain",
+      "getChain",
+    ],
   },
   {
     heading: "Assets — publish, edit, consume",
@@ -246,18 +274,63 @@ async function runResourceWizard(chainId: number) {
   return interactiveResourceSearch(chainId);
 }
 
+// Thin wrapper over the RPC registry: seed it from the `RPC` env, resolve the single
+// active (default) chain, and return that chain's memoized signer. For legacy
+// single-URL users the chainId is still discovered by probing getNetwork() and nothing
+// about their behavior changes; multi-URL/JSON-map users get a FallbackProvider.
 async function initializeSigner() {
-  const provider = new JsonRpcProvider(process.env.RPC);
-  let signer: Signer;
+  loadRegistry();
+  // Lenient: the real default when there is one, else any registered chain purely to
+  // obtain a signer for chain-agnostic commands (plan §"Default chain" step 4).
+  const chainId = await getActiveChainId();
+  const signer = await getSigner(chainId);
+  return { signer, chainId };
+}
 
-  if (process.env.PRIVATE_KEY) {
-    signer = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
-  } else {
-    signer = ethers.Wallet.fromPhrase(process.env.MNEMONIC, provider);
+// Resolve the chain for a chain-explicit command (category c): the `--chainId` flag →
+// the default chain → a clear error. Validates the flag is a registered positive integer.
+function resolveChainId(flag?: string | number): number {
+  if (flag !== undefined && flag !== null && `${flag}`.trim() !== "") {
+    const id = Number(flag);
+    if (!Number.isInteger(id) || id <= 0) {
+      throw new Error(`Invalid --chainId "${flag}": must be a positive integer.`);
+    }
+    if (!hasChain(id)) {
+      throw new Error(
+        `Chain ${id} is not configured. Configured chains: ${
+          listChains()
+            .map((c) => c.chainId)
+            .join(", ") || "none"
+        }. Add it with 'addChain <chainId> <rpcUrl>'.`,
+      );
+    }
+    return id;
   }
+  const def = getDefaultChainId();
+  if (def !== undefined) return def;
+  throw new Error(
+    `No chain specified and no default chain is set. Pass --chainId <id>, or run 'setChain <id>'. Configured chains: ${
+      listChains()
+        .map((c) => c.chainId)
+        .join(", ") || "none"
+    }.`,
+  );
+}
 
-  const { chainId } = await signer.provider.getNetwork();
-  return { signer, chainId: Number(chainId) };
+// Route a chain-explicit command's Commands instance onto the resolved chain. Returns the
+// resolved chainId, or null (already logged) when resolution/switch fails so the action bails.
+async function routeExplicit(
+  commands: Commands,
+  flag?: string | number,
+): Promise<number | null> {
+  try {
+    const target = resolveChainId(flag);
+    await commands.useChain(target);
+    return target;
+  } catch (e) {
+    console.error(chalk.red((e as Error).message));
+    return null;
+  }
 }
 
 export async function createCLI() {
@@ -283,6 +356,15 @@ export async function createCLI() {
     }
     if (!process.env.RPC) {
       console.error(chalk.red("Have you forgot to set env RPC?"));
+      process.exit(1);
+    }
+    // Validate the RPC shape (single URL or JSON map keyed by chainId) up front, so a
+    // malformed value fails fast with a clear, example-bearing message instead of deep
+    // inside the first command. Pure parse — no providers built, no network touched.
+    try {
+      parseRpcEnv(process.env.RPC);
+    } catch (e) {
+      console.error(chalk.red((e as Error).message));
       process.exit(1);
     }
   }
@@ -518,11 +600,195 @@ export async function createCLI() {
       // Best effort: a node that is down must not fail the command.
       const status = await validateNode(current);
       if (status) {
+        const nodeChains = nodeChainIds(status);
         console.log(
-          `Version: ${status.version}, chain(s): ${nodeChainIds(status).join(", ") || "none"}`,
+          `Version: ${status.version}, chain(s): ${nodeChains.join(", ") || "none"}`,
         );
+        // Cross-reference the node's served chains with the RPC registry, surfacing any
+        // chain the node serves but for which no RPC is configured (commands would fail).
+        try {
+          loadRegistry();
+          const missing = nodeChains.filter((c) => !hasChain(Number(c)));
+          const configured = nodeChains.filter((c) => hasChain(Number(c)));
+          if (configured.length) {
+            console.log(
+              chalk.green(`  RPC configured for chain(s): ${configured.join(", ")}`),
+            );
+          }
+          if (missing.length) {
+            console.log(
+              chalk.yellow(
+                `  No RPC configured for node chain(s): ${missing.join(
+                  ", ",
+                )} — add one with 'addChain <chainId> <rpcUrl>'.`,
+              ),
+            );
+          }
+        } catch {
+          // RPC not configured / unavailable — the node info above is still useful.
+        }
       } else {
         console.log(chalk.yellow("Node is not reachable right now."));
+      }
+    });
+
+  // ---------------------------------------------------------------------------
+  // Chain / RPC management (node-free — see NODE_FREE_COMMANDS). Implemented directly
+  // here, mirroring setNode/getNode: the registry is the single source of truth and no
+  // signer/Commands instance is needed. Errors are plain Error so the gate/REPL render
+  // them in red and stay alive.
+  // ---------------------------------------------------------------------------
+  const configuredChainList = (): string =>
+    listChains()
+      .map((c) => c.chainId)
+      .join(", ") || "none";
+
+  program
+    .command("addChain")
+    .alias("addRpc")
+    .description(
+      "Register an RPC chain at runtime (verifies each URL serves the chain; persists)",
+    )
+    .argument("<chainId>", "Chain id the URL(s) serve")
+    .argument("[rpcUrl...]", "One or more RPC URLs for that chain")
+    .option("-c, --chainId <chainId>", "Chain id the URL(s) serve")
+    .option("-u, --url <rpcUrl...>", "One or more RPC URLs for that chain")
+    .action(async (chainIdArg, rpcUrlArgs, options) => {
+      loadRegistry();
+      const id = Number(options.chainId || chainIdArg);
+      const urls: string[] =
+        options.url && options.url.length ? options.url : rpcUrlArgs;
+      if (!Number.isInteger(id) || id <= 0) {
+        console.error(chalk.red(`Invalid chainId "${chainIdArg}".`));
+        return;
+      }
+      if (!urls || urls.length === 0) {
+        console.error(chalk.red("At least one RPC URL is required."));
+        return;
+      }
+      try {
+        await addChain(id, urls);
+        console.log(
+          chalk.green(
+            `Chain ${id} registered with ${urls.length} URL(s). Configured chains: ${configuredChainList()}.`,
+          ),
+        );
+      } catch (e) {
+        console.error(chalk.red((e as Error).message));
+      }
+    });
+
+  program
+    .command("removeChain")
+    .alias("removeRpc")
+    .description("Unregister an RPC chain (persists)")
+    .argument("<chainId>", "Chain id to remove")
+    .option("-c, --chainId <chainId>", "Chain id to remove")
+    .action(async (chainIdArg, options) => {
+      loadRegistry();
+      const id = Number(options.chainId || chainIdArg);
+      if (!Number.isInteger(id) || id <= 0) {
+        console.error(chalk.red(`Invalid chainId "${chainIdArg}".`));
+        return;
+      }
+      try {
+        removeChain(id);
+        console.log(
+          chalk.green(
+            `Chain ${id} removed. Configured chains: ${configuredChainList()}.`,
+          ),
+        );
+      } catch (e) {
+        console.error(chalk.red((e as Error).message));
+      }
+    });
+
+  program
+    .command("listChains")
+    .alias("getRpcs")
+    .alias("chains")
+    .description("List configured RPC chains, their URLs, and the default")
+    .action(async () => {
+      loadRegistry();
+      // A legacy single-URL RPC isn't registered until its chainId is probed; do that
+      // (best effort) so it shows up here without needing to run a signing command first.
+      await getActiveChainId().catch(() => undefined);
+      const chains = listChains();
+      if (chains.length === 0) {
+        console.log(chalk.yellow("No RPC chains configured."));
+        return;
+      }
+      // Best-effort: cross-reference the node's served chains, if a node is set.
+      let nodeChains: number[] = [];
+      const current = getCurrentNodeUrl();
+      if (current) {
+        const status = await validateNode(current);
+        if (status) nodeChains = nodeChainIds(status).map((c) => Number(c));
+      }
+      const def = resolveDefaultChain(nodeChains);
+      console.log(chalk.bold("Configured RPC chains:"));
+      for (const { chainId, urls } of chains) {
+        const marks: string[] = [];
+        if (chainId === def) marks.push(chalk.green("default"));
+        if (nodeChains.includes(chainId)) marks.push("served by node");
+        const suffix = marks.length ? `  [${marks.join(", ")}]` : "";
+        console.log(`  ${chainId}${suffix}`);
+        for (const u of urls) console.log(`      ${u}`);
+      }
+      const nodeMissing = nodeChains.filter((c) => !hasChain(c));
+      if (nodeMissing.length) {
+        console.log(
+          chalk.yellow(
+            `Node serves chain(s) with no configured RPC: ${nodeMissing.join(", ")}.`,
+          ),
+        );
+      }
+      if (def === undefined) {
+        console.log(
+          chalk.yellow(
+            "No default chain set — chain-explicit commands need --chainId. Set one with 'setChain <chainId>'.",
+          ),
+        );
+      }
+    });
+
+  program
+    .command("setChain")
+    .alias("useChain")
+    .description("Set the default (active) chain (must be registered; persists)")
+    .argument("<chainId>", "Chain id to make default")
+    .option("-c, --chainId <chainId>", "Chain id to make default")
+    .action(async (chainIdArg, options) => {
+      loadRegistry();
+      const id = Number(options.chainId || chainIdArg);
+      if (!Number.isInteger(id) || id <= 0) {
+        console.error(chalk.red(`Invalid chainId "${chainIdArg}".`));
+        return;
+      }
+      try {
+        setDefaultChainId(id);
+        console.log(chalk.green(`Default chain is now ${id}.`));
+      } catch (e) {
+        console.error(chalk.red((e as Error).message));
+      }
+    });
+
+  program
+    .command("getChain")
+    .alias("currentChain")
+    .description("Show the current default (active) chain")
+    .action(async () => {
+      loadRegistry();
+      await getActiveChainId().catch(() => undefined);
+      const def = getDefaultChainId();
+      if (def !== undefined) {
+        console.log(`Default chain: ${def}`);
+      } else {
+        console.log(
+          chalk.yellow(
+            `No default chain set. Configured chains: ${configuredChainList()}. Set one with 'setChain <chainId>'.`,
+          ),
+        );
       }
     });
 
@@ -705,6 +971,10 @@ export async function createCLI() {
       toBoolean,
     )
     .option(
+      "--chainId <chainId>",
+      "Payment/escrow chain for the job (defaults to the active chain). Each dataset/algorithm is still ordered on its own DDO chain.",
+    )
+    .option(
       "-o, --output [output]",
       "Output backend to save job results to. Supported types include S3, FTP, URL, Arweave, etc. Defaults to node local disk if omitted.",
     )
@@ -777,6 +1047,17 @@ export async function createCLI() {
         const { signer, chainId } = await initializeSigner();
         const commands = new Commands(signer, chainId);
 
+        // Payment/escrow chain (category d): `--chainId` → default → error. Independent
+        // of where the assets live — each asset is ordered on its own DDO chain inside
+        // the compute methods.
+        let paymentChainId: number;
+        try {
+          paymentChainId = resolveChainId(options.chainId);
+        } catch (e) {
+          console.error(chalk.red((e as Error).message));
+          return;
+        }
+
         const initArgs = [
           null,
           dsDids,
@@ -790,7 +1071,10 @@ export async function createCLI() {
           algoSvcId,
         ];
         console.log("initArgs:", initArgs);
-        const initResp = await commands.initializeCompute(initArgs);
+        const initResp = await commands.initializeCompute(
+          initArgs,
+          paymentChainId,
+        );
 
         if (!initResp) {
           console.error(chalk.red("Initialization failed. Aborting."));
@@ -799,8 +1083,11 @@ export async function createCLI() {
 
         console.log(chalk.yellow("\n--- Payment Details ---"));
         console.log(JSON.stringify(initResp, null, 2));
+        // The payment token lives on the payment chain, which may differ from the active
+        // chain — read its decimals with that chain's signer, not the default one.
+        const paymentSigner = await commands.signerFor(paymentChainId);
         const amount = await unitsToAmount(
-          signer,
+          paymentSigner,
           initResp.payment.token,
           initResp.payment.amount.toString(),
         );
@@ -845,8 +1132,10 @@ export async function createCLI() {
           algoSvcId,
         ];
 
-        await commands.computeStart(computeArgs);
-        console.log(chalk.green("Compute job started successfully."));
+        const started = await commands.computeStart(computeArgs, paymentChainId);
+        if (started) {
+          console.log(chalk.green("Compute job started successfully."));
+        }
       },
     );
 
@@ -896,6 +1185,10 @@ export async function createCLI() {
       "-x, --algo-service [algoServiceId]",
       "Algorithm Service ID (optional)",
     )
+    .option(
+      "--chainId <chainId>",
+      "Chain to sign the free compute request on (defaults to the active chain). A free env does no ordering or payment.",
+    )
     .action(
       async (
         datasetDids,
@@ -944,6 +1237,9 @@ export async function createCLI() {
         }
         const { signer, chainId } = await initializeSigner();
         const commands = new Commands(signer, chainId);
+        // Free compute is single-chain signing only (no ordering/escrow): route the
+        // signer onto `--chainId` → default, exactly like a category (c) command.
+        if ((await routeExplicit(commands, options.chainId)) === null) return;
         await commands.freeComputeStart([
           null,
           dsDids,
@@ -1147,6 +1443,10 @@ export async function createCLI() {
       "Max seconds to wait for Running (default 600)",
       parseInt,
     )
+    .option(
+      "--chainId <chainId>",
+      "Payment/escrow chain (default: active chain); must be one the env prices on",
+    )
     .action(async (computeEnvId, duration, paymentToken, options) => {
       const envId = options.env || computeEnvId;
       const token = paymentToken;
@@ -1186,6 +1486,9 @@ export async function createCLI() {
 
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
+      // Services are single-chain: --chainId (→ default) is the payment/escrow chain, and
+      // must be registered here; startService additionally checks it is one the env prices on.
+      if ((await routeExplicit(commands, options.chainId)) === null) return;
       await commands.startService({
         envId,
         duration,
@@ -1333,6 +1636,7 @@ export async function createCLI() {
       "Auto-confirm payment (true/false)",
       toBoolean,
     )
+    .option("--chainId <chainId>", "Payment/escrow chain (default: active chain)")
     .action(async (serviceId, additionalDuration, paymentToken, options) => {
       const id = options.service || serviceId;
       const addl = options.duration || additionalDuration;
@@ -1355,6 +1659,7 @@ export async function createCLI() {
       }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
+      if ((await routeExplicit(commands, options.chainId)) === null) return;
       await commands.extendService(id, addl, token, options.accept);
     });
 
@@ -1497,10 +1802,16 @@ export async function createCLI() {
   program
     .command("mintOcean")
     .description("Mints Ocean tokens")
-    .action(async () => {
+    .option(
+      "-t, --token <token>",
+      "Ocean token address (overrides the chain's configured address; required on chains with no bundled Ocean token)",
+    )
+    .option("--chainId <chainId>", "Chain to mint on (default: active chain)")
+    .action(async (options) => {
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
-      await commands.mintOceanTokens();
+      if ((await routeExplicit(commands, options.chainId)) === null) return;
+      await commands.mintOceanTokens(options.token);
     });
 
   // Generate new auth token
@@ -1533,16 +1844,19 @@ export async function createCLI() {
     .argument("<amount>", "Amount of tokens to deposit")
     .option("-t, --token <token>", "Address of the token to deposit")
     .option("-a, --amount <amount>", "Amount of tokens to deposit")
+    .option("--chainId <chainId>", "Escrow chain (default: active chain)")
     .action(async (token, amount, options) => {
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
+      const target = await routeExplicit(commands, options.chainId);
+      if (target === null) return;
       const tokenAddress = options.token || token;
       const amountToDeposit = options.amount || amount;
       const success = await commands.depositToEscrow(
-        signer,
+        commands.signer,
         tokenAddress,
         amountToDeposit,
-        chainId,
+        target,
       );
       if (!success) {
         console.log(chalk.red("Deposit failed"));
@@ -1558,9 +1872,11 @@ export async function createCLI() {
     .description("Get deposited token amount in escrow for user")
     .argument("<token>", "Address of the token to check")
     .option("-t, --token <token>", "Address of the token to check")
+    .option("--chainId <chainId>", "Escrow chain (default: active chain)")
     .action(async (token, options) => {
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
+      if ((await routeExplicit(commands, options.chainId)) === null) return;
       await commands.getEscrowBalance(token || options.token);
     });
 
@@ -1572,9 +1888,11 @@ export async function createCLI() {
     .argument("<amount>", "Amount of tokens to withdraw")
     .option("-t, --token <token>", "Address of the token to check")
     .option("-a, --amount <amount>", "Amount of tokens to withdraw")
+    .option("--chainId <chainId>", "Escrow chain (default: active chain)")
     .action(async (token, amount, options) => {
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
+      if ((await routeExplicit(commands, options.chainId)) === null) return;
       await commands.withdrawFromEscrow(token || options.token, amount);
     });
 
@@ -1601,6 +1919,7 @@ export async function createCLI() {
       "-c, --maxLockCounts <maxLockCounts>",
       "Maximum number of locks allowed",
     )
+    .option("--chainId <chainId>", "Escrow chain (default: active chain)")
     .action(
       async (
         token,
@@ -1612,6 +1931,7 @@ export async function createCLI() {
       ) => {
         const { signer, chainId } = await initializeSigner();
         const commands = new Commands(signer, chainId);
+        if ((await routeExplicit(commands, options.chainId)) === null) return;
         const tokenAddress = options.token || token;
         const payeeAddress = options.payee || payee;
         const maxLockedAmountValue = options.maxLockedAmount || maxLockedAmount;
@@ -1642,9 +1962,11 @@ export async function createCLI() {
     .argument("<payee>", "Address of the payee to check")
     .option("-t, --token <token>", "Address of the token to check")
     .option("-p, --payee <payee>", "Address of the payee to check")
+    .option("--chainId <chainId>", "Escrow chain (default: active chain)")
     .action(async (token, payee, options) => {
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
+      if ((await routeExplicit(commands, options.chainId)) === null) return;
       await commands.getAuthorizationsEscrow(
         token || options.token,
         payee || options.payee,
@@ -1678,9 +2000,11 @@ export async function createCLI() {
       "Whether tokens are transferable (true/false)",
       "false",
     )
+    .option("--chainId <chainId>", "Chain to deploy on (default: active chain)")
     .action(async (name, symbol, initialUsers, transferable, options) => {
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
+      if ((await routeExplicit(commands, options.chainId)) === null) return;
       await commands.createAccessList([
         options.name || name,
         options.symbol || symbol,
@@ -1702,9 +2026,11 @@ export async function createCLI() {
       "-u, --users <users>",
       "Comma-separated list of user addresses to add",
     )
+    .option("--chainId <chainId>", "Access-list chain (default: active chain)")
     .action(async (accessListAddress, users, options) => {
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
+      if ((await routeExplicit(commands, options.chainId)) === null) return;
       await commands.addToAccessList([
         options.address || accessListAddress,
         options.users || users,
@@ -1724,9 +2050,11 @@ export async function createCLI() {
       "-u, --users <users>",
       "Comma-separated list of user addresses to check",
     )
+    .option("--chainId <chainId>", "Access-list chain (default: active chain)")
     .action(async (accessListAddress, users, options) => {
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
+      if ((await routeExplicit(commands, options.chainId)) === null) return;
       await commands.checkAccessList([
         options.address || accessListAddress,
         options.users || users,
@@ -1746,9 +2074,11 @@ export async function createCLI() {
       "-u, --users <users>",
       "Comma-separated list of user addresses to remove",
     )
+    .option("--chainId <chainId>", "Access-list chain (default: active chain)")
     .action(async (accessListAddress, users, options) => {
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
+      if ((await routeExplicit(commands, options.chainId)) === null) return;
       await commands.removeFromAccessList([
         options.address || accessListAddress,
         options.users || users,

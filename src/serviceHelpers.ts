@@ -15,7 +15,7 @@ import {
   ServiceTemplatePublic,
   TemplateResourceRequirement,
 } from "@oceanprotocol/lib";
-import { getConfigByChainId } from "./helpers.js";
+import { getConfigFor } from "./rpcRegistry.js";
 
 // ---------------------------------------------------------------------------
 // 4.1 Status labels
@@ -260,17 +260,17 @@ export async function verifyServiceEscrow(
   durationSeconds: number,
 ): Promise<boolean> {
   try {
-    const config = await getConfigByChainId(chainId);
-    if (!config?.Escrow) {
+    const config = getConfigFor(chainId);
+    if (!config?.escrow) {
       console.error(
         chalk.red(
-          `Escrow contract address not found for chain ${chainId} in the address file.`,
+          `Escrow contract address not found for chain ${chainId}. Set ADDRESS_FILE to a deployment for this chain, or use a supported chain.`,
         ),
       );
       return false;
     }
     const escrow = new EscrowContract(
-      getAddress(config.Escrow),
+      getAddress(config.escrow),
       signer,
       chainId,
     );

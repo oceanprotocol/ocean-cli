@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { homedir } from "os";
 import { runCommand } from "./util.js";
-import { getConfigByChainId } from "../src/helpers.js";
+import { getConfigFor } from "../src/rpcRegistry.js";
 import { JsonRpcProvider, ethers } from "ethers";
 import { AccessListContract, AccesslistFactory } from "@oceanprotocol/lib";
 
@@ -22,7 +22,7 @@ describe("Ocean CLI Access List", function () {
     process.env.NODE_URL = "http://127.0.0.1:8001";
     process.env.ADDRESS_FILE = `${homedir}/.ocean/ocean-contracts/artifacts/address.json`;
 
-    chainConfig = await getConfigByChainId(8996);
+    chainConfig = getConfigFor(8996);
 
     const provider = new JsonRpcProvider(process.env.RPC);
     owner = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
@@ -247,7 +247,7 @@ describe("Ocean CLI Access List", function () {
   describe("Access List Factory", function () {
     it("should verify access list is deployed via factory", async function () {
       const factory = new AccesslistFactory(
-        chainConfig.AccessListFactory,
+        chainConfig.accessListFactory,
         owner,
         chainConfig.chainId,
       );
@@ -258,7 +258,7 @@ describe("Ocean CLI Access List", function () {
 
     it("should verify access list is soulbound", async function () {
       const factory = new AccesslistFactory(
-        chainConfig.AccessListFactory,
+        chainConfig.accessListFactory,
         owner,
         chainConfig.chainId,
       );

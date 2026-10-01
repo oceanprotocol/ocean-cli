@@ -727,7 +727,7 @@ export async function createCLI() {
     )
     .option(
       "--amount <value>",
-      "Job amount to quote a subsidy for, in natural token units (e.g. 1.5 — the lib converts to base units). Needs --node and --jobType.",
+      "Job amount to quote a subsidy for, in natural token units (e.g. 1.5). Needs --node and --jobType.",
     )
     .action(async (token, options) => {
       const { signer, chainId } = await initializeSigner();

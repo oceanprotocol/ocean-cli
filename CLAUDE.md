@@ -80,6 +80,7 @@ All registered in `src/cli.ts` via Commander (`commander` v13). Every command su
 - Tokens/auth: `mintOcean`, `generateAuthToken`, `invalidateAuthToken`.
 - Escrow: `depositEscrow`, `getUserFundsEscrow`, `withdrawFromEscrow`, `authorizeEscrow`, `getAuthorizationsEscrow`.
 - Access lists: `createAccessList`, `addToAccessList`, `checkAccessList`, `removeFromAccessList`.
+- Subsidy providers: `getSubsidyProviders` (alias `subsidyProviders`), `getSubsidyStatus` (alias `subsidyStatus`). Provider addresses come **only** from the node's status (`nodeSubsidyInfo` in `nodeConnection.ts`), never from bundled config — a node may not support subsidies. `getSubsidyStatus` uses the ocean.js `SubsidyView`/`OPFSubsidyProvider`/`OneTimeSubsidyProvider` wrappers. Compute/service commands (`startCompute`, `startService`, `extendService`) also take `--subsidyProviders <list>` (tri-state: omit → node default, `none`/empty → `[]`, CSV → those; parsed by `parseSubsidyProviders` in `helpers.ts`). `startFreeCompute` ignores it.
 - Persistent storage buckets: `createBucket`, `addFileToBucket`, `listBuckets`, `listFilesInBucket`, `getFileObject`, `deleteFile`.
 - Admin: `downloadNodeLogs`.
 - Node selection: `setNode` (alias `useNode`), `getNode` (alias `currentNode`).

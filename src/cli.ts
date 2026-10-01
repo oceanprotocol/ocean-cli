@@ -11,12 +11,17 @@ import {
   ServiceStatusNumber,
   ServiceRestartParams,
 } from "@oceanprotocol/lib";
-import { parseComputeInput, toBoolean } from "./helpers.js";
+import {
+  parseComputeInput,
+  toBoolean,
+  parseSubsidyProviders,
+} from "./helpers.js";
 import {
   getCurrentNodeUrl,
   getCurrentEnvId,
   hasNode,
   nodeChainIds,
+  nodeSubsidyInfo,
   setCurrentNodeUrl,
   setCurrentEnvId,
   clearCurrentEnvId,
@@ -152,6 +157,10 @@ const HELP_GROUPS: HelpGroup[] = [
     ],
   },
   {
+    heading: "Subsidy providers",
+    commands: ["getSubsidyProviders", "getSubsidyStatus"],
+  },
+  {
     heading: "Persistent storage (buckets)",
     commands: [
       "createBucket",
@@ -226,6 +235,32 @@ export function formatGroupedHelp(program: Command): string {
 // of hardcoding, so it can't drift. `../package.json` resolves from both src/
 // (dev via tsx) and dist/ (published), since both sit one level below the root.
 const pkg = createRequire(import.meta.url)("../package.json");
+
+// Print the subsidy-provider info a node advertises in its status (shared by getNode and
+// getSubsidyProviders). `indent` lets getNode nest it under the node summary.
+function printSubsidyInfo(
+  info: { providers: Record<string, string[]>; filter: boolean },
+  indent = "  ",
+): void {
+  const chains = Object.keys(info.providers).filter(
+    (c) => (info.providers[c]?.length ?? 0) > 0,
+  );
+  if (chains.length === 0) {
+    console.log(
+      chalk.yellow(`${indent}Subsidy providers: none advertised by this node.`),
+    );
+  } else {
+    console.log(`${indent}Subsidy providers:`);
+    for (const c of chains.sort()) {
+      console.log(`${indent}  chain ${c}: ${info.providers[c].join(", ")}`);
+    }
+  }
+  console.log(
+    `${indent}Subsidy provider filter (whitelist enforced): ${
+      info.filter ? "on" : "off"
+    }`,
+  );
+}
 
 // Parse a CLI JSON array-of-strings option (e.g. --cmd '["python","app.py"]').
 // Returns the array, or throws with a clear message for the action to surface.
@@ -627,9 +662,83 @@ export async function createCLI() {
         } catch {
           // RPC not configured / unavailable — the node info above is still useful.
         }
+        printSubsidyInfo(nodeSubsidyInfo(status));
       } else {
         console.log(chalk.yellow("Node is not reachable right now."));
       }
+    });
+
+  // getSubsidyProviders command — show the subsidy-provider contracts the current node
+  // advertises per chain (and whether it enforces a whitelist on user-supplied ones).
+  // Node-dependent (deliberately NOT in NODE_FREE_COMMANDS): the preAction gate refuses it
+  // until a node is set. Implemented inline like getNode — no signer/Commands needed.
+  program
+    .command("getSubsidyProviders")
+    .alias("subsidyProviders")
+    .description(
+      "Show the subsidy-provider contracts the current Ocean Node supports (per chain)",
+    )
+    .action(async () => {
+      const current = getCurrentNodeUrl();
+      if (!current) {
+        console.log(
+          chalk.yellow(
+            "No Ocean Node set. Run `setNode <nodeUrl>` to pick one.",
+          ),
+        );
+        return;
+      }
+      const status = await validateNode(current);
+      if (!status) {
+        console.log(chalk.yellow("Node is not reachable right now."));
+        return;
+      }
+      console.log(`Ocean Node: ${current}`);
+      printSubsidyInfo(nodeSubsidyInfo(status));
+    });
+
+  // getSubsidyStatus command — read-only, provider-agnostic subsidy report for a token on a
+  // chain: kind, per-window buckets (limit/used/remaining), claimable-now amount, contract
+  // balance, eligibility, and (with --node/--jobType/--amount) a quote. Provider addresses are
+  // discovered from the node; --subsidy only narrows to a subset the node advertises.
+  program
+    .command("getSubsidyStatus")
+    .alias("subsidyStatus")
+    .description(
+      "Show subsidy limits / remaining credit for a token from the node's subsidy providers",
+    )
+    .argument("<token>", "Token address to report limits/credit for")
+    .option("-t, --token <token>", "Token address to report limits/credit for")
+    .option(
+      "--chainId <chainId>",
+      "Subsidy/escrow chain (default: active chain)",
+    )
+    .option(
+      "--subsidy <list>",
+      "Narrow to specific node-advertised provider contract(s) (comma-separated); else all the node lists",
+    )
+    .option(
+      "--node <address>",
+      "Node address, for isNodeAllowed / quoteSubsidy",
+    )
+    .option(
+      "--jobType <type>",
+      "Job type for isJobTypeSubsidized / quoteSubsidy (compute | service | none)",
+    )
+    .option(
+      "--amount <value>",
+      "Job amount to quote a subsidy for (needs --node and --jobType)",
+    )
+    .action(async (token, options) => {
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
+      if ((await routeExplicit(commands, options.chainId)) === null) return;
+      await commands.getSubsidyStatus(token || options.token, {
+        subsidy: options.subsidy,
+        node: options.node,
+        jobType: options.jobType,
+        amount: options.amount,
+      });
     });
 
   // ---------------------------------------------------------------------------
@@ -978,6 +1087,10 @@ export async function createCLI() {
       "-o, --output [output]",
       "Output backend to save job results to. Supported types include S3, FTP, URL, Arweave, etc. Defaults to node local disk if omitted.",
     )
+    .option(
+      "--subsidyProviders <list>",
+      "Subsidy provider contract addresses (comma-separated) to claim against. Omit to use the node's defaults; pass 'none' (or empty) to explicitly claim with no subsidy.",
+    )
     .action(
       async (
         datasetDids,
@@ -1132,7 +1245,22 @@ export async function createCLI() {
           algoSvcId,
         ];
 
-        const started = await commands.computeStart(computeArgs, paymentChainId);
+        // Tri-state: undefined (node default) | [] (no subsidy) | [addr,...].
+        let subsidyProviders: string[] | undefined;
+        try {
+          subsidyProviders = parseSubsidyProviders(options.subsidyProviders);
+        } catch (e) {
+          console.error(
+            chalk.red(`Invalid --subsidyProviders: ${(e as Error).message}`),
+          );
+          return;
+        }
+
+        const started = await commands.computeStart(
+          computeArgs,
+          paymentChainId,
+          subsidyProviders,
+        );
         if (started) {
           console.log(chalk.green("Compute job started successfully."));
         }
@@ -1447,6 +1575,10 @@ export async function createCLI() {
       "--chainId <chainId>",
       "Payment/escrow chain (default: active chain); must be one the env prices on",
     )
+    .option(
+      "--subsidyProviders <list>",
+      "Subsidy provider contract addresses (comma-separated) to claim against. Omit for node defaults; 'none' (or empty) for no subsidy.",
+    )
     .action(async (computeEnvId, duration, paymentToken, options) => {
       const envId = options.env || computeEnvId;
       const token = paymentToken;
@@ -1474,11 +1606,13 @@ export async function createCLI() {
       let ports: number[] | undefined;
       let cmd: string[] | undefined;
       let entrypoint: string[] | undefined;
+      let subsidyProviders: string[] | undefined;
       try {
         if (options.ports) ports = parsePorts(options.ports);
         if (options.cmd) cmd = parseJsonStringArray("--cmd", options.cmd);
         if (options.entrypoint)
           entrypoint = parseJsonStringArray("--entrypoint", options.entrypoint);
+        subsidyProviders = parseSubsidyProviders(options.subsidyProviders);
       } catch (e) {
         console.error(chalk.red((e as Error).message));
         return;
@@ -1508,6 +1642,7 @@ export async function createCLI() {
         accept: options.accept,
         wait: options.wait,
         timeout: options.timeout,
+        subsidyProviders,
       });
     });
 
@@ -1637,6 +1772,10 @@ export async function createCLI() {
       toBoolean,
     )
     .option("--chainId <chainId>", "Payment/escrow chain (default: active chain)")
+    .option(
+      "--subsidyProviders <list>",
+      "Subsidy provider contract addresses (comma-separated) to claim against. Omit for node defaults; 'none' (or empty) for no subsidy.",
+    )
     .action(async (serviceId, additionalDuration, paymentToken, options) => {
       const id = options.service || serviceId;
       const addl = options.duration || additionalDuration;
@@ -1657,10 +1796,25 @@ export async function createCLI() {
         );
         return;
       }
+      let subsidyProviders: string[] | undefined;
+      try {
+        subsidyProviders = parseSubsidyProviders(options.subsidyProviders);
+      } catch (e) {
+        console.error(
+          chalk.red(`Invalid --subsidyProviders: ${(e as Error).message}`),
+        );
+        return;
+      }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
       if ((await routeExplicit(commands, options.chainId)) === null) return;
-      await commands.extendService(id, addl, token, options.accept);
+      await commands.extendService(
+        id,
+        addl,
+        token,
+        options.accept,
+        subsidyProviders,
+      );
     });
 
   // restartService command

@@ -699,6 +699,48 @@ Notes:
 
 ---
 
+### Subsidy Providers
+
+Subsidy providers are on-chain contracts that sponsor part or all of a job's cost (a subsidy released
+back to the payer, plus an optional bonus paid to the node), subject to allow-lists, job-type
+restrictions and per-period caps. **The Ocean Node is the source of truth for which subsidy providers
+are usable** — a node may not support them at all — so the CLI reads provider addresses from the node's
+status, never from bundled contract addresses.
+
+**See which subsidy providers a node supports:**
+
+- `npm run cli getSubsidyProviders`
+
+  Prints the per-chain subsidy-provider contracts the current node advertises, and whether the node
+  enforces a whitelist on user-supplied providers (`subsidyProviderFilter`). The same info is also shown
+  by `getNode`.
+
+**Check your subsidy limits / remaining credit for a token:**
+
+- **Positional:**  
+  `npm run cli getSubsidyStatus 0x1234...tokenAddress`
+
+- **Named Options:**  
+  `npm run cli getSubsidyStatus --token 0x1234...tokenAddress --chainId 8453 --node 0xNodeAddr --jobType compute --amount 10`
+
+  Discovers the provider contract(s) from the node, then for each prints its kind, per-window buckets
+  (limit / used / remaining / reset), the amount claimable now, the contract's available balance and your
+  eligibility. `--subsidy 0xAddr[,0xAddr2]` narrows to specific node-advertised contract(s);
+  `--node`/`--jobType`/`--amount` together also print a subsidy quote (`{subsidy, bonus}`).
+
+**Choose subsidy providers when starting compute / services:**
+
+- Add `--subsidyProviders <list>` to `startCompute`, `startService`, or `extendService`:
+  - omit the flag → the node uses its configured defaults,
+  - `--subsidyProviders none` (or empty) → claim with **no** subsidy,
+  - `--subsidyProviders 0xA,0xB` → claim against exactly those contracts.
+
+  e.g. `npm run cli startCompute -- did:op:dataset did:op:algo env1 900 0xToken '[...resources...]' --accept true --subsidyProviders 0xA,0xB`
+
+  (`startFreeCompute` ignores subsidy providers — a free job does no escrow claim.)
+
+---
+
 **Allow Algorithm on Dataset:**
 
 - **Positional:**  

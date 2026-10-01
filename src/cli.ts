@@ -727,7 +727,7 @@ export async function createCLI() {
     )
     .option(
       "--amount <value>",
-      "Job amount to quote a subsidy for (needs --node and --jobType)",
+      "Job amount to quote a subsidy for, in natural token units (e.g. 1.5 — the lib converts to base units). Needs --node and --jobType.",
     )
     .action(async (token, options) => {
       const { signer, chainId } = await initializeSigner();
@@ -1157,6 +1157,20 @@ export async function createCLI() {
           );
           return;
         }
+
+        // Tri-state: undefined (node default) | [] (no subsidy) | [addr,...].
+        // Validate up front so a malformed address is rejected before compute
+        // initialization and the payment prompt.
+        let subsidyProviders: string[] | undefined;
+        try {
+          subsidyProviders = parseSubsidyProviders(options.subsidyProviders);
+        } catch (e) {
+          console.error(
+            chalk.red(`Invalid --subsidyProviders: ${(e as Error).message}`),
+          );
+          return;
+        }
+
         const { signer, chainId } = await initializeSigner();
         const commands = new Commands(signer, chainId);
 
@@ -1244,17 +1258,6 @@ export async function createCLI() {
           svcIds,
           algoSvcId,
         ];
-
-        // Tri-state: undefined (node default) | [] (no subsidy) | [addr,...].
-        let subsidyProviders: string[] | undefined;
-        try {
-          subsidyProviders = parseSubsidyProviders(options.subsidyProviders);
-        } catch (e) {
-          console.error(
-            chalk.red(`Invalid --subsidyProviders: ${(e as Error).message}`),
-          );
-          return;
-        }
 
         const started = await commands.computeStart(
           computeArgs,

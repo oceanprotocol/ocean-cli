@@ -10,6 +10,7 @@ function makeAquarius(known?: Set<string>): Aquarius {
       if (known && !known.has(did)) return null;
       return {
         id: did,
+        version: "4.1.0",
         services: [
           {
             id: `service-${did}`,

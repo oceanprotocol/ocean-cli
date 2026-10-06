@@ -264,6 +264,20 @@ export async function handleComputeOrder(
   if (!Number.isInteger(serviceIndex) || serviceIndex < 0 || !service) {
     throw new Error(`Service index ${serviceIndex} not found in asset ${asset.id}`);
   }
+  // Validate new orders before approving fees. Reuse does not need indexed datatokens.
+  let datatokenIndex: number;
+  if (!order.validOrder) {
+    const { datatokens } = ddoInstance.getAssetFields();
+    datatokenIndex = datatokens?.findIndex(
+      (token) =>
+        token.address.toLowerCase() === service.datatokenAddress.toLowerCase(),
+    );
+    if (datatokenIndex === undefined || datatokenIndex < 0) {
+      throw new Error(
+        `Datatoken for service ${service.id} not found in asset ${asset.id}`,
+      );
+    }
+  }
   /* We do have 3 possible situations:
 	   - have validOrder and no providerFees -> then order is valid, providerFees are valid, just use it in startCompute
 	   - have validOrder and providerFees -> then order is valid but providerFees are not valid, we need to call reuseOrder and pay only providerFees
@@ -294,16 +308,6 @@ export async function handleComputeOrder(
     return orderReusedTx.transactionHash;
   }
   console.log("Ordering asset with DID: ", asset.id);
-  const { datatokens } = ddoInstance.getAssetFields();
-  const datatokenIndex = datatokens?.findIndex(
-    (token) =>
-      token.address.toLowerCase() === service.datatokenAddress.toLowerCase(),
-  );
-  if (datatokenIndex === undefined || datatokenIndex < 0) {
-    throw new Error(
-      `Datatoken for service ${service.id} not found in asset ${asset.id}`,
-    );
-  }
   const txStartOrder = await orderAsset(
     asset,
     payerAccount,

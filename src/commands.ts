@@ -555,7 +555,10 @@ export class Commands {
         );
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error);
-        console.error(chalk.red("Error getting Policy Server Object:"), message);
+        console.error(
+          chalk.red("Error getting Policy Server Object:"),
+          message,
+        );
         return;
       }
     }
@@ -3140,6 +3143,10 @@ export class Commands {
     maxLockedAmount: string,
     maxLockSeconds: string,
     maxLockCounts: string,
+    // Escrow v2: unix timestamp (seconds) after which the payee can no longer create/extend
+    // locks. Omitted/undefined → "0" (indefinite, the pre-v2 behaviour). A past timestamp
+    // revokes; claim and cancel are never gated by it, so funds are never stuck.
+    expiryTimestamp?: string,
   ) {
     try {
       // Neither the Escrow contract nor ocean.js rejects a zero/negative limit —
@@ -3159,6 +3166,22 @@ export class Commands {
         }
       }
 
+      // expiryTimestamp is optional; when given it must be a non-negative integer (unix
+      // seconds). "0" is the indefinite default. A value in the past is allowed on purpose —
+      // that is how a revoke is expressed.
+      let expiry = "0";
+      if (expiryTimestamp !== undefined && expiryTimestamp !== "") {
+        if (!/^\d+$/.test(expiryTimestamp.trim())) {
+          console.error(
+            chalk.red(
+              `expiryTimestamp must be a non-negative unix timestamp in seconds (got "${expiryTimestamp}"). Use 0 for indefinite.`,
+            ),
+          );
+          return false;
+        }
+        expiry = expiryTimestamp.trim();
+      }
+
       const escrowAddress = requireAddress(
         Number(this.config.chainId),
         "escrow",
@@ -3167,40 +3190,23 @@ export class Commands {
 
       const escrow = new EscrowContract(getAddress(escrowAddress), this.signer);
 
-      console.log("Authorizing payee...");
+      // Escrow v2: authorize() always sends a transaction now — it creates OR overwrites the
+      // on-chain record (it no longer silently no-ops when one already exists). That is what
+      // makes renew / shorten / revoke reachable: re-authorizing updates the limits, and a past
+      // expiry revokes. So authorizeTx is always a TransactionResponse here (never null).
+      const expiryNote =
+        expiry === "0"
+          ? "indefinite"
+          : `expiry ${expiry} (${new Date(Number(expiry) * 1000).toISOString()})`;
+      console.log(`Authorizing payee... (${expiryNote})`);
       const authorizeTx = await escrow.authorize(
         getAddress(token),
         getAddress(payee),
         maxLockedAmount,
         maxLockSeconds,
         maxLockCounts,
+        expiry,
       );
-      // ocean.js sends NO transaction when an authorization already exists for
-      // (payer, token, payee) — authorizeTx is null and the existing limits stay
-      // as they are. Say so explicitly: dereferencing null here used to surface
-      // as a TypeError under "Authorization failed", which reads like a chain
-      // error and hides the fact that the old, possibly lower, maxLockSeconds /
-      // maxLockedAmount / maxLockCounts are still in force.
-      if (!authorizeTx) {
-        const existing = await escrow.getAuthorizations(
-          getAddress(token),
-          await this.signer.getAddress(),
-          getAddress(payee),
-        );
-        console.log(
-          chalk.yellow(
-            `Payee ${payee} is already authorized for token ${token} — the existing ` +
-              `authorization was left untouched (it cannot be raised or lowered here).`,
-          ),
-        );
-        if (existing?.length) {
-          const a = existing[0];
-          console.log(
-            `  maxLockedAmount (wei): ${a.maxLockedAmount}   maxLockSeconds: ${a.maxLockSeconds}   maxLockCounts: ${a.maxLockCounts}`,
-          );
-        }
-        return true;
-      }
       await authorizeTx.wait();
       console.log(`Successfully authorized payee ${payee} for token ${token}`);
 
@@ -3248,14 +3254,127 @@ export class Commands {
       decimals,
     );
 
+    // Escrow v2: the auth tuple gained a 7th field, expiryTimestamp (unix seconds; 0 =
+    // indefinite). A legacy (v1) escrow returns a 6-field tuple, so read defensively and treat
+    // a missing value as indefinite.
+    const expiryRaw = authorization.expiryTimestamp ?? authorization[6] ?? "0";
+    const expirySeconds = Number(expiryRaw);
+    const expiryLabel =
+      !expirySeconds || expirySeconds === 0
+        ? "indefinite (0)"
+        : `${expirySeconds} (${new Date(expirySeconds * 1000).toISOString()})${
+            expirySeconds * 1000 < Date.now() ? " — EXPIRED/revoked" : ""
+          }`;
+
     console.log("Authorizations found:");
-    console.log(`- Current Locked Amount: ${Number(currentLockedAmount)}`);
+    // Escrow v2: currentLockedAmount reflects only the payer's OWN locked funds (P), not any
+    // provider-sponsored portion (S). The sponsored bucket is read via getEscrowInfo.
+    console.log(
+      `- Current Locked Amount (payer-funded): ${Number(currentLockedAmount)}`,
+    );
     console.log(`- Current Locks: ${authorization.currentLocks}`);
     console.log(`- Max locked amount: ${Number(maxLockedAmount)}`);
     console.log(`- Max lock seconds: ${authorization.maxLockSeconds}`);
     console.log(`- Max lock counts: ${authorization.maxLockCounts}`);
+    console.log(`- Expiry: ${expiryLabel}`);
 
     return authorizations;
+  }
+
+  /**
+   * Read-only Escrow v2 diagnostics for the active (or --chainId) chain. Uses ERC-165 capability
+   * discovery so it also prints something sensible against a legacy (pre-v2) escrow. When a token
+   * is supplied it additionally prints, for a lock-subsidy escrow, the sponsored bucket total and
+   * the signer's reclaimable amount, and for an enterprise escrow, the token's fee gate.
+   */
+  public async getEscrowInfo(token?: string) {
+    const chainId = Number(this.config.chainId);
+    const escrowAddress = requireAddress(chainId, "escrow", "Escrow");
+    const escrow = new EscrowContract(
+      getAddress(escrowAddress),
+      this.signer,
+      chainId,
+    );
+
+    console.log(`Escrow ${escrowAddress} (chain ${chainId}):`);
+
+    // version() / escrowKind() only exist on a v2 escrow — a legacy escrow reverts or lacks the
+    // method, which surfaces as a thrown error; catch and report "legacy (pre-v2)".
+    let isV2 = true;
+    try {
+      const version = await escrow.version();
+      console.log(`- Version: ${version}`);
+    } catch {
+      isV2 = false;
+      console.log("- Version: legacy (pre-v2, no on-chain version())");
+    }
+
+    if (isV2) {
+      try {
+        const kind = await escrow.escrowKind();
+        console.log(
+          `- Kind: ${kind === 1 ? "ENTERPRISE (fee-gated)" : "COMMUNITY (permissionless)"}`,
+        );
+      } catch {
+        /* escrowKind not available — ignore */
+      }
+    }
+
+    // supportsInterface() is safe against a legacy escrow (returns false on revert).
+    const lockSubsidy = await escrow.isEscrowLockSubsidy();
+    const enterprise = await escrow.isEscrowEnterprise();
+    console.log(`- Lock-time sponsorship (IEscrowLockSubsidy): ${lockSubsidy}`);
+    console.log(`- Enterprise (IEscrowEnterprise): ${enterprise}`);
+
+    if (lockSubsidy) {
+      try {
+        const max = await escrow.maxSponsorsPerLock();
+        console.log(`- Max sponsors per lock: ${max}`);
+      } catch {
+        /* ignore */
+      }
+    }
+
+    if (!token) {
+      if (lockSubsidy || enterprise) {
+        console.log(
+          chalk.gray(
+            "Pass a token address to also see the sponsored bucket / fee gate for that token.",
+          ),
+        );
+      }
+      return;
+    }
+
+    const tokenAddress = getAddress(token);
+
+    if (lockSubsidy) {
+      try {
+        const sponsoredTotal = await escrow.getSponsoredTotal(tokenAddress);
+        const reclaimable = await escrow.getReclaimable(
+          await this.signer.getAddress(),
+          tokenAddress,
+        );
+        console.log(`- Sponsored bucket total (${token}): ${sponsoredTotal}`);
+        console.log(`- Your reclaimable (${token}): ${reclaimable}`);
+      } catch (error) {
+        console.error(chalk.yellow("Could not read sponsorship state:"), error);
+      }
+    }
+
+    if (enterprise) {
+      try {
+        const collector = await escrow.feeCollector();
+        const allowed = await escrow.isTokenAllowed(tokenAddress);
+        console.log(`- Fee collector: ${collector}`);
+        console.log(`- Token allowed (${token}): ${allowed}`);
+      } catch (error) {
+        console.error(
+          chalk.yellow("Could not read enterprise fee gate:"),
+          error,
+        );
+      }
+    }
   }
 
   // Map the user's --jobType to the on-chain JobType enum (NONE=0, COMPUTE=1, SERVICE=2,

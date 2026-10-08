@@ -92,17 +92,18 @@ const HELP_GROUPS: HelpGroup[] = [
   },
   {
     heading: "Chains & RPC",
-    commands: [
-      "addChain",
-      "removeChain",
-      "listChains",
-      "setChain",
-      "getChain",
-    ],
+    commands: ["addChain", "removeChain", "listChains", "setChain", "getChain"],
   },
   {
     heading: "Assets — publish, edit, consume",
-    commands: ["publish", "publishAlgo", "editAsset", "allowAlgo", "getDDO", "download"],
+    commands: [
+      "publish",
+      "publishAlgo",
+      "editAsset",
+      "allowAlgo",
+      "getDDO",
+      "download",
+    ],
   },
   {
     heading: "Compute",
@@ -145,6 +146,7 @@ const HELP_GROUPS: HelpGroup[] = [
       "withdrawFromEscrow",
       "authorizeEscrow",
       "getAuthorizationsEscrow",
+      "getEscrowInfo",
     ],
   },
   {
@@ -188,14 +190,19 @@ function groupedCommandNames(): string[] {
 // vanish from help), one grouped twice, or a group naming a command that no longer exists.
 function assertHelpGroupsCoverAll(program: Command): void {
   const grouped = groupedCommandNames();
-  const dupes = [...new Set(grouped.filter((n, i) => grouped.indexOf(n) !== i))];
+  const dupes = [
+    ...new Set(grouped.filter((n, i) => grouped.indexOf(n) !== i)),
+  ];
   const registered = program.commands.map((c) => c.name());
   const missing = registered.filter((n) => !grouped.includes(n));
   const unknown = grouped.filter((n) => !registered.includes(n));
   const problems: string[] = [];
-  if (dupes.length) problems.push(`listed in more than one group: ${dupes.join(", ")}`);
-  if (missing.length) problems.push(`not in any help group: ${missing.join(", ")}`);
-  if (unknown.length) problems.push(`grouped but not registered: ${unknown.join(", ")}`);
+  if (dupes.length)
+    problems.push(`listed in more than one group: ${dupes.join(", ")}`);
+  if (missing.length)
+    problems.push(`not in any help group: ${missing.join(", ")}`);
+  if (unknown.length)
+    problems.push(`grouped but not registered: ${unknown.join(", ")}`);
   if (problems.length) {
     throw new Error(`Help groups out of sync — ${problems.join("; ")}`);
   }
@@ -213,7 +220,10 @@ export function formatGroupedHelp(program: Command): string {
     return `  ${label}${gap}${desc}`;
   };
 
-  const out: string[] = [chalk.bold(`Ocean CLI v${pkg.version} — commands`), ""];
+  const out: string[] = [
+    chalk.bold(`Ocean CLI v${pkg.version} — commands`),
+    "",
+  ];
   for (const group of HELP_GROUPS) {
     out.push(chalk.cyan.bold(group.heading));
     for (const n of group.commands ?? []) out.push(line(n));
@@ -328,7 +338,9 @@ function resolveChainId(flag?: string | number): number {
   if (flag !== undefined && flag !== null && `${flag}`.trim() !== "") {
     const id = Number(flag);
     if (!Number.isInteger(id) || id <= 0) {
-      throw new Error(`Invalid --chainId "${flag}": must be a positive integer.`);
+      throw new Error(
+        `Invalid --chainId "${flag}": must be a positive integer.`,
+      );
     }
     if (!hasChain(id)) {
       throw new Error(
@@ -647,7 +659,9 @@ export async function createCLI() {
           const configured = nodeChains.filter((c) => hasChain(Number(c)));
           if (configured.length) {
             console.log(
-              chalk.green(`  RPC configured for chain(s): ${configured.join(", ")}`),
+              chalk.green(
+                `  RPC configured for chain(s): ${configured.join(", ")}`,
+              ),
             );
           }
           if (missing.length) {
@@ -864,7 +878,9 @@ export async function createCLI() {
   program
     .command("setChain")
     .alias("useChain")
-    .description("Set the default (active) chain (must be registered; persists)")
+    .description(
+      "Set the default (active) chain (must be registered; persists)",
+    )
     .argument("<chainId>", "Chain id to make default")
     .option("-c, --chainId <chainId>", "Chain id to make default")
     .action(async (chainIdArg, options) => {
@@ -1774,7 +1790,10 @@ export async function createCLI() {
       "Auto-confirm payment (true/false)",
       toBoolean,
     )
-    .option("--chainId <chainId>", "Payment/escrow chain (default: active chain)")
+    .option(
+      "--chainId <chainId>",
+      "Payment/escrow chain (default: active chain)",
+    )
     .option(
       "--subsidyProviders <list>",
       "Subsidy provider contract addresses (comma-separated) to claim against. Omit for node defaults; 'none' (or empty) for no subsidy.",
@@ -2056,7 +2075,9 @@ export async function createCLI() {
   // Escrow authorization command
   program
     .command("authorizeEscrow")
-    .description("Authorize a payee to lock and claim funds from escrow")
+    .description(
+      "Authorize (or re-authorize) a payee to lock and claim funds from escrow. Re-running overwrites the existing limits (renew/shorten); pass a past --expiry to revoke",
+    )
     .argument("<token>", "Address of the token to authorize")
     .argument("<payee>", "Address of the payee to authorize")
     .argument("<maxLockedAmount>", "Maximum amount that can be locked by payee")
@@ -2075,6 +2096,10 @@ export async function createCLI() {
     .option(
       "-c, --maxLockCounts <maxLockCounts>",
       "Maximum number of locks allowed",
+    )
+    .option(
+      "-e, --expiry <timestamp>",
+      "Escrow v2: unix timestamp (seconds) after which the payee can no longer create/extend locks. 0 = indefinite (default). A past timestamp revokes; claim/cancel are never gated by it",
     )
     .option("--chainId <chainId>", "Escrow chain (default: active chain)")
     .action(
@@ -2101,6 +2126,7 @@ export async function createCLI() {
           maxLockedAmountValue,
           maxLockSecondsValue,
           maxLockCountsValue,
+          options.expiry,
         );
 
         if (!success) {
@@ -2111,6 +2137,27 @@ export async function createCLI() {
         console.log(chalk.green("Authorization successful"));
       },
     );
+
+  // Escrow v2 diagnostics: escrow kind/version, ERC-165 capabilities, and (with a token) the
+  // sponsored bucket / enterprise fee gate.
+  program
+    .command("getEscrowInfo")
+    .alias("escrowInfo")
+    .description(
+      "Show escrow capabilities for the active chain (version, kind, lock-time sponsorship, enterprise fee gate). Pass a token to also read the sponsored bucket and fee gate",
+    )
+    .argument(
+      "[token]",
+      "Optional token address to read the sponsored bucket / fee gate for",
+    )
+    .option("-t, --token <token>", "Optional token address")
+    .option("--chainId <chainId>", "Escrow chain (default: active chain)")
+    .action(async (token, options) => {
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
+      if ((await routeExplicit(commands, options.chainId)) === null) return;
+      await commands.getEscrowInfo(options.token || token);
+    });
 
   program
     .command("getAuthorizationsEscrow")
@@ -2267,7 +2314,7 @@ export async function createCLI() {
       "-m, --maxLogs [maxLogs]",
       "Maximum number of logs to retrieve (default: 100, max: 1000)",
     )
-    .action(async (output, last, from, to, options) => {
+    .action(async (output, last, from, to, maxLogs, options) => {
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
       await commands.downloadNodeLogs([
@@ -2275,7 +2322,7 @@ export async function createCLI() {
         options.last || last,
         options.from || from,
         options.to || to,
-        options.maxLogs,
+        options.maxLogs || maxLogs,
       ]);
     });
 
@@ -2380,8 +2427,14 @@ export async function createCLI() {
       "--token <addresses>",
       "Restrict to payment-token address(es), comma-separated; applied to every --chain",
     )
-    .option("--max-price <amount>", "Drop paid results costing more than this (human units)")
-    .option("--duration <seconds>", "Assumed job duration for the cost estimate")
+    .option(
+      "--max-price <amount>",
+      "Drop paid results costing more than this (human units)",
+    )
+    .option(
+      "--duration <seconds>",
+      "Assumed job duration for the cost estimate",
+    )
     .option(
       "--order-by <key>",
       "Order results: price | freeCapacity | resources | leastBusy",

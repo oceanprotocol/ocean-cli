@@ -147,7 +147,7 @@ describe("Ocean CLI Escrow", function () {
     const expiry = Math.floor(Date.now() / 1000) + 3600;
 
     const output = await runCommand(
-      `npm run cli authorizeEscrow ${tokenAddress} ${payee.address} 1 3600 10 --expiry ${expiry}`,
+      `npm run cli -- authorizeEscrow ${tokenAddress} ${payee.address} 1 3600 10 --expiry ${expiry}`,
     );
     expect(output).to.include("Authorization successful");
 
@@ -163,7 +163,7 @@ describe("Ocean CLI Escrow", function () {
     // A timestamp in the past revokes: the payee can no longer create new locks, but existing
     // locks stay claimable/cancellable.
     const output = await runCommand(
-      `npm run cli authorizeEscrow ${tokenAddress} ${payee.address} 1 3600 10 --expiry 1`,
+      `npm run cli -- authorizeEscrow ${tokenAddress} ${payee.address} 1 3600 10 --expiry 1`,
     );
     expect(output).to.include("Authorization successful");
 
@@ -175,7 +175,7 @@ describe("Ocean CLI Escrow", function () {
 
   it("should reject a non-numeric expiry", async function () {
     const output = await runCommand(
-      `npm run cli authorizeEscrow ${tokenAddress} ${payee.address} 1 3600 10 --expiry not-a-timestamp`,
+      `npm run cli -- authorizeEscrow ${tokenAddress} ${payee.address} 1 3600 10 --expiry not-a-timestamp`,
     );
     expect(output).to.include("Authorization failed");
   });

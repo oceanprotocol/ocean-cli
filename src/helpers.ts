@@ -707,3 +707,21 @@ export function summarizeComputeEnvFees(env: {
   return `${header}: pays on\n${lines.join("\n")}`;
 }
 
+
+/**
+ * Parse the `--subsidyProviders` CLI value into the tri-state the Ocean Node expects
+ * (ocean-node #1485, ocean.js #2160):
+ *   - flag omitted          -> `undefined` (the node uses its configured defaults)
+ *   - `none` / empty string -> `[]`        (explicitly claim with NO subsidy providers)
+ *   - a CSV of addresses    -> `string[]`  (use exactly these, EIP-55 normalized)
+ * Preserving the `undefined` vs `[]` distinction is essential — the ocean.js request
+ * body is truthy-guarded (`if (subsidyProviders)`), and `[]` is truthy, so an empty
+ * array is transmitted while `undefined` is omitted.
+ * Throws on a malformed address.
+ */
+export function parseSubsidyProviders(raw?: string): string[] | undefined {
+  if (raw === undefined) return undefined;
+  const trimmed = raw.trim();
+  if (trimmed === "" || trimmed.toLowerCase() === "none") return [];
+  return trimmed.split(",").map((a) => ethers.getAddress(a.trim()));
+}

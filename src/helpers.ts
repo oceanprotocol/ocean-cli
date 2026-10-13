@@ -258,6 +258,26 @@ export async function handleComputeOrder(
   oceanNodeUrl: string,
   consumeMarkerFee?: ConsumeMarketFee,
 ) {
+  const ddoInstance = DDOManager.getDDOClass(asset);
+  const { services } = ddoInstance.getDDOFields();
+  const service = services?.[serviceIndex];
+  if (!Number.isInteger(serviceIndex) || serviceIndex < 0 || !service) {
+    throw new Error(`Service index ${serviceIndex} not found in asset ${asset.id}`);
+  }
+  // Validate new orders before approving fees. Reuse does not need indexed datatokens.
+  let datatokenIndex: number;
+  if (!order.validOrder) {
+    const { datatokens } = ddoInstance.getAssetFields();
+    datatokenIndex = datatokens?.findIndex(
+      (token) =>
+        token.address.toLowerCase() === service.datatokenAddress.toLowerCase(),
+    );
+    if (datatokenIndex === undefined || datatokenIndex < 0) {
+      throw new Error(
+        `Datatoken for service ${service.id} not found in asset ${asset.id}`,
+      );
+    }
+  }
   /* We do have 3 possible situations:
 	   - have validOrder and no providerFees -> then order is valid, providerFees are valid, just use it in startCompute
 	   - have validOrder and providerFees -> then order is valid but providerFees are not valid, we need to call reuseOrder and pay only providerFees
@@ -272,14 +292,14 @@ export async function handleComputeOrder(
       config,
       await payerAccount.getAddress(),
       order.providerFee.providerFeeToken,
-      asset.services[0].datatokenAddress,
+      service.datatokenAddress,
       order.providerFee.providerFeeAmount,
     );
   }
   if (order.validOrder) {
     if (!order.providerFee) return order.validOrder;
     const tx = await datatoken.reuseOrder(
-      asset.services[0].datatokenAddress,
+      service.datatokenAddress,
       order.validOrder,
       order.providerFee,
     );
@@ -297,6 +317,9 @@ export async function handleComputeOrder(
     consumerAddress,
     consumeMarkerFee,
     providerFees,
+    undefined,
+    datatokenIndex,
+    serviceIndex,
   );
 
   if (!txStartOrder) return;
@@ -323,7 +346,10 @@ export async function isOrderable(
     // `documentId` first so published algorithms are validated against the
     // dataset's provider rather than the raw-algorithm allowance.
     if (algorithm.documentId) {
-      const algoService = algorithmDDO?.services.find(
+      const servicesAlgo = algorithmDDO
+        ? DDOManager.getDDOClass(algorithmDDO).getDDOFields().services
+        : undefined;
+      const algoService = servicesAlgo?.find(
         (s) => s.id === algorithm.serviceId,
       );
       if (algoService && algoService.type === "compute") {
@@ -424,9 +450,14 @@ export async function resolveComputeInputs(
         );
         return null;
       }
+      const { services } = DDOManager.getDDOClass(dataDdo).getDDOFields();
+      if (!services?.[0]) {
+        console.error(`Error: dataset ${token} has no services.`);
+        return null;
+      }
       assets.push({
         documentId: dataDdo.id,
-        serviceId: dataDdo.services[0].id,
+        serviceId: services[0].id,
       });
       ddos.push(dataDdo);
     } else if (token && typeof token === "object") {
@@ -453,7 +484,8 @@ export async function resolveComputeInputs(
   let providerURI = fallbackProviderURI;
   const firstDdo = ddos.find((d) => d !== null);
   if (firstDdo) {
-    providerURI = firstDdo.services[0].serviceEndpoint;
+    const { services } = DDOManager.getDDOClass(firstDdo).getDDOFields();
+    providerURI = services[0].serviceEndpoint;
   }
 
   // Resolve the algorithm (single entry: DID or raw object)
@@ -476,10 +508,20 @@ export async function resolveComputeInputs(
       );
       return null;
     }
+    const { services, metadata } =
+      DDOManager.getDDOClass(algoDdo).getDDOFields();
+    if (!services?.[0]) {
+      console.error(`Error: algorithm ${algoToken} has no services.`);
+      return null;
+    }
+    if (!metadata?.algorithm) {
+      console.error(`Error: algorithm ${algoToken} has no algorithm metadata.`);
+      return null;
+    }
     algo = {
       documentId: algoDdo.id,
-      serviceId: algoDdo.services[0].id,
-      meta: algoDdo.metadata.algorithm,
+      serviceId: services[0].id,
+      meta: metadata.algorithm,
     };
   } else if (algoToken && typeof algoToken === "object") {
     const rawAlgo = algoToken as unknown as ComputeAlgorithm;
@@ -706,4 +748,3 @@ export function summarizeComputeEnvFees(env: {
   });
   return `${header}: pays on\n${lines.join("\n")}`;
 }
-

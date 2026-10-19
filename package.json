@@ -1,6 +1,6 @@
 {
   "name": "@oceanprotocol/cli",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "CLI tool to interact with the oceanprotocol's JavaScript library to privately & securely publish, consume and run compute on data.",
   "type": "module",
   "bin": {
@@ -61,7 +61,7 @@
     "@eslint/js": "^10.0.1",
     "@types/chai": "^5.2.3",
     "@types/mocha": "^10.0.10",
-    "@types/node": "^22.20.1",
+    "@types/node": "^26.6.4",
     "auto-changelog": "^2.6.0",
     "chai": "^6.2.2",
     "eslint": "^10.8.1",
@@ -75,8 +75,8 @@
   },
   "dependencies": {
     "@oasisprotocol/sapphire-ethers-v6": "^6.0.1",
-    "@oceanprotocol/contracts": "^3.2.0-rc.0",
-    "@oceanprotocol/ddo-js": "^0.4.1",
+    "@oceanprotocol/contracts": "^3.2.0-rc.1",
+    "@oceanprotocol/ddo-js": "^1.0.0",
     "@oceanprotocol/lib": "^9.3.0-next.4",
     "axios": "^1.19.0",
     "chalk": "^4.1.2",

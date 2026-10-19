@@ -3194,10 +3194,19 @@ export class Commands {
       // on-chain record (it no longer silently no-ops when one already exists). That is what
       // makes renew / shorten / revoke reachable: re-authorizing updates the limits, and a past
       // expiry revokes. So authorizeTx is always a TransactionResponse here (never null).
-      const expiryNote =
-        expiry === "0"
-          ? "indefinite"
-          : `expiry ${expiry} (${new Date(Number(expiry) * 1000).toISOString()})`;
+      // Format the ISO date defensively: a valid unix-seconds string can still be large
+      // enough that expiry * 1000 falls outside JavaScript Date's ±8.64e15 ms range, where
+      // toISOString() throws. The on-chain expiry is unaffected, so keep it and drop only the
+      // human-readable ISO suffix when conversion is invalid.
+      let expiryNote: string;
+      if (expiry === "0") {
+        expiryNote = "indefinite";
+      } else {
+        const expiryDate = new Date(Number(expiry) * 1000);
+        expiryNote = Number.isNaN(expiryDate.getTime())
+          ? `expiry ${expiry}`
+          : `expiry ${expiry} (${expiryDate.toISOString()})`;
+      }
       console.log(`Authorizing payee... (${expiryNote})`);
       const authorizeTx = await escrow.authorize(
         getAddress(token),

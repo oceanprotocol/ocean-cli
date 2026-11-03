@@ -51,8 +51,12 @@ jobs:
     # Guards the global-install contract without needing a full Ocean stack:
     # a broken bin, cwd-dependent module loading, or env-gated --help/--version
     # would all fail here. Also asserts the publish tarball excludes sources.
-    runs-on: ubuntu-latest
-
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node: ["22", "24", "26"]
     steps:
       - name: Checkout code
         uses: actions/checkout@v7

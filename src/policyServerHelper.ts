@@ -10,12 +10,77 @@ import {
   SsiWalletDid,
   SsiWalletSession,
 } from "./policyServerInterfaces.js";
-import axios from "axios";
 import { Signer } from "ethers";
 
 // Bounded timeout for the node `status` probe. Without it an unresponsive node
 // would hang the probe (and any download/compute waiting on it) indefinitely.
 const PS_STATUS_PROBE_TIMEOUT_MS = 10_000;
+
+/**
+ * Thrown by `request()` on a non-2xx response. Carries the HTTP status and the
+ * parsed body (`data`), but deliberately not the request headers, so an
+ * Authorization bearer token never ends up in a logged error.
+ */
+export class HttpError extends Error {
+  constructor(
+    public readonly status: number,
+    public readonly data: unknown,
+    url: string,
+    statusText: string,
+  ) {
+    super(`HTTP ${status}${statusText ? ` ${statusText}` : ""} from ${url}`);
+    this.name = "HttpError";
+  }
+}
+
+interface RequestOptions {
+  method?: "GET" | "POST";
+  /** Objects are JSON-encoded; strings are sent verbatim. */
+  body?: unknown;
+  headers?: Record<string, string>;
+  timeoutMs?: number;
+}
+
+/**
+ * Minimal `fetch` wrapper mirroring the axios behavior this module used to rely
+ * on: JSON-encodes object bodies, parses the response as JSON when it is
+ * (falling back to the raw text), and throws an `HttpError` on a non-2xx status.
+ */
+async function request<T = any>(
+  url: string,
+  { method = "GET", body, headers = {}, timeoutMs }: RequestOptions = {},
+): Promise<T> {
+  const init: RequestInit = {
+    method,
+    headers: { Accept: "application/json, text/plain, */*", ...headers },
+  };
+  if (body !== undefined) {
+    if (typeof body === "string") {
+      init.body = body;
+    } else {
+      init.body = JSON.stringify(body);
+      init.headers = { "Content-Type": "application/json", ...init.headers };
+    }
+  }
+  if (timeoutMs) {
+    init.signal = AbortSignal.timeout(timeoutMs);
+  }
+
+  const response = await fetch(url, init);
+  const text = await response.text();
+  let data: unknown = text;
+  if (text.length > 0) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      // Not JSON (e.g. the wallet nonce endpoint returns plain text).
+    }
+  }
+  if (!response.ok) {
+    throw new HttpError(response.status, data, url, response.statusText);
+  }
+  return data as T;
+}
 
 /**
  * Probe whether the target node has a policy server configured, via the
@@ -28,12 +93,12 @@ export async function isPolicyServerConfigured(
   providerUrl: string,
 ): Promise<boolean> {
   try {
-    const statusResponse = await axios.post(
-      `${providerUrl}/directCommand`,
-      { command: "status" },
-      { timeout: PS_STATUS_PROBE_TIMEOUT_MS },
-    );
-    return statusResponse.data?.isPSConfigured === true;
+    const status = await request(`${providerUrl}/directCommand`, {
+      method: "POST",
+      body: { command: "status" },
+      timeoutMs: PS_STATUS_PROBE_TIMEOUT_MS,
+    });
+    return status?.isPSConfigured === true;
   } catch {
     return false;
   }
@@ -67,24 +132,19 @@ export async function connectToSSIWallet(
     throw new Error("No SSI Wallet API configured");
   }
 
-  try {
-    let response = await axios.get(`${api}/wallet-api/auth/account/web3/nonce`);
+  const nonce = await request<string>(
+    `${api}/wallet-api/auth/account/web3/nonce`,
+  );
+  const payload = {
+    challenge: nonce,
+    signed: await owner.signMessage(nonce),
+    publicKey: await owner.getAddress(),
+  };
 
-    const nonce = response.data;
-    const payload = {
-      challenge: nonce,
-      signed: await owner.signMessage(nonce),
-      publicKey: await owner.getAddress(),
-    };
-
-    response = await axios.post(
-      `${api}/wallet-api/auth/account/web3/signed`,
-      payload,
-    );
-    return response.data;
-  } catch (error) {
-    throw error.response ?? error;
-  }
+  return request<SsiWalletSession>(
+    `${api}/wallet-api/auth/account/web3/signed`,
+    { method: "POST", body: payload },
+  );
 }
 
 export async function sendPresentationRequest(
@@ -98,26 +158,14 @@ export async function sendPresentationRequest(
   if (!api) {
     throw new Error("No SSI Wallet API configured");
   }
-  try {
-    const response = await axios.post(
-      `${api}/wallet-api/wallet/${walletId}/exchange/usePresentationRequest`,
-      {
-        did,
-        presentationRequest,
-        selectedCredentials,
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        withCredentials: true,
-      },
-    );
-
-    return response.data;
-  } catch (error) {
-    throw error.response ?? error;
-  }
+  return request<{ redirectUri: string }>(
+    `${api}/wallet-api/wallet/${walletId}/exchange/usePresentationRequest`,
+    {
+      method: "POST",
+      body: { did, presentationRequest, selectedCredentials },
+      headers: { Authorization: `Bearer ${token}` },
+    },
+  );
 }
 
 export async function resolvePresentationRequest(
@@ -129,22 +177,14 @@ export async function resolvePresentationRequest(
   if (!api) {
     throw new Error("No SSI Wallet API configured");
   }
-  try {
-    const response = await axios.post(
-      `${api}/wallet-api/wallet/${walletId}/exchange/resolvePresentationRequest`,
-      presentationRequest,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        withCredentials: true,
-      },
-    );
-
-    return response.data;
-  } catch (error) {
-    throw error.response ?? error;
-  }
+  return request<string>(
+    `${api}/wallet-api/wallet/${walletId}/exchange/resolvePresentationRequest`,
+    {
+      method: "POST",
+      body: presentationRequest,
+      headers: { Authorization: `Bearer ${token}` },
+    },
+  );
 }
 
 export async function getWalletDids(
@@ -155,21 +195,9 @@ export async function getWalletDids(
   if (!api) {
     throw new Error("No SSI Wallet API configured");
   }
-  try {
-    const response = await axios.get(
-      `${api}/wallet-api/wallet/${walletId}/dids`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        withCredentials: true,
-      },
-    );
-
-    return response.data;
-  } catch (error) {
-    throw error.response ?? error;
-  }
+  return request<SsiWalletDid[]>(`${api}/wallet-api/wallet/${walletId}/dids`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
 }
 
 export async function requestCredentialPresentation(
@@ -201,30 +229,25 @@ export async function requestCredentialPresentation(
       consumerAddress,
       documentId: asset.id,
     };
-    const response = await axios.post(
+    const data = await request(
       `${providerUrl}/api/services/PolicyServerPassthrough`,
-      {
-        policyServerPassthrough: action,
-      },
+      { method: "POST", body: { policyServerPassthrough: action } },
     );
 
-    if (response.data.length === 0) {
+    if (data.length === 0) {
       // eslint-disable-next-line no-throw-literal
       throw { success: false, message: "No openid4vc url found" };
     }
 
     return {
-      success: response.data?.success,
-      openid4vc: response.data?.message,
+      success: data?.success,
+      openid4vc: data?.message,
       policyServerData: policyServer,
     };
   } catch (error) {
-    if (error.request?.response) {
-      const err = JSON.parse(error.request.response);
-      throw err;
-    }
-    if (error.response?.data) {
-      throw error.response?.data;
+    // On an HTTP error the node's response body carries the actual reason.
+    if (error instanceof HttpError && error.data) {
+      throw error.data;
     }
     throw error;
   }
@@ -239,22 +262,14 @@ export async function matchCredentialForPresentationDefinition(
   if (!api) {
     throw new Error("No SSI Wallet API configured");
   }
-  try {
-    const response = await axios.post(
-      `${api}/wallet-api/wallet/${walletId}/exchange/matchCredentialsForPresentationDefinition`,
-      presentationDefinition,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        withCredentials: true,
-      },
-    );
-
-    return response.data;
-  } catch (error) {
-    throw error.response ?? error;
-  }
+  return request<SsiVerifiableCredential[]>(
+    `${api}/wallet-api/wallet/${walletId}/exchange/matchCredentialsForPresentationDefinition`,
+    {
+      method: "POST",
+      body: presentationDefinition,
+      headers: { Authorization: `Bearer ${token}` },
+    },
+  );
 }
 
 export async function getPd(
@@ -266,14 +281,12 @@ export async function getPd(
       action: PolicyServerActions.GET_PD,
       sessionId,
     };
-    const response = await axios.post(
+    const data = await request(
       `${providerUrl}/api/services/PolicyServerPassthrough`,
-      {
-        policyServerPassthrough: action,
-      },
+      { method: "POST", body: { policyServerPassthrough: action } },
     );
 
-    if (typeof response.data === "string" && response.data.length === 0) {
+    if (typeof data === "string" && data.length === 0) {
       // eslint-disable-next-line no-throw-literal
       throw {
         success: false,
@@ -281,10 +294,10 @@ export async function getPd(
       };
     }
 
-    return response.data?.message;
+    return data?.message;
   } catch (error) {
-    if (error.response?.data) {
-      throw error.response?.data;
+    if (error instanceof HttpError && error.data) {
+      throw error.data;
     }
     throw error;
   }
@@ -317,12 +330,12 @@ export async function getPolicyServerOBJ(
 ): Promise<PolicyServerInitiateActionData | null> {
   try {
     try {
-      const statusResponse = await axios.post(
-        `${providerUrl}/directCommand`,
-        { command: "status" },
-        { timeout: PS_STATUS_PROBE_TIMEOUT_MS },
-      );
-      if (statusResponse.data?.isPSConfigured !== true) {
+      const status = await request(`${providerUrl}/directCommand`, {
+        method: "POST",
+        body: { command: "status" },
+        timeoutMs: PS_STATUS_PROBE_TIMEOUT_MS,
+      });
+      if (status?.isPSConfigured !== true) {
         return null;
       }
     } catch {
@@ -416,8 +429,8 @@ export async function getPolicyServerOBJ(
       presentationDefinitionUri: "",
     };
   } catch (error: any) {
-    // Log the message only: an axios error carries the full request config,
-    // including the Authorization bearer token for the SSI wallet.
+    // Log the message only; never dump the whole error object, which could
+    // wrap a request that carried the SSI wallet's Authorization bearer token.
     console.error(`getPolicyServerOBJ error: ${error?.message}`);
     if (error?.message) {
       throw new Error(`getPolicyServerOBJ failed: ${error.message}`, {
@@ -504,8 +517,8 @@ export async function getPolicyServerOBJs(
 
     return results;
   } catch (error: any) {
-    // Log the message only: an axios error carries the full request config,
-    // including the Authorization bearer token for the SSI wallet.
+    // Log the message only; never dump the whole error object, which could
+    // wrap a request that carried the SSI wallet's Authorization bearer token.
     console.error(`getPolicyServerOBJs error: ${error?.message}`);
     if (error?.message) {
       throw new Error(`getPolicyServerOBJs failed: ${error.message}`, {

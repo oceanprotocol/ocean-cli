@@ -8,6 +8,8 @@ permissions:
 
 jobs:
   build:
+    # Builds once and packs the publish tarball; pack_smoke reuses it instead
+    # of repeating npm ci + build on every OS/Node cell of its matrix.
     runs-on: ubuntu-latest
 
     steps:
@@ -21,63 +23,21 @@ jobs:
         with:
           node-version: "24"
 
-      - name: Install dependencies
-        run: npm install
-
-      - name: Run build
-        run: npm run build
-
-  lint:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
+      # node_modules is cached whole (not just ~/.npm) and keyed on the
+      # lockfile, so a hit skips npm ci entirely. build, lint and test_system
+      # share one key, so the first job to finish seeds the others.
+      - name: Restore node_modules
+        id: node-modules
+        uses: actions/cache@v6
         with:
-          persist-credentials: false
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: "24"
+          path: node_modules
+          key: node-modules-${{ runner.os }}-node24-${{ hashFiles('package-lock.json') }}
 
       - name: Install dependencies
-        run: npm install
-
-      - name: Run lint
-        run: npm run lint
-
-  pack_smoke:
-    # Guards the global-install contract without needing a full Ocean stack:
-    # a broken bin, cwd-dependent module loading, or env-gated --help/--version
-    # would all fail here. Also asserts the publish tarball excludes sources.
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-        node: ["22", "24", "26"]
-    defaults:
-      run:
-        # windows-latest defaults to PowerShell, which cannot run the
-        # VAR=$(...) / tar / grep / /dev/null bash idioms below. Git Bash
-        # ships on the Windows runners, so one shell serves all three OSes.
-        shell: bash
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: ${{ matrix.node }}
-
-      - name: Install dependencies
+        if: steps.node-modules.outputs.cache-hit != 'true'
         run: npm ci
 
-      - name: Build
+      - name: Run build
         run: npm run build
 
       - name: Pack tarball
@@ -97,8 +57,77 @@ jobs:
             echo "Tarball must not ship src/ or test/"; exit 1
           fi
 
+      - name: Upload tarball
+        uses: actions/upload-artifact@v7
+        with:
+          name: npm-tarball
+          path: ${{ env.TARBALL }}
+          if-no-files-found: error
+          retention-days: 1
+
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+
+      - name: Restore node_modules
+        id: node-modules
+        uses: actions/cache@v6
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-node24-${{ hashFiles('package-lock.json') }}
+
+      - name: Install dependencies
+        if: steps.node-modules.outputs.cache-hit != 'true'
+        run: npm ci
+
+      - name: Run lint
+        run: npm run lint
+
+  pack_smoke:
+    # Guards the global-install contract without needing a full Ocean stack:
+    # a broken bin, cwd-dependent module loading, or env-gated --help/--version
+    # would all fail here. The tarball itself (built and content-checked once
+    # in `build`) is platform-independent tsc output, so each matrix cell only
+    # installs it globally and runs the bin -- no checkout, npm ci, or build.
+    needs: build
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node: ["22", "24", "26"]
+    defaults:
+      run:
+        # windows-latest defaults to PowerShell, which cannot run the
+        # VAR=$(...) / /dev/null bash idioms below. Git Bash ships on the
+        # Windows runners, so one shell serves all three OSes.
+        shell: bash
+    steps:
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Download tarball
+        uses: actions/download-artifact@v8
+        with:
+          name: npm-tarball
+
       - name: Install globally from tarball
-        run: npm i -g "./$TARBALL"
+        run: |
+          TARBALL=$(ls ./*.tgz)
+          echo "Installing $TARBALL"
+          npm i -g "$TARBALL"
 
       - name: Run bin from a foreign cwd with NO env vars
         working-directory: ${{ runner.temp }}
@@ -126,15 +155,6 @@ jobs:
         with:
           node-version: "24"
 
-      - name: Cache node_modules
-        uses: actions/cache@v6
-        env:
-          cache-name: cache-node-modules
-        with:
-          path: ~/.npm
-          key: ${{ runner.os }}-test-${{ matrix.transport }}-${{ env.cache-name }}-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: ${{ runner.os }}-test-${{ matrix.transport }}-${{ env.cache-name }}-
-
       - name: Set ADDRESS_FILE
         run: echo "ADDRESS_FILE=${HOME}/.ocean/ocean-contracts/artifacts/address.json" >> $GITHUB_ENV
 
@@ -158,7 +178,16 @@ jobs:
         working-directory: ${{ github.workspace }}/barge
         run: |
           bash -x start_ocean.sh --with-typesense 2>&1 > start_ocean.log &
-      - run: npm ci
+      - name: Restore node_modules
+        id: node-modules
+        uses: actions/cache@v6
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-node24-${{ hashFiles('package-lock.json') }}
+
+      - name: Install dependencies
+        if: steps.node-modules.outputs.cache-hit != 'true'
+        run: npm ci
       - run: npm run build
       - run: docker image ls
       - name: Wait for node to be ready

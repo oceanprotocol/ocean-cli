@@ -137,5 +137,56 @@ describe("Ocean CLI Escrow", function () {
     expect(output).to.include("Max locked amount: 1");
     expect(output).to.include("Max lock seconds: 3600");
     expect(output).to.include("Max lock counts: 10");
+    // Escrow v2: the authorization now carries an expiry; the one set above was indefinite.
+    expect(output).to.include("Expiry:");
+  });
+
+  it("should re-authorize a payee with an expiry (Escrow v2 overwrite)", async function () {
+    // A future expiry. authorize() in Escrow v2 overwrites the existing record instead of
+    // no-op'ing, so this renews the authorization with a bounded expiry.
+    const expiry = Math.floor(Date.now() / 1000) + 3600;
+
+    const output = await runCommand(
+      `npm run cli -- authorizeEscrow ${tokenAddress} ${payee.address} 1 3600 10 --expiry ${expiry}`,
+    );
+    expect(output).to.include("Authorization successful");
+
+    const info = await runCommand(
+      `npm run cli getAuthorizationsEscrow ${tokenAddress} ${payee.address}`,
+    );
+    // Expiry is now a concrete timestamp, not "indefinite (0)".
+    expect(info).to.include("Expiry:");
+    expect(info).to.not.include("indefinite (0)");
+  });
+
+  it("should revoke a payee with a past expiry (Escrow v2)", async function () {
+    // A timestamp in the past revokes: the payee can no longer create new locks, but existing
+    // locks stay claimable/cancellable.
+    const output = await runCommand(
+      `npm run cli -- authorizeEscrow ${tokenAddress} ${payee.address} 1 3600 10 --expiry 1`,
+    );
+    expect(output).to.include("Authorization successful");
+
+    const info = await runCommand(
+      `npm run cli getAuthorizationsEscrow ${tokenAddress} ${payee.address}`,
+    );
+    expect(info).to.include("EXPIRED/revoked");
+  });
+
+  it("should reject a non-numeric expiry", async function () {
+    const output = await runCommand(
+      `npm run cli -- authorizeEscrow ${tokenAddress} ${payee.address} 1 3600 10 --expiry not-a-timestamp`,
+    );
+    expect(output).to.include("Authorization failed");
+  });
+
+  it("should report escrow capabilities via getEscrowInfo", async function () {
+    const output = await runCommand(
+      `npm run cli getEscrowInfo ${tokenAddress}`,
+    );
+    // Against the Escrow v2 deployment this prints the version and the ERC-165 capability flags.
+    expect(output).to.include("Version:");
+    expect(output).to.include("Lock-time sponsorship (IEscrowLockSubsidy):");
+    expect(output).to.include("Enterprise (IEscrowEnterprise):");
   });
 });

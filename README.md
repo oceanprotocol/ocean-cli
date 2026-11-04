@@ -596,6 +596,17 @@ Notes:
 
 ---
 
+> **Escrow v2.** The escrow contracts now support **lock-time pre-funded sponsorship** (a subsidy
+> provider can back part or all of a lock when it is created, so a fully-sponsored user can transact
+> with no deposit) and **authorization expiry** (a payee key can be time-boxed or revoked). The CLI
+> reflects this: `authorizeEscrow` takes an `--expiry` and re-running it overwrites the record
+> (renew/shorten/revoke), `getAuthorizationsEscrow` prints the expiry, and `getEscrowInfo` reports
+> the escrow's capabilities and the sponsored bucket. Reading escrow state, note that
+> `getUserFunds().locked` and an authorization's `Current Locked Amount` now count only the payer's
+> **own** locked funds — provider-sponsored tokens live in a separate sponsored bucket
+> (`getEscrowInfo <token>`). These commands require the Escrow v2 deployment; they still work (and
+> degrade gracefully) against a legacy escrow. See the full change set in `PR_description.md`.
+
 **Deposit to Escrow:**
 
 - **Positional:**  
@@ -640,6 +651,20 @@ Notes:
   - `maxLockedAmount`: Maximum amount that can be locked by payee
   - `maxLockSeconds`: Maximum lock duration in seconds
   - `maxLockCounts`: Maximum number of locks allowed
+- Options:
+  - `-e, --expiry <timestamp>`: **(Escrow v2)** unix timestamp (seconds) after which the payee
+    can no longer create/extend locks. `0` = indefinite (default). Re-running `authorizeEscrow`
+    **overwrites** the existing authorization (renew/shorten); passing an `--expiry` in the past
+    **revokes** it. Claim and cancel are never gated by expiry, so existing locks stay claimable.
+
+  Examples — revoke a payee, then re-grant for 1 hour:
+
+  ```bash
+  # revoke now (any past timestamp works)
+  npm run cli authorizeEscrow 0x<token> 0x<payee> 1000 3600 10 --expiry 1
+  # re-authorize, expiring 1h from now
+  npm run cli authorizeEscrow 0x<token> 0x<payee> 1000 3600 10 --expiry $(( $(date +%s) + 3600 ))
+  ```
 
 ---
 
@@ -650,6 +675,29 @@ Notes:
 
 - **Named Options:**  
   `npm run cli getAuthorizationsEscrow --token 0x1234...tokenAddress --payee 0x5678...payeeAddress`
+
+- Prints the current/max lock limits, current locks, and **(Escrow v2)** the authorization's
+  `expiryTimestamp` (`indefinite (0)`, or the ISO date, flagged `EXPIRED/revoked` when in the past).
+  Note that `Current Locked Amount` now reflects only the **payer-funded** portion of live locks —
+  any provider-sponsored amount lives in the separate sponsored bucket (see `getEscrowInfo`).
+
+---
+
+**Get Escrow Info (Escrow v2):**
+
+- **Positional:**  
+  `npm run cli getEscrowInfo` or `npm run cli getEscrowInfo 0x1234...tokenAddress`
+
+- **Named Options:**  
+  `npm run cli getEscrowInfo --token 0x1234...tokenAddress --chainId 8453`
+
+- Reads the escrow deployment on the active (or `--chainId`) chain via ERC-165 capability
+  discovery and prints: the on-chain `version`, the `escrowKind` (`COMMUNITY` vs `ENTERPRISE`),
+  whether lock-time sponsorship (`IEscrowLockSubsidy`) and the enterprise fee gate
+  (`IEscrowEnterprise`) are supported, and `maxSponsorsPerLock`. When a `token` is supplied it also
+  prints the sponsored-bucket total and your reclaimable amount (lock-subsidy escrows), and the fee
+  collector + whether the token is allowed (enterprise escrows). Works against a legacy (pre-v2)
+  escrow too — it simply reports it as legacy. Alias: `escrowInfo`.
 
 ---
 
@@ -696,6 +744,48 @@ Notes:
 
 - **Named Options:**  
   `npm run cli removeFromAccessList --address 0x1234...accessListAddress --users "0xUser1,0xUser2"`
+
+---
+
+### Subsidy Providers
+
+Subsidy providers are on-chain contracts that sponsor part or all of a job's cost (a subsidy released
+back to the payer, plus an optional bonus paid to the node), subject to allow-lists, job-type
+restrictions and per-period caps. **The Ocean Node is the source of truth for which subsidy providers
+are usable** — a node may not support them at all — so the CLI reads provider addresses from the node's
+status, never from bundled contract addresses.
+
+**See which subsidy providers a node supports:**
+
+- `npm run cli getSubsidyProviders`
+
+  Prints the per-chain subsidy-provider contracts the current node advertises, and whether the node
+  enforces a whitelist on user-supplied providers (`subsidyProviderFilter`). The same info is also shown
+  by `getNode`.
+
+**Check your subsidy limits / remaining credit for a token:**
+
+- **Positional:**  
+  `npm run cli getSubsidyStatus 0x1234...tokenAddress`
+
+- **Named Options:**  
+  `npm run cli getSubsidyStatus --token 0x1234...tokenAddress --chainId 8453 --node 0xNodeAddr --jobType compute --amount 10`
+
+  Discovers the provider contract(s) from the node, then for each prints its kind, per-window buckets
+  (limit / used / remaining / reset), the amount claimable now, the contract's available balance and your
+  eligibility. `--subsidy 0xAddr[,0xAddr2]` narrows to specific node-advertised contract(s);
+  `--node`/`--jobType`/`--amount` together also print a subsidy quote (`{subsidy, bonus}`).
+
+**Choose subsidy providers when starting compute / services:**
+
+- Add `--subsidyProviders <list>` to `startCompute`, `startService`, or `extendService`:
+  - omit the flag → the node uses its configured defaults,
+  - `--subsidyProviders none` (or empty) → claim with **no** subsidy,
+  - `--subsidyProviders 0xA,0xB` → claim against exactly those contracts.
+
+  e.g. `npm run cli startCompute -- did:op:dataset did:op:algo env1 900 0xToken '[...resources...]' --accept true --subsidyProviders 0xA,0xB`
+
+  (`startFreeCompute` ignores subsidy providers — a free job does no escrow claim.)
 
 ---
 
@@ -944,11 +1034,17 @@ Notes:
   `-p, --payee <payee>`  
   `-m, --maxLockedAmount <maxLockedAmount>`  
   `-s, --maxLockSeconds <maxLockSeconds>`  
-  `-c, --maxLockCounts <maxLockCounts>`
+  `-c, --maxLockCounts <maxLockCounts>`  
+  `-e, --expiry <timestamp>` (Escrow v2; `0` = indefinite, a past value revokes)  
+  `--chainId <chainId>`
 
 - **getAuthorizationsEscrow:**  
   `-t, --token <token>`  
   `-p, --payee <payee>`
+
+- **getEscrowInfo (escrowInfo):**  
+  `[token]` / `-t, --token <token>`  
+  `--chainId <chainId>`
 
 - **createAccessList:**  
   `-n, --name <name>`  

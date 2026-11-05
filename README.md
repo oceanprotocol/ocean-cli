@@ -77,7 +77,7 @@ All configuration is via environment variables.
 
 | Variable | Description |
 | --- | --- |
-| `NODE_URL` | The initial Ocean Node: HTTP(S) URL, libp2p peer id, or full multiaddr. The CLI starts without it, but then only `setNode`, `getNode` and `help` (plus the chain commands) work; everything else fails with `No Ocean Node set` until you run `setNode`. In practice, set it. |
+| `NODE_URL` | The initial Ocean Node: HTTP(S) URL, libp2p peer id, or full multiaddr. The CLI starts without it, but then only `setNode`, `setNodeEnv`, `getNode`, `help`, `searchComputeResources` and the chain commands work; everything else fails with `No Ocean Node set` until you run `setNode`. (`searchComputeResources` runs node-free but still needs `RPC`, a signer and libp2p — it is a way to *find* a node before selecting one.) In practice, set it. |
 
 **Optional**
 
@@ -100,7 +100,7 @@ All configuration is via environment variables.
 - **Interactive vs one-shot.** By default the CLI runs the command you pass (if any) and then stays in a prompt (REPL). Leave with `exit`, `quit`, **ESC** or **CTRL-C**. In the prompt you can type the bare command or paste a full `ocean-cli ...` line. With `AVOID_LOOP_RUN=true` it runs once and exits. In one-shot mode `setNode` only validates; the switch dies with the process, so use `NODE_URL`.
 - **Positional or named arguments.** Every command accepts both; named options may come in any order and win over positionals. `publish metadata.json` equals `publish --file metadata.json`.
 - **JSON arguments.** Single-quote JSON on the shell and put `--` before the arguments so option parsing stops: `ocean-cli startCompute -- '["did:op:a",{"fileObject":{...}}]' did:op:algo ...`.
-- **Help.** `ocean-cli h` lists commands, `ocean-cli help <command>` shows a command's arguments and options.
+- **Help.** `ocean-cli h` or `ocean-cli help` prints the grouped command list (the `help` command takes no argument). For a specific command's arguments and options, add `--help` / `-h` after it: `ocean-cli publish --help`.
 
 ## Nodes and chains
 
@@ -109,7 +109,7 @@ All configuration is via environment variables.
 ```bash
 ocean-cli setNode http://127.0.0.1:8001      # alias useNode; also a peer id, multiaddr, or --node
 ocean-cli getNode                            # alias currentNode: active node, version, chains served
-ocean-cli setNodeEnv 16Uiu2HAm...|0xff10...-0xc92e...   # alias useNodeEnv
+ocean-cli setNodeEnv '16Uiu2HAm...|0xff10...-0xc92e...'   # alias useNodeEnv (quote: the token contains a '|')
 ```
 
 `setNode` health-checks the node first; if unreachable, nothing changes. `setNodeEnv` takes the `Node+env:` token printed by `searchComputeResources`, switches node like `setNode` and remembers the compute env so `startCompute` / `startFreeCompute` need no `--env`. Notes:
@@ -128,7 +128,7 @@ ocean-cli setChain 137                                               # alias use
 ocean-cli getChain                                                   # alias currentChain
 ```
 
-Added chains persist to `~/.ocean/cli/rpc.json`. The default chain resolves as: `setChain` / `CHAIN_ID` -> persisted default -> the only configured chain -> the one chain both the node serves and your registry knows.
+Added chains persist to `~/.ocean/cli/rpc.json`. The active default chain is: `setChain` / `CHAIN_ID` -> persisted default -> the only configured chain. If none of those resolve, commands that target a specific chain require an explicit `--chainId`. (The display-only `listChains` additionally reports the single chain the node and your registry both know, but that intersection is not used to auto-select a chain for commands.)
 
 **How each command picks its chain:**
 
@@ -142,7 +142,7 @@ For `startCompute`, `--chainId` is the **payment/escrow** chain only; each asset
 
 ## Command guide
 
-Each section shows the common usage; run `ocean-cli help <command>` for every option, or see the [reference table](#command-reference).
+Each section shows the common usage; run `ocean-cli <command> --help` for every option, or see the [reference table](#command-reference).
 
 ### Assets
 
@@ -162,11 +162,11 @@ ocean-cli allowAlgo did:op:dataset did:op:algo               # dataset NFT owner
 ```bash
 ocean-cli getComputeEnvironments [nodeUrlOrPeerId]           # alias getC2DEnvs; prints a payment summary per env
 ocean-cli searchComputeResources --cpu 4 --ram 16 --paid --chain 8996 --order-by price   # alias findComputeNodes
-ocean-cli startCompute -- did1,did2 algoDid env1 3600 0xPaymentToken '[{"id":"cpu","amount":1}]' --accept true
+ocean-cli startCompute --accept true -- did1,did2 algoDid env1 3600 0xPaymentToken '[{"id":"cpu","amount":1}]'
 ocean-cli startFreeCompute did1,did2 algoDid env1
 ocean-cli getJobStatus did:op:123 job-123                    # or --dataset --job [--agreement]
-ocean-cli downloadJobResults job-123 0 ./results             # or --job --index --folder
-ocean-cli stopCompute did:op:123 job-123
+ocean-cli downloadJobResults job-123 0 ./results             # positional only (jobId, index, folder)
+ocean-cli stopCompute did:op:123 job-123 <agreementId>       # agreementId is required
 ocean-cli computeStreamableLogs <jobId>                      # or --job
 ```
 
@@ -176,7 +176,7 @@ ocean-cli computeStreamableLogs <jobId>                      # or --job
 - `paymentToken` is required: a token the environment accepts on the payment chain (see `getComputeEnvironments`).
 - `resources` is required: stringified JSON within the environment's limits, e.g. `'[{"id":"cpu","amount":3},{"id":"ram","amount":16772672536},{"id":"disk","amount":0}]'`.
 - `--accept true` auto-confirms payment (mandatory when stdin is not a TTY); `false` prompts.
-- `--services svc1,svc2` and `--algo-service` are optional; the first available service is used when omitted.
+- `--services` (comma-separated dataset service ids, mapped by position to the datasets) and `--algo-service` (the algorithm's service id) are optional; the first available service is used when omitted.
 - `--output` is an optional stringified JSON remote-storage backend for results (S3, FTP, URL, Arweave, IPFS); omitted means results stay on the node's disk. Example: `'{"remoteStorage":{"type":"s3","s3Access":{"endpoint":"https://s3.amazonaws.com","region":"us-east-1","bucket":"my-results","objectKey":"jobs/result.tar","accessKeyId":"AKIA...","secretAccessKey":"..."}}}'`.
 
 `startFreeCompute` takes the same dataset/algo/`--services`/`--algo-service`/`--output` arguments, targets a free environment and does no ordering or payment.
@@ -185,13 +185,13 @@ ocean-cli computeStreamableLogs <jobId>                      # or --job
 
 ```bash
 # Raw algorithm on a dataset that sets allowRawAlgorithm: true
-ocean-cli startCompute -- did:op:dataset '{"fileObject":{"type":"url","url":"https://example.com/algo.py","method":"GET"},"meta":{"container":{"entrypoint":"python $ALGO","image":"oceanprotocol/algo_dockers","tag":"python-branin","checksum":"sha256:..."}}}' env1 900 paymentToken resources --accept true
+ocean-cli startCompute --accept true -- did:op:dataset '{"fileObject":{"type":"url","url":"https://example.com/algo.py","method":"GET"},"meta":{"container":{"entrypoint":"python $ALGO","image":"oceanprotocol/algo_dockers","tag":"python-branin","checksum":"sha256:..."}}}' env1 900 paymentToken resources
 
 # Raw dataset on a published algorithm
-ocean-cli startCompute -- '[{"fileObject":{"type":"url","url":"https://example.com/data.csv","method":"GET"}}]' did:op:algo env1 900 paymentToken resources --accept true
+ocean-cli startCompute --accept true -- '[{"fileObject":{"type":"url","url":"https://example.com/data.csv","method":"GET"}}]' did:op:algo env1 900 paymentToken resources
 
 # Mixed: published DID plus raw IPFS file
-ocean-cli startCompute -- '["did:op:dataset",{"fileObject":{"type":"ipfs","hash":"Qm..."}}]' did:op:algo env1 900 paymentToken resources --accept true
+ocean-cli startCompute --accept true -- '["did:op:dataset",{"fileObject":{"type":"ipfs","hash":"Qm..."}}]' did:op:algo env1 900 paymentToken resources
 ```
 
 **Finding a node.** `searchComputeResources` is a P2P/DHT search (needs libp2p, so not with `DISABLE_P2P=true`; works before `setNode`). Run it with no filters for an interactive wizard, or script it with flags: `--cpu --ram --disk --gpu --gpu-model --resource name:amount (repeatable) --free|--paid|--both --chain <ids> --token <addrs> --max-price --duration --order-by price|freeCapacity|resources|leastBusy`. `--chain` and `--token` take comma-separated lists; a paid env pricing on several requested chains is listed once per chain. Each match starts with a ready-to-run `setNodeEnv <node>|<env>` line. Environments that fall short of the request are filtered out, with a note on how many.
@@ -208,15 +208,15 @@ ocean-cli depositEscrow 0x<token> 100
 ocean-cli authorizeEscrow 0x<token> 0x<envConsumerAddress> 100 90000 100
 
 # From an operator template, or your own image (tag goes in --tag, not --image)
-ocean-cli -- startService <envId> 3600 0x<token> --template jupyter-cpu --user-data '{"JUPYTER_TOKEN":"secret"}'
-ocean-cli -- startService <envId> 3600 0x<token> --image nginxinc/nginx-unprivileged --tag alpine --ports 8080
+ocean-cli startService <envId> 3600 0x<token> --template jupyter-cpu --user-data '{"JUPYTER_TOKEN":"secret"}'
+ocean-cli startService <envId> 3600 0x<token> --image nginxinc/nginx-unprivileged --tag alpine --ports 8080
 
 ocean-cli getServiceStatus <serviceId>                     # alias myServices; YOUR services, full detail
-ocean-cli -- getServices --status 40                       # alias listServices; ALL owners on the node
-ocean-cli -- serviceLogs <serviceId> --since 10m           # alias computeServiceLogs
-ocean-cli -- extendService <serviceId> 1800 --accept true
-ocean-cli -- restartService <serviceId>                    # reuse stored spec
-ocean-cli -- restartService <serviceId> --image myrepo/algo --tag v2   # rebuild on a new image
+ocean-cli getServices --status 40                          # alias listServices; ALL owners on the node
+ocean-cli serviceLogs <serviceId> --since 10m              # alias computeServiceLogs
+ocean-cli extendService <serviceId> 1800 --accept true
+ocean-cli restartService <serviceId>                       # reuse stored spec
+ocean-cli restartService <serviceId> --image myrepo/algo --tag v2   # rebuild on a new image
 ocean-cli stopService <serviceId>
 ```
 
@@ -286,11 +286,11 @@ ocean-cli mintOcean [--token 0xOcean] [--chainId 8996]     # mint test Ocean tok
 
 ## Command reference
 
-50 commands, as registered in `src/cli.ts`. `<x>` is required, `[x]` optional. Every command accepts the positionals as named options unless noted. `help <cmd>` is authoritative.
+50 commands, as registered in `src/cli.ts`. `<x>` is required, `[x]` optional. Every command accepts the positionals as named options unless noted. `<command> --help` is authoritative.
 
 | Command | Aliases | Arguments | Options |
 | --- | --- | --- | --- |
-| `help` | `h` | `[command]` | |
+| `help` | `h` | | |
 | `setNode` | `useNode` | `<nodeUrl>` | `-n, --node` |
 | `setNodeEnv` | `useNodeEnv` | `<nodeEnv>` | |
 | `getNode` | `currentNode` | | |
@@ -305,14 +305,14 @@ ocean-cli mintOcean [--token 0xOcean] [--chainId 8996]     # mint test Ocean tok
 | `editAsset` | `edit` | `<did> <file>` | `-d, --did`, `-f, --file`, `-e, --encrypt [bool]` |
 | `download` | | `<did> [folder] [serviceId]` | `-d, --did`, `-f, --folder` (default `.`), `-s, --service` |
 | `allowAlgo` | | `<datasetDid> <algoDid>` | `-d, --dataset`, `-a, --algo`, `-e, --encrypt [bool]` |
-| `startCompute` | | `[datasets] [algo] [env] [maxJobDuration] [paymentToken] [resources] [services] [algoServiceId]` | `-d, --datasets`, `-a, --algo`, `-e, --env`, `--maxJobDuration`, `-t, --token`, `--resources`, `--chainId`, `--accept`, `--init`, `--amountToDeposit`, `-o, --output`, `-s, --services`, `-x, --algo-service` |
-| `startFreeCompute` | | `[datasets] [algo] [env] [services] [algoServiceId]` | `-d, --datasets`, `-a, --algo`, `-e, --env`, `-o, --output`, `-s, --services`, `-x, --algo-service`, `--chainId` |
+| `startCompute` | | `[datasets] [algo] [env] [maxJobDuration] [paymentToken] [resources] [output] [serviceIds] [algoServiceId]` | `-d, --datasets`, `-a, --algo`, `-e, --env`, `--maxJobDuration`, `-t, --token`, `--resources`, `--chainId`, `--accept`, `-o, --output`, `-s, --services`, `-x, --algo-service` |
+| `startFreeCompute` | | `[datasets] [algo] [env] [output] [serviceIds] [algoServiceId]` | `-d, --datasets`, `-a, --algo`, `-e, --env`, `-o, --output`, `-s, --services`, `-x, --algo-service`, `--chainId` |
 | `getComputeEnvironments` | `getC2DEnvs` | `[node]` | `-n, --node` |
 | `searchComputeResources` | `findComputeNodes` | | `--cpu --ram --disk --gpu --gpu-model --resource --free --paid --both --chain --token --max-price --duration --order-by` |
 | `computeStreamableLogs` | | `<jobId>` | `-j, --job` |
-| `stopCompute` | | `<datasetDid> <jobId> [agreementId]` | `-d, --dataset`, `-j, --job`, `-a, --agreement` |
+| `stopCompute` | | `<datasetDid> <jobId> <agreementId>` | `-d, --dataset`, `-j, --job`, `-a, --agreement` |
 | `getJobStatus` | | `<datasetDid> <jobId> [agreementId]` | `-d, --dataset`, `-j, --job`, `-a, --agreement` |
-| `downloadJobResults` | | `<jobId> <index> [folder]` | `-j, --job`, `-i, --index`, `-f, --folder` |
+| `downloadJobResults` | | `<jobId> <index> [folder]` | |
 | `getServiceTemplates` | `serviceTemplates` | `[node]` | `-n, --node` |
 | `startService` | | `<computeEnvId> <duration> <paymentToken>` | `--template`, `-i, --image`, `--tag`, `--checksum`, `--dockerfile`, `--additional-docker-files`, `--cmd`, `--entrypoint`, `-p, --ports`, `-r, --resources`, `-u, --user-data`, `--user-data-file`, `--accept`, `--wait`, `--timeout`, `--chainId` |
 | `getServiceStatus` | `myServices` | `[serviceId]` | `-s, --service`, `-v, --verbose` |

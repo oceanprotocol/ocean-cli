@@ -98,7 +98,7 @@ All configuration is via environment variables.
 ## How the CLI works
 
 - **Interactive vs one-shot.** By default the CLI runs the command you pass (if any) and then stays in a prompt (REPL). Leave with `exit`, `quit`, **ESC** or **CTRL-C**. In the prompt you can type the bare command or paste a full `ocean-cli ...` line. With `AVOID_LOOP_RUN=true` it runs once and exits. In one-shot mode `setNode` only validates; the switch dies with the process, so use `NODE_URL`.
-- **Positional or named arguments.** Every command accepts both; named options may come in any order and win over positionals. `publish metadata.json` equals `publish --file metadata.json`.
+- **Positional and named arguments.** Named options may come in any order and **override** the matching positional when both are given. But a **required** positional (`<x>`) must still be supplied positionally — passing only its named option fails with Commander's *missing required argument* (e.g. `publish --file metadata.json` errors; use `publish metadata.json`, and `publish metadata.json --file other.json` lets the option win). Optional positionals (`[x]`) may be omitted or supplied via their named option. A few commands (e.g. `downloadJobResults`) are positional-only.
 - **JSON arguments.** Single-quote JSON on the shell and put `--` before the arguments so option parsing stops: `ocean-cli startCompute -- '["did:op:a",{"fileObject":{...}}]' did:op:algo ...`.
 - **Help.** `ocean-cli h` or `ocean-cli help` prints the grouped command list (the `help` command takes no argument). For a specific command's arguments and options, add `--help` / `-h` after it: `ocean-cli publish --help`.
 
@@ -286,7 +286,7 @@ ocean-cli mintOcean [--token 0xOcean] [--chainId 8996]     # mint test Ocean tok
 
 ## Command reference
 
-50 commands, as registered in `src/cli.ts`. `<x>` is required, `[x]` optional. Every command accepts the positionals as named options unless noted. `<command> --help` is authoritative.
+50 commands, as registered in `src/cli.ts`. `<x>` is required, `[x]` optional. A named option **overrides** its positional when both are passed, but a required `<x>` must still be given positionally (passing only its option fails with *missing required argument* — this affects e.g. `publish`, `startCompute`, `startFreeCompute`); optional `[x]` positionals may instead be supplied as named options. Commands with no Options entry (e.g. `downloadJobResults`) are positional-only. `<command> --help` is authoritative.
 
 | Command | Aliases | Arguments | Options |
 | --- | --- | --- | --- |

@@ -79,7 +79,7 @@
     "@oceanprotocol/ddo-js": "^1.0.0",
     "@oceanprotocol/lib": "^9.0.0",
     "axios": "^1.19.0",
-    "chalk": "^4.1.2",
+    "chalk": "^6.0.1",
     "commander": "^13.1.0",
     "enquirer": "^2.4.1",
     "ethers": "^6.17.0",

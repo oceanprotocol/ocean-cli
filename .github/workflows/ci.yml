@@ -14,9 +14,15 @@ permissions:
 
 jobs:
   build:
-    # Builds once and packs the publish tarball; pack_smoke reuses it instead
-    # of repeating npm ci + build on every OS/Node cell of its matrix.
+    # Compiles on every supported Node major (npm ci + tsc + npm pack + content
+    # check). Only the Node 24 cell uploads the publish tarball: tsc output is
+    # platform- and Node-independent, and pack_smoke needs exactly one artifact
+    # under that name.
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ["22", "24", "26"]
 
     steps:
       - name: Checkout code
@@ -27,7 +33,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: "24"
+          node-version: ${{ matrix.node }}
           cache: npm
 
       - name: Install dependencies
@@ -54,6 +60,7 @@ jobs:
           fi
 
       - name: Upload tarball
+        if: matrix.node == '24'
         uses: actions/upload-artifact@v7
         with:
           name: npm-tarball

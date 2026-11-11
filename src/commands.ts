@@ -3411,14 +3411,25 @@ export class Commands {
   private resolveSubsidyProviderAddresses(
     chainId: number,
     nodeProviders: Record<string, string[]>,
+    filter: boolean,
     override?: string,
   ): string[] {
     const fromNode = (nodeProviders?.[String(chainId)] ?? []).map((a) =>
       getAddress(a),
     );
     if (fromNode.length === 0) {
+      // Two distinct states, don't conflate them:
+      //  - filter ON + empty list  -> the node restricts usage to its configured set and that
+      //    set is empty, so no provider can ever be used: genuinely unsupported.
+      //  - filter OFF + empty list -> the node still accepts subsidies (callers may supply their
+      //    own provider); it just advertises none to report on here.
+      if (filter) {
+        throw new Error(
+          `This node does not support subsidy providers on chain ${chainId}: the provider filter is on and its configured list is empty, so no provider can be used.`,
+        );
+      }
       throw new Error(
-        `This node does not support subsidy providers on chain ${chainId}.`,
+        `This node supports subsidies but has no subsidy providers configured on chain ${chainId}.`,
       );
     }
     if (!override || !override.trim()) return [...new Set(fromNode)];
@@ -3494,7 +3505,7 @@ export class Commands {
       );
       return;
     }
-    const { providers } = nodeSubsidyInfo(status);
+    const { providers, filter } = nodeSubsidyInfo(status);
     const nodeAddress = status.address ? getAddress(status.address) : undefined;
 
     let addresses: string[];
@@ -3503,6 +3514,7 @@ export class Commands {
       addresses = this.resolveSubsidyProviderAddresses(
         chainId,
         providers,
+        filter,
         opts.subsidy,
       );
       jobType = this.mapJobType(opts.jobType);

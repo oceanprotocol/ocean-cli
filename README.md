@@ -260,7 +260,7 @@ ocean-cli getSubsidyProviders                              # alias subsidyProvid
 ocean-cli getSubsidyStatus 0xToken                         # alias subsidyStatus; your limits / remaining credit
 ```
 
-- `getSubsidyStatus` discovers the provider contract(s) from the node, then prints each one's kind, per-window buckets (limit / used / remaining / reset), claimable amount, contract balance and your eligibility. Flags: `--token --chainId --node --jobType --amount --subsidy 0xA[,0xB]`; `--node`/`--jobType`/`--amount` together also print a subsidy quote (`{subsidy, bonus}`).
+- `getSubsidyStatus` discovers the provider contract(s) from the node, then prints each one's kind, per-window buckets (limit / used / remaining / reset), claimable amount, contract balance and your eligibility. Flags: `--token --chainId --node --jobType --amount --subsidy 0xA[,0xB]`. `--node <url|peerId>` queries a specific Ocean Node (default: the active node) and uses that node's on-chain address for the `isNodeAllowed` check; adding `--jobType` and `--amount` also prints a subsidy quote (`{subsidy, bonus}`).
 - `startCompute`, `startService` and `extendService` take `--subsidyProviders <list>`: omit for the node's defaults, `none` (or empty) to claim with **no** subsidy, or `0xA,0xB` to claim against exactly those contracts. `startFreeCompute` ignores it (a free job does no escrow claim).
 
 ### Access lists
@@ -353,7 +353,7 @@ ocean-cli mintOcean [--token 0xOcean] [--chainId 8996]     # mint test Ocean tok
 | `getAuthorizationsEscrow` | | `<token> <payee>` | `-t, --token`, `-p, --payee`, `--chainId` |
 | `getEscrowInfo` | `escrowInfo` | `[token]` | `-t, --token`, `--chainId` |
 | `getSubsidyProviders` | `subsidyProviders` | | `--chainId` |
-| `getSubsidyStatus` | `subsidyStatus` | `[token]` | `-t, --token`, `--chainId`, `-n, --node`, `--jobType`, `-a, --amount`, `--subsidy` |
+| `getSubsidyStatus` | `subsidyStatus` | `[token]` | `-t, --token`, `--chainId`, `--node`, `--jobType`, `--amount`, `--subsidy` |
 | `createAccessList` | | `<name> <symbol> [initialUsers] [transferable]` | `-n, --name`, `-s, --symbol`, `-u, --initial-users`, `-t, --transferable`, `--chainId` |
 | `addToAccessList` | | `<address> <users>` | `-a, --address`, `-u, --users`, `--chainId` |
 | `checkAccessList` | | `<address> <users>` | `-a, --address`, `-u, --users`, `--chainId` |

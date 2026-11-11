@@ -1303,6 +1303,7 @@ export class Commands {
     const escrow = new EscrowContract(
       getAddress(parsedProviderInitializeComputeJob.payment.escrowAddress),
       paymentSigner,
+      payChain,
     );
     console.log("Verifying payment...");
     await new Promise((resolve) => setTimeout(resolve, 3000));
@@ -3453,22 +3454,43 @@ export class Commands {
       amount?: string;
     } = {},
   ): Promise<void> {
+    if (!token) {
+      console.error(
+        chalk.red(
+          "A token address is required. Pass it positionally (getSubsidyStatus 0x...) or with --token 0x...",
+        ),
+      );
+      return;
+    }
     const chainId = Number(this.config.chainId);
     const payer = await this.signer.getAddress();
     const tokenAddress = getAddress(token);
 
-    // Provider addresses come from the node, never from bundled config.
-    const nodeUrl = getCurrentNodeUrl();
-    const status = nodeUrl ? await validateNode(nodeUrl) : null;
+    // Provider addresses come from the node, never from bundled config. `--node`
+    // (opts.node) targets a specific Ocean Node to query (URL / peer id / multiaddr,
+    // like setNode); without it we use the active node. The on-chain node operator
+    // address for isNodeAllowed / quoteSubsidy is taken from that node's own status
+    // (status.address), so the caller never has to supply it separately.
+    const nodeUrl = opts.node || getCurrentNodeUrl();
+    if (!nodeUrl) {
+      console.error(
+        chalk.red(
+          "No Ocean Node to query. Set one with setNode, or pass --node <url|peerId>.",
+        ),
+      );
+      return;
+    }
+    const status = await validateNode(nodeUrl);
     if (!status) {
       console.error(
         chalk.red(
-          "Could not read node status (no reachable Ocean Node). The node advertises which subsidy providers it supports.",
+          `Could not read status of ${nodeUrl}. The node advertises which subsidy providers it supports.`,
         ),
       );
       return;
     }
     const { providers } = nodeSubsidyInfo(status);
+    const nodeAddress = status.address ? getAddress(status.address) : undefined;
 
     let addresses: string[];
     let jobType: number | undefined;
@@ -3539,10 +3561,10 @@ export class Commands {
         console.log(
           `  User allowed (isUserAllowed): ${await view.isUserAllowed(payer)}`,
         );
-        if (opts.node) {
+        if (nodeAddress) {
           console.log(
-            `  Node allowed (isNodeAllowed): ${await view.isNodeAllowed(
-              getAddress(opts.node),
+            `  Node allowed (isNodeAllowed, ${nodeAddress}): ${await view.isNodeAllowed(
+              nodeAddress,
             )}`,
           );
         }
@@ -3554,10 +3576,10 @@ export class Commands {
           );
         }
 
-        // Optional quote — needs a node address, a job type and an amount.
-        if (opts.amount && opts.node && jobType !== undefined) {
+        // Optional quote — needs the queried node's address, a job type and an amount.
+        if (opts.amount && nodeAddress && jobType !== undefined) {
           const quote = await view.quoteSubsidy(
-            getAddress(opts.node),
+            nodeAddress,
             payer,
             jobType,
             tokenAddress,

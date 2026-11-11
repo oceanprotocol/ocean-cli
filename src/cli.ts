@@ -721,7 +721,7 @@ export async function createCLI() {
     .description(
       "Show subsidy limits / remaining credit for a token from the node's subsidy providers",
     )
-    .argument("<token>", "Token address to report limits/credit for")
+    .argument("[token]", "Token address to report limits/credit for (or use --token)")
     .option("-t, --token <token>", "Token address to report limits/credit for")
     .option(
       "--chainId <chainId>",
@@ -732,8 +732,8 @@ export async function createCLI() {
       "Narrow to specific node-advertised provider contract(s) (comma-separated); else all the node lists",
     )
     .option(
-      "--node <address>",
-      "Node address, for isNodeAllowed / quoteSubsidy",
+      "--node <urlOrPeerId>",
+      "Ocean Node to query for providers (URL / peer id / multiaddr); default: active node. Its on-chain address is used for isNodeAllowed / quoteSubsidy",
     )
     .option(
       "--jobType <type>",
@@ -741,7 +741,7 @@ export async function createCLI() {
     )
     .option(
       "--amount <value>",
-      "Job amount to quote a subsidy for, in natural token units (e.g. 1.5). Needs --node and --jobType.",
+      "Job amount to quote a subsidy for, in natural token units (e.g. 1.5). Needs --jobType (uses the queried node's address).",
     )
     .action(async (token, options) => {
       const { signer, chainId } = await initializeSigner();

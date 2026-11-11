@@ -308,63 +308,63 @@ ocean-cli mintOcean [--token 0xOcean] [--chainId 8996]     # mint test Ocean tok
 
 ## Command reference
 
-53 commands, as registered in `src/cli.ts`. `<x>` is required, `[x]` optional. A named option **overrides** its positional when both are passed, but a required `<x>` must still be given positionally (passing only its option fails with *missing required argument* — this affects e.g. `publish`, `startCompute`, `startFreeCompute`); optional `[x]` positionals may instead be supplied as named options. Commands with no Options entry (e.g. `downloadJobResults`) are positional-only. `<command> --help` is authoritative.
+53 commands, as registered in `src/cli.ts`. `<x>` is required, `[x]` optional. A named option **overrides** its positional when both are passed. Every positional that has a matching named option is declared `[x]`, so it can be supplied **either** positionally **or** by its option alone (the command itself errors if a needed value is missing from both). The remaining `<x>` positionals have no named-option equivalent and must be given positionally — these are `setNodeEnv`, `startService`, `downloadJobResults`, `restartService`, and the bucket commands (`addFileToBucket`, `listFilesInBucket`, `getFileObject`, `deleteFile`). Commands with no Options entry are positional-only. `<command> --help` is authoritative.
 
 | Command | Aliases | Arguments | Options |
 | --- | --- | --- | --- |
 | `help` | `h` | | |
-| `setNode` | `useNode` | `<nodeUrl>` | `-n, --node` |
+| `setNode` | `useNode` | `[nodeUrl]` | `-n, --node` |
 | `setNodeEnv` | `useNodeEnv` | `<nodeEnv>` | |
 | `getNode` | `currentNode` | | |
-| `addChain` | `addRpc` | `<chainId> [rpcUrl...]` | `-c, --chainId`, `-u, --url` |
-| `removeChain` | `removeRpc` | `<chainId>` | `-c, --chainId` |
+| `addChain` | `addRpc` | `[chainId] [rpcUrl...]` | `-c, --chainId`, `-u, --url` |
+| `removeChain` | `removeRpc` | `[chainId]` | `-c, --chainId` |
 | `listChains` | `getRpcs`, `chains` | | |
-| `setChain` | `useChain` | `<chainId>` | `-c, --chainId` |
+| `setChain` | `useChain` | `[chainId]` | `-c, --chainId` |
 | `getChain` | `currentChain` | | |
-| `getDDO` | | `<did>` | `-d, --did` |
-| `publish` | | `<file>` | `-f, --file`, `-e, --encrypt [bool]` (default true) |
-| `publishAlgo` | | `<file>` | `-f, --file`, `-e, --encrypt [bool]` |
-| `editAsset` | `edit` | `<did> <file>` | `-d, --did`, `-f, --file`, `-e, --encrypt [bool]` |
-| `download` | | `<did> [folder] [serviceId]` | `-d, --did`, `-f, --folder` (default `.`), `-s, --service` |
-| `allowAlgo` | | `<datasetDid> <algoDid>` | `-d, --dataset`, `-a, --algo`, `-e, --encrypt [bool]` |
+| `getDDO` | | `[did]` | `-d, --did` |
+| `publish` | | `[file]` | `-f, --file`, `-e, --encrypt [bool]` (default true) |
+| `publishAlgo` | | `[file]` | `-f, --file`, `-e, --encrypt [bool]` |
+| `editAsset` | `edit` | `[did] [file]` | `-d, --did`, `-f, --file`, `-e, --encrypt [bool]` |
+| `download` | | `[did] [folder] [serviceId]` | `-d, --did`, `-f, --folder` (default `.`), `-s, --service` |
+| `allowAlgo` | | `[datasetDid] [algoDid]` | `-d, --dataset`, `-a, --algo`, `-e, --encrypt [bool]` |
 | `startCompute` | | `[datasets] [algo] [env] [maxJobDuration] [paymentToken] [resources] [output] [serviceIds] [algoServiceId]` | `-d, --datasets`, `-a, --algo`, `-e, --env`, `--maxJobDuration`, `-t, --token`, `--resources`, `--chainId`, `--accept`, `-o, --output`, `-s, --services`, `-x, --algo-service`, `--subsidyProviders` |
 | `startFreeCompute` | | `[datasets] [algo] [env] [output] [serviceIds] [algoServiceId]` | `-d, --datasets`, `-a, --algo`, `-e, --env`, `-o, --output`, `-s, --services`, `-x, --algo-service`, `--chainId` |
 | `getComputeEnvironments` | `getC2DEnvs` | `[node]` | `-n, --node` |
 | `searchComputeResources` | `findComputeNodes` | | `--cpu --ram --disk --gpu --gpu-model --resource --free --paid --both --chain --token --max-price --duration --order-by` |
-| `computeStreamableLogs` | | `<jobId>` | `-j, --job` |
-| `stopCompute` | | `<datasetDid> <jobId> <agreementId>` | `-d, --dataset`, `-j, --job`, `-a, --agreement` |
-| `getJobStatus` | | `<datasetDid> <jobId> [agreementId]` | `-d, --dataset`, `-j, --job`, `-a, --agreement` |
+| `computeStreamableLogs` | | `[jobId]` | `-j, --job` |
+| `stopCompute` | | `[datasetDid] [jobId] [agreementId]` | `-d, --dataset`, `-j, --job`, `-a, --agreement` |
+| `getJobStatus` | | `[datasetDid] [jobId] [agreementId]` | `-d, --dataset`, `-j, --job`, `-a, --agreement` |
 | `downloadJobResults` | | `<jobId> <index> [folder]` | |
 | `getServiceTemplates` | `serviceTemplates` | `[node]` | `-n, --node` |
 | `startService` | | `<computeEnvId> <duration> <paymentToken>` | `--template`, `-i, --image`, `--tag`, `--checksum`, `--dockerfile`, `--additional-docker-files`, `--cmd`, `--entrypoint`, `-p, --ports`, `-r, --resources`, `-u, --user-data`, `--user-data-file`, `--accept`, `--wait`, `--timeout`, `--chainId`, `--subsidyProviders` |
 | `getServiceStatus` | `myServices` | `[serviceId]` | `-s, --service`, `-v, --verbose` |
 | `getServices` | `listServices` | `[node]` | `-n, --node`, `--status`, `--include-all`, `--from`, `-v, --verbose` |
-| `serviceLogs` | `computeServiceLogs` | `<serviceId>` | `-s, --service`, `--since` |
-| `extendService` | | `<serviceId> <additionalDuration> [paymentToken]` | `-s, --service`, `--duration`, `-t, --token`, `--accept`, `--chainId`, `--subsidyProviders` |
+| `serviceLogs` | `computeServiceLogs` | `[serviceId]` | `-s, --service`, `--since` |
+| `extendService` | | `[serviceId] [additionalDuration] [paymentToken]` | `-s, --service`, `--duration`, `-t, --token`, `--accept`, `--chainId`, `--subsidyProviders` |
 | `restartService` | | `<serviceId>` | `-u, --user-data`, `--user-data-file`, `--cmd`, `--entrypoint`, `--image`, `--tag`, `--checksum`, `--dockerfile`, `--additional-docker-files`, `--wait`, `--timeout` |
-| `stopService` | | `<serviceId>` | `-s, --service` |
+| `stopService` | | `[serviceId]` | `-s, --service` |
 | `mintOcean` | | | `-t, --token`, `--chainId` |
 | `generateAuthToken` | | | |
-| `invalidateAuthToken` | | `<token>` | `-t, --token` |
-| `depositEscrow` | | `<token> <amount>` | `-t, --token`, `-a, --amount`, `--chainId` |
-| `getUserFundsEscrow` | | `<token>` | `-t, --token`, `--chainId` |
-| `withdrawFromEscrow` | | `<token> <amount>` | `-t, --token`, `-a, --amount`, `--chainId` |
-| `authorizeEscrow` | | `<token> <payee> <maxLockedAmount> <maxLockSeconds> <maxLockCounts>` | `-t, --token`, `-p, --payee`, `-m, --maxLockedAmount`, `-s, --maxLockSeconds`, `-c, --maxLockCounts`, `-e, --expiry`, `--chainId` |
-| `getAuthorizationsEscrow` | | `<token> <payee>` | `-t, --token`, `-p, --payee`, `--chainId` |
+| `invalidateAuthToken` | | `[token]` | `-t, --token` |
+| `depositEscrow` | | `[token] [amount]` | `-t, --token`, `-a, --amount`, `--chainId` |
+| `getUserFundsEscrow` | | `[token]` | `-t, --token`, `--chainId` |
+| `withdrawFromEscrow` | | `[token] [amount]` | `-t, --token`, `-a, --amount`, `--chainId` |
+| `authorizeEscrow` | | `[token] [payee] [maxLockedAmount] [maxLockSeconds] [maxLockCounts]` | `-t, --token`, `-p, --payee`, `-m, --maxLockedAmount`, `-s, --maxLockSeconds`, `-c, --maxLockCounts`, `-e, --expiry`, `--chainId` |
+| `getAuthorizationsEscrow` | | `[token] [payee]` | `-t, --token`, `-p, --payee`, `--chainId` |
 | `getEscrowInfo` | `escrowInfo` | `[token]` | `-t, --token`, `--chainId` |
 | `getSubsidyProviders` | `subsidyProviders` | | `--chainId` |
 | `getSubsidyStatus` | `subsidyStatus` | `[token]` | `-t, --token`, `--chainId`, `--node`, `--jobType`, `--amount`, `--subsidy` |
-| `createAccessList` | | `<name> <symbol> [initialUsers] [transferable]` | `-n, --name`, `-s, --symbol`, `-u, --initial-users`, `-t, --transferable`, `--chainId` |
-| `addToAccessList` | | `<address> <users>` | `-a, --address`, `-u, --users`, `--chainId` |
-| `checkAccessList` | | `<address> <users>` | `-a, --address`, `-u, --users`, `--chainId` |
-| `removeFromAccessList` | | `<address> <users>` | `-a, --address`, `-u, --users`, `--chainId` |
+| `createAccessList` | | `[name] [symbol] [initialUsers] [transferable]` | `-n, --name`, `-s, --symbol`, `-u, --initial-users`, `-t, --transferable`, `--chainId` |
+| `addToAccessList` | | `[address] [users]` | `-a, --address`, `-u, --users`, `--chainId` |
+| `checkAccessList` | | `[address] [users]` | `-a, --address`, `-u, --users`, `--chainId` |
+| `removeFromAccessList` | | `[address] [users]` | `-a, --address`, `-u, --users`, `--chainId` |
 | `createBucket` | | `[accessListAddress]` | |
 | `addFileToBucket` | | `<bucketId> <filePath> [fileName]` | |
 | `listBuckets` | | | `-o, --owner` |
 | `listFilesInBucket` | | `<bucketId>` | |
 | `getFileObject` | | `<bucketId> <fileName>` | |
 | `deleteFile` | | `<bucketId> <fileName>` | |
-| `downloadNodeLogs` | | `<output> [last] [from] [to]` | `-o, --output`, `-l, --last`, `-f, --from`, `-t, --to`, `-m, --maxLogs` |
+| `downloadNodeLogs` | | `[output] [last] [from] [to]` | `-o, --output`, `-l, --last`, `-f, --from`, `-t, --to`, `-m, --maxLogs` |
 
 ## Sample metadata files
 

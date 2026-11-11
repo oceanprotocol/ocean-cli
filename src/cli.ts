@@ -510,10 +510,18 @@ export async function createCLI() {
     .description(
       "Sets / switches the Ocean Node used by subsequent commands, without restarting",
     )
-    .argument("<nodeUrl>", "HTTP(S) URL, peer id or full multiaddr of the node")
+    .argument("[nodeUrl]", "HTTP(S) URL, peer id or full multiaddr of the node")
     .option("-n, --node <nodeUrl>", "Ocean Node to use")
     .action(async (nodeUrl, options) => {
       const target = options.node || nodeUrl;
+      if (!target) {
+        console.error(
+          chalk.red(
+            "A node is required. Pass it positionally or with --node (URL / peer id / multiaddr).",
+          ),
+        );
+        return;
+      }
       const previous = getCurrentNodeUrl();
       if (target === previous) {
         console.log(chalk.green(`Node ${target} is already the active one.`));
@@ -772,7 +780,7 @@ export async function createCLI() {
     .description(
       "Register an RPC chain at runtime (verifies each URL serves the chain; persists)",
     )
-    .argument("<chainId>", "Chain id the URL(s) serve")
+    .argument("[chainId]", "Chain id the URL(s) serve")
     .argument("[rpcUrl...]", "One or more RPC URLs for that chain")
     .option("-c, --chainId <chainId>", "Chain id the URL(s) serve")
     .option("-u, --url <rpcUrl...>", "One or more RPC URLs for that chain")
@@ -805,7 +813,7 @@ export async function createCLI() {
     .command("removeChain")
     .alias("removeRpc")
     .description("Unregister an RPC chain (persists)")
-    .argument("<chainId>", "Chain id to remove")
+    .argument("[chainId]", "Chain id to remove")
     .option("-c, --chainId <chainId>", "Chain id to remove")
     .action(async (chainIdArg, options) => {
       loadRegistry();
@@ -881,7 +889,7 @@ export async function createCLI() {
     .description(
       "Set the default (active) chain (must be registered; persists)",
     )
-    .argument("<chainId>", "Chain id to make default")
+    .argument("[chainId]", "Chain id to make default")
     .option("-c, --chainId <chainId>", "Chain id to make default")
     .action(async (chainIdArg, options) => {
       loadRegistry();
@@ -921,7 +929,7 @@ export async function createCLI() {
   program
     .command("getDDO")
     .description("Gets DDO for an asset using the asset did")
-    .argument("<did>", "The asset DID")
+    .argument("[did]", "The asset DID")
     .option("-d, --did <did>", "The asset DID")
     .action(async (did, options) => {
       const assetDid = options.did || did;
@@ -939,7 +947,7 @@ export async function createCLI() {
   program
     .command("publish")
     .description("Publishes a new asset with access service or compute service")
-    .argument("<metadataFile>", "Path to metadata file")
+    .argument("[metadataFile]", "Path to metadata file")
     .option("-f, --file <metadataFile>", "Path to metadata file")
     .option("-e, --encrypt [boolean]", "Encrypt DDO", true)
     .action(async (metadataFile, options) => {
@@ -958,7 +966,7 @@ export async function createCLI() {
   program
     .command("publishAlgo")
     .description("Publishes a new algorithm")
-    .argument("<metadataFile>", "Path to metadata file")
+    .argument("[metadataFile]", "Path to metadata file")
     .option("-f, --file <metadataFile>", "Path to metadata file")
     .option("-e, --encrypt [boolean]", "Encrypt DDO", true)
     .action(async (metadataFile, options) => {
@@ -978,8 +986,8 @@ export async function createCLI() {
     .command("editAsset")
     .alias("edit")
     .description("Updates DDO using the metadata items in the file")
-    .argument("<datasetDid>", "Dataset DID")
-    .argument("<metadataFile>", "Updated metadata file")
+    .argument("[datasetDid]", "Dataset DID")
+    .argument("[metadataFile]", "Updated metadata file")
     .option("-d, --did <datasetDid>", "Dataset DID")
     .option("-f, --file <metadataFile>", "Updated metadata file")
     .option("-e, --encrypt [boolean]", "Encrypt DDO", true)
@@ -1000,7 +1008,7 @@ export async function createCLI() {
   program
     .command("download")
     .description("Downloads an asset into specified folder")
-    .argument("<did>", "The asset DID")
+    .argument("[did]", "The asset DID")
     .argument("[folder]", "Destination folder", ".")
     .argument("[serviceId]", "Service ID (optional)")
     .option("-d, --did <did>", "The asset DID")
@@ -1024,8 +1032,8 @@ export async function createCLI() {
   program
     .command("allowAlgo")
     .description("Approves an algorithm to run on a dataset")
-    .argument("<datasetDid>", "Dataset DID")
-    .argument("<algoDid>", "Algorithm DID")
+    .argument("[datasetDid]", "Dataset DID")
+    .argument("[algoDid]", "Algorithm DID")
     .option("-d, --dataset <datasetDid>", "Dataset DID")
     .option("-a, --algo <algoDid>", "Algorithm DID")
     .option("-e, --encrypt [boolean]", "Encrypt DDO", true)
@@ -1419,12 +1427,18 @@ export async function createCLI() {
   program
     .command("computeStreamableLogs")
     .description("Gets the existing compute streamable logs")
-    .argument("<jobId>", "Job ID")
+    .argument("[jobId]", "Job ID")
     .option("-j, --job <jobId>", "Job ID")
     .action(async (jobId, options) => {
+      const args = jobId || options.job;
+      if (!args) {
+        console.error(
+          chalk.red("A job ID is required. Pass it positionally or with --job."),
+        );
+        return;
+      }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
-      const args = jobId || options.job;
       await commands.computeStreamableLogs([args]);
     });
 
@@ -1432,9 +1446,9 @@ export async function createCLI() {
   program
     .command("stopCompute")
     .description("Stops a compute job")
-    .argument("<datasetDid>", "Dataset DID")
-    .argument("<jobId>", "Job ID")
-    .argument("<agreementId>", "Agreement ID")
+    .argument("[datasetDid]", "Dataset DID")
+    .argument("[jobId]", "Job ID")
+    .argument("[agreementId]", "Agreement ID")
     .option("-d, --dataset <datasetDid>", "Dataset DID")
     .option("-j, --job <jobId>", "Job ID")
     .option("-a, --agreement [agreementId]", "Agreement ID")
@@ -1458,8 +1472,8 @@ export async function createCLI() {
   program
     .command("getJobStatus")
     .description("Displays the compute job status")
-    .argument("<datasetDid>", "Dataset DID")
-    .argument("<jobId>", "Job ID")
+    .argument("[datasetDid]", "Dataset DID")
+    .argument("[jobId]", "Job ID")
     .argument("[agreementId]", "Agreement ID")
     .option("-d, --dataset <datasetDid>", "Dataset DID")
     .option("-j, --job <jobId>", "Job ID")
@@ -1745,7 +1759,7 @@ export async function createCLI() {
     .command("serviceLogs")
     .alias("computeServiceLogs")
     .description("Streams live logs from an on-demand service's container")
-    .argument("<serviceId>", "Service ID")
+    .argument("[serviceId]", "Service ID")
     .option("-s, --service <serviceId>", "Service ID")
     .option(
       "--since <since>",
@@ -1768,9 +1782,9 @@ export async function createCLI() {
     .description(
       "Extends a running on-demand service's expiry (paid via escrow)",
     )
-    .argument("<serviceId>", "Service ID")
+    .argument("[serviceId]", "Service ID")
     .argument(
-      "<additionalDuration>",
+      "[additionalDuration]",
       "Additional duration in seconds",
       parseInt,
     )
@@ -1961,7 +1975,7 @@ export async function createCLI() {
   program
     .command("stopService")
     .description("Stops an on-demand service and releases its resources")
-    .argument("<serviceId>", "Service ID")
+    .argument("[serviceId]", "Service ID")
     .option("-s, --service <serviceId>", "Service ID")
     .action(async (serviceId, options) => {
       const id = options.service || serviceId;
@@ -2004,30 +2018,47 @@ export async function createCLI() {
   program
     .command("invalidateAuthToken")
     .description("Invalidate auth token")
-    .argument("<token>", "Auth token")
+    .argument("[token]", "Auth token")
     .option("-t, --token <token>", "Auth token")
     .action(async (token, options) => {
+      const authToken = token || options.token;
+      if (!authToken) {
+        console.error(
+          chalk.red(
+            "An auth token is required. Pass it positionally or with --token.",
+          ),
+        );
+        return;
+      }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
-      await commands.invalidateAuthToken([token || options.token]);
+      await commands.invalidateAuthToken([authToken]);
     });
 
   // Escrow deposit command
   program
     .command("depositEscrow")
     .description("Deposit tokens into the escrow contract")
-    .argument("<token>", "Address of the token to deposit")
-    .argument("<amount>", "Amount of tokens to deposit")
+    .argument("[token]", "Address of the token to deposit")
+    .argument("[amount]", "Amount of tokens to deposit")
     .option("-t, --token <token>", "Address of the token to deposit")
     .option("-a, --amount <amount>", "Amount of tokens to deposit")
     .option("--chainId <chainId>", "Escrow chain (default: active chain)")
     .action(async (token, amount, options) => {
+      const tokenAddress = options.token || token;
+      const amountToDeposit = options.amount || amount;
+      if (!tokenAddress || !amountToDeposit) {
+        console.error(
+          chalk.red(
+            "A token address and amount are required. Pass them positionally or with --token / --amount.",
+          ),
+        );
+        return;
+      }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
       const target = await routeExplicit(commands, options.chainId);
       if (target === null) return;
-      const tokenAddress = options.token || token;
-      const amountToDeposit = options.amount || amount;
       const success = await commands.depositToEscrow(
         commands.signer,
         tokenAddress,
@@ -2046,30 +2077,49 @@ export async function createCLI() {
   program
     .command("getUserFundsEscrow")
     .description("Get deposited token amount in escrow for user")
-    .argument("<token>", "Address of the token to check")
+    .argument("[token]", "Address of the token to check")
     .option("-t, --token <token>", "Address of the token to check")
     .option("--chainId <chainId>", "Escrow chain (default: active chain)")
     .action(async (token, options) => {
+      const tokenAddress = token || options.token;
+      if (!tokenAddress) {
+        console.error(
+          chalk.red(
+            "A token address is required. Pass it positionally or with --token.",
+          ),
+        );
+        return;
+      }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
       if ((await routeExplicit(commands, options.chainId)) === null) return;
-      await commands.getEscrowBalance(token || options.token);
+      await commands.getEscrowBalance(tokenAddress);
     });
 
   // Withdraw from escrow
   program
     .command("withdrawFromEscrow")
     .description("Withdraw tokens from escrow")
-    .argument("<token>", "Address of the token to check")
-    .argument("<amount>", "Amount of tokens to withdraw")
+    .argument("[token]", "Address of the token to check")
+    .argument("[amount]", "Amount of tokens to withdraw")
     .option("-t, --token <token>", "Address of the token to check")
     .option("-a, --amount <amount>", "Amount of tokens to withdraw")
     .option("--chainId <chainId>", "Escrow chain (default: active chain)")
     .action(async (token, amount, options) => {
+      const tokenAddress = token || options.token;
+      const amountToWithdraw = amount || options.amount;
+      if (!tokenAddress || !amountToWithdraw) {
+        console.error(
+          chalk.red(
+            "A token address and amount are required. Pass them positionally or with --token / --amount.",
+          ),
+        );
+        return;
+      }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
       if ((await routeExplicit(commands, options.chainId)) === null) return;
-      await commands.withdrawFromEscrow(token || options.token, amount);
+      await commands.withdrawFromEscrow(tokenAddress, amountToWithdraw);
     });
 
   // Escrow authorization command
@@ -2078,11 +2128,11 @@ export async function createCLI() {
     .description(
       "Authorize (or re-authorize) a payee to lock and claim funds from escrow. Re-running overwrites the existing limits (renew/shorten); pass a past --expiry to revoke",
     )
-    .argument("<token>", "Address of the token to authorize")
-    .argument("<payee>", "Address of the payee to authorize")
-    .argument("<maxLockedAmount>", "Maximum amount that can be locked by payee")
-    .argument("<maxLockSeconds>", "Maximum lock duration in seconds")
-    .argument("<maxLockCounts>", "Maximum number of locks allowed")
+    .argument("[token]", "Address of the token to authorize")
+    .argument("[payee]", "Address of the payee to authorize")
+    .argument("[maxLockedAmount]", "Maximum amount that can be locked by payee")
+    .argument("[maxLockSeconds]", "Maximum lock duration in seconds")
+    .argument("[maxLockCounts]", "Maximum number of locks allowed")
     .option("-t, --token <token>", "Address of the token to authorize")
     .option("-p, --payee <payee>", "Address of the payee to authorize")
     .option(
@@ -2119,6 +2169,21 @@ export async function createCLI() {
         const maxLockedAmountValue = options.maxLockedAmount || maxLockedAmount;
         const maxLockSecondsValue = options.maxLockSeconds || maxLockSeconds;
         const maxLockCountsValue = options.maxLockCounts || maxLockCounts;
+
+        if (
+          !tokenAddress ||
+          !payeeAddress ||
+          !maxLockedAmountValue ||
+          !maxLockSecondsValue ||
+          !maxLockCountsValue
+        ) {
+          console.error(
+            chalk.red(
+              "token, payee, maxLockedAmount, maxLockSeconds and maxLockCounts are all required. Pass them positionally or with --token / --payee / --maxLockedAmount / --maxLockSeconds / --maxLockCounts.",
+            ),
+          );
+          return;
+        }
 
         const success = await commands.authorizeEscrowPayee(
           tokenAddress,
@@ -2162,26 +2227,33 @@ export async function createCLI() {
   program
     .command("getAuthorizationsEscrow")
     .description("Get authorizations for escrow")
-    .argument("<token>", "Address of the token to check")
-    .argument("<payee>", "Address of the payee to check")
+    .argument("[token]", "Address of the token to check")
+    .argument("[payee]", "Address of the payee to check")
     .option("-t, --token <token>", "Address of the token to check")
     .option("-p, --payee <payee>", "Address of the payee to check")
     .option("--chainId <chainId>", "Escrow chain (default: active chain)")
     .action(async (token, payee, options) => {
+      const tokenAddress = token || options.token;
+      const payeeAddress = payee || options.payee;
+      if (!tokenAddress || !payeeAddress) {
+        console.error(
+          chalk.red(
+            "A token address and payee are required. Pass them positionally or with --token / --payee.",
+          ),
+        );
+        return;
+      }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
       if ((await routeExplicit(commands, options.chainId)) === null) return;
-      await commands.getAuthorizationsEscrow(
-        token || options.token,
-        payee || options.payee,
-      );
+      await commands.getAuthorizationsEscrow(tokenAddress, payeeAddress);
     });
 
   program
     .command("createAccessList")
     .description("Create a new access list contract")
-    .argument("<name>", "Name for the access list")
-    .argument("<symbol>", "Symbol for the access list")
+    .argument("[name]", "Name for the access list")
+    .argument("[symbol]", "Symbol for the access list")
     .argument(
       "[initialUsers]",
       "Comma-separated list of initial user addresses",
@@ -2206,12 +2278,22 @@ export async function createCLI() {
     )
     .option("--chainId <chainId>", "Chain to deploy on (default: active chain)")
     .action(async (name, symbol, initialUsers, transferable, options) => {
+      const listName = options.name || name;
+      const listSymbol = options.symbol || symbol;
+      if (!listName || !listSymbol) {
+        console.error(
+          chalk.red(
+            "A name and symbol are required. Pass them positionally or with --name / --symbol.",
+          ),
+        );
+        return;
+      }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
       if ((await routeExplicit(commands, options.chainId)) === null) return;
       await commands.createAccessList([
-        options.name || name,
-        options.symbol || symbol,
+        listName,
+        listSymbol,
         options.transferable || transferable,
         options.initialUsers || initialUsers,
       ]);
@@ -2220,8 +2302,8 @@ export async function createCLI() {
   program
     .command("addToAccessList")
     .description("Add user(s) to an access list")
-    .argument("<accessListAddress>", "Address of the access list contract")
-    .argument("<users>", "Comma-separated list of user addresses to add")
+    .argument("[accessListAddress]", "Address of the access list contract")
+    .argument("[users]", "Comma-separated list of user addresses to add")
     .option(
       "-a, --address <accessListAddress>",
       "Address of the access list contract",
@@ -2232,20 +2314,27 @@ export async function createCLI() {
     )
     .option("--chainId <chainId>", "Access-list chain (default: active chain)")
     .action(async (accessListAddress, users, options) => {
+      const listAddress = options.address || accessListAddress;
+      const listUsers = options.users || users;
+      if (!listAddress || !listUsers) {
+        console.error(
+          chalk.red(
+            "An access-list address and user(s) are required. Pass them positionally or with --address / --users.",
+          ),
+        );
+        return;
+      }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
       if ((await routeExplicit(commands, options.chainId)) === null) return;
-      await commands.addToAccessList([
-        options.address || accessListAddress,
-        options.users || users,
-      ]);
+      await commands.addToAccessList([listAddress, listUsers]);
     });
 
   program
     .command("checkAccessList")
     .description("Check if user(s) are on an access list")
-    .argument("<accessListAddress>", "Address of the access list contract")
-    .argument("<users>", "Comma-separated list of user addresses to check")
+    .argument("[accessListAddress]", "Address of the access list contract")
+    .argument("[users]", "Comma-separated list of user addresses to check")
     .option(
       "-a, --address <accessListAddress>",
       "Address of the access list contract",
@@ -2256,20 +2345,27 @@ export async function createCLI() {
     )
     .option("--chainId <chainId>", "Access-list chain (default: active chain)")
     .action(async (accessListAddress, users, options) => {
+      const listAddress = options.address || accessListAddress;
+      const listUsers = options.users || users;
+      if (!listAddress || !listUsers) {
+        console.error(
+          chalk.red(
+            "An access-list address and user(s) are required. Pass them positionally or with --address / --users.",
+          ),
+        );
+        return;
+      }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
       if ((await routeExplicit(commands, options.chainId)) === null) return;
-      await commands.checkAccessList([
-        options.address || accessListAddress,
-        options.users || users,
-      ]);
+      await commands.checkAccessList([listAddress, listUsers]);
     });
 
   program
     .command("removeFromAccessList")
     .description("Remove user(s) from an access list")
-    .argument("<accessListAddress>", "Address of the access list contract")
-    .argument("<users>", "Comma-separated list of user addresses to remove")
+    .argument("[accessListAddress]", "Address of the access list contract")
+    .argument("[users]", "Comma-separated list of user addresses to remove")
     .option(
       "-a, --address <accessListAddress>",
       "Address of the access list contract",
@@ -2280,19 +2376,26 @@ export async function createCLI() {
     )
     .option("--chainId <chainId>", "Access-list chain (default: active chain)")
     .action(async (accessListAddress, users, options) => {
+      const listAddress = options.address || accessListAddress;
+      const listUsers = options.users || users;
+      if (!listAddress || !listUsers) {
+        console.error(
+          chalk.red(
+            "An access-list address and user(s) are required. Pass them positionally or with --address / --users.",
+          ),
+        );
+        return;
+      }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
       if ((await routeExplicit(commands, options.chainId)) === null) return;
-      await commands.removeFromAccessList([
-        options.address || accessListAddress,
-        options.users || users,
-      ]);
+      await commands.removeFromAccessList([listAddress, listUsers]);
     });
 
   program
     .command("downloadNodeLogs")
     .description("Download logs from a node as an admin")
-    .argument("<output>", "Output directory to save the logs")
+    .argument("[output]", "Output directory to save the logs")
     .argument(
       "[last]",
       "Period of time to get logs from now (in hours). Use either last or from-to",
@@ -2315,10 +2418,19 @@ export async function createCLI() {
       "Maximum number of logs to retrieve (default: 100, max: 1000)",
     )
     .action(async (output, last, from, to, maxLogs, options) => {
+      const outputDir = options.output || output;
+      if (!outputDir) {
+        console.error(
+          chalk.red(
+            "An output directory is required. Pass it positionally or with --output.",
+          ),
+        );
+        return;
+      }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
       await commands.downloadNodeLogs([
-        options.output || output,
+        outputDir,
         options.last || last,
         options.from || from,
         options.to || to,

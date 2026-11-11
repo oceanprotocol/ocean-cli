@@ -1,1106 +1,415 @@
+<div align="center">
+
 [![banner](https://raw.githubusercontent.com/oceanprotocol/art/master/github/repo-banner%402x.png)](https://oceanprotocol.com)
 
-<h1 align="center">Ocean CLI</h1>
+# Ocean CLI
 
-> CLI tool to interact with the oceanprotocol's JavaScript library to privately & securely publish, consume and run compute on data.
+**Publish, consume and run compute on data from your terminal, privately and securely.**
 
-[![npm](https://img.shields.io/npm/v/@oceanprotocol/lib.svg)](https://www.npmjs.com/package/@oceanprotocol/lib)
+[![npm](https://img.shields.io/npm/v/@oceanprotocol/cli.svg)](https://www.npmjs.com/package/@oceanprotocol/cli)
+[![license](https://img.shields.io/npm/l/@oceanprotocol/cli.svg)](LICENSE)
+[![node](https://img.shields.io/node/v/@oceanprotocol/cli.svg)](https://nodejs.org)
 [![code style: prettier](https://img.shields.io/badge/code_style-prettier-7b1173.svg?style=flat-square)](https://github.com/prettier/prettier)
-[![js oceanprotocol](https://img.shields.io/badge/js-oceanprotocol-7b1173.svg)](https://github.com/oceanprotocol/eslint-config-oceanprotocol)
 
-With the Ocean CLI tool you can:
+</div>
 
-- **Publish** data services: downloadable files or compute-to-data.
-- **Edit** existing assets.
-- **Consume** data services, ordering datatokens and downloading data.
-- **Compute to data** on public available datasets using a published algorithm.
-- **Run on-demand services**: launch long-running containers (JupyterLab, inference servers, …) on compute environments, paid via escrow.
-- **Manage access control** with access lists for restricting dataset/algorithm access.
-- **Handle escrow payments** for compute jobs with deposit, withdrawal, and authorization.
-- **Manage authentication** with token generation and invalidation.
+Ocean CLI is the command-line client for [Ocean Protocol](https://oceanprotocol.com). It talks to an **Ocean Node** (which handles indexing, metadata caching, encryption, ordering and compute) and to an EVM chain through an RPC endpoint. With it you can:
 
-Ocean CLI is using ocean.js JavaScript library which is part of the [Ocean Protocol](https://oceanprotocol.com) toolset.
+- **Publish and edit** data assets: downloadable files or compute-to-data.
+- **Consume** assets: order datatokens and download data.
+- **Run compute-to-data** (free or paid) on published datasets with a published or raw algorithm.
+- **Run on-demand services**: long-running containers (JupyterLab, inference servers, ...) on compute environments, paid via escrow.
+- **Manage escrow** payments, **access lists**, **persistent-storage buckets** and **auth tokens**.
 
-If you run into problems, please open up a [new issue](https://github.com/oceanprotocol/ocean-cli/issues/new?assignees=&labels=Type%3A+Bug&projects=&template=bug_report.md&title=).
+Built on [`@oceanprotocol/lib`](https://github.com/oceanprotocol/ocean.js) (ocean.js `^9.0.0`) and [`@oceanprotocol/ddo-js`](https://github.com/oceanprotocol/ddo.js) (`^1.0.0`). Problems? Open a [new issue](https://github.com/oceanprotocol/ocean-cli/issues/new?assignees=&labels=Type%3A+Bug&projects=&template=bug_report.md&title=).
 
-- [📚 Prerequisites](#-prerequisites)
-- [🏗 Installation & Usage](#-installation--usage)
-- [🏛 License](#-license)
+## Contents
 
-## 📚 Prerequisites
+[Requirements](#requirements) | [Install](#install) | [Quick start](#quick-start) | [Configuration](#configuration) | [How the CLI works](#how-the-cli-works) | [Nodes and chains](#nodes-and-chains) | [Command guide](#command-guide) | [Command reference](#command-reference) | [Sample metadata](#sample-metadata-files) | [Troubleshooting](#troubleshooting) | [Development](#development) | [License](#license)
 
-- node.js ([Install from here](https://nodejs.org/en/download/))
-- A Unix based operating system (Mac or Linux)
+## Requirements
 
-## 🏗 Installation & Usage
+- Node.js `>=22` ([download](https://nodejs.org/en/download/))
+- Linux, macOS, or Windows via WSL
+- An RPC endpoint for the chain you target
+- A funded wallet (native gas token, plus datatokens / payment tokens as needed)
+- An Ocean Node to talk to (HTTP(S) URL, libp2p peer id, or multiaddr)
 
-### Install globally (recommended)
-
-Install the CLI from npm to get the `ocean-cli` command available everywhere:
+## Install
 
 ```bash
 npm install -g @oceanprotocol/cli
+ocean-cli --version
+ocean-cli h            # list all commands
 ```
 
-Then invoke it directly (from any directory):
+`--help`, `-h`, `--version` and `h` work with no environment variables set. Every other command needs the configuration below. Contributors: see [Development](#development).
+
+## Quick start
 
 ```bash
-ocean-cli h                 # list commands
-ocean-cli --version
+export PRIVATE_KEY="0x..."                  # or MNEMONIC="word1 word2 ..."
+export RPC="https://your-rpc.example"
+export NODE_URL="http://127.0.0.1:8001"
+
+# Publish a sample asset (edit chainId / serviceEndpoint in the file first)
 ocean-cli publish metadata/simpleDownloadDataset.json
+
+# Download it (prints the DID on publish)
+ocean-cli download did:op:123 ./downloads
+
+# See where you can run compute
+ocean-cli getComputeEnvironments
 ```
 
-> `ocean-cli --help`, `ocean-cli -h`, `ocean-cli --version` and `ocean-cli h` work with **no** environment variables set. Every other command requires the env vars described below.
+## Configuration
 
-### From source (for contributors)
+All configuration is via environment variables.
 
-Clone and install, then run the CLI straight from TypeScript with `npm run cli` (no build step needed):
+**Required**
+
+| Variable | Description |
+| --- | --- |
+| `PRIVATE_KEY` or `MNEMONIC` | Signer credentials. The private key is preferred. |
+| `RPC` | Either a single URL (`http://localhost:8545`) or a JSON map keyed by chainId whose values are a URL or an ordered list of URLs: `'{"1":"https://eth.example","8453":["https://a","https://b"]}'`. Two or more URLs for a chain become an ethers v6 `FallbackProvider` (`quorum: 1`, declaration order = preference). A malformed value fails at startup with the expected shape. |
+
+**Recommended**
+
+| Variable | Description |
+| --- | --- |
+| `NODE_URL` | The initial Ocean Node: HTTP(S) URL, libp2p peer id, or full multiaddr. The CLI starts without it, but then only `setNode`, `setNodeEnv`, `getNode`, `help`, `searchComputeResources` and the chain commands work; everything else fails with `No Ocean Node set` until you run `setNode`. (`searchComputeResources` runs node-free but still needs `RPC`, a signer and libp2p — it is a way to *find* a node before selecting one.) In practice, set it. |
+
+**Optional**
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `CHAIN_ID` | resolved automatically | Default (active) chain for the session. See [Nodes and chains](#nodes-and-chains). |
+| `RPC_CONFIG_FILE` | `~/.ocean/cli/rpc.json` | Where runtime-added chains are persisted (same JSON-map shape, hand-editable). Env `RPC` is merged with it and **env wins** on conflict. |
+| `ADDRESS_FILE` | ocean.js bundled addresses | Path to a contracts `address.json` for Barge / custom deployments. Without it, escrow, access-list and Ocean-token addresses come from the multi-chain set bundled with ocean.js. |
+| `DISABLE_P2P` | unset | `true` skips libp2p. **Fatal at startup if combined with a P2P `NODE_URL`** (peer id / multiaddr). Use it only if you exclusively use HTTP nodes. `searchComputeResources` needs libp2p. |
+| `BOOTSTRAP_PEERS` | unset | Comma-separated extra libp2p multiaddrs, added to the built-in Ocean bootstrap list. |
+| `AVOID_LOOP_RUN` | unset | `true` = one-shot: run the command and exit (use for CI and scripts). Unset = interactive. |
+| `INDEXING_MAX_RETRIES` | `120` | Max retries while waiting for an asset to be indexed. |
+| `INDEXING_RETRY_INTERVAL` | `4000` | Milliseconds between indexing retries. |
+| `SSI_WALLET_API`, `SSI_WALLET_ID`, `SSI_WALLET_DID` | unset | SSI wallet settings for v5 DDOs (credentialSubject / SSI policy flows). |
+
+`mintOcean` additionally needs an Ocean token address, from the chain's configured `oceanTokenAddress` or `--token <address>` (some chains, e.g. Base, ship none).
+
+## How the CLI works
+
+- **Interactive vs one-shot.** By default the CLI runs the command you pass (if any) and then stays in a prompt (REPL). Leave with `exit`, `quit`, **ESC** or **CTRL-C**. In the prompt you can type the bare command or paste a full `ocean-cli ...` line. With `AVOID_LOOP_RUN=true` it runs once and exits. In one-shot mode `setNode` only validates; the switch dies with the process, so use `NODE_URL`.
+- **Positional and named arguments.** Named options may come in any order and **override** the matching positional when both are given. But a **required** positional (`<x>`) must still be supplied positionally — passing only its named option fails with Commander's *missing required argument* (e.g. `publish --file metadata.json` errors; use `publish metadata.json`, and `publish metadata.json --file other.json` lets the option win). Optional positionals (`[x]`) may be omitted or supplied via their named option. A few commands (e.g. `downloadJobResults`) are positional-only.
+- **JSON arguments.** Single-quote JSON on the shell and put `--` before the arguments so option parsing stops: `ocean-cli startCompute -- '["did:op:a",{"fileObject":{...}}]' did:op:algo ...`.
+- **Help.** `ocean-cli h` or `ocean-cli help` prints the grouped command list (the `help` command takes no argument). For a specific command's arguments and options, add `--help` / `-h` after it: `ocean-cli publish --help`.
+
+## Nodes and chains
+
+**Choosing the node** (works inside the interactive prompt, no restart):
+
+```bash
+ocean-cli setNode http://127.0.0.1:8001      # alias useNode; also a peer id, multiaddr, or --node
+ocean-cli getNode                            # alias currentNode: active node, version, chains served
+ocean-cli setNodeEnv '16Uiu2HAm...|0xff10...-0xc92e...'   # alias useNodeEnv (quote: the token contains a '|')
+```
+
+`setNode` health-checks the node first; if unreachable, nothing changes. `setNodeEnv` takes the `Node+env:` token printed by `searchComputeResources`, switches node like `setNode` and remembers the compute env so `startCompute` / `startFreeCompute` need no `--env`. Notes:
+
+- Compute jobs live on the node that started them; after a switch, `getJobStatus` / `downloadJobResults` query the new node.
+- For a node on your own machine prefer the full multiaddr (`/ip4/127.0.0.1/tcp/9001/ws/p2p/<peerId>`); a bare peer id needs DHT lookup, which may not advertise localhost.
+- `chainId` always comes from `RPC`, never from the node. `setNode` warns if the node does not serve your chain; `getNode` flags served chains with no RPC configured.
+
+**Managing chains** (node-free; work before a node is set):
+
+```bash
+ocean-cli addChain 137 https://polygon-rpc.com [https://backup...]   # alias addRpc; each URL is verified
+ocean-cli removeChain 137                                            # alias removeRpc
+ocean-cli listChains                                                 # aliases getRpcs, chains
+ocean-cli setChain 137                                               # alias useChain; persisted default
+ocean-cli getChain                                                   # alias currentChain
+```
+
+Added chains persist to `~/.ocean/cli/rpc.json`. The active default chain is: `setChain` / `CHAIN_ID` -> persisted default -> the only configured chain. If none of those resolve, commands that target a specific chain require an explicit `--chainId`. (The display-only `listChains` additionally reports the single chain the node and your registry both know, but that intersection is not used to auto-select a chain for commands.)
+
+**How each command picks its chain:**
+
+| Category | Commands | Chain used |
+| --- | --- | --- |
+| Chain-agnostic | reads, jobs, storage, auth tokens, node/chain management | Default (or any registered) chain; node/chain management does not sign |
+| DDO-implied | `publish`, `publishAlgo`, `editAsset`, `allowAlgo`, `download` | The DDO's own `chainId` |
+| Explicit | `mintOcean`, all escrow, all access-list, `startService`, `extendService`, `startCompute`, `startFreeCompute` | `--chainId <id>`, else the default chain, else an error listing configured chains |
+
+For `startCompute`, `--chainId` is the **payment/escrow** chain only; each asset is ordered on its own DDO chain, so one job can span chains. Every chain involved must be a registered RPC. For `startFreeCompute` it only selects the signing chain.
+
+## Command guide
+
+Each section shows the common usage; run `ocean-cli <command> --help` for every option, or see the [reference table](#command-reference).
+
+### Assets
+
+```bash
+ocean-cli getDDO did:op:123                                  # or --did
+ocean-cli publish metadata.json                              # or --file; add --encrypt false to skip DDO encryption
+ocean-cli publishAlgo algorithm.json                         # same options as publish
+ocean-cli editAsset did:op:123 metadata.json                 # alias edit; or --did / --file
+ocean-cli download did:op:123 ./custom-folder [serviceId]    # or --did --folder --service
+ocean-cli allowAlgo did:op:dataset did:op:algo               # dataset NFT owner only; --encrypt true|false
+```
+
+`download` defaults to `services[0]`; a `serviceId` not present in the DDO fails fast. For v5 DDOs (version >= 5.0.0) it first runs a provider-initialize step, and with `SSI_WALLET_API` set it performs the SSI / policy-server verification (skipped automatically when the node has no policy server).
+
+### Compute
+
+```bash
+ocean-cli getComputeEnvironments [nodeUrlOrPeerId]           # alias getC2DEnvs; prints a payment summary per env
+ocean-cli searchComputeResources --cpu 4 --ram 16 --paid --chain 8996 --order-by price   # alias findComputeNodes
+ocean-cli startCompute --accept true -- did1,did2 algoDid env1 3600 0xPaymentToken '[{"id":"cpu","amount":1}]'
+ocean-cli startFreeCompute did1,did2 algoDid env1
+ocean-cli getJobStatus did:op:123 job-123                    # or --dataset --job [--agreement]
+ocean-cli downloadJobResults job-123 0 ./results             # positional only (jobId, index, folder)
+ocean-cli stopCompute did:op:123 job-123 <agreementId>       # agreementId is required
+ocean-cli computeStreamableLogs <jobId>                      # or --job
+```
+
+`startCompute` details:
+
+- `maxJobDuration` (seconds) is required and drives the payment.
+- `paymentToken` is required: a token the environment accepts on the payment chain (see `getComputeEnvironments`).
+- `resources` is required: stringified JSON within the environment's limits, e.g. `'[{"id":"cpu","amount":3},{"id":"ram","amount":16772672536},{"id":"disk","amount":0}]'`.
+- `--accept true` auto-confirms payment (mandatory when stdin is not a TTY); `false` prompts.
+- `--services` (comma-separated dataset service ids, mapped by position to the datasets) and `--algo-service` (the algorithm's service id) are optional; the first available service is used when omitted.
+- `--output` is an optional stringified JSON remote-storage backend for results (S3, FTP, URL, Arweave, IPFS); omitted means results stay on the node's disk. Example: `'{"remoteStorage":{"type":"s3","s3Access":{"endpoint":"https://s3.amazonaws.com","region":"us-east-1","bucket":"my-results","objectKey":"jobs/result.tar","accessKeyId":"AKIA...","secretAccessKey":"..."}}}'`.
+- `--subsidyProviders` optionally picks which subsidy providers back the escrow claim (see [Subsidy providers](#subsidy-providers)).
+
+`startFreeCompute` takes the same dataset/algo/`--services`/`--algo-service`/`--output` arguments, targets a free environment and does no ordering or payment.
+
+**Raw (unpublished) datasets and algorithms.** Instead of a DID, pass a full `ComputeAsset` (datasets) or `ComputeAlgorithm` JSON object with a `fileObject`. Raw entries have no DID and no datatoken order, and can be mixed with DIDs (the value must then be valid JSON, DIDs quoted). Works for both `startCompute` and `startFreeCompute`:
+
+```bash
+# Raw algorithm on a dataset that sets allowRawAlgorithm: true
+ocean-cli startCompute --accept true -- did:op:dataset '{"fileObject":{"type":"url","url":"https://example.com/algo.py","method":"GET"},"meta":{"container":{"entrypoint":"python $ALGO","image":"oceanprotocol/algo_dockers","tag":"python-branin","checksum":"sha256:..."}}}' env1 900 paymentToken resources
+
+# Raw dataset on a published algorithm
+ocean-cli startCompute --accept true -- '[{"fileObject":{"type":"url","url":"https://example.com/data.csv","method":"GET"}}]' did:op:algo env1 900 paymentToken resources
+
+# Mixed: published DID plus raw IPFS file
+ocean-cli startCompute --accept true -- '["did:op:dataset",{"fileObject":{"type":"ipfs","hash":"Qm..."}}]' did:op:algo env1 900 paymentToken resources
+```
+
+**Finding a node.** `searchComputeResources` is a P2P/DHT search (needs libp2p, so not with `DISABLE_P2P=true`; works before `setNode`). Run it with no filters for an interactive wizard, or script it with flags: `--cpu --ram --disk --gpu --gpu-model --resource name:amount (repeatable) --free|--paid|--both --chain <ids> --token <addrs> --max-price --duration --order-by price|freeCapacity|resources|leastBusy`. `--chain` and `--token` take comma-separated lists; a paid env pricing on several requested chains is listed once per chain. Each match starts with a ready-to-run `setNodeEnv <node>|<env>` line. Environments that fall short of the request are filtered out, with a note on how many.
+
+### Services on demand
+
+An on-demand service is a long-running container that stays up until it expires, is stopped, or is extended, reachable at `http://<nodeHost>:<hostPort>`. Escrow must be funded and authorized first.
+
+```bash
+ocean-cli getServiceTemplates                              # alias serviceTemplates
+
+# Fund escrow and authorize the env's consumer address (maxLockSeconds >= duration + 3600)
+ocean-cli depositEscrow 0x<token> 100
+ocean-cli authorizeEscrow 0x<token> 0x<envConsumerAddress> 100 90000 100
+
+# From an operator template, or your own image (tag goes in --tag, not --image)
+ocean-cli startService <envId> 3600 0x<token> --template jupyter-cpu --user-data '{"JUPYTER_TOKEN":"secret"}'
+ocean-cli startService <envId> 3600 0x<token> --image nginxinc/nginx-unprivileged --tag alpine --ports 8080
+
+ocean-cli getServiceStatus <serviceId>                     # alias myServices; YOUR services, full detail
+ocean-cli getServices --status 40                          # alias listServices; ALL owners on the node
+ocean-cli serviceLogs <serviceId> --since 10m              # alias computeServiceLogs
+ocean-cli extendService <serviceId> 1800 --accept true
+ocean-cli restartService <serviceId>                       # reuse stored spec
+ocean-cli restartService <serviceId> --image myrepo/algo --tag v2   # rebuild on a new image
+ocean-cli stopService <serviceId>
+```
+
+- Duration is in seconds. The CLI prints an estimated cost; the authoritative cost is shown as `Node-computed cost:` after start.
+- Start is asynchronous: it returns a `serviceId` in status `Starting (10)`, then the CLI polls until `Running (40)` (unless `--wait false`; `--timeout` defaults to 600 s). If interrupted, resume with `getServiceStatus <serviceId>`.
+- Escrow shortfalls do not fail the HTTP call; they surface as the job ending in `Error`. The CLI pre-verifies funds and authorization and aborts with the exact remediation commands.
+- Image spec: at most one of `--tag`, `--checksum`, `--dockerfile`. Keep the tag out of `--image`, otherwise the node builds an invalid `image:tag:latest`.
+- Containers run with `CapDrop ALL` and cannot bind ports below 1024; listen on a high port such as 8080.
+- `--user-data` is a JSON object of container env vars, encrypted to the node's key. Values are never logged.
+- `getServiceStatus` shows your services in full; `getServices` lists all owners' services with the image spec stripped and supports `--status`, `--include-all`, `--from`.
+- `restartService` with no spec flags bounces the container unchanged (REUSE). Any of `--image --tag --checksum --dockerfile --additional-docker-files` rebuilds it on the new spec (RESPEC), keeping ports, expiry and payment window at no extra charge. `--cmd` / `--entrypoint` replace the stored command (empty array clears).
+
+### Escrow
+
+```bash
+ocean-cli depositEscrow 0xToken 100                        # or --token --amount
+ocean-cli getUserFundsEscrow 0xToken
+ocean-cli withdrawFromEscrow 0xToken 50
+ocean-cli authorizeEscrow 0xToken 0xPayee 1000 3600 10     # token payee maxLockedAmount maxLockSeconds maxLockCounts
+ocean-cli getAuthorizationsEscrow 0xToken 0xPayee
+ocean-cli getEscrowInfo [0xToken]                          # alias escrowInfo; read-only capability report
+```
+
+All accept `--chainId`. `authorizeEscrow` flags: `--token --payee --maxLockedAmount --maxLockSeconds --maxLockCounts`.
+
+**Escrow v2.** The escrow contracts support **lock-time pre-funded sponsorship** (a subsidy provider can back part or all of a lock at creation, so a fully-sponsored user can transact with no deposit) and **authorization expiry** (a payee key can be time-boxed or revoked). The CLI reflects this:
+
+- `authorizeEscrow` takes `-e, --expiry <unixSeconds>` (`0` = indefinite, default). Re-running it **overwrites** the record (renew/shorten), and an `--expiry` in the past **revokes** it; claim and cancel are never gated by expiry, so existing locks stay claimable. Example — revoke then re-grant for 1h: `ocean-cli authorizeEscrow 0xToken 0xPayee 1000 3600 10 --expiry 1` then `... --expiry $(( $(date +%s) + 3600 ))`.
+- `getAuthorizationsEscrow` prints the authorization's `expiryTimestamp`, and `getEscrowInfo [token]` reports the escrow's capabilities (version, `escrowKind`, `IEscrowLockSubsidy`/`IEscrowEnterprise` support, `maxSponsorsPerLock`) via ERC-165, plus the sponsored-bucket total and your reclaimable amount when a token is given.
+- Reading state: `getUserFunds().locked` and `Current Locked Amount` now count only the payer's **own** locked funds; provider-sponsored tokens live in a separate sponsored bucket (`getEscrowInfo <token>`).
+
+These commands require the Escrow v2 deployment; they degrade gracefully against a legacy escrow.
+
+### Subsidy providers
+
+Subsidy providers are on-chain contracts that sponsor part or all of a job's cost (a subsidy released back to the payer, plus an optional bonus paid to the node), subject to allow-lists, job-type restrictions and per-period caps. **The Ocean Node is the source of truth for which subsidy providers are usable** (a node may not support them at all), so the CLI reads provider addresses from the node's status, never from bundled contract addresses.
+
+```bash
+ocean-cli getSubsidyProviders                              # alias subsidyProviders; per-chain providers the node advertises
+ocean-cli getSubsidyStatus 0xToken                         # alias subsidyStatus; your limits / remaining credit
+```
+
+- `getSubsidyStatus` discovers the provider contract(s) from the node, then prints each one's kind, per-window buckets (limit / used / remaining / reset), claimable amount, contract balance and your eligibility. Flags: `--token --chainId --node --jobType --amount --subsidy 0xA[,0xB]`; `--node`/`--jobType`/`--amount` together also print a subsidy quote (`{subsidy, bonus}`).
+- `startCompute`, `startService` and `extendService` take `--subsidyProviders <list>`: omit for the node's defaults, `none` (or empty) to claim with **no** subsidy, or `0xA,0xB` to claim against exactly those contracts. `startFreeCompute` ignores it (a free job does no escrow claim).
+
+### Access lists
+
+```bash
+ocean-cli createAccessList "My Access List" "MAL" "0xUser1,0xUser2" false   # name symbol [initialUsers] [transferable, default false]
+ocean-cli addToAccessList 0xListAddress "0xUser1,0xUser2"
+ocean-cli checkAccessList 0xListAddress "0xUser1,0xUser2"
+ocean-cli removeFromAccessList 0xListAddress "0xUser1,0xUser2"
+```
+
+Named forms: `--name --symbol --initial-users --transferable`, and `--address --users`. All accept `--chainId`.
+
+### Persistent storage
+
+```bash
+ocean-cli createBucket [accessListAddress]                 # omit for owner-only access
+ocean-cli addFileToBucket <bucketId> ./file.csv [fileName] # name defaults to the file's basename
+ocean-cli listBuckets [--owner 0xOwner]                    # defaults to the signer
+ocean-cli listFilesInBucket <bucketId>
+ocean-cli getFileObject <bucketId> <fileName>              # file-object descriptor
+ocean-cli deleteFile <bucketId> <fileName>
+```
+
+### Auth tokens
+
+```bash
+ocean-cli generateAuthToken
+ocean-cli invalidateAuthToken myAuthToken123               # or --token
+```
+
+### Admin
+
+```bash
+ocean-cli downloadNodeLogs ./logs 24                       # or --output ./logs --last 24
+```
+
+Writes `<output>/logs.json`. Use either `--last` (hours from now) or `--from` / `--to` (epoch ms); `--maxLogs` defaults to 100 (max 1000). Requires admin privileges on the node.
+
+### Development and testing helpers
+
+```bash
+ocean-cli mintOcean [--token 0xOcean] [--chainId 8996]     # mint test Ocean tokens (Barge / test chains)
+```
+
+## Command reference
+
+53 commands, as registered in `src/cli.ts`. `<x>` is required, `[x]` optional. A named option **overrides** its positional when both are passed, but a required `<x>` must still be given positionally (passing only its option fails with *missing required argument* — this affects e.g. `publish`, `startCompute`, `startFreeCompute`); optional `[x]` positionals may instead be supplied as named options. Commands with no Options entry (e.g. `downloadJobResults`) are positional-only. `<command> --help` is authoritative.
+
+| Command | Aliases | Arguments | Options |
+| --- | --- | --- | --- |
+| `help` | `h` | | |
+| `setNode` | `useNode` | `<nodeUrl>` | `-n, --node` |
+| `setNodeEnv` | `useNodeEnv` | `<nodeEnv>` | |
+| `getNode` | `currentNode` | | |
+| `addChain` | `addRpc` | `<chainId> [rpcUrl...]` | `-c, --chainId`, `-u, --url` |
+| `removeChain` | `removeRpc` | `<chainId>` | `-c, --chainId` |
+| `listChains` | `getRpcs`, `chains` | | |
+| `setChain` | `useChain` | `<chainId>` | `-c, --chainId` |
+| `getChain` | `currentChain` | | |
+| `getDDO` | | `<did>` | `-d, --did` |
+| `publish` | | `<file>` | `-f, --file`, `-e, --encrypt [bool]` (default true) |
+| `publishAlgo` | | `<file>` | `-f, --file`, `-e, --encrypt [bool]` |
+| `editAsset` | `edit` | `<did> <file>` | `-d, --did`, `-f, --file`, `-e, --encrypt [bool]` |
+| `download` | | `<did> [folder] [serviceId]` | `-d, --did`, `-f, --folder` (default `.`), `-s, --service` |
+| `allowAlgo` | | `<datasetDid> <algoDid>` | `-d, --dataset`, `-a, --algo`, `-e, --encrypt [bool]` |
+| `startCompute` | | `[datasets] [algo] [env] [maxJobDuration] [paymentToken] [resources] [output] [serviceIds] [algoServiceId]` | `-d, --datasets`, `-a, --algo`, `-e, --env`, `--maxJobDuration`, `-t, --token`, `--resources`, `--chainId`, `--accept`, `-o, --output`, `-s, --services`, `-x, --algo-service`, `--subsidyProviders` |
+| `startFreeCompute` | | `[datasets] [algo] [env] [output] [serviceIds] [algoServiceId]` | `-d, --datasets`, `-a, --algo`, `-e, --env`, `-o, --output`, `-s, --services`, `-x, --algo-service`, `--chainId` |
+| `getComputeEnvironments` | `getC2DEnvs` | `[node]` | `-n, --node` |
+| `searchComputeResources` | `findComputeNodes` | | `--cpu --ram --disk --gpu --gpu-model --resource --free --paid --both --chain --token --max-price --duration --order-by` |
+| `computeStreamableLogs` | | `<jobId>` | `-j, --job` |
+| `stopCompute` | | `<datasetDid> <jobId> <agreementId>` | `-d, --dataset`, `-j, --job`, `-a, --agreement` |
+| `getJobStatus` | | `<datasetDid> <jobId> [agreementId]` | `-d, --dataset`, `-j, --job`, `-a, --agreement` |
+| `downloadJobResults` | | `<jobId> <index> [folder]` | |
+| `getServiceTemplates` | `serviceTemplates` | `[node]` | `-n, --node` |
+| `startService` | | `<computeEnvId> <duration> <paymentToken>` | `--template`, `-i, --image`, `--tag`, `--checksum`, `--dockerfile`, `--additional-docker-files`, `--cmd`, `--entrypoint`, `-p, --ports`, `-r, --resources`, `-u, --user-data`, `--user-data-file`, `--accept`, `--wait`, `--timeout`, `--chainId`, `--subsidyProviders` |
+| `getServiceStatus` | `myServices` | `[serviceId]` | `-s, --service`, `-v, --verbose` |
+| `getServices` | `listServices` | `[node]` | `-n, --node`, `--status`, `--include-all`, `--from`, `-v, --verbose` |
+| `serviceLogs` | `computeServiceLogs` | `<serviceId>` | `-s, --service`, `--since` |
+| `extendService` | | `<serviceId> <additionalDuration> [paymentToken]` | `-s, --service`, `--duration`, `-t, --token`, `--accept`, `--chainId`, `--subsidyProviders` |
+| `restartService` | | `<serviceId>` | `-u, --user-data`, `--user-data-file`, `--cmd`, `--entrypoint`, `--image`, `--tag`, `--checksum`, `--dockerfile`, `--additional-docker-files`, `--wait`, `--timeout` |
+| `stopService` | | `<serviceId>` | `-s, --service` |
+| `mintOcean` | | | `-t, --token`, `--chainId` |
+| `generateAuthToken` | | | |
+| `invalidateAuthToken` | | `<token>` | `-t, --token` |
+| `depositEscrow` | | `<token> <amount>` | `-t, --token`, `-a, --amount`, `--chainId` |
+| `getUserFundsEscrow` | | `<token>` | `-t, --token`, `--chainId` |
+| `withdrawFromEscrow` | | `<token> <amount>` | `-t, --token`, `-a, --amount`, `--chainId` |
+| `authorizeEscrow` | | `<token> <payee> <maxLockedAmount> <maxLockSeconds> <maxLockCounts>` | `-t, --token`, `-p, --payee`, `-m, --maxLockedAmount`, `-s, --maxLockSeconds`, `-c, --maxLockCounts`, `-e, --expiry`, `--chainId` |
+| `getAuthorizationsEscrow` | | `<token> <payee>` | `-t, --token`, `-p, --payee`, `--chainId` |
+| `getEscrowInfo` | `escrowInfo` | `[token]` | `-t, --token`, `--chainId` |
+| `getSubsidyProviders` | `subsidyProviders` | | `--chainId` |
+| `getSubsidyStatus` | `subsidyStatus` | `[token]` | `-t, --token`, `--chainId`, `-n, --node`, `--jobType`, `-a, --amount`, `--subsidy` |
+| `createAccessList` | | `<name> <symbol> [initialUsers] [transferable]` | `-n, --name`, `-s, --symbol`, `-u, --initial-users`, `-t, --transferable`, `--chainId` |
+| `addToAccessList` | | `<address> <users>` | `-a, --address`, `-u, --users`, `--chainId` |
+| `checkAccessList` | | `<address> <users>` | `-a, --address`, `-u, --users`, `--chainId` |
+| `removeFromAccessList` | | `<address> <users>` | `-a, --address`, `-u, --users`, `--chainId` |
+| `createBucket` | | `[accessListAddress]` | |
+| `addFileToBucket` | | `<bucketId> <filePath> [fileName]` | |
+| `listBuckets` | | | `-o, --owner` |
+| `listFilesInBucket` | | `<bucketId>` | |
+| `getFileObject` | | `<bucketId> <fileName>` | |
+| `deleteFile` | | `<bucketId> <fileName>` | |
+| `downloadNodeLogs` | | `<output> [last] [from] [to]` | `-o, --output`, `-l, --last`, `-f, --from`, `-t, --to`, `-m, --maxLogs` |
+
+## Sample metadata files
+
+The [`metadata/`](metadata/) folder holds ready-to-publish DDOs. They default to chain `8996` (Barge); **edit `chainId` and `serviceEndpoint` to match your network before publishing.**
+
+| File | DDO | What it is |
+| --- | --- | --- |
+| `simpleDownloadDataset.json` | v4.1.0 | Dataset with an `access` service (URL file); the basic publish + download example |
+| `simpleDownloadDatasetV5.json` | v5.0.0 | Same, as a v5 DDO (credentialSubject / SSI flows; see `SSI_WALLET_*`) |
+| `downloadAssetPaymentUSDC.json` | v4.1.0 | Download dataset priced in USDC instead of the default token |
+| `simpleComputeDataset.json` | v4.1.0 | Dataset with a `compute` service (URL file) |
+| `simpleIPFSComputeDataset.json` | v4.1.0 | Compute dataset whose file is stored on IPFS |
+| `jsAlgo.json` | v4.1.0 | Node.js algorithm (URL file) for compute |
+| `jsAlgoV5.json` | v5.0.0 | Node.js algorithm as a v5 DDO |
+| `jsIPFSAlgo.json` | v4.1.0 | Node.js algorithm stored on IPFS |
+| `pythonAlgo.json` | v4.1.0 | Python algorithm (`oceanprotocol/algo_dockers` image) |
+
+## Troubleshooting
+
+- **`No Ocean Node set`**: `NODE_URL` is unset. Export it, or run `setNode <url>` in the interactive prompt.
+- **Node unreachable**: `setNode` keeps your current node when the health check fails. Check the URL/peer id and port; for a local P2P node use the full multiaddr. Over P2P a bare peer id can take up to 30 s (DHT lookup); HTTP times out at 10 s.
+- **Fails at startup with a `DISABLE_P2P` message**: `DISABLE_P2P=true` and a P2P `NODE_URL` contradict each other. Unset one.
+- **Wrong chain / `chainId` errors**: the chain must be a registered RPC. Run `listChains`, then `addChain <chainId> <rpcUrl>`. `getNode` shows which chains the node serves. Pass `--chainId` on chain-explicit commands, or set a default with `setChain`. For DDO-implied commands the chain is the DDO's `chainId`, so fix it in your metadata file.
+- **Escrow shortfall / service ends in `Error`**: deposit and authorize before starting (`depositEscrow`, then `authorizeEscrow` with `maxLockSeconds >= duration + 3600`). `getUserFundsEscrow` and `getAuthorizationsEscrow` show the current state.
+- **Asset not indexed yet**: the CLI waits up to `INDEXING_MAX_RETRIES` x `INDEXING_RETRY_INTERVAL` (default 120 x 4 s). Raise them for slow chains.
+- **Script hangs after the command**: set `AVOID_LOOP_RUN=true` for one-shot runs.
+- **`mintOcean` asks for `--token`**: the chain has no bundled Ocean token address.
+
+## Development
 
 ```bash
 git clone https://github.com/oceanprotocol/ocean-cli.git
 cd ocean-cli
+nvm use            # .nvmrc pins Node 22.23.1 (needed for lint and release tooling)
 npm install
-npm run cli h
-```
-
-> **The command examples in this README use the `npm run cli <command>` form. If you installed globally, drop the `npm run cli` prefix and use `ocean-cli <command>` instead — the two are otherwise identical.** In interactive mode you can paste either form; a leading `npm run cli` or `ocean-cli` token is stripped automatically.
-
-### Set up environment variables
-
-- Set a private key(by exporting env "PRIVATE_KEY") or a mnemonic (by exporting env "MNEMONIC")
-
-```
-export PRIVATE_KEY="XXXX"
-```
-
-or
-
-```
-export MNEMONIC="XXXX"
-```
-
-- Set an RPC
-
-```
-export RPC='XXXX'
-```
-
-`RPC` accepts **either** a single URL (unchanged, legacy behaviour) **or** a JSON map keyed by
-chainId, where each chain's value is one URL or an ordered list of URLs:
-
-```bash
-export RPC='http://localhost:8545'                                   # single URL
-export RPC='{"1":"https://eth.example","8453":["https://a","https://b"]}'
-```
-
-When a chain lists **two or more** URLs they are used as an ethers v6 `FallbackProvider`
-(`quorum: 1`, declaration order = preference, a slow endpoint hands off to the next), so a single
-dead endpoint no longer breaks the session. A malformed `RPC` value fails fast at startup with a
-message showing the expected shape. Contract addresses (escrow / access-list factory / Ocean
-token) are resolved by ocean.js `ConfigHelper` — from `ADDRESS_FILE` when set (Barge / custom
-deployments) else the multi-chain set bundled with the library — so escrow / access-list now work
-off-Barge on any supported chain without a local `address.json`. `mintOcean` additionally needs a
-configured `oceanTokenAddress` or an explicit `--token <address>` (some chains, e.g. Base, ship no
-bundled Ocean token).
-
-**Multiple chains, added at runtime, and the default chain.** When `RPC` lists more than one chain
-you can also register/unregister chains at runtime with [`addChain`](#chain-management) /
-`removeChain`, list them with `listChains`, and pick the **default (active) chain** with `setChain`.
-Runtime-added chains are persisted to `~/.ocean/cli/rpc.json` (override with `RPC_CONFIG_FILE`, same
-JSON-map shape, hand-editable) so they survive a restart; on load the env `RPC` is merged with that
-file and **env wins on conflict**. The default chain is resolved as: `setChain` / `CHAIN_ID` env →
-persisted default → the sole configured chain → the one chain both the node serves and the registry
-knows. Commands then pick their chain as follows:
-
-- **Chain-agnostic** commands (reads, jobs, storage, auth) just sign on the default (or any
-  registered) chain. The node/chain-management commands (`setNode`/`getNode`, `addChain`,
-  `removeChain`, `listChains`, `setChain`, `getChain`) are node-free registry operations that do not
-  sign at all.
-- **Chain-implied** commands (`publish`, `publishAlgo`, `editAsset`, `allowAlgo`, `download`) use the
-  **DDO's own `chainId`** — publishing now honours the `chainId` in your metadata file.
-- **Chain-explicit** commands (`mintOcean`, all escrow, all access-list, and the escrow-paid
-  `startService` / `extendService`) take a single **`--chainId <id>`** flag; without it they fall back
-  to the default chain, and error (listing the configured chains) when there is none.
-
-- Optional (but recommended), set an Ocean Node URL. Ocean Nodes infrastructure is responsible for handling assets indexing and metadata caching. It replaced old Provider and Aquarius standalone apps.
-
-```
-export NODE_URL='XXXX'
-```
-
-  `NODE_URL` is the **initial** node only. If it is not set the CLI still starts, but **only `setNode`, `getNode` and `help` are available** — every other command is refused with `No Ocean Node set` until you pick a node:
-
-```bash
-npm run cli            # starts with no node
-# > setNode http://127.0.0.1:8001
-# > getComputeEnvironments        # now works
-```
-
-  You can switch node at any time with [`setNode`](#setnode) without restarting the CLI. See [`getNode`](#getnode) to check which node is active.
-
-- Optional, set DISABLE_P2P to `'true'` to skip starting the libp2p transport. In interactive mode the CLI starts libp2p at startup (in the background, so it does not delay the prompt) even when `NODE_URL` is an HTTP URL, so that a later switch to a P2P node does not have to wait for bootstrap peers and DHT warm-up. One-shot runs (`AVOID_LOOP_RUN='true'`) skip that warm-up — they have no later command to benefit from it — and start libp2p only when the node they target is a P2P one. Set this when you only ever use HTTP nodes and do not want the CLI dialing the public Ocean bootstrap nodes.
-
-```bash
-export DISABLE_P2P='true'
-```
-
-- Optional, set ADDRESS_FILE if you want to use a custom set of smart contract address
-
-```
-export ADDRESS_FILE='path-to-address-file'
-```
-
-- Optional, set INDEXING_MAX_RETRIES to the max number of retries when waiting for an asset to be indexed. Default is 120 retries max.
-
-```bash
-export INDEXING_MAX_RETRIES='120'
-```
-
-- Optional, set INDEXING_RETRY_INTERVAL to the interval (in milliseconds) for each retry when waiting for an asset to be indexed. Default is 4 seconds (4000 ms).
-
-```bash
-export INDEXING_RETRY_INTERVAL='4000'
-```
-
-- Optional, set AVOID_LOOP_RUN to `'true'` to run a single command and exit afterwards (one-shot mode — required for CI and scripting). **By default the CLI is interactive**: it runs the command you pass (if any), then keeps reading further commands from a prompt, just like a REPL. Exit the interactive loop with `exit` / `quit`, the **ESC** key, or **CTRL-C**.
-
-```bash
-export AVOID_LOOP_RUN='true'   # one-shot; unset or 'false' = interactive loop
-```
-
-- Optional, set SSI_WALLET_API, SSI_WALLET_ID, SSI_WALLET_DID to support v5 DDOs (assets using credentialSubject and SSI policy flows).
-
-```bash
-export SSI_WALLET_API="https://your-ssi-wallet.example/api"
-export SSI_WALLET_ID="did:example:your-wallet-did-or-id"
-export SSI_WALLET_DID="did:example"
-```
-
-
-
-### Build the TypeScript code
-
-```
+npm run cli h      # runs from TypeScript source via tsx, no build step; same as `ocean-cli h`
 npm run build
 ```
 
-### Use
+`npm run cli <command>` is equivalent to `ocean-cli <command>`. Tests (`npm test`) are mostly end-to-end and need a running [Barge](https://github.com/oceanprotocol/barge) stack (RPC, Ocean Node, deployed contracts). Architecture notes and contributor guidance are in [`CLAUDE.md`](CLAUDE.md). Release history: [CHANGELOG.md](CHANGELOG.md).
 
-List available commands
-
-```
-npm run cli h
-```
-
-E.g. run publish command
-
-Make sure to update chainId and serviceEndpoint from the assets from `metadata` folder.
+## License
 
 ```
-npm run cli publish metadata/simpleDownloadDataset.json
-```
-
-### Command Usage
-
-The Ocean CLI supports flexible argument ordering. You can supply arguments using:
-- **Positional Arguments** (traditional style): Must follow the defined order.
-- **Named Options**: Can be provided in any order. These options include flags like `--did`, `--file`, etc.
-
-#### General Format
-
-```bash
-npm run cli <command> [options] <arguments>
-```
-
-#### Help Commands
-
-- **General help:**  
-  `npm run cli --help` or `npm run cli -h` (globally: `ocean-cli --help` / `ocean-cli -h`)
-
-- **Version:**  
-  `npm run cli --version` (globally: `ocean-cli --version`)
-
-- **Command-specific help:**  
-  `npm run cli help <command>`
-
-#### Examples
-
-**Choosing the Ocean Node:**
-
-<a name="setnode"></a>
-
-- **Switch node (works inside the interactive loop, no restart needed):**  
-  `npm run cli setNode http://127.0.0.1:8001`  
-  Also accepts a peer id or a full multiaddr, and `--node`:  
-  `npm run cli setNode --node /dns4/node.example/tcp/9001/ws/p2p/16Uiu2HAm...`  
-  Alias: `useNode`.
-
-  The node is health-checked before the switch: if it cannot be reached, the current node is kept and nothing changes.
-
-<a name="setnodeenv"></a>
-
-- **Select a node *and* a compute env in one step (from a search result):**  
-  `npm run cli setNodeEnv 16Uiu2HAm...|0xff10...-0xc92e...` (alias `useNodeEnv`).  
-  Paste the `Node+env: <node>|<env>` token printed by `searchComputeResources` (the leading
-  `Node+env:` label is tolerated). It validates and switches to the node exactly like `setNode`,
-  and additionally **remembers the compute env** so a following `startCompute` / `startFreeCompute`
-  uses it by default — you don't repeat `--env`. Override any time with an explicit `--env`. Like
-  `setNode`, on an unreachable node nothing changes (node and env are both left as they were).
-
-<a name="getnode"></a>
-
-- **Show the node in use:**  
-  `npm run cli getNode` (alias `currentNode`) — prints the active node plus its version and the chain(s) it serves.
-
-Notes when switching nodes:
-
-- **Compute jobs live on the node that started them.** After a switch, `getJobStatus` / `downloadJobResults` query the *new* node — switch back to look up older jobs.
-- **For a node on your own machine, prefer the full multiaddr** (`/ip4/127.0.0.1/tcp/9001/ws/p2p/<peerId>`) over a bare peer id: a bare id has to be found via DHT, which may not advertise localhost addresses.
-- **In one-shot mode** (`AVOID_LOOP_RUN='true'`) `setNode` only validates the node and prints the result — the switch dies with the process. Use `NODE_URL` for one-shot runs.
-- `chainId` still comes from `RPC`, never from the node. `setNode` warns when the node does not serve the chain your RPC is on. `getNode` also flags any chain the node serves for which **no RPC is configured**.
-
----
-
-<a name="chain-management"></a>
-
-**Chain / RPC management** (node-free — these work before `setNode` picks a node):
-
-- **Register a chain at runtime:**  
-  `npm run cli addChain 137 https://polygon-rpc.com` (alias `addRpc`; positional or `--chainId`/`--url`). Give more than one URL for a `FallbackProvider`: `addChain 137 https://a https://b`. Each URL is verified to actually serve the given chain (a URL on a different chain is rejected), then the chain is persisted to `~/.ocean/cli/rpc.json`.
-- **Unregister a chain:**  
-  `npm run cli removeChain 137` (alias `removeRpc`). Refuses to remove the only configured chain; clears the default if it pointed there.
-- **List configured chains:**  
-  `npm run cli listChains` (aliases `getRpcs`, `chains`) — prints each chain, its URLs, which is the default, and (if a node is set) which chains the node serves / lacks an RPC for.
-- **Set / show the default chain:**  
-  `npm run cli setChain 137` (alias `useChain`) sets the default (must be registered; persisted). `npm run cli getChain` (alias `currentChain`) prints it.
-
-`--chainId` on the chain-explicit commands overrides the default for a single command; `CHAIN_ID` env sets it for the session; `setChain` persists it.
-
----
-
-**Get DDO:**
-
-- **Positional:**  
-  `npm run cli getDDO did:op:123`
-
-- **Named Option:**  
-  `npm run cli getDDO --did did:op:123`
-
----
-
-**Publish:**
-
-- **Positional:**  
-  `npm run cli publish metadata.json`
-
-- **Named Options:**  
-  `npm run cli publish --file metadata.json`  
-  With encryption disabled:  
-  `npm run cli publish --file metadata.json --encrypt false`  
-  (Note: `--file` and `--encrypt` can be in any order.)
-
----
-
-**Publish Algorithm:**
-
-- **Positional:**  
-  `npm run cli publishAlgo algorithm.json`
-
-- **Named Options:**  
-  `npm run cli publishAlgo --file algorithm.json`  
-  With encryption disabled:  
-  `npm run cli publishAlgo --encrypt false --file algorithm.json`
-
----
-
-**Edit Asset:**
-
-- **Positional:**  
-  `npm run cli editAsset did:op:123 metadata.json`
-
-- **Named Options:**  
-  `npm run cli editAsset --did did:op:123 --file metadata.json`  
-  (The flags can be provided in any order, for example:  
-  `npm run cli editAsset --file metadata.json --did did:op:123`)
-
----
-
-**Download:**
-
-- **Positional:**  
-  `npm run cli download did:op:123 ./custom-folder serviceId`
-
-- **Named Options:**  
-  `npm run cli download --did did:op:123 --folder ./custom-folder --service serviceId`
-  (Order of `--did` and `--folder` does not matter.)
-
-- **Rules:**
-  serviceId is optional. If omitted, the CLI defaults to the first service listed in the DDO (`services[0]`). If you pass a `serviceId` that does not exist in the DDO, the command now fails fast with a clear error instead of silently ordering the first service.
-
-  For **v5 DDOs** (version ≥ 5.0.0) the download first runs a provider-initialization step against the asset's service endpoint. When `SSI_WALLET_API` is set (see the env vars above) this also performs the SSI / policy-server verification flow; when the target node reports it has no policy server configured, that step is skipped automatically.
-
----
-
-**Start Compute:**
-
-- **Positional:**  
-  `npm run cli startCompute -- did1,did2 algoDid env1 maxJobDuration paymentToken resources svc1,svc2 algoServiceId`
-
-- **Named Options:**  
-  `npm run cli startCompute --datasets did1,did2 --algo algoDid --env env1 --maxJobDuration maxJobDuration --token paymentToken --resources resources --accept true --services svc1,svc2 --algo-service algoServiceId`
-  (Options can be provided in any order.)
-
-- **Rules:**
-  serviceIds and algoServiceId are optional. If omitted, the CLI defaults to the first available service.
-
-
-- `maxJobDuration` is a required parameter an represents the time measured in seconds for job maximum execution, the payment is based on this maxJobDuration value, user needs to provide this.
-- `--chainId` is optional and selects the **payment/escrow chain** for the job (flag → active/default chain → error). It is independent of where the assets live: each dataset and the algorithm are ordered on **their own** DDO chain, so one job can span multiple chains and pay on another. Every chain the job touches (the payment chain plus each asset's chain) must be a registered RPC — add any missing one with `addChain <chainId> <rpcUrl>`. In the common single-chain case you can omit `--chainId` entirely.
-- `paymentToken` is required and represents the address of the token that is supported by the environment **on the payment chain** for processing the compute job payment. It can be retrieved from `getComputeEnvironments` command output, which lists the fee chains and their accepted tokens per environment.
-- `resources` is required and represents a stringified JSON object obtained from `getComputeEnvironments` command output. `getComputeEnvironments` command shows the available resources and the selected resources by the user need to be within the available limits.
-e.g.: `'[{"id":"cpu","amount":3},{"id":"ram","amount":16772672536},{"id":"disk","amount":0}]'`
--  `--accept` option can be set to `true` or `false`. If it is set to `false` a prompt will be displayed to the user for manual accepting the payment before starting a compute job. If it is set to `true`, the compute job starts automatically, without user input.
-- `output` is an optional stringified JSON object specifying a remote storage backend where job results will be uploaded. Supported types include S3, FTP, URL, Arweave, and IPFS. If omitted, results are stored on the node's local disk. e.g.: `'{"remoteStorage":{"type":"s3","s3Access":{"endpoint":"https://s3.amazonaws.com","region":"us-east-1","bucket":"my-results","objectKey":"jobs/result.tar","accessKeyId":"AKIA...","secretAccessKey":"..."}}}'`
-
-**Raw (unpublished) datasets and algorithms:**
-
-Instead of a DID, you can pass a full `ComputeAsset` (datasets) or `ComputeAlgorithm` (algorithm) JSON object with a `fileObject`, to run compute on raw data/algorithms that are not published as assets. Raw entries have no DID and are not ordered (no datatoken). DID-based and raw entries can be mixed within the datasets argument (the value must then be valid JSON, with DIDs quoted). JSON must be single-quoted on the shell.
-
-- Raw algorithm against a published dataset that allows raw algorithms (`allowRawAlgorithm: true`):  
-  `npm run cli startCompute -- did:op:dataset '{"fileObject":{"type":"url","url":"https://example.com/algo.py","method":"GET"},"meta":{"container":{"entrypoint":"python $ALGO","image":"oceanprotocol/algo_dockers","tag":"python-branin","checksum":"sha256:..."}}}' env1 900 paymentToken resources --accept true`
-- Raw dataset(s) against a published algorithm:  
-  `npm run cli startCompute -- '[{"fileObject":{"type":"url","url":"https://example.com/data.csv","method":"GET"}}]' did:op:algo env1 900 paymentToken resources --accept true`
-- Mixed datasets (a published DID and a raw file):  
-  `npm run cli startCompute -- '["did:op:dataset",{"fileObject":{"type":"ipfs","hash":"Qm..."}}]' did:op:algo env1 900 paymentToken resources --accept true`
-
----
-
-**Start Free Compute:**
-
-- **Positional:**  
-  `npm run cli startFreeCompute did1,did2 algoDid env1`
-
-- **Named Options:**
-  `npm run cli startFreeCompute --datasets did1,did2 --algo algoDid --env env1 --services svc1,svc2 --algo-service algoServiceId`
-  (Options can be provided in any order.)
-
-  - `output` is an optional stringified JSON object specifying a remote storage backend where job results will be uploaded. Same format as `startCompute`.
-
-- **Rules:**
-  serviceIds and algoServiceId are optional. If omitted, the CLI defaults to the first available service.`
-  (Options can be provided in any order.)
-
-- `output` is an optional stringified JSON object specifying a remote storage backend where job results will be uploaded. Same format as `startCompute`.
-- `--chainId` is optional. A free environment does no ordering or payment, so this only selects which registered chain the request is signed on (flag → active/default chain). Omit it to use the active chain.
-- Like `startCompute`, the datasets and algorithm arguments accept raw `ComputeAsset`/`ComputeAlgorithm` JSON objects with a `fileObject` (no DID), and mixed DID + raw datasets. e.g.:  
-  `npm run cli startFreeCompute did:op:dataset '{"fileObject":{"type":"url","url":"https://example.com/algo.py","method":"GET"},"meta":{"container":{"entrypoint":"python $ALGO","image":"oceanprotocol/algo_dockers","tag":"python-branin","checksum":"sha256:..."}}}' env1`
-
----
-
-**Stop Compute:**
-
-- **Positional:**  
-  `npm run cli stopCompute did:op:123 job-123`
-
-- **Named Options:**  
-  `npm run cli stopCompute --dataset did:op:123 --job job-123`  
-  (Optionally, you can also provide an agreement ID using `--agreement`.)
-
----
-
-**Get Compute Environments:**
-
-  `npm run cli getComputeEnvironments`
-
-  Prints, per environment, a **payment summary** — whether it is free, and for a paid env each fee chain with its accepted payment-token addresses — so you can pick `--chainId` and `--paymentToken` for `startCompute` without reading the raw JSON (the full JSON is still printed below the summary).
-
-  Optionally pass a specific Ocean Node URL or peer id to query instead of `NODE_URL`:
-
-  `npm run cli getComputeEnvironments <nodeUrlOrPeerId>`
-
----
-
-**Search Compute Resources (alias `findComputeNodes`):**
-
-  Discover which nodes on the network can run your compute job, filtered by the resources you
-  need, by free vs paid, and — for paid — by chain / token / price, with matches ordered by
-  your preference. This is a **P2P/DHT search** (no HTTP equivalent), so it needs libp2p and
-  cannot run with `DISABLE_P2P=true`; it works even on an HTTP-configured node and **before**
-  `setNode` (it's a natural way to *find* a node to select).
-
-- **Interactive wizard** (default — run with no filter flags):
-
-  `npm run cli searchComputeResources`
-
-- **Scripted (non-interactive) with flags:**
-
-  ```bash
-  npm run cli searchComputeResources --cpu 4 --ram 16 --gpu 1 --gpu-model A100 \
-    --paid --chain 8996 --token 0x... --max-price 5 --duration 3600 --order-by price
-  ```
-
-  `--chain` and `--token` accept comma-separated lists. Pricing is computed per chain, and a
-  paid environment that prices on several of the requested chains is **listed once per chain**
-  (each with that chain's cheapest token) so you can compare the same env across chains. The
-  `--token` list is applied as the filter on each chain (per-chain token sets are only
-  expressible through the wizard):
-
-  ```bash
-  npm run cli searchComputeResources --cpu 4 --paid --chain 8996,137 --token 0xOCEAN,0xUSDC
-  ```
-
-- **Open-ended resource, free tier:**
-
-  `npm run cli searchComputeResources --resource fpga:2 --free --order-by leastBusy`
-
-  `cpu | ram | disk | gpu` are the known resource names; `--resource name:amount` (repeatable)
-  accepts any other resource name (e.g. `fpga`, `tpu`). With no tier flag, both free and paid
-  are searched. Results are filtered to genuine matches — environments whose resources fall short
-  of the request, or (paid) that don't price on one of the requested chains with an accepted
-  token, are dropped, and a note reports how many were filtered out. Each match's **first line is
-  a ready-to-run `setNodeEnv <node>|<env>` command**, followed by per-resource `need`/`max`,
-  accepted tokens + estimated cost (paid), running/queued jobs, and a stable `PROVIDER …` line.
-  Copy-paste that first line to select both the node and the compute env in one step, then just
-  run `startCompute …` — the env is remembered, no `--env` needed.
-
-  ```text
-  setNodeEnv 16Uiu2HAmR9z4…|0xff10…-0xc92e…
-    [paid]  cpu: need 1, max 4
-    estimated cost: 0.003 0x1c7D…7238 on chain 8996
-    ...
-  ```
-
----
-
-**Get Compute Streamable Logs:**
-
-  `npm run cli computeStreamableLogs`
-
----
-
-**Get Job Status:**
-
-- **Positional:**  
-  `npm run cli getJobStatus did:op:123 job-123`
-
-- **Named Options:**  
-  `npm run cli getJobStatus --dataset did:op:123 --job job-123`  
-  (Optionally, an agreement ID may be provided.)
-
----
-
-**Download Job Results:**
-
-- **Positional:**  
-  `npm run cli downloadJobResults job-123 0 ./results`
-
-- **Named Options:**  
-  `npm run cli downloadJobResults --job job-123 --index 0 --folder ./results`
-
----
-
-### Service-on-Demand (long-running containers)
-
-Launch a long-running container (JupyterLab, an inference server, nginx, …) on a
-compute environment. Unlike a compute job — which runs an algorithm to completion
-and exits — an on-demand service stays up until it **expires**, is **stopped**, or
-is **extended**, and is reachable through a forwarded port (`http://<nodeHost>:<hostPort>`).
-
-Full happy path:
-
-```bash
-# 1. Inspect the node's templates and which environments can run them
-npm run cli getServiceTemplates
-
-# 2. Fund escrow and authorize the environment's consumer address as payee
-#    (maxLockSeconds must be at least duration + 3600)
-npm run cli depositEscrow 0x<token> 100
-npm run cli authorizeEscrow 0x<token> 0x<envConsumerAddress> 100 90000 100
-
-# 3a. Start from an operator template
-npm run cli -- startService <envId> 3600 0x<token> --template jupyter-cpu \
-  --user-data '{"JUPYTER_TOKEN":"secret"}'
-
-# 3b. …or bring your own image (pass the tag via --tag, NOT inside --image)
-npm run cli -- startService <envId> 3600 0x<token> \
-  --image nginxinc/nginx-unprivileged --tag alpine --ports 8080
-
-# 4. Inspect / manage
-npm run cli getServiceStatus <serviceId>          # YOUR services, full detail
-npm run cli -- getServices --status 40            # ALL owners' running services on the node (SERVICES_LIST)
-npm run cli -- serviceLogs <serviceId> --since 10m
-npm run cli -- extendService <serviceId> 1800 --accept true
-npm run cli -- restartService <serviceId>                               # REUSE: bounce container unchanged
-npm run cli -- restartService <serviceId> --cmd '["python","app.py"]'   # optional cmd/entrypoint override
-npm run cli -- restartService <serviceId> --image myrepo/algo --tag v2  # RESPEC: rebuild on a new image (#2119)
-npm run cli stopService <serviceId>
-```
-
-Notes:
-
-- **Duration is in seconds.** The CLI prints an **estimated** cost for the payment
-  prompt; the **authoritative** cost is computed by the node and shown as
-  `Node-computed cost:` right after start.
-- **Start is asynchronous.** `startService` returns immediately with a `serviceId`
-  in status `Starting (10)`; the CLI then polls until `Running (40)` (unless
-  `--wait false`) and prints the endpoint URL. If polling is interrupted, resume
-  with `getServiceStatus <serviceId>`.
-- **Escrow must be funded and authorized before start.** Escrow shortfalls do not
-  fail the HTTP call — they surface as the job ending in `Error`/`*Failed` — so the
-  CLI pre-verifies funds/authorization client-side and aborts early with the exact
-  remediation commands.
-- **Image spec:** provide at most one of `--tag`, `--checksum`, `--dockerfile`, and
-  keep the tag in `--tag` (an image reference that already contains a tag makes the
-  node build an invalid `image:tag:latest` reference).
-- **Ports:** containers run with `CapDrop ALL` and cannot bind ports below 1024 —
-  services must listen on a high container port (e.g. 8080).
-- **`--user-data`** is a plain JSON object of container env vars; ocean.js encrypts
-  it to the node's key. The CLI **never logs its values** (keys only).
-- **`getServiceStatus` vs `getServices`:** `getServiceStatus` shows *your* services
-  with full detail; `getServices` (alias `listServices`, the SERVICES_LIST command)
-  lists services across *all* owners on the node, with the docker image spec
-  stripped, and supports `--status` / `--include-all` / `--from` filters.
-- **`restartService` has two modes (#2119):** with **no** container-spec flags the
-  container bounces on its stored spec (REUSE); supplying any image-spec flag
-  (`--image`, `--tag`, `--checksum`, `--dockerfile`, `--additional-docker-files`)
-  rebuilds the container on the new spec (RESPEC), keeping the same ports, expiry
-  and payment window at no extra charge.
-- **`restartService --cmd/--entrypoint`** replace the stored command/entrypoint on
-  the recreated container (an empty array clears them); omit to reuse the stored
-  configuration.
-
----
-
-**Mint Ocean:**
-
-- **Positional:**  
-  `npm run cli mintOcean`  
-  (No arguments are required for this command.)
-
----
-
-**Generate Auth Token:**
-
-  `npm run cli generateAuthToken`  
-  (No arguments are required for this command.)
-
----
-
-**Invalidate Auth Token:**
-
-- **Positional:**  
-  `npm run cli invalidateAuthToken myAuthToken123`
-
-- **Named Option:**  
-  `npm run cli invalidateAuthToken --token myAuthToken123`
-
----
-
-> **Escrow v2.** The escrow contracts now support **lock-time pre-funded sponsorship** (a subsidy
-> provider can back part or all of a lock when it is created, so a fully-sponsored user can transact
-> with no deposit) and **authorization expiry** (a payee key can be time-boxed or revoked). The CLI
-> reflects this: `authorizeEscrow` takes an `--expiry` and re-running it overwrites the record
-> (renew/shorten/revoke), `getAuthorizationsEscrow` prints the expiry, and `getEscrowInfo` reports
-> the escrow's capabilities and the sponsored bucket. Reading escrow state, note that
-> `getUserFunds().locked` and an authorization's `Current Locked Amount` now count only the payer's
-> **own** locked funds — provider-sponsored tokens live in a separate sponsored bucket
-> (`getEscrowInfo <token>`). These commands require the Escrow v2 deployment; they still work (and
-> degrade gracefully) against a legacy escrow. See the full change set in `PR_description.md`.
-
-**Deposit to Escrow:**
-
-- **Positional:**  
-  `npm run cli depositEscrow 0x1234...tokenAddress 100`
-
-- **Named Options:**  
-  `npm run cli depositEscrow --token 0x1234...tokenAddress --amount 100`
-
----
-
-**Get User Funds in Escrow:**
-
-- **Positional:**  
-  `npm run cli getUserFundsEscrow 0x1234...tokenAddress`
-
-- **Named Option:**  
-  `npm run cli getUserFundsEscrow --token 0x1234...tokenAddress`
-
----
-
-**Withdraw from Escrow:**
-
-- **Positional:**  
-  `npm run cli withdrawFromEscrow 0x1234...tokenAddress 50`
-
-- **Named Options:**  
-  `npm run cli withdrawFromEscrow --token 0x1234...tokenAddress --amount 50`
-
----
-
-**Authorize Escrow Payee:**
-
-- **Positional:**  
-  `npm run cli authorizeEscrow 0x1234...tokenAddress 0x5678...payeeAddress 1000 3600 10`
-
-- **Named Options:**  
-  `npm run cli authorizeEscrow --token 0x1234...tokenAddress --payee 0x5678...payeeAddress --maxLockedAmount 1000 --maxLockSeconds 3600 --maxLockCounts 10`
-
-- Arguments:
-  - `token`: Address of the token to authorize
-  - `payee`: Address of the payee to authorize
-  - `maxLockedAmount`: Maximum amount that can be locked by payee
-  - `maxLockSeconds`: Maximum lock duration in seconds
-  - `maxLockCounts`: Maximum number of locks allowed
-- Options:
-  - `-e, --expiry <timestamp>`: **(Escrow v2)** unix timestamp (seconds) after which the payee
-    can no longer create/extend locks. `0` = indefinite (default). Re-running `authorizeEscrow`
-    **overwrites** the existing authorization (renew/shorten); passing an `--expiry` in the past
-    **revokes** it. Claim and cancel are never gated by expiry, so existing locks stay claimable.
-
-  Examples — revoke a payee, then re-grant for 1 hour:
-
-  ```bash
-  # revoke now (any past timestamp works)
-  npm run cli authorizeEscrow 0x<token> 0x<payee> 1000 3600 10 --expiry 1
-  # re-authorize, expiring 1h from now
-  npm run cli authorizeEscrow 0x<token> 0x<payee> 1000 3600 10 --expiry $(( $(date +%s) + 3600 ))
-  ```
-
----
-
-**Get Escrow Authorizations:**
-
-- **Positional:**  
-  `npm run cli getAuthorizationsEscrow 0x1234...tokenAddress 0x5678...payeeAddress`
-
-- **Named Options:**  
-  `npm run cli getAuthorizationsEscrow --token 0x1234...tokenAddress --payee 0x5678...payeeAddress`
-
-- Prints the current/max lock limits, current locks, and **(Escrow v2)** the authorization's
-  `expiryTimestamp` (`indefinite (0)`, or the ISO date, flagged `EXPIRED/revoked` when in the past).
-  Note that `Current Locked Amount` now reflects only the **payer-funded** portion of live locks —
-  any provider-sponsored amount lives in the separate sponsored bucket (see `getEscrowInfo`).
-
----
-
-**Get Escrow Info (Escrow v2):**
-
-- **Positional:**  
-  `npm run cli getEscrowInfo` or `npm run cli getEscrowInfo 0x1234...tokenAddress`
-
-- **Named Options:**  
-  `npm run cli getEscrowInfo --token 0x1234...tokenAddress --chainId 8453`
-
-- Reads the escrow deployment on the active (or `--chainId`) chain via ERC-165 capability
-  discovery and prints: the on-chain `version`, the `escrowKind` (`COMMUNITY` vs `ENTERPRISE`),
-  whether lock-time sponsorship (`IEscrowLockSubsidy`) and the enterprise fee gate
-  (`IEscrowEnterprise`) are supported, and `maxSponsorsPerLock`. When a `token` is supplied it also
-  prints the sponsored-bucket total and your reclaimable amount (lock-subsidy escrows), and the fee
-  collector + whether the token is allowed (enterprise escrows). Works against a legacy (pre-v2)
-  escrow too — it simply reports it as legacy. Alias: `escrowInfo`.
-
----
-
-**Create Access List:**
-
-- **Positional:**  
-  `npm run cli createAccessList "My Access List" "MAL" "0xUser1,0xUser2" false`
-
-- **Named Options:**  
-  `npm run cli createAccessList --name "My Access List" --symbol "MAL" --initial-users "0xUser1,0xUser2" --transferable false`
-
-- Arguments:
-  - `name`: Name for the access list
-  - `symbol`: Symbol for the access list
-  - `initialUsers`: Comma-separated list of initial user addresses (optional)
-  - `transferable`: Whether tokens are transferable (true/false, optional, default: `false`)
-
----
-
-**Add to Access List:**
-
-- **Positional:**  
-  `npm run cli addToAccessList 0x1234...accessListAddress "0xUser1,0xUser2"`
-
-- **Named Options:**  
-  `npm run cli addToAccessList --address 0x1234...accessListAddress --users "0xUser1,0xUser2"`
-
----
-
-**Check Access List:**
-
-- **Positional:**  
-  `npm run cli checkAccessList 0x1234...accessListAddress "0xUser1,0xUser2"`
-
-- **Named Options:**  
-  `npm run cli checkAccessList --address 0x1234...accessListAddress --users "0xUser1,0xUser2"`
-
----
-
-**Remove from Access List:**
-
-- **Positional:**  
-  `npm run cli removeFromAccessList 0x1234...accessListAddress "0xUser1,0xUser2"`
-
-- **Named Options:**  
-  `npm run cli removeFromAccessList --address 0x1234...accessListAddress --users "0xUser1,0xUser2"`
-
----
-
-### Subsidy Providers
-
-Subsidy providers are on-chain contracts that sponsor part or all of a job's cost (a subsidy released
-back to the payer, plus an optional bonus paid to the node), subject to allow-lists, job-type
-restrictions and per-period caps. **The Ocean Node is the source of truth for which subsidy providers
-are usable** — a node may not support them at all — so the CLI reads provider addresses from the node's
-status, never from bundled contract addresses.
-
-**See which subsidy providers a node supports:**
-
-- `npm run cli getSubsidyProviders`
-
-  Prints the per-chain subsidy-provider contracts the current node advertises, and whether the node
-  enforces a whitelist on user-supplied providers (`subsidyProviderFilter`). The same info is also shown
-  by `getNode`.
-
-**Check your subsidy limits / remaining credit for a token:**
-
-- **Positional:**  
-  `npm run cli getSubsidyStatus 0x1234...tokenAddress`
-
-- **Named Options:**  
-  `npm run cli getSubsidyStatus --token 0x1234...tokenAddress --chainId 8453 --node 0xNodeAddr --jobType compute --amount 10`
-
-  Discovers the provider contract(s) from the node, then for each prints its kind, per-window buckets
-  (limit / used / remaining / reset), the amount claimable now, the contract's available balance and your
-  eligibility. `--subsidy 0xAddr[,0xAddr2]` narrows to specific node-advertised contract(s);
-  `--node`/`--jobType`/`--amount` together also print a subsidy quote (`{subsidy, bonus}`).
-
-**Choose subsidy providers when starting compute / services:**
-
-- Add `--subsidyProviders <list>` to `startCompute`, `startService`, or `extendService`:
-  - omit the flag → the node uses its configured defaults,
-  - `--subsidyProviders none` (or empty) → claim with **no** subsidy,
-  - `--subsidyProviders 0xA,0xB` → claim against exactly those contracts.
-
-  e.g. `npm run cli startCompute -- did:op:dataset did:op:algo env1 900 0xToken '[...resources...]' --accept true --subsidyProviders 0xA,0xB`
-
-  (`startFreeCompute` ignores subsidy providers — a free job does no escrow claim.)
-
----
-
-**Allow Algorithm on Dataset:**
-
-- **Positional:**  
-  `npm run cli allowAlgo did:op:dataset did:op:algo`
-
-- **With named option:**  
-  `npm run cli allowAlgo did:op:dataset did:op:algo --encrypt true`
-
-- The dataset and algorithm DIDs are required positional arguments (`--dataset` / `--algo` may override them, but the positionals must still be supplied). `--encrypt` toggles DDO encryption (default: `true`).
-
-- Approves an algorithm to run on a compute-enabled dataset (signer must be the dataset NFT owner).
-
----
-
-**Create Bucket:**
-
-  `npm run cli createBucket`
-
-- Creates a new persistent-storage bucket on the node. Pass an access-list contract address to gate it; omit for owner-only access:
-
-  `npm run cli createBucket 0x1234...accessListAddress`
-
----
-
-**Add File to Bucket:**
-
-  `npm run cli addFileToBucket <bucketId> ./path/to/file.csv`
-
-- Optionally pass a name to store the file under (defaults to the file's basename):
-
-  `npm run cli addFileToBucket <bucketId> ./path/to/file.csv results.csv`
-
----
-
-**List Buckets:**
-
-  `npm run cli listBuckets`
-
-- Lists buckets owned by the signer, or by a specific owner:
-
-  `npm run cli listBuckets --owner 0x1234...ownerAddress`
-
----
-
-**List Files in Bucket:**
-
-  `npm run cli listFilesInBucket <bucketId>`
-
----
-
-**Get File Object:**
-
-  `npm run cli getFileObject <bucketId> <fileName>`
-
-- Returns the file-object descriptor for a file in a bucket.
-
----
-
-**Delete File:**
-
-  `npm run cli deleteFile <bucketId> <fileName>`
-
----
-
-**Download Node Logs (admin):**
-
-- **Positional:**  
-  `npm run cli downloadNodeLogs ./logs 24`
-
-- **Named Options:**  
-  `npm run cli downloadNodeLogs --output ./logs --last 24`
-
-- Downloads node logs into `<output>/logs.json`. Use either `last` (hours from now) **or** a `from`/`to` epoch-ms range. `maxLogs` caps the number of entries (default: 100, max: 1000). Requires admin privileges on the node.
-
----
-
-#### Available Named Options Per Command
-
-- **setNode** (alias `useNode`)**:**  
-  `<nodeUrl>` (Positional. HTTP(S) URL, peer id or full multiaddr)  
-  `-n, --node <nodeUrl>` (Same as the positional)
-
-- **setNodeEnv** (alias `useNodeEnv`)**:**  
-  `<nodeEnv>` (Positional. A `node|env` token from a `searchComputeResources` result; a leading `Node+env:` label is tolerated. Sets the node and remembers the compute env for later `startCompute`.)
-
-- **getNode** (alias `currentNode`)**:** no arguments (prints the active node and, if set, the remembered compute env)
-
-- **getDDO:**  
-  `-d, --did <did>`
-
-- **publish:**  
-  `-f, --file <metadataFile>`  
-  `-e, --encrypt [boolean]` (Default: `true`)
-
-- **publishAlgo:**  
-  `-f, --file <metadataFile>`  
-  `-e, --encrypt [boolean]` (Default: `true`)
-
-- **editAsset:**  
-  `-d, --did <datasetDid>`  
-  `-f, --file <metadataFile>`  
-  `-e, --encrypt [boolean]` (Default: `true`)
-
-- **download:**  
-  `-d, --did <did>`  
-  `-f, --folder [destinationFolder]` (Default: `.`)
-  `-s, --service <serviceId>` (Optional, target a specific service)
-
-- **allowAlgo:**  
-  `-d, --dataset <datasetDid>`  
-  `-a, --algo <algoDid>`  
-  `-e, --encrypt [boolean]` (Default: `true`)
-
-
-- **startCompute:**
-  `-d, --datasets <datasetDids>`
-  `-a, --algo <algoDid>`
-  `-e, --env <computeEnvId>` (Optional if a compute env was selected via `setNodeEnv`; explicit value wins)
-  `--init <initializeResponse>`
-  `--maxJobDuration <maxJobDuration>`
-  `-t, --token <paymentToken>`
-  `--resources <resources>`
-  `--chainId <chainId>` (Optional. Payment/escrow chain; flag → active/default chain → error. Assets are still ordered on their own DDO chains.)
-  `--amountToDeposit <amountToDeposit>` (Id `''`, it will fallback to initialize compute payment amount.)
-  `-o, --output [output]` (Optional. Stringified JSON object specifying a remote storage backend for job results.)
-  `-s, --services [serviceIds]` (Optional, comma-separated; must match datasetDids length, positional 1–1)
-  `-x, --algo-service [algoServiceId]` (Optional, override algorithm service)
-
-- **startFreeCompute:**  
-  `-d, --datasets <datasetDids>`  
-  `-a, --algo <algoDid>`  
-  `-e, --env <computeEnvId>` (Optional if a compute env was selected via `setNodeEnv`; explicit value wins)
-  `-o, --output [output]` (Optional. Stringified JSON object specifying a remote storage backend for job results.)
-  `-s, --services [serviceIds]` (Optional, comma-separated; must match datasetDids length, positional 1–1)
-  `-x, --algo-service [algoServiceId]` (Optional, override algorithm service)
-  `--chainId <chainId>` (Optional. Chain to sign the free request on; free envs do no ordering/payment.)
-
-- **getComputeEnvironments:**  
-  `-n, --node [node]` (Optional. Ocean Node URL or peer id to query; defaults to `NODE_URL`)
-
-- **searchComputeResources:** (alias `findComputeNodes`)  
-  `--cpu <cores>` `--ram <gb>` `--disk <gb>` `--gpu <count>` (each optional; at least one resource required to skip the wizard)  
-  `--gpu-model <name>` (Optional. GPU kind/description to match, e.g. A100)  
-  `--resource <name:amount>` (Optional, repeatable. Any resource name, e.g. `fpga:2`)  
-  `--free` / `--paid` / `--both` (Optional tier; default both)  
-  `--chain <chainIds>` (Optional. Comma-separated chainIds to price against; defaults to the RPC chain)  
-  `--token <addresses>` (Optional. Comma-separated payment-token addresses; applied to every `--chain`)  
-  `--max-price <amount>` (Optional. Drop paid results above this, in human units)  
-  `--duration <seconds>` (Optional. Assumed job duration for the cost estimate)  
-  `--order-by <key>` (Optional. `price` | `freeCapacity` | `resources` | `leastBusy`)
-
-- **computeStreamableLogs:**  
-
-- **stopCompute:**  
-  `-d, --dataset <datasetDid>`  
-  `-j, --job <jobId>`  
-  `-a, --agreement [agreementId]`
-
-- **getJobStatus:**  
-  `-d, --dataset <datasetDid>`  
-  `-j, --job <jobId>`  
-  `-a, --agreement [agreementId]`
-
-- **downloadJobResults:**  
-  `-j, --job <jobId>`  
-  `-i, --index <index>`  
-  `-f, --folder [destinationFolder]`
-
-- **getServiceTemplates:** (alias `serviceTemplates`)  
-  `[node]` (Optional positional. Ocean Node URL or peer id to query; defaults to `NODE_URL`)  
-  `-n, --node <node>` (Optional. Same as the positional)
-
-- **startService:**  
-  `<computeEnvId>` `<duration>` (seconds) `<paymentToken>` (required positionals)  
-  `--template <templateId>` (Start from an operator-published template)  
-  `-i, --image <image>` (Container image — alternative to `--template`; keep the tag in `--tag`)  
-  `--tag <tag>` / `--checksum <sha256>` / `--dockerfile <path>` (image spec — provide at most one)  
-  `--additional-docker-files <path>` (JSON file of `{filename: content}`, used with `--dockerfile`)  
-  `--cmd <json>` / `--entrypoint <json>` (Docker CMD/ENTRYPOINT override as JSON arrays)  
-  `-p, --ports <ports>` (Comma-separated container ports, e.g. `8888,8080`)  
-  `-r, --resources <resources>` (Stringified JSON `[{"id":"cpu","amount":1},…]`; defaults to template requirements)  
-  `-u, --user-data <json>` / `--user-data-file <path>` (Container env vars; encrypted to the node, never logged)  
-  `--accept [boolean]` (Auto-confirm payment)  
-  `--wait [boolean]` (Poll until Running/failure; default `true`)  
-  `--timeout <seconds>` (Max seconds to wait for Running; default 600)
-
-- **getServiceStatus:** (alias `myServices`)  
-  `[serviceId]` (Optional; omit to list all your services)  
-  `-s, --service <serviceId>`  
-  `-v, --verbose [boolean]` (Dump full job objects)
-
-- **getServices:** (alias `listServices` — the SERVICES_LIST command, all owners)  
-  `[node]` / `-n, --node <node>` (Optional Ocean Node URL or peer id; defaults to `NODE_URL`)  
-  `--status <status>` (Filter by a single status number, e.g. `40` for Running)  
-  `--include-all [boolean]` (Include all statuses, not just active reservations)  
-  `--from <timestamp>` (Only services created at/after this ISO string or Unix timestamp)  
-  `-v, --verbose [boolean]` (Dump full job objects)
-
-- **serviceLogs:** (alias `computeServiceLogs`)  
-  `<serviceId>` / `-s, --service <serviceId>`  
-  `--since <since>` (Unix seconds or a relative duration like `30s` / `2h`)
-
-- **extendService:**  
-  `<serviceId>` `<additionalDuration>` (seconds) `[paymentToken]`  
-  `-s, --service <serviceId>`  
-  `--duration <additionalDuration>`  
-  `-t, --token [paymentToken]` (defaults to the token used at start)  
-  `--accept [boolean]` (Auto-confirm payment)
-
-- **restartService:**  
-  `<serviceId>`  
-  `-u, --user-data <json>` / `--user-data-file <path>` (REPLACE stored env vars)  
-  `--cmd <json>` / `--entrypoint <json>` (REPLACE stored Docker CMD/ENTRYPOINT; empty array clears)  
-  `--image <image>` / `--tag <tag>` / `--checksum <checksum>` / `--dockerfile <dockerfile>` / `--additional-docker-files <json>` (RESPEC: rebuild the container on a new image spec; #2119)  
-  `--wait [boolean]` (Poll until Running; default `true`)  
-  `--timeout <seconds>` (Max seconds to wait; default 600)
-
-- **stopService:**  
-  `<serviceId>` / `-s, --service <serviceId>`
-
-- **mintOcean:**  
-  No options/arguments required.
-
-- **generateAuthToken:**  
-  No options/arguments required.
-
-- **invalidateAuthToken:**  
-  `-t, --token <token>`
-
-- **depositEscrow:**  
-  `-t, --token <token>`  
-  `-a, --amount <amount>`
-
-- **getUserFundsEscrow:**  
-  `-t, --token <token>`
-
-- **withdrawFromEscrow:**  
-  `-t, --token <token>`  
-  `-a, --amount <amount>`
-
-- **authorizeEscrow:**  
-  `-t, --token <token>`  
-  `-p, --payee <payee>`  
-  `-m, --maxLockedAmount <maxLockedAmount>`  
-  `-s, --maxLockSeconds <maxLockSeconds>`  
-  `-c, --maxLockCounts <maxLockCounts>`  
-  `-e, --expiry <timestamp>` (Escrow v2; `0` = indefinite, a past value revokes)  
-  `--chainId <chainId>`
-
-- **getAuthorizationsEscrow:**  
-  `-t, --token <token>`  
-  `-p, --payee <payee>`
-
-- **getEscrowInfo (escrowInfo):**  
-  `[token]` / `-t, --token <token>`  
-  `--chainId <chainId>`
-
-- **createAccessList:**  
-  `-n, --name <name>`  
-  `-s, --symbol <symbol>`  
-  `-u, --initial-users [initialUsers]` (Default: `''`)  
-  `-t, --transferable [transferable]` (Default: `false`)
-
-- **addToAccessList:**  
-  `-a, --address <accessListAddress>`  
-  `-u, --users <users>`
-
-- **checkAccessList:**  
-  `-a, --address <accessListAddress>`  
-  `-u, --users <users>`
-
-- **removeFromAccessList:**  
-  `-a, --address <accessListAddress>`  
-  `-u, --users <users>`
-
-- **createBucket:**  
-  Positional only: `[accessListAddress]` (optional; omit for owner-only access)
-
-- **addFileToBucket:**  
-  Positional only: `<bucketId> <filePath> [fileName]`
-
-- **listBuckets:**  
-  `-o, --owner <address>` (Optional; defaults to signer)
-
-- **listFilesInBucket:**  
-  Positional only: `<bucketId>`
-
-- **getFileObject:**  
-  Positional only: `<bucketId> <fileName>`
-
-- **deleteFile:**  
-  Positional only: `<bucketId> <fileName>`
-
-- **downloadNodeLogs:**  
-  `-o, --output <output>`  
-  `-l, --last [last]` (Hours from now; use either `last` or `from`/`to`)  
-  `-f, --from [from]` (Start time, epoch ms)  
-  `-t, --to [to]` (End time, epoch ms)  
-  `-m, --maxLogs [maxLogs]` (Default: 100, max: 1000)
-
----
-
-**Note:**  
-- When using **named options**, you can write them in any order.  
-- When relying on **positional arguments**, ensure they follow the exact order as defined by the command.
-
-This flexible approach lets you use the style that best suits your workflow while remaining fully backwards compatible.
-
-## 🏛 License
-
-```
-Copyright ((C)) 2025 Ocean Protocol Foundation
+Copyright (C) 2026 Ocean Protocol Foundation
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

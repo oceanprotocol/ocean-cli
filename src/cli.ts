@@ -515,12 +515,9 @@ export async function createCLI() {
     .action(async (nodeUrl, options) => {
       const target = options.node || nodeUrl;
       if (!target) {
-        console.error(
-          chalk.red(
-            "A node is required. Pass it positionally or with --node (URL / peer id / multiaddr).",
-          ),
+        throw new Error(
+          "A node is required. Pass it positionally or with --node (URL / peer id / multiaddr).",
         );
-        return;
       }
       const previous = getCurrentNodeUrl();
       if (target === previous) {
@@ -790,12 +787,14 @@ export async function createCLI() {
       const urls: string[] =
         options.url && options.url.length ? options.url : rpcUrlArgs;
       if (!Number.isInteger(id) || id <= 0) {
-        console.error(chalk.red(`Invalid chainId "${chainIdArg}".`));
-        return;
+        throw new Error(
+          `A valid chain id is required. Pass it positionally or with --chainId (got "${chainIdArg ?? ""}").`,
+        );
       }
       if (!urls || urls.length === 0) {
-        console.error(chalk.red("At least one RPC URL is required."));
-        return;
+        throw new Error(
+          "At least one RPC URL is required. Pass it positionally or with --url.",
+        );
       }
       try {
         await addChain(id, urls);
@@ -819,8 +818,9 @@ export async function createCLI() {
       loadRegistry();
       const id = Number(options.chainId || chainIdArg);
       if (!Number.isInteger(id) || id <= 0) {
-        console.error(chalk.red(`Invalid chainId "${chainIdArg}".`));
-        return;
+        throw new Error(
+          `A valid chain id is required. Pass it positionally or with --chainId (got "${chainIdArg ?? ""}").`,
+        );
       }
       try {
         removeChain(id);
@@ -895,8 +895,9 @@ export async function createCLI() {
       loadRegistry();
       const id = Number(options.chainId || chainIdArg);
       if (!Number.isInteger(id) || id <= 0) {
-        console.error(chalk.red(`Invalid chainId "${chainIdArg}".`));
-        return;
+        throw new Error(
+          `A valid chain id is required. Pass it positionally or with --chainId (got "${chainIdArg ?? ""}").`,
+        );
       }
       try {
         setDefaultChainId(id);
@@ -934,9 +935,7 @@ export async function createCLI() {
     .action(async (did, options) => {
       const assetDid = options.did || did;
       if (!assetDid) {
-        console.error(chalk.red("DID is required"));
-        // process.exit(1);
-        return;
+        throw new Error("A DID is required. Pass it positionally or with --did.");
       }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
@@ -953,9 +952,9 @@ export async function createCLI() {
     .action(async (metadataFile, options) => {
       const file = options.file || metadataFile;
       if (!file) {
-        console.error(chalk.red("Metadata file is required"));
-        // process.exit(1);
-        return;
+        throw new Error(
+          "A metadata file is required. Pass it positionally or with --file.",
+        );
       }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
@@ -972,9 +971,9 @@ export async function createCLI() {
     .action(async (metadataFile, options) => {
       const file = options.file || metadataFile;
       if (!file) {
-        console.error(chalk.red("Metadata file is required"));
-        // process.exit(1);
-        return;
+        throw new Error(
+          "A metadata file is required. Pass it positionally or with --file.",
+        );
       }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
@@ -995,9 +994,9 @@ export async function createCLI() {
       const dsDid = options.did || datasetDid;
       const file = options.file || metadataFile;
       if (!dsDid || !file) {
-        console.error(chalk.red("Dataset DID and metadata file are required"));
-        // process.exit(1);
-        return;
+        throw new Error(
+          "A dataset DID and metadata file are required. Pass them positionally or with --did / --file.",
+        );
       }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
@@ -1019,9 +1018,7 @@ export async function createCLI() {
       const destFolder = options.folder || folder || ".";
       const svcId = options.service || serviceId;
       if (!assetDid) {
-        console.error(chalk.red("DID is required"));
-        // process.exit(1);
-        return;
+        throw new Error("A DID is required. Pass it positionally or with --did.");
       }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
@@ -1041,9 +1038,9 @@ export async function createCLI() {
       const dsDid = options.dataset || datasetDid;
       const aDid = options.algo || algoDid;
       if (!dsDid || !aDid) {
-        console.error(chalk.red("Dataset DID and Algorithm DID are required"));
-        // process.exit(1);
-        return;
+        throw new Error(
+          "A dataset DID and algorithm DID are required. Pass them positionally or with --dataset / --algo.",
+        );
       }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
@@ -1432,10 +1429,9 @@ export async function createCLI() {
     .action(async (jobId, options) => {
       const args = jobId || options.job;
       if (!args) {
-        console.error(
-          chalk.red("A job ID is required. Pass it positionally or with --job."),
+        throw new Error(
+          "A job ID is required. Pass it positionally or with --job.",
         );
-        return;
       }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
@@ -1457,9 +1453,9 @@ export async function createCLI() {
       const jId = options.job || jobId;
       const agrId = options.agreement || agreementId;
       if (!dsDid || !jId) {
-        console.error(chalk.red("Dataset DID and Job ID are required"));
-        // process.exit(1);
-        return;
+        throw new Error(
+          "A dataset DID and job ID are required. Pass them positionally or with --dataset / --job.",
+        );
       }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
@@ -1483,9 +1479,9 @@ export async function createCLI() {
       const jId = options.job || jobId;
       const agrId = options.agreement || agreementId;
       if (!dsDid || !jId) {
-        console.error(chalk.red("Dataset DID and Job ID are required"));
-        // process.exit(1);
-        return;
+        throw new Error(
+          "A dataset DID and job ID are required. Pass them positionally or with --dataset / --job.",
+        );
       }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
@@ -1768,8 +1764,9 @@ export async function createCLI() {
     .action(async (serviceId, options) => {
       const id = options.service || serviceId;
       if (!id) {
-        console.error(chalk.red("Missing required argument: <serviceId>"));
-        return;
+        throw new Error(
+          "A service ID is required. Pass it positionally or with --service.",
+        );
       }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
@@ -1817,20 +1814,14 @@ export async function createCLI() {
       const addl = options.duration || additionalDuration;
       const token = options.token || paymentToken;
       if (!id || !addl) {
-        console.error(
-          chalk.red(
-            "Missing required arguments: <serviceId> <additionalDuration>",
-          ),
+        throw new Error(
+          "A service ID and additional duration are required. Pass them positionally or with --service / --duration.",
         );
-        return;
       }
       if (!Number.isInteger(addl) || addl <= 0) {
-        console.error(
-          chalk.red(
-            "additionalDuration must be a positive integer number of seconds.",
-          ),
+        throw new Error(
+          "additionalDuration must be a positive integer number of seconds.",
         );
-        return;
       }
       let subsidyProviders: string[] | undefined;
       try {
@@ -1980,8 +1971,9 @@ export async function createCLI() {
     .action(async (serviceId, options) => {
       const id = options.service || serviceId;
       if (!id) {
-        console.error(chalk.red("Missing required argument: <serviceId>"));
-        return;
+        throw new Error(
+          "A service ID is required. Pass it positionally or with --service.",
+        );
       }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
@@ -2023,12 +2015,9 @@ export async function createCLI() {
     .action(async (token, options) => {
       const authToken = token || options.token;
       if (!authToken) {
-        console.error(
-          chalk.red(
-            "An auth token is required. Pass it positionally or with --token.",
-          ),
+        throw new Error(
+          "An auth token is required. Pass it positionally or with --token.",
         );
-        return;
       }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
@@ -2048,12 +2037,9 @@ export async function createCLI() {
       const tokenAddress = options.token || token;
       const amountToDeposit = options.amount || amount;
       if (!tokenAddress || !amountToDeposit) {
-        console.error(
-          chalk.red(
-            "A token address and amount are required. Pass them positionally or with --token / --amount.",
-          ),
+        throw new Error(
+          "A token address and amount are required. Pass them positionally or with --token / --amount.",
         );
-        return;
       }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
@@ -2083,12 +2069,9 @@ export async function createCLI() {
     .action(async (token, options) => {
       const tokenAddress = token || options.token;
       if (!tokenAddress) {
-        console.error(
-          chalk.red(
-            "A token address is required. Pass it positionally or with --token.",
-          ),
+        throw new Error(
+          "A token address is required. Pass it positionally or with --token.",
         );
-        return;
       }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
@@ -2109,12 +2092,9 @@ export async function createCLI() {
       const tokenAddress = token || options.token;
       const amountToWithdraw = amount || options.amount;
       if (!tokenAddress || !amountToWithdraw) {
-        console.error(
-          chalk.red(
-            "A token address and amount are required. Pass them positionally or with --token / --amount.",
-          ),
+        throw new Error(
+          "A token address and amount are required. Pass them positionally or with --token / --amount.",
         );
-        return;
       }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
@@ -2177,12 +2157,9 @@ export async function createCLI() {
           !maxLockSecondsValue ||
           !maxLockCountsValue
         ) {
-          console.error(
-            chalk.red(
-              "token, payee, maxLockedAmount, maxLockSeconds and maxLockCounts are all required. Pass them positionally or with --token / --payee / --maxLockedAmount / --maxLockSeconds / --maxLockCounts.",
-            ),
+          throw new Error(
+            "token, payee, maxLockedAmount, maxLockSeconds and maxLockCounts are all required. Pass them positionally or with --token / --payee / --maxLockedAmount / --maxLockSeconds / --maxLockCounts.",
           );
-          return;
         }
 
         const success = await commands.authorizeEscrowPayee(
@@ -2236,12 +2213,9 @@ export async function createCLI() {
       const tokenAddress = token || options.token;
       const payeeAddress = payee || options.payee;
       if (!tokenAddress || !payeeAddress) {
-        console.error(
-          chalk.red(
-            "A token address and payee are required. Pass them positionally or with --token / --payee.",
-          ),
+        throw new Error(
+          "A token address and payee are required. Pass them positionally or with --token / --payee.",
         );
-        return;
       }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
@@ -2281,12 +2255,9 @@ export async function createCLI() {
       const listName = options.name || name;
       const listSymbol = options.symbol || symbol;
       if (!listName || !listSymbol) {
-        console.error(
-          chalk.red(
-            "A name and symbol are required. Pass them positionally or with --name / --symbol.",
-          ),
+        throw new Error(
+          "A name and symbol are required. Pass them positionally or with --name / --symbol.",
         );
-        return;
       }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
@@ -2317,12 +2288,9 @@ export async function createCLI() {
       const listAddress = options.address || accessListAddress;
       const listUsers = options.users || users;
       if (!listAddress || !listUsers) {
-        console.error(
-          chalk.red(
-            "An access-list address and user(s) are required. Pass them positionally or with --address / --users.",
-          ),
+        throw new Error(
+          "An access-list address and user(s) are required. Pass them positionally or with --address / --users.",
         );
-        return;
       }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
@@ -2348,12 +2316,9 @@ export async function createCLI() {
       const listAddress = options.address || accessListAddress;
       const listUsers = options.users || users;
       if (!listAddress || !listUsers) {
-        console.error(
-          chalk.red(
-            "An access-list address and user(s) are required. Pass them positionally or with --address / --users.",
-          ),
+        throw new Error(
+          "An access-list address and user(s) are required. Pass them positionally or with --address / --users.",
         );
-        return;
       }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
@@ -2379,12 +2344,9 @@ export async function createCLI() {
       const listAddress = options.address || accessListAddress;
       const listUsers = options.users || users;
       if (!listAddress || !listUsers) {
-        console.error(
-          chalk.red(
-            "An access-list address and user(s) are required. Pass them positionally or with --address / --users.",
-          ),
+        throw new Error(
+          "An access-list address and user(s) are required. Pass them positionally or with --address / --users.",
         );
-        return;
       }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
@@ -2420,12 +2382,9 @@ export async function createCLI() {
     .action(async (output, last, from, to, maxLogs, options) => {
       const outputDir = options.output || output;
       if (!outputDir) {
-        console.error(
-          chalk.red(
-            "An output directory is required. Pass it positionally or with --output.",
-          ),
+        throw new Error(
+          "An output directory is required. Pass it positionally or with --output.",
         );
-        return;
       }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);

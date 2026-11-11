@@ -1308,15 +1308,20 @@ export class Commands {
     console.log("Verifying payment...");
     await new Promise((resolve) => setTimeout(resolve, 3000));
 
+    // amountToDeposit and maxLockedAmount must be in the SAME unit: the lib compares
+    // them directly and treats the larger as a human-readable amount. Pass the human
+    // amount for both (passing base units for maxLockedAmount makes the lib demand
+    // amount * 10^decimals tokens and the funds check always fails).
+    const paymentAmountHuman = await unitsToAmount(
+      paymentSigner,
+      paymentToken,
+      parsedProviderInitializeComputeJob.payment.amount,
+    );
     const validationEscrow = await escrow.verifyFundsForEscrowPayment(
       paymentToken,
       computeEnv.consumerAddress,
-      await unitsToAmount(
-        paymentSigner,
-        paymentToken,
-        parsedProviderInitializeComputeJob.payment.amount,
-      ),
-      parsedProviderInitializeComputeJob.payment.amount.toString(),
+      paymentAmountHuman,
+      paymentAmountHuman,
       parsedProviderInitializeComputeJob.payment.minLockSeconds.toString(),
       "10",
     );

@@ -84,7 +84,7 @@ describe("Ocean CLI Access List", function () {
         expect(error.stderr || error.message).to.satisfy(
           (msg: string) =>
             msg.includes("error: missing required argument") ||
-            msg.includes("Name and symbol are required"),
+            msg.includes("A name and symbol are required"),
         );
       }
     });
@@ -118,7 +118,7 @@ describe("Ocean CLI Access List", function () {
         expect(error.stderr || error.message).to.satisfy(
           (msg: string) =>
             msg.includes("error: missing required argument") ||
-            msg.includes("at least one user are required"),
+            msg.includes("An access-list address and user(s) are required"),
         );
       }
     });

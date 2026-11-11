@@ -3546,9 +3546,27 @@ export class Commands {
         console.log(`  Kind: ${SubsidyKind[kind] ?? kind}`);
 
         const report = await view.subsidyBuckets(payer, tokenAddress);
-        console.log(`  Paused: ${report.paused}`);
-        console.log(`  User allowed: ${report.userAllowed}`);
-        console.log(`  Token enabled: ${report.tokenEnabled}`);
+        console.log(
+          report.paused
+            ? chalk.red(
+                "  Paused: true (this subsidy provider is paused — no claims are possible)",
+              )
+            : chalk.green("  Paused: false"),
+        );
+        console.log(
+          report.userAllowed
+            ? chalk.green("  User allowed: true")
+            : chalk.red(
+                "  User allowed: false (you are not on this provider's user access list — you cannot use this subsidy provider)",
+              ),
+        );
+        console.log(
+          report.tokenEnabled
+            ? chalk.green("  Token enabled: true")
+            : chalk.red(
+                "  Token enabled: false (this token is not subsidised by this provider)",
+              ),
+        );
         if (!report.buckets || report.buckets.length === 0) {
           console.log("  Buckets: (none)");
         } else {
@@ -3575,14 +3593,16 @@ export class Commands {
             tokenAddress,
           )}`,
         );
-        console.log(
-          `  User allowed (isUserAllowed): ${await view.isUserAllowed(payer)}`,
-        );
         if (nodeAddress) {
+          const nodeAllowed = await view.isNodeAllowed(nodeAddress);
           console.log(
-            `  Node allowed (isNodeAllowed, ${nodeAddress}): ${await view.isNodeAllowed(
-              nodeAddress,
-            )}`,
+            nodeAllowed
+              ? chalk.green(
+                  `  Node allowed (isNodeAllowed, ${nodeAddress}): true`,
+                )
+              : chalk.red(
+                  `  Node allowed (isNodeAllowed, ${nodeAddress}): false (this node is not on the provider's node access list — it cannot use this subsidy provider)`,
+                ),
           );
         }
         if (jobType !== undefined) {

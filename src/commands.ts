@@ -3599,7 +3599,13 @@ export class Commands {
         // Kind-specific detail (subsidyBuckets already covers the core numbers).
         if (kind === SubsidyKind.ROLLING_WINDOW) {
           const opf = new OPFSubsidyProvider(this.signer, address, chainId);
+          const limits = await opf.getTokenLimits(tokenAddress);
           console.log("  Rolling-window detail:");
+          console.log(
+            `    token config: subsidy=${Number(limits.pctBps) / 100}% enabled=${
+              limits.enabled
+            }`,
+          );
           console.log(
             `    remaining daily/weekly/monthly: ${await opf.remainingDaily(
               payer,
@@ -3623,7 +3629,9 @@ export class Commands {
           const cfg = await one.getTokenConfig(tokenAddress);
           console.log("  One-time detail:");
           console.log(
-            `    token config: pctBps=${cfg.pctBps} defaultCredit=${cfg.defaultCredit} enabled=${cfg.enabled}`,
+            `    token config: subsidy=${Number(cfg.pctBps) / 100}% defaultCredit=${
+              cfg.defaultCredit
+            } enabled=${cfg.enabled}`,
           );
           console.log(
             `    effective/remaining/used credit: ${await one.effectiveCredit(

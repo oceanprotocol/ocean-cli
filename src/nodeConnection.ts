@@ -268,3 +268,28 @@ export function nodeChainIds(status: NodeStatus): string[] {
   ];
   return [...new Set(ids)];
 }
+
+/**
+ * Subsidy-provider info the node advertises in its status (ocean-node #1479/#1485):
+ * `subsidyProviders` is a per-chain map (chainId -> checksummed contract addresses) and
+ * `subsidyProviderFilter` tells whether the node restricts user-supplied providers to that
+ * configured set. The node is the single source of truth for which providers are usable —
+ * a node may not support subsidies at all, in which case `providers` is `{}`.
+ *
+ * ocean.js's `NodeStatus` type may not (yet) declare these fields, but the node returns
+ * them at runtime, so we read them through a local narrowing cast rather than depend on
+ * the lib type. Older nodes that omit them yield `{}` / `false`.
+ */
+export function nodeSubsidyInfo(status: NodeStatus): {
+  providers: Record<string, string[]>;
+  filter: boolean;
+} {
+  const s = status as unknown as {
+    subsidyProviders?: Record<string, string[]>;
+    subsidyProviderFilter?: boolean;
+  };
+  return {
+    providers: s.subsidyProviders ?? {},
+    filter: Boolean(s.subsidyProviderFilter),
+  };
+}

@@ -178,6 +178,7 @@ ocean-cli computeStreamableLogs <jobId>                      # or --job
 - `--accept true` auto-confirms payment (mandatory when stdin is not a TTY); `false` prompts.
 - `--services` (comma-separated dataset service ids, mapped by position to the datasets) and `--algo-service` (the algorithm's service id) are optional; the first available service is used when omitted.
 - `--output` is an optional stringified JSON remote-storage backend for results (S3, FTP, URL, Arweave, IPFS); omitted means results stay on the node's disk. Example: `'{"remoteStorage":{"type":"s3","s3Access":{"endpoint":"https://s3.amazonaws.com","region":"us-east-1","bucket":"my-results","objectKey":"jobs/result.tar","accessKeyId":"AKIA...","secretAccessKey":"..."}}}'`.
+- `--subsidyProviders` optionally picks which subsidy providers back the escrow claim (see [Subsidy providers](#subsidy-providers)).
 
 `startFreeCompute` takes the same dataset/algo/`--services`/`--algo-service`/`--output` arguments, targets a free environment and does no ordering or payment.
 
@@ -237,9 +238,30 @@ ocean-cli getUserFundsEscrow 0xToken
 ocean-cli withdrawFromEscrow 0xToken 50
 ocean-cli authorizeEscrow 0xToken 0xPayee 1000 3600 10     # token payee maxLockedAmount maxLockSeconds maxLockCounts
 ocean-cli getAuthorizationsEscrow 0xToken 0xPayee
+ocean-cli getEscrowInfo [0xToken]                          # alias escrowInfo; read-only capability report
 ```
 
 All accept `--chainId`. `authorizeEscrow` flags: `--token --payee --maxLockedAmount --maxLockSeconds --maxLockCounts`.
+
+**Escrow v2.** The escrow contracts support **lock-time pre-funded sponsorship** (a subsidy provider can back part or all of a lock at creation, so a fully-sponsored user can transact with no deposit) and **authorization expiry** (a payee key can be time-boxed or revoked). The CLI reflects this:
+
+- `authorizeEscrow` takes `-e, --expiry <unixSeconds>` (`0` = indefinite, default). Re-running it **overwrites** the record (renew/shorten), and an `--expiry` in the past **revokes** it; claim and cancel are never gated by expiry, so existing locks stay claimable. Example — revoke then re-grant for 1h: `ocean-cli authorizeEscrow 0xToken 0xPayee 1000 3600 10 --expiry 1` then `... --expiry $(( $(date +%s) + 3600 ))`.
+- `getAuthorizationsEscrow` prints the authorization's `expiryTimestamp`, and `getEscrowInfo [token]` reports the escrow's capabilities (version, `escrowKind`, `IEscrowLockSubsidy`/`IEscrowEnterprise` support, `maxSponsorsPerLock`) via ERC-165, plus the sponsored-bucket total and your reclaimable amount when a token is given.
+- Reading state: `getUserFunds().locked` and `Current Locked Amount` now count only the payer's **own** locked funds; provider-sponsored tokens live in a separate sponsored bucket (`getEscrowInfo <token>`).
+
+These commands require the Escrow v2 deployment; they degrade gracefully against a legacy escrow.
+
+### Subsidy providers
+
+Subsidy providers are on-chain contracts that sponsor part or all of a job's cost (a subsidy released back to the payer, plus an optional bonus paid to the node), subject to allow-lists, job-type restrictions and per-period caps. **The Ocean Node is the source of truth for which subsidy providers are usable** (a node may not support them at all), so the CLI reads provider addresses from the node's status, never from bundled contract addresses.
+
+```bash
+ocean-cli getSubsidyProviders                              # alias subsidyProviders; per-chain providers the node advertises
+ocean-cli getSubsidyStatus 0xToken                         # alias subsidyStatus; your limits / remaining credit
+```
+
+- `getSubsidyStatus` discovers the provider contract(s) from the node, then prints each one's kind, per-window buckets (limit / used / remaining / reset), claimable amount, contract balance and your eligibility. Flags: `--token --chainId --node --jobType --amount --subsidy 0xA[,0xB]`. `--node <url|peerId>` queries a specific Ocean Node (default: the active node) and uses that node's on-chain address for the `isNodeAllowed` check; adding `--jobType` and `--amount` also prints a subsidy quote (`{subsidy, bonus}`).
+- `startCompute`, `startService` and `extendService` take `--subsidyProviders <list>`: omit for the node's defaults, `none` (or empty) to claim with **no** subsidy, or `0xA,0xB` to claim against exactly those contracts. `startFreeCompute` ignores it (a free job does no escrow claim).
 
 ### Access lists
 
@@ -286,60 +308,63 @@ ocean-cli mintOcean [--token 0xOcean] [--chainId 8996]     # mint test Ocean tok
 
 ## Command reference
 
-50 commands, as registered in `src/cli.ts`. `<x>` is required, `[x]` optional. A named option **overrides** its positional when both are passed, but a required `<x>` must still be given positionally (passing only its option fails with *missing required argument* — this affects e.g. `publish`, `startCompute`, `startFreeCompute`); optional `[x]` positionals may instead be supplied as named options. Commands with no Options entry (e.g. `downloadJobResults`) are positional-only. `<command> --help` is authoritative.
+53 commands, as registered in `src/cli.ts`. `<x>` is required, `[x]` optional. A named option **overrides** its positional when both are passed. Every positional that has a matching named option is declared `[x]`, so it can be supplied **either** positionally **or** by its option alone (the command itself errors if a needed value is missing from both). The remaining `<x>` positionals have no named-option equivalent and must be given positionally — these are `setNodeEnv`, `startService`, `downloadJobResults`, `restartService`, and the bucket commands (`addFileToBucket`, `listFilesInBucket`, `getFileObject`, `deleteFile`). Commands with no Options entry are positional-only. `<command> --help` is authoritative.
 
 | Command | Aliases | Arguments | Options |
 | --- | --- | --- | --- |
 | `help` | `h` | | |
-| `setNode` | `useNode` | `<nodeUrl>` | `-n, --node` |
+| `setNode` | `useNode` | `[nodeUrl]` | `-n, --node` |
 | `setNodeEnv` | `useNodeEnv` | `<nodeEnv>` | |
 | `getNode` | `currentNode` | | |
-| `addChain` | `addRpc` | `<chainId> [rpcUrl...]` | `-c, --chainId`, `-u, --url` |
-| `removeChain` | `removeRpc` | `<chainId>` | `-c, --chainId` |
+| `addChain` | `addRpc` | `[chainId] [rpcUrl...]` | `-c, --chainId`, `-u, --url` |
+| `removeChain` | `removeRpc` | `[chainId]` | `-c, --chainId` |
 | `listChains` | `getRpcs`, `chains` | | |
-| `setChain` | `useChain` | `<chainId>` | `-c, --chainId` |
+| `setChain` | `useChain` | `[chainId]` | `-c, --chainId` |
 | `getChain` | `currentChain` | | |
-| `getDDO` | | `<did>` | `-d, --did` |
-| `publish` | | `<file>` | `-f, --file`, `-e, --encrypt [bool]` (default true) |
-| `publishAlgo` | | `<file>` | `-f, --file`, `-e, --encrypt [bool]` |
-| `editAsset` | `edit` | `<did> <file>` | `-d, --did`, `-f, --file`, `-e, --encrypt [bool]` |
-| `download` | | `<did> [folder] [serviceId]` | `-d, --did`, `-f, --folder` (default `.`), `-s, --service` |
-| `allowAlgo` | | `<datasetDid> <algoDid>` | `-d, --dataset`, `-a, --algo`, `-e, --encrypt [bool]` |
-| `startCompute` | | `[datasets] [algo] [env] [maxJobDuration] [paymentToken] [resources] [output] [serviceIds] [algoServiceId]` | `-d, --datasets`, `-a, --algo`, `-e, --env`, `--maxJobDuration`, `-t, --token`, `--resources`, `--chainId`, `--accept`, `-o, --output`, `-s, --services`, `-x, --algo-service` |
+| `getDDO` | | `[did]` | `-d, --did` |
+| `publish` | | `[file]` | `-f, --file`, `-e, --encrypt [bool]` (default true) |
+| `publishAlgo` | | `[file]` | `-f, --file`, `-e, --encrypt [bool]` |
+| `editAsset` | `edit` | `[did] [file]` | `-d, --did`, `-f, --file`, `-e, --encrypt [bool]` |
+| `download` | | `[did] [folder] [serviceId]` | `-d, --did`, `-f, --folder` (default `.`), `-s, --service` |
+| `allowAlgo` | | `[datasetDid] [algoDid]` | `-d, --dataset`, `-a, --algo`, `-e, --encrypt [bool]` |
+| `startCompute` | | `[datasets] [algo] [env] [maxJobDuration] [paymentToken] [resources] [output] [serviceIds] [algoServiceId]` | `-d, --datasets`, `-a, --algo`, `-e, --env`, `--maxJobDuration`, `-t, --token`, `--resources`, `--chainId`, `--accept`, `-o, --output`, `-s, --services`, `-x, --algo-service`, `--subsidyProviders` |
 | `startFreeCompute` | | `[datasets] [algo] [env] [output] [serviceIds] [algoServiceId]` | `-d, --datasets`, `-a, --algo`, `-e, --env`, `-o, --output`, `-s, --services`, `-x, --algo-service`, `--chainId` |
 | `getComputeEnvironments` | `getC2DEnvs` | `[node]` | `-n, --node` |
 | `searchComputeResources` | `findComputeNodes` | | `--cpu --ram --disk --gpu --gpu-model --resource --free --paid --both --chain --token --max-price --duration --order-by` |
-| `computeStreamableLogs` | | `<jobId>` | `-j, --job` |
-| `stopCompute` | | `<datasetDid> <jobId> <agreementId>` | `-d, --dataset`, `-j, --job`, `-a, --agreement` |
-| `getJobStatus` | | `<datasetDid> <jobId> [agreementId]` | `-d, --dataset`, `-j, --job`, `-a, --agreement` |
+| `computeStreamableLogs` | | `[jobId]` | `-j, --job` |
+| `stopCompute` | | `[datasetDid] [jobId] [agreementId]` | `-d, --dataset`, `-j, --job`, `-a, --agreement` |
+| `getJobStatus` | | `[datasetDid] [jobId] [agreementId]` | `-d, --dataset`, `-j, --job`, `-a, --agreement` |
 | `downloadJobResults` | | `<jobId> <index> [folder]` | |
 | `getServiceTemplates` | `serviceTemplates` | `[node]` | `-n, --node` |
-| `startService` | | `<computeEnvId> <duration> <paymentToken>` | `--template`, `-i, --image`, `--tag`, `--checksum`, `--dockerfile`, `--additional-docker-files`, `--cmd`, `--entrypoint`, `-p, --ports`, `-r, --resources`, `-u, --user-data`, `--user-data-file`, `--accept`, `--wait`, `--timeout`, `--chainId` |
+| `startService` | | `<computeEnvId> <duration> <paymentToken>` | `--template`, `-i, --image`, `--tag`, `--checksum`, `--dockerfile`, `--additional-docker-files`, `--cmd`, `--entrypoint`, `-p, --ports`, `-r, --resources`, `-u, --user-data`, `--user-data-file`, `--accept`, `--wait`, `--timeout`, `--chainId`, `--subsidyProviders` |
 | `getServiceStatus` | `myServices` | `[serviceId]` | `-s, --service`, `-v, --verbose` |
 | `getServices` | `listServices` | `[node]` | `-n, --node`, `--status`, `--include-all`, `--from`, `-v, --verbose` |
-| `serviceLogs` | `computeServiceLogs` | `<serviceId>` | `-s, --service`, `--since` |
-| `extendService` | | `<serviceId> <additionalDuration> [paymentToken]` | `-s, --service`, `--duration`, `-t, --token`, `--accept`, `--chainId` |
+| `serviceLogs` | `computeServiceLogs` | `[serviceId]` | `-s, --service`, `--since` |
+| `extendService` | | `[serviceId] [additionalDuration] [paymentToken]` | `-s, --service`, `--duration`, `-t, --token`, `--accept`, `--chainId`, `--subsidyProviders` |
 | `restartService` | | `<serviceId>` | `-u, --user-data`, `--user-data-file`, `--cmd`, `--entrypoint`, `--image`, `--tag`, `--checksum`, `--dockerfile`, `--additional-docker-files`, `--wait`, `--timeout` |
-| `stopService` | | `<serviceId>` | `-s, --service` |
+| `stopService` | | `[serviceId]` | `-s, --service` |
 | `mintOcean` | | | `-t, --token`, `--chainId` |
 | `generateAuthToken` | | | |
-| `invalidateAuthToken` | | `<token>` | `-t, --token` |
-| `depositEscrow` | | `<token> <amount>` | `-t, --token`, `-a, --amount`, `--chainId` |
-| `getUserFundsEscrow` | | `<token>` | `-t, --token`, `--chainId` |
-| `withdrawFromEscrow` | | `<token> <amount>` | `-t, --token`, `-a, --amount`, `--chainId` |
-| `authorizeEscrow` | | `<token> <payee> <maxLockedAmount> <maxLockSeconds> <maxLockCounts>` | `-t, --token`, `-p, --payee`, `-m, --maxLockedAmount`, `-s, --maxLockSeconds`, `-c, --maxLockCounts`, `--chainId` |
-| `getAuthorizationsEscrow` | | `<token> <payee>` | `-t, --token`, `-p, --payee`, `--chainId` |
-| `createAccessList` | | `<name> <symbol> [initialUsers] [transferable]` | `-n, --name`, `-s, --symbol`, `-u, --initial-users`, `-t, --transferable`, `--chainId` |
-| `addToAccessList` | | `<address> <users>` | `-a, --address`, `-u, --users`, `--chainId` |
-| `checkAccessList` | | `<address> <users>` | `-a, --address`, `-u, --users`, `--chainId` |
-| `removeFromAccessList` | | `<address> <users>` | `-a, --address`, `-u, --users`, `--chainId` |
+| `invalidateAuthToken` | | `[token]` | `-t, --token` |
+| `depositEscrow` | | `[token] [amount]` | `-t, --token`, `-a, --amount`, `--chainId` |
+| `getUserFundsEscrow` | | `[token]` | `-t, --token`, `--chainId` |
+| `withdrawFromEscrow` | | `[token] [amount]` | `-t, --token`, `-a, --amount`, `--chainId` |
+| `authorizeEscrow` | | `[token] [payee] [maxLockedAmount] [maxLockSeconds] [maxLockCounts]` | `-t, --token`, `-p, --payee`, `-m, --maxLockedAmount`, `-s, --maxLockSeconds`, `-c, --maxLockCounts`, `-e, --expiry`, `--chainId` |
+| `getAuthorizationsEscrow` | | `[token] [payee]` | `-t, --token`, `-p, --payee`, `--chainId` |
+| `getEscrowInfo` | `escrowInfo` | `[token]` | `-t, --token`, `--chainId` |
+| `getSubsidyProviders` | `subsidyProviders` | | `--chainId` |
+| `getSubsidyStatus` | `subsidyStatus` | `[token]` | `-t, --token`, `--chainId`, `--node`, `--jobType`, `--amount`, `--subsidy` |
+| `createAccessList` | | `[name] [symbol] [initialUsers] [transferable]` | `-n, --name`, `-s, --symbol`, `-u, --initial-users`, `-t, --transferable`, `--chainId` |
+| `addToAccessList` | | `[address] [users]` | `-a, --address`, `-u, --users`, `--chainId` |
+| `checkAccessList` | | `[address] [users]` | `-a, --address`, `-u, --users`, `--chainId` |
+| `removeFromAccessList` | | `[address] [users]` | `-a, --address`, `-u, --users`, `--chainId` |
 | `createBucket` | | `[accessListAddress]` | |
 | `addFileToBucket` | | `<bucketId> <filePath> [fileName]` | |
 | `listBuckets` | | | `-o, --owner` |
 | `listFilesInBucket` | | `<bucketId>` | |
 | `getFileObject` | | `<bucketId> <fileName>` | |
 | `deleteFile` | | `<bucketId> <fileName>` | |
-| `downloadNodeLogs` | | `<output> [last] [from] [to]` | `-o, --output`, `-l, --last`, `-f, --from`, `-t, --to`, `-m, --maxLogs` |
+| `downloadNodeLogs` | | `[output] [last] [from] [to]` | `-o, --output`, `-l, --last`, `-f, --from`, `-t, --to`, `-m, --maxLogs` |
 
 ## Sample metadata files
 

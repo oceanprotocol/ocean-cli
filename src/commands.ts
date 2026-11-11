@@ -2038,11 +2038,6 @@ export class Commands {
             );
           }
         }
-        if (t.requiredResources?.length) {
-          console.log(
-            `  requiredResources: ${JSON.stringify(t.requiredResources)}`,
-          );
-        }
         if (t.recommendedResources?.length) {
           console.log(
             `  recommendedResources: ${JSON.stringify(t.recommendedResources)}`,

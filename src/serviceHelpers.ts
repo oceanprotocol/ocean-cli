@@ -14,6 +14,9 @@ import {
   ServiceStatusNumber,
   ServiceTemplatePublic,
   TemplateResourceRequirement,
+  sizeSharedResources,
+  planGpuLayouts,
+  grantableAmount,
 } from "@oceanprotocol/lib";
 import { getConfigFor } from "./rpcRegistry.js";
 
@@ -61,28 +64,44 @@ function colorForStatus(status: number, text: string): string {
 
 // ---------------------------------------------------------------------------
 // 4.2 Environment <-> template resource matching
-// (ported from ocean.js test/integration/Services.test.ts)
+// (delegates to ocean.js's unit-aware ServiceResources helpers)
 // ---------------------------------------------------------------------------
+//
+// ocean.js v10 replaced ServiceTemplatePublic.requiredResources with
+// `recommendedResources`, and turned TemplateResourceRequirement into a
+// discriminated union: cpu/ram/disk members carry `id` + `recommended` (cpu in
+// `cores`, ram/disk in `GB`), while the GPU member carries `type: 'gpu'` +
+// `layouts` and no `id`. Because ram/disk are now declared in GB while a
+// compute environment reports those resources in bytes, matching must be
+// unit-aware — so we lean on the library's `sizeSharedResources` /
+// `planGpuLayouts` instead of comparing raw numbers.
 
+// Narrows a requirement to its shared (cpu/ram/disk) member — the GPU member is
+// the only one without an `id`.
+type SharedRequirement = Extract<TemplateResourceRequirement, { id: string }>;
+type GpuRequirement = Extract<TemplateResourceRequirement, { type: "gpu" }>;
+
+function isSharedRequirement(
+  req: TemplateResourceRequirement,
+): req is SharedRequirement {
+  return "id" in req;
+}
+
+// Whole units of a single shared requirement a new booking could still get.
+// Only meaningful for cpu (cores) — ram/disk use byte-vs-GB sizing handled by
+// the library — so this stays a best-effort display helper.
 export function availableFor(
   env: ComputeEnvironment,
   req: TemplateResourceRequirement,
 ): number {
   const resources: ComputeResource[] = env.resources ?? [];
-  if (req.id) {
+  if (isSharedRequirement(req)) {
     const r = resources.find((x) => x.id === req.id);
-    return r ? (r.total ?? 0) - (r.inUse ?? 0) : 0;
+    return r ? grantableAmount(r) : 0;
   }
   return resources
-    .filter((x) => x.kind === req.kind && (!req.type || x.type === req.type))
-    .reduce((sum, x) => sum + ((x.total ?? 0) - (x.inUse ?? 0)), 0);
-}
-
-export function envSatisfiesTemplate(
-  env: ComputeEnvironment,
-  reqs?: TemplateResourceRequirement[],
-): boolean {
-  return (reqs ?? []).every((req) => availableFor(env, req) >= req.min);
+    .filter((x) => x.type === "gpu")
+    .reduce((sum, x) => sum + grantableAmount(x), 0);
 }
 
 // Human-readable reason a template does not fit an env (or null when it fits).
@@ -91,15 +110,39 @@ export function templateMismatchReason(
   template?: ServiceTemplatePublic,
 ): string | null {
   if (!template) return null;
-  for (const req of template.requiredResources ?? []) {
-    const have = availableFor(env, req);
-    if (have < req.min) {
-      const what =
-        req.id ?? `${req.kind ?? "resource"}${req.type ? `/${req.type}` : ""}`;
-      return `${what}: need ${req.min}, have ${have}`;
+  const reqs = template.recommendedResources ?? [];
+  const resources = env.resources ?? [];
+
+  // Shared cpu/ram/disk: unit-aware sizing (GB -> bytes) from the library.
+  const shared = reqs.filter(isSharedRequirement);
+  if (shared.length && sizeSharedResources(resources, shared) === null) {
+    // cpu is the only id we can compare in like units for a precise message.
+    const cpu = shared.find((r) => r.id === "cpu");
+    if (cpu && availableFor(env, cpu) < cpu.recommended) {
+      return `cpu: recommended ${cpu.recommended} ${cpu.unit}, available ${availableFor(
+        env,
+        cpu,
+      )}`;
+    }
+    return "insufficient cpu/ram/disk for the template's recommended resources";
+  }
+
+  // GPU: layout planning from the library.
+  const gpu = reqs.find((r): r is GpuRequirement => !isSharedRequirement(r));
+  if (gpu) {
+    const gpuResources = resources.filter((r) => r.type === "gpu");
+    if (planGpuLayouts({ gpuResources, requirement: gpu }).length === 0) {
+      return `gpu: no layout on this environment satisfies the template's recommended ${gpu.recommended} ${gpu.unit} per GPU`;
     }
   }
   return null;
+}
+
+export function envSatisfiesTemplate(
+  env: ComputeEnvironment,
+  template?: ServiceTemplatePublic,
+): boolean {
+  return templateMismatchReason(env, template) === null;
 }
 
 export function findServiceEnvironments(
@@ -107,9 +150,7 @@ export function findServiceEnvironments(
   template?: ServiceTemplatePublic,
 ): ComputeEnvironment[] {
   return (envs ?? []).filter(
-    (e) =>
-      e.features?.services !== false &&
-      (!template || envSatisfiesTemplate(e, template.requiredResources)),
+    (e) => e.features?.services !== false && envSatisfiesTemplate(e, template),
   );
 }
 
@@ -121,12 +162,18 @@ export function resolveServiceResources(
   template: ServiceTemplatePublic | undefined,
   env: ComputeEnvironment,
 ): ComputeResourceRequest[] {
-  const requiredById = (template?.requiredResources ?? []).filter(
-    (r) => typeof r.id === "string",
+  // Unit-aware sizing of the template's recommended cpu/ram/disk against the
+  // environment (converts the template's GB figures to the bytes the node
+  // expects, and drops zero amounts). GPU layout selection, when needed, is
+  // left to an explicit --resources selection.
+  const sizing = sizeSharedResources(
+    env.resources ?? [],
+    template?.recommendedResources,
   );
-  if (requiredById.length) {
-    return requiredById.map((r) => ({ id: r.id as string, amount: r.min }));
+  if (sizing && sizing.requests.length) {
+    return sizing.requests;
   }
+  // Fallback: a minimal cpu + ram request.
   return (env.resources ?? [])
     .filter((r) => r.id === "cpu" || r.id === "ram")
     .map((r) => ({ id: r.id, amount: 1 }));

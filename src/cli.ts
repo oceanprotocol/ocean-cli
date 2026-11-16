@@ -1052,11 +1052,11 @@ export async function createCLI() {
     .command("startCompute")
     .description("Starts a compute job")
     .argument(
-      "<datasetDids>",
+      "[datasetDids]",
       'Dataset DIDs (comma-separated), an empty array for none, OR a JSON ComputeAsset object/array with a fileObject (raw datasets, no DID). Mixed input must be valid JSON, e.g. \'["did:op:abc",{"fileObject":{...}}]\'',
     )
     .argument(
-      "<algoDid>",
+      "[algoDid]",
       "Algorithm DID, OR a JSON ComputeAlgorithm object with a fileObject and meta (raw algorithm, no DID)",
     )
     .argument(
@@ -1318,11 +1318,11 @@ export async function createCLI() {
     .command("startFreeCompute")
     .description("Starts a FREE compute job")
     .argument(
-      "<datasetDids>",
+      "[datasetDids]",
       'Dataset DIDs (comma-separated), an empty array for none, OR a JSON ComputeAsset object/array with a fileObject (raw datasets, no DID). Mixed input must be valid JSON, e.g. \'["did:op:abc",{"fileObject":{...}}]\'',
     )
     .argument(
-      "<algoDid>",
+      "[algoDid]",
       "Algorithm DID, OR a JSON ComputeAlgorithm object with a fileObject and meta (raw algorithm, no DID)",
     )
     .argument(

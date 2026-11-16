@@ -36,6 +36,21 @@ describe("Ocean CLI Escrow", function () {
     await runCommand(`npm run cli -- mintOcean`);
   });
 
+  // The expiryTimestamp stored on-chain for the payer -> payee authorization (Escrow v2).
+  async function storedExpiry(): Promise<number> {
+    const escrow = new EscrowContract(
+      getAddress(escrowAddress),
+      payer,
+      chainConfig.chainId,
+    );
+    const authorizations = await escrow.getAuthorizations(
+      tokenAddress,
+      payer.address,
+      payee.address,
+    );
+    return Number(authorizations[0].expiryTimestamp);
+  }
+
   it("should deposit tokens into escrow", async function () {
     const depositAmount = "1";
 
@@ -139,6 +154,8 @@ describe("Ocean CLI Escrow", function () {
     expect(output).to.include("Max lock counts: 10");
     // Escrow v2: the authorization now carries an expiry; the one set above was indefinite.
     expect(output).to.include("Expiry:");
+    expect(output).to.include("indefinite (0)");
+    expect(await storedExpiry()).to.equal(0);
   });
 
   it("should re-authorize a payee with an expiry (Escrow v2 overwrite)", async function () {
@@ -157,6 +174,7 @@ describe("Ocean CLI Escrow", function () {
     // Expiry is now a concrete timestamp, not "indefinite (0)".
     expect(info).to.include("Expiry:");
     expect(info).to.not.include("indefinite (0)");
+    expect(await storedExpiry()).to.equal(expiry);
   });
 
   it("should revoke a payee with a past expiry (Escrow v2)", async function () {
@@ -171,6 +189,7 @@ describe("Ocean CLI Escrow", function () {
       `npm run cli getAuthorizationsEscrow ${tokenAddress} ${payee.address}`,
     );
     expect(info).to.include("EXPIRED/revoked");
+    expect(await storedExpiry()).to.equal(1);
   });
 
   it("should reject a non-numeric expiry", async function () {

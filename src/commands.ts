@@ -93,6 +93,7 @@ import {
   validateNode,
   nodeSubsidyInfo,
 } from "./nodeConnection.js";
+import { escrowContractFor } from "./escrowHelpers.js";
 import {
   ResourceSearchParams,
   ProviderEnvRow,
@@ -1422,8 +1423,10 @@ export class Commands {
       return;
     }
 
-    const escrow = new EscrowContract(
-      getAddress(parsedProviderInitializeComputeJob.payment.escrowAddress),
+    // Version-matched ABI: a legacy escrow returns six-field authorizations, which the
+    // funds check below and the authorization reads after it must be able to decode.
+    const escrow = await escrowContractFor(
+      parsedProviderInitializeComputeJob.payment.escrowAddress,
       paymentSigner,
       payChain,
     );
@@ -3460,8 +3463,10 @@ export class Commands {
     const payerAddress = getAddress(payer);
     const payeeAddress = getAddress(payee);
     const decimals = await getTokenDecimals(this.signer, token);
-    const escrow = new EscrowContract(
-      getAddress(requireAddress(chainId, "escrow", "Escrow")),
+    // Version-matched ABI: a legacy (v1) escrow returns six-field authorizations, which the
+    // lib's default seven-field ABI cannot decode.
+    const escrow = await escrowContractFor(
+      requireAddress(chainId, "escrow", "Escrow"),
       this.signer,
       chainId,
     );
@@ -3491,8 +3496,8 @@ export class Commands {
     );
 
     // Escrow v2: the auth tuple gained a 7th field, expiryTimestamp (unix seconds; 0 =
-    // indefinite). A legacy (v1) escrow returns a 6-field tuple, so read defensively and treat
-    // a missing value as indefinite.
+    // indefinite). A legacy (v1) escrow returns a 6-field tuple (decoded with the six-field
+    // ABI above), so read defensively and treat a missing value as indefinite.
     const expiryRaw = authorization.expiryTimestamp ?? authorization[6] ?? "0";
     const expirySeconds = Number(expiryRaw);
     const expiryLabel =

@@ -1,9 +1,8 @@
 import util from "util";
 import chalk from "chalk";
-import { Signer, getAddress } from "ethers";
+import { Signer } from "ethers";
 import {
   ProviderInstance,
-  EscrowContract,
   amountToUnits,
   unitsToAmount,
   getTokenDecimals,
@@ -19,6 +18,7 @@ import {
   grantableAmount,
 } from "@oceanprotocol/lib";
 import { getConfigFor } from "./rpcRegistry.js";
+import { escrowContractFor } from "./escrowHelpers.js";
 
 // ---------------------------------------------------------------------------
 // 4.1 Status labels
@@ -303,6 +303,19 @@ export function describeUserDataKeys(
 // Read-only. Returns the payer's own share of the cost (human units): the full cost, or
 // less when subsidy providers pre-fund part of the lock (zero when fully sponsored).
 // Prints the error and returns null when it cannot be worked out.
+/**
+ * A JS number as a plain decimal string with at most `decimals` fraction digits — what
+ * `amountToUnits` accepts. `String(n)` does not qualify: a float cost such as 0.1 + 0.2
+ * prints 17 fraction digits (more than a 6-decimal token allows) and a tiny one prints in
+ * exponent form, and both make the conversion throw. Rounds to nearest. Pure.
+ */
+export function toTokenPrecision(amount: number, decimals: number): string {
+  if (!Number.isFinite(amount) || amount < 0) {
+    throw new Error(`Invalid cost amount: ${amount}`);
+  }
+  return amount.toFixed(Math.min(Math.max(Math.trunc(decimals), 0), 100));
+}
+
 export async function quoteServicePayerShare(
   signer: Signer,
   token: string,
@@ -314,7 +327,14 @@ export async function quoteServicePayerShare(
   try {
     const decimals = await getTokenDecimals(signer, token);
     const lockUnits = BigInt(
-      (await amountToUnits(signer, token, String(costHuman), decimals)).toString(),
+      (
+        await amountToUnits(
+          signer,
+          token,
+          toTokenPrecision(costHuman, Number(decimals)),
+          decimals,
+        )
+      ).toString(),
     );
     let prefundedUnits = quotePrefunded ? await quotePrefunded(lockUnits) : 0n;
     if (prefundedUnits > lockUnits) prefundedUnits = lockUnits;
@@ -351,11 +371,8 @@ export async function fundServiceEscrow(
       );
       return false;
     }
-    const escrow = new EscrowContract(
-      getAddress(config.escrow),
-      signer,
-      chainId,
-    );
+    // Version-matched ABI, so the funds check can read a legacy escrow's authorizations.
+    const escrow = await escrowContractFor(config.escrow, signer, chainId);
     const minLockSeconds = durationSeconds + 3600; // node getMinLockTime margin
 
     // Both amounts are HUMAN units (the lib compares them directly). Called even for a

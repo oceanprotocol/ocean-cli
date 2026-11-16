@@ -23,6 +23,7 @@ import {
   ComputeAsset,
   createAsset,
   LoggerInstance,
+  JobSubsidyEstimate,
 } from "@oceanprotocol/lib";
 import { createRequire } from "module";
 
@@ -525,9 +526,10 @@ export async function resolveComputeInputs(
     };
   } else if (algoToken && typeof algoToken === "object") {
     const rawAlgo = algoToken as unknown as ComputeAlgorithm;
-    if (!rawAlgo.fileObject) {
+    // The node accepts the code either as a file to fetch or inline in meta.rawcode.
+    if (!rawAlgo.fileObject && !rawAlgo.meta?.rawcode) {
       console.error(
-        "Error: raw algorithm must contain a 'fileObject'. Got: " +
+        "Error: raw algorithm must contain a 'fileObject' or 'meta.rawcode'. Got: " +
           JSON.stringify(algoToken),
       );
       return null;
@@ -766,4 +768,57 @@ export function parseSubsidyProviders(raw?: string): string[] | undefined {
   const trimmed = raw.trim();
   if (trimmed === "" || trimmed.toLowerCase() === "none") return [];
   return trimmed.split(",").map((a) => ethers.getAddress(a.trim()));
+}
+
+/**
+ * How much of a job's lock the subsidy providers would PRE-FUND, in token base units,
+ * read off an ocean.js `estimateJobSubsidy` result. What is left is the payer's own
+ * share — the only amount that has to sit in (and be authorized on) the payer's escrow.
+ *
+ * `requested` is the `--subsidyProviders` tri-state, and it decides which providers the
+ * node will actually put in the lock:
+ *   - `undefined` -> the node's own set, which is what the estimate's prefunded scenario
+ *     was built from, so its projected total is used as-is;
+ *   - a list      -> the node uses exactly those (a REPLACEMENT of its set), while the
+ *     estimate quotes `advertised ∪ list`. Only the named providers are counted, so an
+ *     advertised provider the user did not name never shrinks the payer's deposit;
+ *   - `[]`        -> no subsidy, nothing is pre-funded.
+ *
+ * An empty prefunded selection means no provider pre-funds (or the escrow has no
+ * lock-subsidy support) and yields 0. The result is capped at `lockUnits`, the node's
+ * authoritative lock amount, so a client-side cost estimate above it cannot push the
+ * payer share below zero.
+ */
+export function prefundedLockUnits(
+  estimate: Pick<
+    JobSubsidyEstimate,
+    "providers" | "scenarios" | "maxSponsorsPerLock"
+  >,
+  requested: string[] | undefined,
+  decimals: number,
+  lockUnits: bigint,
+): bigint {
+  const scenario = estimate.scenarios.prefunded;
+  if (scenario.selected.length === 0) return 0n;
+  if (requested !== undefined && requested.length === 0) return 0n;
+
+  let total: bigint;
+  if (requested === undefined) {
+    total = ethers.parseUnits(scenario.projectedTotalSubsidy, decimals);
+  } else {
+    // The node keeps the first `maxSponsorsPerLock` entries of the caller's list.
+    const named = new Set(
+      requested
+        .slice(0, estimate.maxSponsorsPerLock)
+        .map((a) => a.toLowerCase()),
+    );
+    total = estimate.providers
+      .filter((p) => p.eligible && !p.dropped)
+      .filter((p) => named.has(p.address.toLowerCase()))
+      .reduce(
+        (sum, p) => sum + ethers.parseUnits(p.quotes.prefunded.subsidy, decimals),
+        0n,
+      );
+  }
+  return total > lockUnits ? lockUnits : total;
 }

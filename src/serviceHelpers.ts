@@ -294,16 +294,51 @@ export function describeUserDataKeys(
 }
 
 // ---------------------------------------------------------------------------
-// 4.6 Escrow pre-verification
+// 4.6 Escrow: quote the payer's share, then fund it
 // ---------------------------------------------------------------------------
+//
+// Two steps so the caller can ask for confirmation in between: the quote is read-only,
+// and nothing is deposited or authorized until the user has seen what they pay.
 
-// Prints actionable errors and returns false when escrow is not ready.
-export async function verifyServiceEscrow(
+// Read-only. Returns the payer's own share of the cost (human units): the full cost, or
+// less when subsidy providers pre-fund part of the lock (zero when fully sponsored).
+// Prints the error and returns null when it cannot be worked out.
+export async function quoteServicePayerShare(
+  signer: Signer,
+  token: string,
+  costHuman: number, // from estimateServiceCost
+  // Given the lock amount (base units), returns how much of it subsidy providers would
+  // pre-fund at lock time. Omitted = nothing is pre-funded, the payer funds it all.
+  quotePrefunded?: (lockUnits: bigint) => Promise<bigint>,
+): Promise<string | null> {
+  try {
+    const decimals = await getTokenDecimals(signer, token);
+    const lockUnits = BigInt(
+      (await amountToUnits(signer, token, String(costHuman), decimals)).toString(),
+    );
+    let prefundedUnits = quotePrefunded ? await quotePrefunded(lockUnits) : 0n;
+    if (prefundedUnits > lockUnits) prefundedUnits = lockUnits;
+    return await unitsToAmount(
+      signer,
+      token,
+      (lockUnits - prefundedUnits).toString(),
+      decimals,
+    );
+  } catch (error) {
+    console.error(chalk.red("Error estimating the escrow amount:"), error);
+    return null;
+  }
+}
+
+// Sends transactions: deposits whatever part of the payer's share is missing from
+// escrow and creates or repairs the node's authorization. Call it only after the user
+// confirmed. Prints actionable errors and returns false when escrow is not ready.
+export async function fundServiceEscrow(
   signer: Signer,
   chainId: number,
   token: string,
   payee: string, // env.consumerAddress
-  costHuman: number, // from estimateServiceCost
+  payerShareHuman: string, // from quoteServicePayerShare
   durationSeconds: number,
 ): Promise<boolean> {
   try {
@@ -321,26 +356,16 @@ export async function verifyServiceEscrow(
       signer,
       chainId,
     );
-    const decimals = await getTokenDecimals(signer, token);
-    const amountUnits = await amountToUnits(
-      signer,
-      token,
-      String(costHuman),
-      decimals,
-    );
-    const availableHuman = await unitsToAmount(
-      signer,
-      token,
-      amountUnits.toString(),
-      decimals,
-    );
     const minLockSeconds = durationSeconds + 3600; // node getMinLockTime margin
 
+    // Both amounts are HUMAN units (the lib compares them directly). Called even for a
+    // payer share of 0: it deposits nothing then, but still creates or repairs the
+    // authorization the node needs to create the lock.
     const validation = await escrow.verifyFundsForEscrowPayment(
       token,
       payee,
-      availableHuman,
-      amountUnits.toString(),
+      payerShareHuman,
+      payerShareHuman,
       String(minLockSeconds),
       "10",
     );

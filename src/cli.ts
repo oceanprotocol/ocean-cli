@@ -1240,6 +1240,27 @@ export async function createCLI() {
           initResp.payment.amount.toString(),
         );
 
+        // Subsidy providers may pre-fund part or all of the lock, so show the whole
+        // price and what the payer actually funds. The same figure is handed to
+        // computeStart below, so what is confirmed here is what gets deposited.
+        const lockUnits = BigInt(initResp.payment.amount.toString());
+        const prefundedUnits = await commands.computePrefundedUnits(
+          subsidyProviders,
+          lockUnits,
+        );
+        const toAmount = (units: bigint) =>
+          unitsToAmount(paymentSigner, initResp.payment.token, units.toString());
+        const youPay = await toAmount(lockUnits - prefundedUnits);
+        console.log(chalk.yellow(`  total job cost: ${amount}`));
+        if (prefundedUnits > 0n) {
+          console.log(
+            chalk.green(
+              `  prepaid subsidy covers: ${await toAmount(prefundedUnits)}`,
+            ),
+          );
+        }
+        console.log(chalk.yellow(`  you pay: ${youPay}`));
+
         const proceed = options.accept;
         if (!proceed) {
           if (!process.stdin.isTTY) {
@@ -1252,7 +1273,7 @@ export async function createCLI() {
           }
           const rl = createInterface({ input, output: stdout });
           const confirmation = await rl.question(
-            `\nProceed with payment for starting compute job at price ${amount} in tokens from address ${initResp.payment.token}? (y/n): `,
+            `\nProceed with starting the compute job? Total cost ${amount}, you pay ${youPay}, in tokens from address ${initResp.payment.token} (y/n): `,
           );
           rl.close();
           if (
@@ -1284,6 +1305,7 @@ export async function createCLI() {
           computeArgs,
           paymentChainId,
           subsidyProviders,
+          prefundedUnits,
         );
         if (started) {
           console.log(chalk.green("Compute job started successfully."));

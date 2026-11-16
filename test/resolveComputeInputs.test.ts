@@ -176,7 +176,23 @@ describe("resolveComputeInputs", function () {
     expect(res).to.equal(null);
   });
 
-  it("fails (returns null) when a raw algorithm object lacks a fileObject", async function () {
+  it("accepts a raw algorithm that carries inline meta.rawcode instead of a fileObject", async function () {
+    const res = await resolveComputeInputs(
+      "[]",
+      JSON.stringify({
+        meta: { rawcode: "print(1)", container: { image: "python" } },
+      }),
+      makeAquarius(),
+      indexingParams,
+      FALLBACK,
+    );
+    expect(res.algoDdo).to.equal(null);
+    expect(res.algo.fileObject).to.equal(undefined);
+    expect(res.algo.meta.rawcode).to.equal("print(1)");
+    expect(res.assets).to.have.length(0);
+  });
+
+  it("fails (returns null) when a raw algorithm object has neither a fileObject nor meta.rawcode", async function () {
     const res = await resolveComputeInputs(
       "did:op:dataset1",
       JSON.stringify({ meta: { container: {} } }),

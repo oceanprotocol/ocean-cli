@@ -13,6 +13,7 @@ import {
   isOrderable,
   computeJobChainIds,
   summarizeComputeEnvFees,
+  prefundedLockUnits,
   getDdoChainId,
 } from "./helpers.js";
 import {
@@ -38,6 +39,8 @@ import {
   unitsToAmount,
   EscrowContract,
   getTokenDecimals,
+  estimateJobSubsidy,
+  isNonEmpty,
   AccesslistFactory,
   AccessListContract,
   SubsidyView,
@@ -74,7 +77,8 @@ import {
   estimateServiceCost,
   parseUserData,
   describeUserDataKeys,
-  verifyServiceEscrow,
+  quoteServicePayerShare,
+  fundServiceEscrow,
   pollServiceStatus,
   printServiceJob,
   formatExpiry,
@@ -129,6 +133,11 @@ async function drainLogStream(stream: any): Promise<string> {
     if (chunks.length === 0) throw error;
   }
   return Buffer.concat(chunks).toString("utf-8");
+}
+
+// `total - share` for display, without float noise (0.41 - 0.1 = 0.31, not 0.3099…).
+function formatAmountDiff(total: number, share: string): string {
+  return Number((total - Number(share)).toFixed(18)).toString();
 }
 
 export class Commands {
@@ -915,13 +924,125 @@ export class Commands {
     }
     console.log(chalk.yellow("\n--- Payment Details ---"));
     console.log(JSON.stringify(providerInitializeComputeJob, null, 2));
+    // Kept for computePrefundedUnits(), which the startCompute action calls before the
+    // payment prompt (one fresh Commands instance per invocation, methods run in turn).
+    this.computeQuoteCtx = {
+      signer: paymentSigner,
+      chainId: payChain,
+      node: providerURI,
+      token: paymentToken,
+      environmentId: computeEnv.id,
+      resources: parsedResources,
+      durationSeconds: supportedMaxJobDuration,
+    };
     return providerInitializeComputeJob;
+  }
+
+  private computeQuoteCtx?: {
+    signer: Signer;
+    chainId: number;
+    node: string;
+    token: string;
+    environmentId: string;
+    resources: ComputeResourceRequest[];
+    durationSeconds: number;
+  };
+
+  // How much of a paid compute job's lock (base units) subsidy providers would
+  // pre-fund, for the job last passed to initializeCompute(). Lets the caller show the
+  // payer's real share before asking for confirmation, then hand the same figure to
+  // computeStart() so what was confirmed is what gets funded.
+  public async computePrefundedUnits(
+    subsidyProviders: string[] | undefined,
+    lockUnits: bigint,
+  ): Promise<bigint> {
+    if (!this.computeQuoteCtx) return 0n;
+    return this.prefundedUnitsForJob({
+      ...this.computeQuoteCtx,
+      jobType: 1,
+      // The node treats every algorithm a consumer supplies (raw code, a file or a
+      // DID) as untrusted for a provider's image allowlist, so a provider that
+      // restricts images never sponsors a compute job (the container is then
+      // irrelevant). Mirror that, or the estimate would count a subsidy the node
+      // will not apply.
+      hasCustomEntrypoint: true,
+      subsidyProviders,
+      lockUnits,
+    });
+  }
+
+  // Base units of the lock that subsidy providers would pre-fund for a paid compute
+  // job or on-demand service (0 when none do). Advisory and read-only: any failure to quote — an older
+  // node, an unreachable provider contract, an escrow the node advertises that is not
+  // the configured one — falls back to 0, i.e. the payer funds the whole job as before.
+  private async prefundedUnitsForJob(p: {
+    jobType: 1 | 2; // ocean-node numbering: compute | service
+    // The node's own predicate for "not the trusted operator image" (see call sites).
+    hasCustomEntrypoint: boolean;
+    signer: Signer;
+    chainId: number;
+    node: string;
+    token: string;
+    environmentId: string;
+    resources: ComputeResourceRequest[];
+    durationSeconds: number;
+    container?: {
+      image?: string;
+      tag?: string;
+      checksum?: string;
+      dockerfile?: string;
+    };
+    subsidyProviders?: string[];
+    lockUnits: bigint;
+  }): Promise<bigint> {
+    // `[]` is an explicit "no subsidy".
+    if (p.subsidyProviders && p.subsidyProviders.length === 0) return 0n;
+    try {
+      const decimals = Number(await getTokenDecimals(p.signer, p.token));
+      const estimate = await estimateJobSubsidy({
+        signer: p.signer,
+        chainId: p.chainId,
+        payer: await p.signer.getAddress(),
+        node: p.node,
+        token: p.token,
+        environmentId: p.environmentId,
+        resources: p.resources,
+        durationSeconds: p.durationSeconds,
+        jobType: p.jobType,
+        container: p.container ?? {},
+        hasCustomEntrypoint: p.hasCustomEntrypoint,
+        // Quote against the amount actually being locked: the helper derives its own
+        // cost (with the env's minimum duration), which can exceed it.
+        subsidyNeeded: ethers.formatUnits(p.lockUnits, decimals),
+        customSubsidyProviders: p.subsidyProviders,
+        tokenDecimals: decimals,
+        config: this.configFor(p.chainId),
+      });
+      return prefundedLockUnits(
+        estimate,
+        p.subsidyProviders,
+        decimals,
+        p.lockUnits,
+      );
+    } catch (error) {
+      console.log(
+        chalk.yellow(
+          `Could not estimate the prepaid subsidy (${
+            (error as Error)?.message ?? error
+          }); assuming you fund the whole job.`,
+        ),
+      );
+      return 0n;
+    }
   }
 
   public async computeStart(
     args: string[],
     paymentChainId?: number,
     subsidyProviders?: string[],
+    // Pre-funded base units the caller already quoted (and showed the user) with
+    // computePrefundedUnits(); quoted here when omitted.
+    quotedPrefundedUnits?: bigint,
   ) {
     const resolved = await resolveComputeInputs(
       args[1],
@@ -1312,11 +1433,50 @@ export class Commands {
     // them directly and treats the larger as a human-readable amount. Pass the human
     // amount for both (passing base units for maxLockedAmount makes the lib demand
     // amount * 10^decimals tokens and the funds check always fails).
+    // The node's lock amount is authoritative. Subsidy providers may pre-fund part or
+    // all of it at lock time (Escrow v2), so only the remainder is the payer's to hold
+    // in escrow: a fully sponsored job needs no deposit at all.
+    const lockUnits = BigInt(
+      parsedProviderInitializeComputeJob.payment.amount.toString(),
+    );
+    let prefundedUnits = quotedPrefundedUnits;
+    if (prefundedUnits === undefined) {
+      this.computeQuoteCtx = {
+        signer: paymentSigner,
+        chainId: payChain,
+        node: providerURI,
+        token: paymentToken,
+        environmentId: computeEnv.id,
+        resources: JSON.parse(resources),
+        durationSeconds: supportedMaxJobDuration,
+      };
+      prefundedUnits = await this.computePrefundedUnits(
+        subsidyProviders,
+        lockUnits,
+      );
+    }
+    if (prefundedUnits > lockUnits) prefundedUnits = lockUnits;
+    const payerUnits = lockUnits - prefundedUnits;
     const paymentAmountHuman = await unitsToAmount(
       paymentSigner,
       paymentToken,
-      parsedProviderInitializeComputeJob.payment.amount,
+      payerUnits.toString(),
     );
+    if (prefundedUnits > 0n && quotedPrefundedUnits === undefined) {
+      const [covered, total] = await Promise.all(
+        [prefundedUnits, lockUnits].map((units) =>
+          unitsToAmount(paymentSigner, paymentToken, units.toString()),
+        ),
+      );
+      console.log(
+        chalk.green(
+          `Prepaid subsidy covers ${covered} of ${total}; you fund ${paymentAmountHuman}.`,
+        ),
+      );
+    }
+    // Called with the payer share even when it is 0: it deposits nothing then, but
+    // still creates or repairs the authorization the node needs to create the lock
+    // (a fresh wallet gets a zero-ceiling, sponsored-only one).
     const validationEscrow = await escrow.verifyFundsForEscrowPayment(
       paymentToken,
       computeEnv.consumerAddress,
@@ -1350,9 +1510,8 @@ export class Commands {
     const minLockSeconds =
       parsedProviderInitializeComputeJob.payment.minLockSeconds.toString();
 
-    const requiredUnits = BigInt(
-      parsedProviderInitializeComputeJob.payment.amount.toString(),
-    );
+    // Only the payer's own share has to be available in escrow.
+    const requiredUnits = payerUnits;
     const availableUnits = async (): Promise<bigint> => {
       // ethers returns the userFunds struct; `available` excludes what is locked.
       const funds = await escrow.getUserFunds(payerAddress, tokenAddress);
@@ -1368,7 +1527,7 @@ export class Commands {
       );
       console.log(
         chalk.yellow(
-          `Escrow balance is short of this job's cost — depositing ${shortfall}...`,
+          `Escrow balance is short of your share of this job's cost — depositing ${shortfall}...`,
         ),
       );
       const tokenContract = new ethers.Contract(
@@ -1393,7 +1552,7 @@ export class Commands {
       );
       console.error(
         chalk.red(
-          `Escrow balance for token ${paymentToken} is below this job's cost (${needed}) and the deposit did not go through. ` +
+          `Escrow balance for token ${paymentToken} is below your share of this job's cost (${needed}) and the deposit did not go through. ` +
             `Deposit manually and retry:\n` +
             `  npm run cli depositEscrow ${paymentToken} ${needed}`,
         ),
@@ -1411,18 +1570,14 @@ export class Commands {
           "Escrow authorization for the compute node is missing after the funds check — authorizing explicitly...",
         ),
       );
-      // Ten times the job cost as the ceiling: locks accumulate against
+      // Ten times the payer's share as the ceiling: locks accumulate against
       // maxLockedAmount until they are claimed, so a ceiling of exactly one job's
-      // cost would reject the next job started before this one settles.
-      const jobCost = await unitsToAmount(
-        paymentSigner,
-        paymentToken,
-        parsedProviderInitializeComputeJob.payment.amount,
-      );
+      // share would reject the next job started before this one settles. A fully
+      // sponsored job gives 0: the node may then lock only sponsored funds.
       const authorizeTx = await escrow.authorize(
         tokenAddress,
         payeeAddress,
-        (Number(jobCost) * 10).toString(),
+        (Number(paymentAmountHuman) * 10).toString(),
         minLockSeconds,
         "10",
       );
@@ -1970,11 +2125,20 @@ export class Commands {
     token: string,
     durationSeconds: number,
     accept?: boolean,
+    // The payer's own share from quoteServicePayerShare; below the cost when subsidy
+    // providers pre-fund part of the lock.
+    payerShareHuman?: string,
   ): Promise<boolean> {
+    const youPay = payerShareHuman ?? String(costHuman);
+    const sponsored = Number(youPay) < costHuman;
     console.log(
       chalk.yellow(
         `\n--- Payment Details ---\n` +
-          `  estimated cost: ${costHuman} (token ${token})\n` +
+          `  estimated total cost: ${costHuman} (token ${token})\n` +
+          (sponsored
+            ? `  prepaid subsidy covers: ${formatAmountDiff(costHuman, youPay)}\n`
+            : "") +
+          `  you pay: ${youPay}\n` +
           `  duration: ${durationSeconds}s\n` +
           `  Note: the final cost is computed by the node and shown after start.`,
       ),
@@ -1993,7 +2157,7 @@ export class Commands {
     }
     const rl = createInterface({ input, output });
     const confirmation = await rl.question(
-      `\nProceed with payment of estimated ${costHuman} ${token} for ${durationSeconds}s? (y/n): `,
+      `\nProceed? Estimated total cost ${costHuman}, you pay ${youPay} (token ${token}) for ${durationSeconds}s (y/n): `,
     );
     rl.close();
     const answer = confirmation.trim().toLowerCase();
@@ -2281,7 +2445,7 @@ export class Commands {
       const userDataKeys = describeUserDataKeys(userData);
       if (userDataKeys) console.log(`userData keys: ${userDataKeys}`);
 
-      // 6. Cost + escrow gate
+      // 6. Cost + the payer's share of it (read-only; funding happens after the prompt)
       const cost = estimateServiceCost(
         env,
         chainIdNum,
@@ -2297,15 +2461,29 @@ export class Commands {
         );
         return;
       }
-      const escrowOk = await verifyServiceEscrow(
+      const payerShare = await quoteServicePayerShare(
         this.signer,
-        chainIdNum,
         opts.paymentToken,
-        env.consumerAddress,
         cost,
-        opts.duration,
+        (lockUnits) =>
+          this.prefundedUnitsForJob({
+            jobType: 2,
+            // Same predicate the node applies to a service for the image allowlist.
+            hasCustomEntrypoint:
+              isNonEmpty(dockerEntrypoint) || isNonEmpty(dockerCmd),
+            signer: this.signer,
+            chainId: chainIdNum,
+            node: this.oceanNodeUrl,
+            token: opts.paymentToken,
+            environmentId: env.id,
+            resources,
+            durationSeconds: opts.duration,
+            container: { image, tag, checksum, dockerfile },
+            subsidyProviders: opts.subsidyProviders,
+            lockUnits,
+          }),
       );
-      if (!escrowOk) return;
+      if (payerShare === null) return;
 
       // 7. Confirmation prompt
       const proceed = await this.confirmServicePayment(
@@ -2313,8 +2491,21 @@ export class Commands {
         opts.paymentToken,
         opts.duration,
         opts.accept,
+        payerShare,
       );
       if (!proceed) return;
+
+      // Only now, after the user agreed, deposit the payer's share (if any is
+      // missing) and authorize the node.
+      const funded = await fundServiceEscrow(
+        this.signer,
+        chainIdNum,
+        opts.paymentToken,
+        env.consumerAddress,
+        payerShare,
+        opts.duration,
+      );
+      if (!funded) return;
 
       // 8. Start (async on the node — returns immediately in status Starting)
       const params: ServiceStartParams = {
@@ -2608,15 +2799,36 @@ export class Commands {
         return;
       }
 
-      const escrowOk = await verifyServiceEscrow(
+      const payerShare = await quoteServicePayerShare(
         this.signer,
-        chainIdNum,
         token,
-        env.consumerAddress,
         cost,
-        additionalDuration,
+        (lockUnits) =>
+          this.prefundedUnitsForJob({
+            jobType: 2,
+            hasCustomEntrypoint:
+              isNonEmpty(job.dockerEntrypoint) || isNonEmpty(job.dockerCmd),
+            signer: this.signer,
+            chainId: chainIdNum,
+            node: this.oceanNodeUrl,
+            token,
+            environmentId: env.id,
+            resources: (job.resources ?? []).map((r: any) => ({
+              id: r.id,
+              amount: r.amount,
+            })),
+            durationSeconds: additionalDuration,
+            container: {
+              image: job.image,
+              tag: job.tag,
+              checksum: job.checksum,
+              dockerfile: job.dockerfile,
+            },
+            subsidyProviders,
+            lockUnits,
+          }),
       );
-      if (!escrowOk) return;
+      if (payerShare === null) return;
 
       // 4. Confirmation prompt
       const proceed = await this.confirmServicePayment(
@@ -2624,8 +2836,21 @@ export class Commands {
         token,
         additionalDuration,
         accept,
+        payerShare,
       );
       if (!proceed) return;
+
+      // Only now, after the user agreed, deposit the payer's share (if any is
+      // missing) and authorize the node.
+      const funded = await fundServiceEscrow(
+        this.signer,
+        chainIdNum,
+        token,
+        env.consumerAddress,
+        payerShare,
+        additionalDuration,
+      );
+      if (!funded) return;
 
       // 5. Extend
       const oldExpiry = job.expiresAt;

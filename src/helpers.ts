@@ -263,7 +263,9 @@ export async function handleComputeOrder(
   const { services } = ddoInstance.getDDOFields();
   const service = services?.[serviceIndex];
   if (!Number.isInteger(serviceIndex) || serviceIndex < 0 || !service) {
-    throw new Error(`Service index ${serviceIndex} not found in asset ${asset.id}`);
+    throw new Error(
+      `Service index ${serviceIndex} not found in asset ${asset.id}`,
+    );
   }
   // Validate new orders before approving fees. Reuse does not need indexed datatokens.
   let datatokenIndex: number;
@@ -745,12 +747,12 @@ export function summarizeComputeEnvFees(env: {
     const tokens = (fees[chainId] || [])
       .map((f) => f?.feeToken)
       .filter((t): t is string => typeof t === "string" && t.length > 0);
-    const tokenList = tokens.length > 0 ? tokens.join(", ") : "(no tokens listed)";
+    const tokenList =
+      tokens.length > 0 ? tokens.join(", ") : "(no tokens listed)";
     return `    chain ${chainId}: ${tokenList}`;
   });
   return `${header}: pays on\n${lines.join("\n")}`;
 }
-
 
 /**
  * Parse the `--subsidyProviders` CLI value into the tri-state the Ocean Node expects
@@ -768,6 +770,93 @@ export function parseSubsidyProviders(raw?: string): string[] | undefined {
   const trimmed = raw.trim();
   if (trimmed === "" || trimmed.toLowerCase() === "none") return [];
   return trimmed.split(",").map((a) => ethers.getAddress(a.trim()));
+}
+
+export interface ResolvedSubsidyProviders {
+  /** Provider contracts to query (EIP-55, de-duplicated). */
+  addresses: string[];
+  /** Filter OFF: `--subsidy` addresses queried although the node does not advertise them. */
+  notAdvertised: string[];
+  /** Filter ON: `--subsidy` addresses dropped because the node would reject them. */
+  ignored: string[];
+}
+
+/**
+ * Resolve the subsidy-provider contract addresses `getSubsidyStatus` reports on. The Ocean
+ * Node is the source of truth for what is usable, so nothing is read from bundled config /
+ * ADDRESS_FILE — the candidates are the node's status `subsidyProviders[chainId]` and the
+ * caller's own `--subsidy` list, and the node's `subsidyProviderFilter` decides how they mix:
+ *   - no `--subsidy`           -> the node's advertised list (error when it is empty);
+ *   - `--subsidy` + filter OFF -> exactly the named addresses. The node accepts any provider
+ *     a consumer names per request, so they are reported whether or not it advertises them
+ *     (the ones it does not are returned in `notAdvertised`);
+ *   - `--subsidy` + filter ON  -> the named addresses narrowed to the node's list, since it
+ *     rejects anything else (the rest are returned in `ignored`).
+ * Pure: the caller prints the notes. Throws on a malformed address or when nothing is usable.
+ */
+export function resolveSubsidyProviderAddresses(
+  chainId: number,
+  nodeProviders: Record<string, string[]> | undefined,
+  filter: boolean,
+  override?: string,
+): ResolvedSubsidyProviders {
+  const fromNode = [
+    ...new Set(
+      (nodeProviders?.[String(chainId)] ?? []).map((a) => ethers.getAddress(a)),
+    ),
+  ];
+  const wanted = [
+    ...new Set(
+      (override ?? "")
+        .split(",")
+        .map((a) => a.trim())
+        .filter(Boolean)
+        .map((a) => {
+          try {
+            return ethers.getAddress(a);
+          } catch {
+            throw new Error(`Invalid --subsidy address '${a}'.`);
+          }
+        }),
+    ),
+  ];
+  const nodeSet = new Set(fromNode);
+
+  if (!filter) {
+    if (wanted.length) {
+      return {
+        addresses: wanted,
+        notAdvertised: wanted.filter((a) => !nodeSet.has(a)),
+        ignored: [],
+      };
+    }
+    if (fromNode.length === 0) {
+      throw new Error(
+        `This node supports subsidies but has no subsidy providers configured on chain ${chainId}. Pass --subsidy 0x... to check a specific provider (the node's provider filter is off, so it accepts providers named per request).`,
+      );
+    }
+    return { addresses: fromNode, notAdvertised: [], ignored: [] };
+  }
+
+  if (fromNode.length === 0) {
+    throw new Error(
+      `This node does not support subsidy providers on chain ${chainId}: the provider filter is on and its configured list is empty, so no provider can be used.`,
+    );
+  }
+  if (wanted.length === 0) {
+    return { addresses: fromNode, notAdvertised: [], ignored: [] };
+  }
+  const kept = wanted.filter((a) => nodeSet.has(a));
+  if (kept.length === 0) {
+    throw new Error(
+      `None of the --subsidy addresses are advertised by the node on chain ${chainId}, and its provider filter is on, so it would reject them.`,
+    );
+  }
+  return {
+    addresses: kept,
+    notAdvertised: [],
+    ignored: wanted.filter((a) => !nodeSet.has(a)),
+  };
 }
 
 /**
@@ -816,7 +905,8 @@ export function prefundedLockUnits(
       .filter((p) => p.eligible && !p.dropped)
       .filter((p) => named.has(p.address.toLowerCase()))
       .reduce(
-        (sum, p) => sum + ethers.parseUnits(p.quotes.prefunded.subsidy, decimals),
+        (sum, p) =>
+          sum + ethers.parseUnits(p.quotes.prefunded.subsidy, decimals),
         0n,
       );
   }

@@ -15,6 +15,7 @@ import {
   summarizeComputeEnvFees,
   prefundedLockUnits,
   getDdoChainId,
+  resolveSubsidyProviderAddresses,
 } from "./helpers.js";
 import {
   getConfigFor,
@@ -3627,59 +3628,6 @@ export class Commands {
   }
 
   /**
-   * Resolve the subsidy-provider contract addresses to query. The Ocean Node is the single
-   * source of truth: a node may not support subsidies at all, and the lib's bundled contract
-   * addresses could list a provider the node will never claim against — so addresses come only
-   * from the node's status `subsidyProviders[chainId]`. `--subsidy` merely narrows to a subset
-   * of what the node advertises. Never reads config / ADDRESS_FILE.
-   */
-  private resolveSubsidyProviderAddresses(
-    chainId: number,
-    nodeProviders: Record<string, string[]>,
-    filter: boolean,
-    override?: string,
-  ): string[] {
-    const fromNode = (nodeProviders?.[String(chainId)] ?? []).map((a) =>
-      getAddress(a),
-    );
-    if (fromNode.length === 0) {
-      // Two distinct states, don't conflate them:
-      //  - filter ON + empty list  -> the node restricts usage to its configured set and that
-      //    set is empty, so no provider can ever be used: genuinely unsupported.
-      //  - filter OFF + empty list -> the node still accepts subsidies (callers may supply their
-      //    own provider); it just advertises none to report on here.
-      if (filter) {
-        throw new Error(
-          `This node does not support subsidy providers on chain ${chainId}: the provider filter is on and its configured list is empty, so no provider can be used.`,
-        );
-      }
-      throw new Error(
-        `This node supports subsidies but has no subsidy providers configured on chain ${chainId}.`,
-      );
-    }
-    if (!override || !override.trim()) return [...new Set(fromNode)];
-    const wanted = override.split(",").map((a) => getAddress(a.trim()));
-    const nodeSet = new Set(fromNode);
-    const kept = wanted.filter((a) => nodeSet.has(a));
-    const dropped = wanted.filter((a) => !nodeSet.has(a));
-    if (dropped.length) {
-      console.warn(
-        chalk.yellow(
-          `Ignoring --subsidy address(es) the node does not advertise: ${dropped.join(
-            ", ",
-          )}`,
-        ),
-      );
-    }
-    if (kept.length === 0) {
-      throw new Error(
-        `None of the --subsidy addresses are advertised by the node on chain ${chainId}.`,
-      );
-    }
-    return [...new Set(kept)];
-  }
-
-  /**
    * Read-only, provider-agnostic subsidy report (ocean.js #2163 / contracts #1052). Discovers
    * the provider contracts from the current node, then for each one uses the `SubsidyView` base
    * wrapper (ERC-165) to print a unified report — kind, per-window buckets (limit/used/remaining),
@@ -3707,7 +3655,8 @@ export class Commands {
     const payer = await this.signer.getAddress();
     const tokenAddress = getAddress(token);
 
-    // Provider addresses come from the node, never from bundled config. `--node`
+    // Provider addresses come from the node (or, when its provider filter is off, from the
+    // caller's own --subsidy list), never from bundled config. `--node`
     // (opts.node) targets a specific Ocean Node to query (URL / peer id / multiaddr,
     // like setNode); without it we use the active node. The on-chain node operator
     // address for isNodeAllowed / quoteSubsidy is taken from that node's own status
@@ -3736,12 +3685,31 @@ export class Commands {
     let addresses: string[];
     let jobType: number | undefined;
     try {
-      addresses = this.resolveSubsidyProviderAddresses(
+      const resolved = resolveSubsidyProviderAddresses(
         chainId,
         providers,
         filter,
         opts.subsidy,
       );
+      addresses = resolved.addresses;
+      if (resolved.ignored.length) {
+        console.warn(
+          chalk.yellow(
+            `Ignoring --subsidy address(es) the node does not advertise (its provider filter is on): ${resolved.ignored.join(
+              ", ",
+            )}`,
+          ),
+        );
+      }
+      if (resolved.notAdvertised.length) {
+        console.log(
+          chalk.yellow(
+            `Not a node default — the node accepts these only when named with --subsidyProviders: ${resolved.notAdvertised.join(
+              ", ",
+            )}`,
+          ),
+        );
+      }
       jobType = this.mapJobType(opts.jobType);
     } catch (e) {
       console.error(chalk.red((e as Error).message));
@@ -3754,9 +3722,9 @@ export class Commands {
       );
       try {
         const view = new SubsidyView(this.signer, address, chainId);
-        // The node already vouches these are subsidy providers, so we don't gate on
-        // `isSubsidyView()` (ERC-165) — it can under-report. `subsidyKind()` is the
-        // liveness probe: if it reverts, the address isn't a readable subsidy view.
+        // We don't gate on `isSubsidyView()` (ERC-165) — it can under-report. `subsidyKind()`
+        // is the liveness probe: if it reverts, the address isn't a readable subsidy view
+        // (which also covers a user-named `--subsidy` address the node does not vouch for).
         let kind: SubsidyKind;
         try {
           kind = await view.subsidyKind();

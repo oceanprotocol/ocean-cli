@@ -1,5 +1,9 @@
 import { expect } from "chai";
-import { parseSubsidyProviders, prefundedLockUnits } from "../src/helpers.js";
+import {
+  parseSubsidyProviders,
+  prefundedLockUnits,
+  resolveSubsidyProviderAddresses,
+} from "../src/helpers.js";
 
 // Pure unit test — no infra needed. Verifies the tri-state parsing of the
 // `--subsidyProviders` CLI value and EIP-55 address normalization.
@@ -145,5 +149,87 @@ describe("prefundedLockUnits", () => {
     const e = estimate([quote(A, "0.9")], [A], "0.9");
     expect(prefundedLockUnits(e, undefined, DECIMALS, LOCK)).to.equal(LOCK);
     expect(prefundedLockUnits(e, [A], DECIMALS, LOCK)).to.equal(LOCK);
+  });
+});
+
+// Which provider contracts `getSubsidyStatus` reports on: the node's advertised list and the
+// caller's `--subsidy` list, mixed according to the node's provider filter.
+describe("resolveSubsidyProviderAddresses", () => {
+  const CHAIN = 8453;
+  const A = "0x4Fd5ECf4Af8490418462A7d80e90A0530eFb9ac5";
+  const B = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
+  const node = (list: string[]) => ({ [String(CHAIN)]: list });
+
+  it("filter off: queries a named provider even when the node advertises none", () => {
+    for (const providers of [node([]), {}, undefined]) {
+      expect(
+        resolveSubsidyProviderAddresses(
+          CHAIN,
+          providers,
+          false,
+          A.toLowerCase(),
+        ),
+      ).to.deep.equal({ addresses: [A], notAdvertised: [A], ignored: [] });
+    }
+  });
+
+  it("filter off: allows named providers outside the node list and flags them", () => {
+    expect(
+      resolveSubsidyProviderAddresses(
+        CHAIN,
+        node([A]),
+        false,
+        `${A}, ${B},${A}`,
+      ),
+    ).to.deep.equal({ addresses: [A, B], notAdvertised: [B], ignored: [] });
+  });
+
+  it("filter off: no --subsidy and an empty node list errors with a --subsidy hint", () => {
+    expect(() => resolveSubsidyProviderAddresses(CHAIN, node([]), false))
+      .to.throw("has no subsidy providers configured on chain 8453")
+      .and.to.match(/--subsidy/);
+  });
+
+  it("no --subsidy: returns the node's de-duplicated list, whatever the filter", () => {
+    for (const filter of [false, true]) {
+      expect(
+        resolveSubsidyProviderAddresses(
+          CHAIN,
+          node([A.toLowerCase(), A, B]),
+          filter,
+          "  ",
+        ),
+      ).to.deep.equal({ addresses: [A, B], notAdvertised: [], ignored: [] });
+    }
+  });
+
+  it("filter on: narrows --subsidy to the node list and reports the rest", () => {
+    expect(
+      resolveSubsidyProviderAddresses(CHAIN, node([A]), true, `${A},${B}`),
+    ).to.deep.equal({ addresses: [A], notAdvertised: [], ignored: [B] });
+  });
+
+  it("filter on: errors when no named provider is advertised", () => {
+    expect(() =>
+      resolveSubsidyProviderAddresses(CHAIN, node([A]), true, B),
+    ).to.throw("None of the --subsidy addresses are advertised");
+  });
+
+  it("filter on: an empty node list is unsupported, even with --subsidy", () => {
+    expect(() =>
+      resolveSubsidyProviderAddresses(CHAIN, node([]), true, A),
+    ).to.throw("does not support subsidy providers on chain 8453");
+  });
+
+  it("only reads the requested chain", () => {
+    expect(() => resolveSubsidyProviderAddresses(1, node([A]), false)).to.throw(
+      "no subsidy providers configured on chain 1",
+    );
+  });
+
+  it("throws a readable error on a malformed --subsidy address", () => {
+    expect(() =>
+      resolveSubsidyProviderAddresses(CHAIN, node([A]), false, "0xnope"),
+    ).to.throw("Invalid --subsidy address '0xnope'");
   });
 });

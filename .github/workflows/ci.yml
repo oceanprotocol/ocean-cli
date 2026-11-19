@@ -36,8 +36,24 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: npm
 
+      # ocean.js without Aquarius (oceanprotocol/ocean.js#2216): remove these two steps and
+      # the link step after its release
+      - name: Checkout ocean.js
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          repository: 'oceanprotocol/ocean.js'
+          ref: 'feat/node-neutral-query'
+          path: 'ocean.js'
+      - name: Build and link ocean.js
+        working-directory: ${{ github.workspace }}/ocean.js
+        run: npm ci && npm run build && npm link
+
       - name: Install dependencies
         run: npm ci
+
+      - name: Use the ocean.js build
+        run: npm link @oceanprotocol/lib
 
       - name: Run build
         run: npm run build
@@ -143,6 +159,10 @@ jobs:
 
   test_system:
     runs-on: ubuntu-latest
+    env:
+      # the ocean-node image that Barge starts: oceanprotocol/ocean-node#1601 (/api/query,
+      # /api/ddo). Remove after its release
+      NODE_VERSION: pr-1601
     strategy:
       fail-fast: false
       matrix:
@@ -183,8 +203,24 @@ jobs:
         working-directory: ${{ github.workspace }}/barge
         run: |
           bash -x start_ocean.sh --with-typesense 2>&1 > start_ocean.log &
+      # ocean.js without Aquarius (oceanprotocol/ocean.js#2216): remove these two steps and
+      # the link step after its release
+      - name: Checkout ocean.js
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          repository: 'oceanprotocol/ocean.js'
+          ref: 'feat/node-neutral-query'
+          path: 'ocean.js'
+      - name: Build and link ocean.js
+        working-directory: ${{ github.workspace }}/ocean.js
+        run: npm ci && npm run build && npm link
+
       - name: Install dependencies
         run: npm ci
+      - name: Use the ocean.js build
+        run: npm link @oceanprotocol/lib
+
       - run: npm run build
       - run: docker image ls
       - name: Wait for node to be ready

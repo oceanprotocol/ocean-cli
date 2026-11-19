@@ -1,26 +1,26 @@
 import { expect } from "chai";
-import { Aquarius } from "@oceanprotocol/lib";
+import { ProviderInstance } from "@oceanprotocol/lib";
 import { resolveComputeInputs, IndexerWaitParams } from "../src/helpers.js";
 
-// A fake Aquarius whose waitForIndexer returns a deterministic DDO per DID,
-// so the resolver can be exercised without a live indexer.
-function makeAquarius(known?: Set<string>): Aquarius {
+// The DIDs that the fake indexer knows; undefined: every DID
+let known: Set<string> | undefined;
+const realWaitForIndexer = ProviderInstance.waitForIndexer;
+
+// A fake waitForIndexer that returns a deterministic DDO per DID,
+// so the resolver can be exercised without a live node.
+async function fakeWaitForIndexer(nodeUri: string, did: string) {
+  if (known && !known.has(did)) return null;
   return {
-    waitForIndexer: async (did: string) => {
-      if (known && !known.has(did)) return null;
-      return {
-        id: did,
-        version: "4.1.0",
-        services: [
-          {
-            id: `service-${did}`,
-            serviceEndpoint: `http://provider-for-${did}`,
-          },
-        ],
-        metadata: { algorithm: { container: { image: "img" } } },
-      };
-    },
-  } as unknown as Aquarius;
+    id: did,
+    version: "4.1.0",
+    services: [
+      {
+        id: `service-${did}`,
+        serviceEndpoint: `http://provider-for-${did}`,
+      },
+    ],
+    metadata: { algorithm: { container: { image: "img" } } },
+  };
 }
 
 const indexingParams: IndexerWaitParams = {
@@ -46,11 +46,21 @@ const RAW_ALGO = {
 };
 
 describe("resolveComputeInputs", function () {
+  before(function () {
+    ProviderInstance.waitForIndexer =
+      fakeWaitForIndexer as unknown as typeof realWaitForIndexer;
+  });
+  after(function () {
+    ProviderInstance.waitForIndexer = realWaitForIndexer;
+  });
+  afterEach(function () {
+    known = undefined;
+  });
+
   it("resolves a single dataset DID and a single algorithm DID", async function () {
     const res = await resolveComputeInputs(
       "did:op:dataset1",
       "did:op:algo1",
-      makeAquarius(),
       indexingParams,
       FALLBACK,
     );
@@ -68,7 +78,6 @@ describe("resolveComputeInputs", function () {
     const res = await resolveComputeInputs(
       "[did:op:a,did:op:b]",
       "did:op:algo1",
-      makeAquarius(),
       indexingParams,
       FALLBACK,
     );
@@ -84,7 +93,6 @@ describe("resolveComputeInputs", function () {
     const res = await resolveComputeInputs(
       "did:op:a,did:op:b",
       "did:op:algo1",
-      makeAquarius(),
       indexingParams,
       FALLBACK,
     );
@@ -100,7 +108,6 @@ describe("resolveComputeInputs", function () {
     const res = await resolveComputeInputs(
       JSON.stringify(RAW_DATASET),
       "did:op:algo1",
-      makeAquarius(),
       indexingParams,
       FALLBACK,
     );
@@ -115,7 +122,6 @@ describe("resolveComputeInputs", function () {
     const res = await resolveComputeInputs(
       JSON.stringify(["did:op:dataset1", RAW_DATASET]),
       "did:op:algo1",
-      makeAquarius(),
       indexingParams,
       FALLBACK,
     );
@@ -131,7 +137,6 @@ describe("resolveComputeInputs", function () {
     const res = await resolveComputeInputs(
       JSON.stringify([RAW_DATASET, "did:op:dataset1"]),
       "did:op:algo1",
-      makeAquarius(),
       indexingParams,
       FALLBACK,
     );
@@ -144,7 +149,6 @@ describe("resolveComputeInputs", function () {
     const res = await resolveComputeInputs(
       "did:op:dataset1",
       JSON.stringify(RAW_ALGO),
-      makeAquarius(),
       indexingParams,
       FALLBACK,
     );
@@ -157,7 +161,6 @@ describe("resolveComputeInputs", function () {
     const res = await resolveComputeInputs(
       "[]",
       "did:op:algo1",
-      makeAquarius(),
       indexingParams,
       FALLBACK,
     );
@@ -169,7 +172,6 @@ describe("resolveComputeInputs", function () {
     const res = await resolveComputeInputs(
       JSON.stringify({ documentId: "x" }),
       "did:op:algo1",
-      makeAquarius(),
       indexingParams,
       FALLBACK,
     );
@@ -182,7 +184,6 @@ describe("resolveComputeInputs", function () {
       JSON.stringify({
         meta: { rawcode: "print(1)", container: { image: "python" } },
       }),
-      makeAquarius(),
       indexingParams,
       FALLBACK,
     );
@@ -196,7 +197,6 @@ describe("resolveComputeInputs", function () {
     const res = await resolveComputeInputs(
       "did:op:dataset1",
       JSON.stringify({ meta: { container: {} } }),
-      makeAquarius(),
       indexingParams,
       FALLBACK,
     );
@@ -204,10 +204,10 @@ describe("resolveComputeInputs", function () {
   });
 
   it("fails (returns null) when a dataset DID cannot be resolved", async function () {
+    known = new Set(["did:op:algo1"]);
     const res = await resolveComputeInputs(
       "did:op:missing",
       "did:op:algo1",
-      makeAquarius(new Set(["did:op:algo1"])),
       indexingParams,
       FALLBACK,
     );

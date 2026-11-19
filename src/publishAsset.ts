@@ -1,6 +1,6 @@
 // src/publishAsset.ts
 import { Signer } from "ethers";
-import { Config, Aquarius } from "@oceanprotocol/lib";
+import { Config } from "@oceanprotocol/lib";
 import { Asset } from "@oceanprotocol/ddo-js";
 import { createAssetUtil, updateAssetMetadata } from "./helpers.js";
 
@@ -21,7 +21,6 @@ export interface PublishAssetParams {
 }
 
 export async function publishAsset(
-  aquarius: Aquarius,
   params: PublishAssetParams,
   signer: Signer,
   config: Config,
@@ -105,7 +104,6 @@ export async function publishAsset(
       metadata,
       params.providerUrl,
       config,
-      aquarius,
     );
 
     console.log(`Asset successfully published with DID: ${did}`);
@@ -116,7 +114,7 @@ export async function publishAsset(
     metadata.services[0].datatokenAddress = assetUrl.datatokenAddress; // Update with the correct Datatoken address
 
     // Use the helper function to update the metadata on the NFT
-    await updateAssetMetadata(signer, metadata, params.providerUrl, aquarius);
+    await updateAssetMetadata(signer, metadata, params.providerUrl);
 
     console.log(`Metadata successfully updated for DID: ${did}`);
   } catch (error) {

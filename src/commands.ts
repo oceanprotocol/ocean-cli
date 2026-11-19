@@ -25,7 +25,6 @@ import {
   listChains,
 } from "./rpcRegistry.js";
 import {
-  Aquarius,
   ComputeAsset,
   ComputeJob,
   Config,
@@ -145,7 +144,6 @@ function formatAmountDiff(total: number, share: string): string {
 export class Commands {
   public signer: Signer;
   public config: Config;
-  public aquarius: Aquarius;
   public oceanNodeUrl: string;
   // optional settings for indexing wait time
   private indexingParams: IndexerWaitParams;
@@ -167,7 +165,6 @@ export class Commands {
     this.indexingParams = getIndexingWaitSettings();
     console.log("Using Ocean Node URL :", this.oceanNodeUrl);
     this.config.nodeUri = this.oceanNodeUrl;
-    this.aquarius = new Aquarius(this.oceanNodeUrl);
   }
 
   // ---------------------------------------------------------------------------
@@ -310,7 +307,7 @@ export class Commands {
   public async start() {
     console.log("Starting the interactive CLI flow...\n\n");
     const data = await interactiveFlow(this.oceanNodeUrl); // Collect data via CLI
-    await publishAsset(this.aquarius, data, this.signer, this.config); // Publish asset with collected data
+    await publishAsset(data, this.signer, this.config); // Publish asset with collected data
   }
 
   // utils
@@ -351,7 +348,6 @@ export class Commands {
         asset,
         this.oceanNodeUrl,
         this.config,
-        this.aquarius,
         encryptDDO,
       );
       console.log("Asset published. ID:  " + urlAssetId);
@@ -392,7 +388,6 @@ export class Commands {
         algoAsset,
         this.oceanNodeUrl,
         this.config,
-        this.aquarius,
         encryptDDO,
       );
       // add some more checks
@@ -405,7 +400,8 @@ export class Commands {
   }
 
   public async editAsset(args: string[]) {
-    const asset = await this.aquarius.waitForIndexer(
+    const asset = await ProviderInstance.waitForIndexer(
+      this.oceanNodeUrl,
       args[1],
       null,
       null,
@@ -440,7 +436,6 @@ export class Commands {
       this.signer,
       asset,
       this.oceanNodeUrl,
-      this.aquarius,
       encryptDDO,
     );
     console.log("Asset updated. Tx: " + JSON.stringify(updateAssetTx, null, 2));
@@ -448,7 +443,8 @@ export class Commands {
 
   public async getDDO(args: string[]) {
     console.log("Resolving Asset with DID: " + args[1]);
-    const resolvedDDO = await this.aquarius.waitForIndexer(
+    const resolvedDDO = await ProviderInstance.waitForIndexer(
+      this.oceanNodeUrl,
       args[1],
       null,
       null,
@@ -517,7 +513,8 @@ export class Commands {
 
   public async download(args: string[]) {
     const did = args[1];
-    const dataDdo = await this.aquarius.waitForIndexer(
+    const dataDdo = await ProviderInstance.waitForIndexer(
+      this.oceanNodeUrl,
       did,
       null,
       null,
@@ -641,7 +638,6 @@ export class Commands {
     const resolved = await resolveComputeInputs(
       args[1],
       args[2],
-      this.aquarius,
       this.indexingParams,
       this.oceanNodeUrl,
     );
@@ -1049,7 +1045,6 @@ export class Commands {
     const resolved = await resolveComputeInputs(
       args[1],
       args[2],
-      this.aquarius,
       this.indexingParams,
       this.oceanNodeUrl,
     );
@@ -1675,7 +1670,6 @@ export class Commands {
     const resolved = await resolveComputeInputs(
       args[1],
       args[2],
-      this.aquarius,
       this.indexingParams,
       this.oceanNodeUrl,
     );
@@ -1864,7 +1858,8 @@ export class Commands {
   }
 
   public async computeStop(args: string[]) {
-    const dataDdo = await this.aquarius.waitForIndexer(
+    const dataDdo = await ProviderInstance.waitForIndexer(
+      this.oceanNodeUrl,
       args[1],
       null,
       null,
@@ -2980,7 +2975,8 @@ export class Commands {
   }
 
   public async allowAlgo(args: string[]) {
-    const asset = await this.aquarius.waitForIndexer(
+    const asset = await ProviderInstance.waitForIndexer(
+      this.oceanNodeUrl,
       args[1],
       null,
       null,
@@ -3014,7 +3010,8 @@ export class Commands {
       );
       return;
     }
-    const algoAsset = await this.aquarius.waitForIndexer(
+    const algoAsset = await ProviderInstance.waitForIndexer(
+      this.oceanNodeUrl,
       args[2],
       null,
       null,
@@ -3062,7 +3059,6 @@ export class Commands {
         this.signer,
         asset,
         this.oceanNodeUrl,
-        this.aquarius,
         encryptDDO,
       );
       console.log("Successfully updated asset metadata: " + txid);
@@ -3073,7 +3069,8 @@ export class Commands {
   }
 
   public async disallowAlgo(args: string[]) {
-    const asset = await this.aquarius.waitForIndexer(
+    const asset = await ProviderInstance.waitForIndexer(
+      this.oceanNodeUrl,
       args[1],
       null,
       null,
@@ -3138,7 +3135,6 @@ export class Commands {
       this.signer,
       asset,
       this.oceanNodeUrl,
-      this.aquarius,
       encryptDDO,
     );
     console.log("Asset updated " + txid);
@@ -3150,7 +3146,8 @@ export class Commands {
     // args[3] - agreementId
     const hasAgreementId = args.length === 4;
 
-    const dataDdo = await this.aquarius.waitForIndexer(
+    const dataDdo = await ProviderInstance.waitForIndexer(
+      this.oceanNodeUrl,
       args[1],
       null,
       null,

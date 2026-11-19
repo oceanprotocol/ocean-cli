@@ -5,7 +5,6 @@ import { wrapEthersSigner } from "@oasisprotocol/sapphire-ethers-v6";
 import { Asset, DDO, DDOManager } from "@oceanprotocol/ddo-js";
 import {
   AccesslistFactory,
-  Aquarius,
   Nft,
   NftFactory,
   ProviderInstance,
@@ -135,7 +134,6 @@ export async function createAssetUtil(
   ddo: DDO,
   oceanNodeUrl: string,
   config: Config,
-  aquariusInstance: Aquarius,
   encryptDDO: boolean = true,
   templateIDorAddress: string | number = 1, // If string, it's template address , otherwise, it's templateId,
   providerFeeToken: string = ZERO_ADDRESS,
@@ -178,7 +176,6 @@ export async function createAssetUtil(
       encryptDDO,
       oceanNodeUrl,
       providerFeeToken,
-      aquariusInstance,
       accessListFactory,
       allowAccessList,
       denyAccessList,
@@ -194,7 +191,6 @@ export async function createAssetUtil(
     encryptDDO,
     oceanNodeUrl,
     providerFeeToken,
-    aquariusInstance,
   );
 }
 
@@ -202,7 +198,6 @@ export async function updateAssetMetadata(
   owner: Signer,
   updatedDdo: Asset,
   oceanNodeUrl: string,
-  aquariusInstance: Aquarius,
   encryptDDO: boolean = true,
 ): Promise<any> {
   const nft = new Nft(
@@ -211,10 +206,10 @@ export async function updateAssetMetadata(
   );
   let flags;
   let metadata;
-  const validateResult = await aquariusInstance.validate(
+  const validateResult = await ProviderInstance.validateDdo(
+    oceanNodeUrl,
     updatedDdo,
     owner,
-    oceanNodeUrl,
   );
   const ddoInstance = DDOManager.getDDOClass(updatedDdo);
   const { chainId, nftAddress } = ddoInstance.getDDOFields();
@@ -424,14 +419,14 @@ export function parseComputeInput(
 
 // Resolves the raw datasets/algo CLI strings into fully-built ComputeAsset[] and
 // ComputeAlgorithm, plus index-aligned DDO arrays (null where the entry is raw).
-// DID entries are resolved via Aquarius; raw (fileObject) entries are passed through
+// DID entries are resolved on the node (nodeUri); raw (fileObject) entries are passed through
 // untouched. Returns null (after logging) when a DID cannot be resolved.
 export async function resolveComputeInputs(
   datasetsInput: string,
   algoInput: string,
-  aquarius: Aquarius,
   indexingParams: IndexerWaitParams,
-  fallbackProviderURI: string,
+  // the node that resolves the DIDs, and the provider of raw-only inputs
+  nodeUri: string,
 ): Promise<ResolvedComputeInputs | null> {
   const datasetTokens = parseComputeInput(datasetsInput);
 
@@ -440,7 +435,8 @@ export async function resolveComputeInputs(
 
   for (const token of datasetTokens) {
     if (typeof token === "string") {
-      const dataDdo = await aquarius.waitForIndexer(
+      const dataDdo = await ProviderInstance.waitForIndexer(
+        nodeUri,
         token,
         undefined,
         undefined,
@@ -484,7 +480,7 @@ export async function resolveComputeInputs(
     }
   }
 
-  let providerURI = fallbackProviderURI;
+  let providerURI = nodeUri;
   const firstDdo = ddos.find((d) => d !== null);
   if (firstDdo) {
     const { services } = DDOManager.getDDOClass(firstDdo).getDDOFields();
@@ -498,7 +494,8 @@ export async function resolveComputeInputs(
   let algoDdo: Asset | DDO | null = null;
 
   if (typeof algoToken === "string") {
-    algoDdo = await aquarius.waitForIndexer(
+    algoDdo = await ProviderInstance.waitForIndexer(
+      nodeUri,
       algoToken,
       undefined,
       undefined,

@@ -211,6 +211,7 @@ export async function updateAssetMetadata(
     updatedDdo,
     owner,
   );
+  if (!validateResult) throw new Error("DDO validation failed");
   const ddoInstance = DDOManager.getDDOClass(updatedDdo);
   const { chainId, nftAddress } = ddoInstance.getDDOFields();
   if (encryptDDO) {

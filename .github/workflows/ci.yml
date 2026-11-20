@@ -36,8 +36,7 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: npm
 
-      # ocean.js without Aquarius (oceanprotocol/ocean.js#2216): remove these two steps and
-      # the link step after its release
+      # ocean.js#2216 build; remove with the link step after its release
       - name: Checkout ocean.js
         uses: actions/checkout@v7
         with:
@@ -160,8 +159,7 @@ jobs:
   test_system:
     runs-on: ubuntu-latest
     env:
-      # the ocean-node image that Barge starts: oceanprotocol/ocean-node#1601 (/api/query,
-      # /api/ddo). Remove after its release
+      # ocean-node#1601 image; remove after its release
       NODE_VERSION: pr-1601
     strategy:
       fail-fast: false
@@ -203,8 +201,7 @@ jobs:
         working-directory: ${{ github.workspace }}/barge
         run: |
           bash -x start_ocean.sh --with-typesense 2>&1 > start_ocean.log &
-      # ocean.js without Aquarius (oceanprotocol/ocean.js#2216): remove these two steps and
-      # the link step after its release
+      # ocean.js#2216 build; remove with the link step after its release
       - name: Checkout ocean.js
         uses: actions/checkout@v7
         with:

@@ -2,14 +2,11 @@ import { expect } from "chai";
 import { ProviderInstance } from "@oceanprotocol/lib";
 import { resolveComputeInputs, IndexerWaitParams } from "../src/helpers.js";
 
-// The DIDs that the fake indexer knows; undefined: every DID
-let known: Set<string> | undefined;
 const realWaitForIndexer = ProviderInstance.waitForIndexer;
 
-// A fake waitForIndexer that returns a deterministic DDO per DID,
-// so the resolver can be exercised without a live node.
+// a node that knows every DID except did:op:missing
 async function fakeWaitForIndexer(nodeUri: string, did: string) {
-  if (known && !known.has(did)) return null;
+  if (did === "did:op:missing") return null;
   return {
     id: did,
     version: "4.1.0",
@@ -52,9 +49,6 @@ describe("resolveComputeInputs", function () {
   });
   after(function () {
     ProviderInstance.waitForIndexer = realWaitForIndexer;
-  });
-  afterEach(function () {
-    known = undefined;
   });
 
   it("resolves a single dataset DID and a single algorithm DID", async function () {
@@ -204,7 +198,6 @@ describe("resolveComputeInputs", function () {
   });
 
   it("fails (returns null) when a dataset DID cannot be resolved", async function () {
-    known = new Set(["did:op:algo1"]);
     const res = await resolveComputeInputs(
       "did:op:missing",
       "did:op:algo1",

@@ -419,13 +419,12 @@ export function parseComputeInput(
 
 // Resolves the raw datasets/algo CLI strings into fully-built ComputeAsset[] and
 // ComputeAlgorithm, plus index-aligned DDO arrays (null where the entry is raw).
-// DID entries are resolved on the node (nodeUri); raw (fileObject) entries are passed through
+// DID entries are resolved on nodeUri; raw (fileObject) entries are passed through
 // untouched. Returns null (after logging) when a DID cannot be resolved.
 export async function resolveComputeInputs(
   datasetsInput: string,
   algoInput: string,
   indexingParams: IndexerWaitParams,
-  // the node that resolves the DIDs, and the provider of raw-only inputs
   nodeUri: string,
 ): Promise<ResolvedComputeInputs | null> {
   const datasetTokens = parseComputeInput(datasetsInput);

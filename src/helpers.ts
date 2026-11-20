@@ -2,7 +2,13 @@ import { ethers, hexlify, Signer, toBeHex } from "ethers";
 import { promises as fs, readFileSync } from "fs";
 import * as path from "path";
 import { wrapEthersSigner } from "@oasisprotocol/sapphire-ethers-v6";
-import { Asset, DDO, DDOManager } from "@oceanprotocol/ddo-js";
+import {
+  Asset,
+  DDO,
+  DDOManager,
+  getDdoChainId,
+  isComputeService,
+} from "@oceanprotocol/ddo-js";
 import {
   AccesslistFactory,
   Aquarius,
@@ -260,9 +266,8 @@ export async function handleComputeOrder(
   consumeMarkerFee?: ConsumeMarketFee,
 ) {
   const ddoInstance = DDOManager.getDDOClass(asset);
-  const { services } = ddoInstance.getDDOFields();
-  const service = services?.[serviceIndex];
-  if (!Number.isInteger(serviceIndex) || serviceIndex < 0 || !service) {
+  const service = ddoInstance.getServiceByIndex(serviceIndex);
+  if (!service) {
     throw new Error(
       `Service index ${serviceIndex} not found in asset ${asset.id}`,
     );
@@ -338,24 +343,19 @@ export async function isOrderable(
   algorithm: ComputeAlgorithm,
   algorithmDDO: Asset | DDO,
 ): Promise<boolean> {
-  const ddoInstanceAsset = DDOManager.getDDOClass(asset);
-  const { services: servicesAsset } = ddoInstanceAsset.getDDOFields();
-  const datasetService = servicesAsset.find((s) => s.id === serviceId);
+  const datasetService = DDOManager.getDDOClass(asset).getService(serviceId);
   if (!datasetService) return false;
 
-  if (datasetService.type === "compute") {
+  if (isComputeService(datasetService)) {
     // A DID-based algorithm carries a `documentId` (and, for convenience, its
     // `meta`); a raw algorithm carries only `meta` (a fileObject, no DID). Check
     // `documentId` first so published algorithms are validated against the
     // dataset's provider rather than the raw-algorithm allowance.
     if (algorithm.documentId) {
-      const servicesAlgo = algorithmDDO
-        ? DDOManager.getDDOClass(algorithmDDO).getDDOFields().services
+      const algoService = algorithmDDO
+        ? DDOManager.getDDOClass(algorithmDDO).getService(algorithm.serviceId)
         : undefined;
-      const algoService = servicesAlgo?.find(
-        (s) => s.id === algorithm.serviceId,
-      );
-      if (algoService && algoService.type === "compute") {
+      if (isComputeService(algoService)) {
         if (algoService.serviceEndpoint !== datasetService.serviceEndpoint) {
           LoggerInstance.error(
             "ERROR: Both assets with compute service are not served by the same provider",
@@ -453,14 +453,14 @@ export async function resolveComputeInputs(
         );
         return null;
       }
-      const { services } = DDOManager.getDDOClass(dataDdo).getDDOFields();
-      if (!services?.[0]) {
+      const service = DDOManager.getDDOClass(dataDdo).getServiceByIndex(0);
+      if (!service) {
         console.error(`Error: dataset ${token} has no services.`);
         return null;
       }
       assets.push({
         documentId: dataDdo.id,
-        serviceId: services[0].id,
+        serviceId: service.id,
       });
       ddos.push(dataDdo);
     } else if (token && typeof token === "object") {
@@ -487,8 +487,8 @@ export async function resolveComputeInputs(
   let providerURI = fallbackProviderURI;
   const firstDdo = ddos.find((d) => d !== null);
   if (firstDdo) {
-    const { services } = DDOManager.getDDOClass(firstDdo).getDDOFields();
-    providerURI = services[0].serviceEndpoint;
+    providerURI =
+      DDOManager.getDDOClass(firstDdo).getServiceByIndex(0).serviceEndpoint;
   }
 
   // Resolve the algorithm (single entry: DID or raw object)
@@ -511,9 +511,10 @@ export async function resolveComputeInputs(
       );
       return null;
     }
-    const { services, metadata } =
-      DDOManager.getDDOClass(algoDdo).getDDOFields();
-    if (!services?.[0]) {
+    const algoInstance = DDOManager.getDDOClass(algoDdo);
+    const { metadata } = algoInstance.getDDOFields();
+    const service = algoInstance.getServiceByIndex(0);
+    if (!service) {
       console.error(`Error: algorithm ${algoToken} has no services.`);
       return null;
     }
@@ -523,7 +524,7 @@ export async function resolveComputeInputs(
     }
     algo = {
       documentId: algoDdo.id,
-      serviceId: services[0].id,
+      serviceId: service.id,
       meta: metadata.algorithm,
     };
   } else if (algoToken && typeof algoToken === "object") {
@@ -674,17 +675,6 @@ export function toBoolean(value) {
 // ---------------------------------------------------------------------------
 // Multi-chain compute helpers (Phase 3).
 // ---------------------------------------------------------------------------
-
-// A DDO's chainId lives at the top level in 4.1.0 DDOs but under
-// `credentialSubject.chainId` in v5 DDOs — read whichever is present so both metadata
-// versions resolve to the right chain (publish/edit routing and compute ordering alike).
-export function getDdoChainId(ddo: unknown): unknown {
-  const d = ddo as {
-    chainId?: unknown;
-    credentialSubject?: { chainId?: unknown };
-  };
-  return d?.chainId ?? d?.credentialSubject?.chainId;
-}
 
 /**
  * The set of chainIds a compute job actually touches: the payment/escrow chain plus

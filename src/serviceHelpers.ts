@@ -1,9 +1,8 @@
 import util from "util";
 import chalk from "chalk";
-import { Signer, getAddress } from "ethers";
+import { Signer } from "ethers";
 import {
   ProviderInstance,
-  EscrowContract,
   amountToUnits,
   unitsToAmount,
   getTokenDecimals,
@@ -14,8 +13,12 @@ import {
   ServiceStatusNumber,
   ServiceTemplatePublic,
   TemplateResourceRequirement,
+  sizeSharedResources,
+  planGpuLayouts,
+  grantableAmount,
 } from "@oceanprotocol/lib";
 import { getConfigFor } from "./rpcRegistry.js";
+import { escrowContractFor } from "./escrowHelpers.js";
 
 // ---------------------------------------------------------------------------
 // 4.1 Status labels
@@ -61,28 +64,44 @@ function colorForStatus(status: number, text: string): string {
 
 // ---------------------------------------------------------------------------
 // 4.2 Environment <-> template resource matching
-// (ported from ocean.js test/integration/Services.test.ts)
+// (delegates to ocean.js's unit-aware ServiceResources helpers)
 // ---------------------------------------------------------------------------
+//
+// ocean.js v10 replaced ServiceTemplatePublic.requiredResources with
+// `recommendedResources`, and turned TemplateResourceRequirement into a
+// discriminated union: cpu/ram/disk members carry `id` + `recommended` (cpu in
+// `cores`, ram/disk in `GB`), while the GPU member carries `type: 'gpu'` +
+// `layouts` and no `id`. Because ram/disk are now declared in GB while a
+// compute environment reports those resources in bytes, matching must be
+// unit-aware — so we lean on the library's `sizeSharedResources` /
+// `planGpuLayouts` instead of comparing raw numbers.
 
+// Narrows a requirement to its shared (cpu/ram/disk) member — the GPU member is
+// the only one without an `id`.
+type SharedRequirement = Extract<TemplateResourceRequirement, { id: string }>;
+type GpuRequirement = Extract<TemplateResourceRequirement, { type: "gpu" }>;
+
+function isSharedRequirement(
+  req: TemplateResourceRequirement,
+): req is SharedRequirement {
+  return "id" in req;
+}
+
+// Whole units of a single shared requirement a new booking could still get.
+// Only meaningful for cpu (cores) — ram/disk use byte-vs-GB sizing handled by
+// the library — so this stays a best-effort display helper.
 export function availableFor(
   env: ComputeEnvironment,
   req: TemplateResourceRequirement,
 ): number {
   const resources: ComputeResource[] = env.resources ?? [];
-  if (req.id) {
+  if (isSharedRequirement(req)) {
     const r = resources.find((x) => x.id === req.id);
-    return r ? (r.total ?? 0) - (r.inUse ?? 0) : 0;
+    return r ? grantableAmount(r) : 0;
   }
   return resources
-    .filter((x) => x.kind === req.kind && (!req.type || x.type === req.type))
-    .reduce((sum, x) => sum + ((x.total ?? 0) - (x.inUse ?? 0)), 0);
-}
-
-export function envSatisfiesTemplate(
-  env: ComputeEnvironment,
-  reqs?: TemplateResourceRequirement[],
-): boolean {
-  return (reqs ?? []).every((req) => availableFor(env, req) >= req.min);
+    .filter((x) => x.type === "gpu")
+    .reduce((sum, x) => sum + grantableAmount(x), 0);
 }
 
 // Human-readable reason a template does not fit an env (or null when it fits).
@@ -91,15 +110,39 @@ export function templateMismatchReason(
   template?: ServiceTemplatePublic,
 ): string | null {
   if (!template) return null;
-  for (const req of template.requiredResources ?? []) {
-    const have = availableFor(env, req);
-    if (have < req.min) {
-      const what =
-        req.id ?? `${req.kind ?? "resource"}${req.type ? `/${req.type}` : ""}`;
-      return `${what}: need ${req.min}, have ${have}`;
+  const reqs = template.recommendedResources ?? [];
+  const resources = env.resources ?? [];
+
+  // Shared cpu/ram/disk: unit-aware sizing (GB -> bytes) from the library.
+  const shared = reqs.filter(isSharedRequirement);
+  if (shared.length && sizeSharedResources(resources, shared) === null) {
+    // cpu is the only id we can compare in like units for a precise message.
+    const cpu = shared.find((r) => r.id === "cpu");
+    if (cpu && availableFor(env, cpu) < cpu.recommended) {
+      return `cpu: recommended ${cpu.recommended} ${cpu.unit}, available ${availableFor(
+        env,
+        cpu,
+      )}`;
+    }
+    return "insufficient cpu/ram/disk for the template's recommended resources";
+  }
+
+  // GPU: layout planning from the library.
+  const gpu = reqs.find((r): r is GpuRequirement => !isSharedRequirement(r));
+  if (gpu) {
+    const gpuResources = resources.filter((r) => r.type === "gpu");
+    if (planGpuLayouts({ gpuResources, requirement: gpu }).length === 0) {
+      return `gpu: no layout on this environment satisfies the template's recommended ${gpu.recommended} ${gpu.unit} per GPU`;
     }
   }
   return null;
+}
+
+export function envSatisfiesTemplate(
+  env: ComputeEnvironment,
+  template?: ServiceTemplatePublic,
+): boolean {
+  return templateMismatchReason(env, template) === null;
 }
 
 export function findServiceEnvironments(
@@ -107,9 +150,7 @@ export function findServiceEnvironments(
   template?: ServiceTemplatePublic,
 ): ComputeEnvironment[] {
   return (envs ?? []).filter(
-    (e) =>
-      e.features?.services !== false &&
-      (!template || envSatisfiesTemplate(e, template.requiredResources)),
+    (e) => e.features?.services !== false && envSatisfiesTemplate(e, template),
   );
 }
 
@@ -121,12 +162,18 @@ export function resolveServiceResources(
   template: ServiceTemplatePublic | undefined,
   env: ComputeEnvironment,
 ): ComputeResourceRequest[] {
-  const requiredById = (template?.requiredResources ?? []).filter(
-    (r) => typeof r.id === "string",
+  // Unit-aware sizing of the template's recommended cpu/ram/disk against the
+  // environment (converts the template's GB figures to the bytes the node
+  // expects, and drops zero amounts). GPU layout selection, when needed, is
+  // left to an explicit --resources selection.
+  const sizing = sizeSharedResources(
+    env.resources ?? [],
+    template?.recommendedResources,
   );
-  if (requiredById.length) {
-    return requiredById.map((r) => ({ id: r.id as string, amount: r.min }));
+  if (sizing && sizing.requests.length) {
+    return sizing.requests;
   }
+  // Fallback: a minimal cpu + ram request.
   return (env.resources ?? [])
     .filter((r) => r.id === "cpu" || r.id === "ram")
     .map((r) => ({ id: r.id, amount: 1 }));
@@ -247,16 +294,71 @@ export function describeUserDataKeys(
 }
 
 // ---------------------------------------------------------------------------
-// 4.6 Escrow pre-verification
+// 4.6 Escrow: quote the payer's share, then fund it
 // ---------------------------------------------------------------------------
+//
+// Two steps so the caller can ask for confirmation in between: the quote is read-only,
+// and nothing is deposited or authorized until the user has seen what they pay.
 
-// Prints actionable errors and returns false when escrow is not ready.
-export async function verifyServiceEscrow(
+// Read-only. Returns the payer's own share of the cost (human units): the full cost, or
+// less when subsidy providers pre-fund part of the lock (zero when fully sponsored).
+// Prints the error and returns null when it cannot be worked out.
+/**
+ * A JS number as a plain decimal string with at most `decimals` fraction digits — what
+ * `amountToUnits` accepts. `String(n)` does not qualify: a float cost such as 0.1 + 0.2
+ * prints 17 fraction digits (more than a 6-decimal token allows) and a tiny one prints in
+ * exponent form, and both make the conversion throw. Rounds to nearest. Pure.
+ */
+export function toTokenPrecision(amount: number, decimals: number): string {
+  if (!Number.isFinite(amount) || amount < 0) {
+    throw new Error(`Invalid cost amount: ${amount}`);
+  }
+  return amount.toFixed(Math.min(Math.max(Math.trunc(decimals), 0), 100));
+}
+
+export async function quoteServicePayerShare(
+  signer: Signer,
+  token: string,
+  costHuman: number, // from estimateServiceCost
+  // Given the lock amount (base units), returns how much of it subsidy providers would
+  // pre-fund at lock time. Omitted = nothing is pre-funded, the payer funds it all.
+  quotePrefunded?: (lockUnits: bigint) => Promise<bigint>,
+): Promise<string | null> {
+  try {
+    const decimals = await getTokenDecimals(signer, token);
+    const lockUnits = BigInt(
+      (
+        await amountToUnits(
+          signer,
+          token,
+          toTokenPrecision(costHuman, Number(decimals)),
+          decimals,
+        )
+      ).toString(),
+    );
+    let prefundedUnits = quotePrefunded ? await quotePrefunded(lockUnits) : 0n;
+    if (prefundedUnits > lockUnits) prefundedUnits = lockUnits;
+    return await unitsToAmount(
+      signer,
+      token,
+      (lockUnits - prefundedUnits).toString(),
+      decimals,
+    );
+  } catch (error) {
+    console.error(chalk.red("Error estimating the escrow amount:"), error);
+    return null;
+  }
+}
+
+// Sends transactions: deposits whatever part of the payer's share is missing from
+// escrow and creates or repairs the node's authorization. Call it only after the user
+// confirmed. Prints actionable errors and returns false when escrow is not ready.
+export async function fundServiceEscrow(
   signer: Signer,
   chainId: number,
   token: string,
   payee: string, // env.consumerAddress
-  costHuman: number, // from estimateServiceCost
+  payerShareHuman: string, // from quoteServicePayerShare
   durationSeconds: number,
 ): Promise<boolean> {
   try {
@@ -269,31 +371,18 @@ export async function verifyServiceEscrow(
       );
       return false;
     }
-    const escrow = new EscrowContract(
-      getAddress(config.escrow),
-      signer,
-      chainId,
-    );
-    const decimals = await getTokenDecimals(signer, token);
-    const amountUnits = await amountToUnits(
-      signer,
-      token,
-      String(costHuman),
-      decimals,
-    );
-    const availableHuman = await unitsToAmount(
-      signer,
-      token,
-      amountUnits.toString(),
-      decimals,
-    );
+    // Version-matched ABI, so the funds check can read a legacy escrow's authorizations.
+    const escrow = await escrowContractFor(config.escrow, signer, chainId);
     const minLockSeconds = durationSeconds + 3600; // node getMinLockTime margin
 
+    // Both amounts are HUMAN units (the lib compares them directly). Called even for a
+    // payer share of 0: it deposits nothing then, but still creates or repairs the
+    // authorization the node needs to create the lock.
     const validation = await escrow.verifyFundsForEscrowPayment(
       token,
       payee,
-      availableHuman,
-      amountUnits.toString(),
+      payerShareHuman,
+      payerShareHuman,
       String(minLockSeconds),
       "10",
     );

@@ -185,6 +185,7 @@ jobs:
           bash -x start_ocean.sh --with-typesense 2>&1 > start_ocean.log &
       - name: Install dependencies
         run: npm ci
+      - run: npm run build
       - run: docker image ls
       - name: Wait for node to be ready
         run: |

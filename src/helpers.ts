@@ -23,6 +23,7 @@ import {
   ComputeAsset,
   createAsset,
   LoggerInstance,
+  JobSubsidyEstimate,
 } from "@oceanprotocol/lib";
 import { createRequire } from "module";
 
@@ -262,7 +263,9 @@ export async function handleComputeOrder(
   const { services } = ddoInstance.getDDOFields();
   const service = services?.[serviceIndex];
   if (!Number.isInteger(serviceIndex) || serviceIndex < 0 || !service) {
-    throw new Error(`Service index ${serviceIndex} not found in asset ${asset.id}`);
+    throw new Error(
+      `Service index ${serviceIndex} not found in asset ${asset.id}`,
+    );
   }
   // Validate new orders before approving fees. Reuse does not need indexed datatokens.
   let datatokenIndex: number;
@@ -525,9 +528,10 @@ export async function resolveComputeInputs(
     };
   } else if (algoToken && typeof algoToken === "object") {
     const rawAlgo = algoToken as unknown as ComputeAlgorithm;
-    if (!rawAlgo.fileObject) {
+    // The node accepts the code either as a file to fetch or inline in meta.rawcode.
+    if (!rawAlgo.fileObject && !rawAlgo.meta?.rawcode) {
       console.error(
-        "Error: raw algorithm must contain a 'fileObject'. Got: " +
+        "Error: raw algorithm must contain a 'fileObject' or 'meta.rawcode'. Got: " +
           JSON.stringify(algoToken),
       );
       return null;
@@ -743,8 +747,168 @@ export function summarizeComputeEnvFees(env: {
     const tokens = (fees[chainId] || [])
       .map((f) => f?.feeToken)
       .filter((t): t is string => typeof t === "string" && t.length > 0);
-    const tokenList = tokens.length > 0 ? tokens.join(", ") : "(no tokens listed)";
+    const tokenList =
+      tokens.length > 0 ? tokens.join(", ") : "(no tokens listed)";
     return `    chain ${chainId}: ${tokenList}`;
   });
   return `${header}: pays on\n${lines.join("\n")}`;
+}
+
+/**
+ * Parse the `--subsidyProviders` CLI value into the tri-state the Ocean Node expects
+ * (ocean-node #1485, ocean.js #2160):
+ *   - flag omitted          -> `undefined` (the node uses its configured defaults)
+ *   - `none` / empty string -> `[]`        (explicitly claim with NO subsidy providers)
+ *   - a CSV of addresses    -> `string[]`  (use exactly these, EIP-55 normalized)
+ * Preserving the `undefined` vs `[]` distinction is essential — the ocean.js request
+ * body is truthy-guarded (`if (subsidyProviders)`), and `[]` is truthy, so an empty
+ * array is transmitted while `undefined` is omitted.
+ * Throws on a malformed address.
+ */
+export function parseSubsidyProviders(raw?: string): string[] | undefined {
+  if (raw === undefined) return undefined;
+  const trimmed = raw.trim();
+  if (trimmed === "" || trimmed.toLowerCase() === "none") return [];
+  return trimmed.split(",").map((a) => ethers.getAddress(a.trim()));
+}
+
+export interface ResolvedSubsidyProviders {
+  /** Provider contracts to query (EIP-55, de-duplicated). */
+  addresses: string[];
+  /** Filter OFF: `--subsidy` addresses queried although the node does not advertise them. */
+  notAdvertised: string[];
+  /** Filter ON: `--subsidy` addresses dropped because the node would reject them. */
+  ignored: string[];
+}
+
+/**
+ * Resolve the subsidy-provider contract addresses `getSubsidyStatus` reports on. The Ocean
+ * Node is the source of truth for what is usable, so nothing is read from bundled config /
+ * ADDRESS_FILE — the candidates are the node's status `subsidyProviders[chainId]` and the
+ * caller's own `--subsidy` list, and the node's `subsidyProviderFilter` decides how they mix:
+ *   - no `--subsidy`           -> the node's advertised list (error when it is empty);
+ *   - `--subsidy` + filter OFF -> exactly the named addresses. The node accepts any provider
+ *     a consumer names per request, so they are reported whether or not it advertises them
+ *     (the ones it does not are returned in `notAdvertised`);
+ *   - `--subsidy` + filter ON  -> the named addresses narrowed to the node's list, since it
+ *     rejects anything else (the rest are returned in `ignored`).
+ * Pure: the caller prints the notes. Throws on a malformed address or when nothing is usable.
+ */
+export function resolveSubsidyProviderAddresses(
+  chainId: number,
+  nodeProviders: Record<string, string[]> | undefined,
+  filter: boolean,
+  override?: string,
+): ResolvedSubsidyProviders {
+  const fromNode = [
+    ...new Set(
+      (nodeProviders?.[String(chainId)] ?? []).map((a) => ethers.getAddress(a)),
+    ),
+  ];
+  const wanted = [
+    ...new Set(
+      (override ?? "")
+        .split(",")
+        .map((a) => a.trim())
+        .filter(Boolean)
+        .map((a) => {
+          try {
+            return ethers.getAddress(a);
+          } catch {
+            throw new Error(`Invalid --subsidy address '${a}'.`);
+          }
+        }),
+    ),
+  ];
+  const nodeSet = new Set(fromNode);
+
+  if (!filter) {
+    if (wanted.length) {
+      return {
+        addresses: wanted,
+        notAdvertised: wanted.filter((a) => !nodeSet.has(a)),
+        ignored: [],
+      };
+    }
+    if (fromNode.length === 0) {
+      throw new Error(
+        `This node supports subsidies but has no subsidy providers configured on chain ${chainId}. Pass --subsidy 0x... to check a specific provider (the node's provider filter is off, so it accepts providers named per request).`,
+      );
+    }
+    return { addresses: fromNode, notAdvertised: [], ignored: [] };
+  }
+
+  if (fromNode.length === 0) {
+    throw new Error(
+      `This node does not support subsidy providers on chain ${chainId}: the provider filter is on and its configured list is empty, so no provider can be used.`,
+    );
+  }
+  if (wanted.length === 0) {
+    return { addresses: fromNode, notAdvertised: [], ignored: [] };
+  }
+  const kept = wanted.filter((a) => nodeSet.has(a));
+  if (kept.length === 0) {
+    throw new Error(
+      `None of the --subsidy addresses are advertised by the node on chain ${chainId}, and its provider filter is on, so it would reject them.`,
+    );
+  }
+  return {
+    addresses: kept,
+    notAdvertised: [],
+    ignored: wanted.filter((a) => !nodeSet.has(a)),
+  };
+}
+
+/**
+ * How much of a job's lock the subsidy providers would PRE-FUND, in token base units,
+ * read off an ocean.js `estimateJobSubsidy` result. What is left is the payer's own
+ * share — the only amount that has to sit in (and be authorized on) the payer's escrow.
+ *
+ * `requested` is the `--subsidyProviders` tri-state, and it decides which providers the
+ * node will actually put in the lock:
+ *   - `undefined` -> the node's own set, which is what the estimate's prefunded scenario
+ *     was built from, so its projected total is used as-is;
+ *   - a list      -> the node uses exactly those (a REPLACEMENT of its set), while the
+ *     estimate quotes `advertised ∪ list`. Only the named providers are counted, so an
+ *     advertised provider the user did not name never shrinks the payer's deposit;
+ *   - `[]`        -> no subsidy, nothing is pre-funded.
+ *
+ * An empty prefunded selection means no provider pre-funds (or the escrow has no
+ * lock-subsidy support) and yields 0. The result is capped at `lockUnits`, the node's
+ * authoritative lock amount, so a client-side cost estimate above it cannot push the
+ * payer share below zero.
+ */
+export function prefundedLockUnits(
+  estimate: Pick<
+    JobSubsidyEstimate,
+    "providers" | "scenarios" | "maxSponsorsPerLock"
+  >,
+  requested: string[] | undefined,
+  decimals: number,
+  lockUnits: bigint,
+): bigint {
+  const scenario = estimate.scenarios.prefunded;
+  if (scenario.selected.length === 0) return 0n;
+  if (requested !== undefined && requested.length === 0) return 0n;
+
+  let total: bigint;
+  if (requested === undefined) {
+    total = ethers.parseUnits(scenario.projectedTotalSubsidy, decimals);
+  } else {
+    // The node keeps the first `maxSponsorsPerLock` entries of the caller's list.
+    const named = new Set(
+      requested
+        .slice(0, estimate.maxSponsorsPerLock)
+        .map((a) => a.toLowerCase()),
+    );
+    total = estimate.providers
+      .filter((p) => p.eligible && !p.dropped)
+      .filter((p) => named.has(p.address.toLowerCase()))
+      .reduce(
+        (sum, p) =>
+          sum + ethers.parseUnits(p.quotes.prefunded.subsidy, decimals),
+        0n,
+      );
+  }
+  return total > lockUnits ? lockUnits : total;
 }

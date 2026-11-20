@@ -54,10 +54,11 @@ describe("Ocean CLI interactive menu (REPL)", function () {
   });
 
   it("survives a command with a missing required argument", async function () {
-    // getDDO requires <did>; the parse error must not terminate the REPL, and a
+    // downloadJobResults requires <jobId> <resultIndex> (positional-only, no
+    // option alternative); the parse error must not terminate the REPL, and a
     // subsequent command must still run.
     const { output, code } = await runRepl([
-      "getDDO",
+      "downloadJobResults",
       "definitelyNotACommand",
       "exit",
     ]);

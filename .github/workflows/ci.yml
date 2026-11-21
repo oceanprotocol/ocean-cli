@@ -183,6 +183,8 @@ jobs:
         working-directory: ${{ github.workspace }}/barge
         run: |
           bash -x start_ocean.sh --with-typesense 2>&1 > start_ocean.log &
+        env:
+          NODE_VERSION: pr-1622
       - name: Install dependencies
         run: npm ci
       - run: npm run build

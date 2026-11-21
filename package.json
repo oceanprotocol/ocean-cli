@@ -77,7 +77,7 @@
     "@oasisprotocol/sapphire-ethers-v6": "^6.0.1",
     "@oceanprotocol/contracts": "^3.2.0-rc.1",
     "@oceanprotocol/ddo-js": "^1.0.0",
-    "@oceanprotocol/lib": "^10.1.0",
+    "@oceanprotocol/lib": "github:oceanprotocol/ocean.js#feature/unify_status_endpoints",
     "chalk": "^6.0.1",
     "commander": "^15.0.0",
     "enquirer": "^2.4.1",

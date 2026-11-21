@@ -1,33 +1,25 @@
 import { expect } from "chai";
-import { startP2P, stopP2P, validateNode } from "../src/nodeConnection.js";
+import { ProviderInstance } from "@oceanprotocol/lib";
 
-// Node status is fetched through ocean.js `getNodeStatus` (the CLI's own
-// `validateNode` wrapper), not a raw `fetch` to the root endpoint. That call
-// uses the STATUS command over whichever transport NODE_URL names, so this test
-// covers both the HTTP and P2P CI legs, and is immune to the ocean-node #1622
-// root-endpoint rename (`nodeId`/`providerAddress`/`nodePublicKey`/`software`
-// are gone; the status object exposes `id`/`address`/`publicKey`).
-const NODE_URL = process.env.NODE_URL || "http://127.0.0.1:8001";
-const IS_P2P = !NODE_URL.startsWith("http");
+// Node status is fetched through ocean.js `getNodeStatus` (which uses the STATUS
+// command over `POST /directCommand`), not a raw `fetch` to the root endpoint, so
+// this is immune to the ocean-node #1622 root-endpoint rename (`nodeId`/
+// `providerAddress`/`nodePublicKey`/`software` are gone; the status object exposes
+// `id`/`address`/`publicKey`). It runs over the node's HTTP API, which is up in
+// both CI transport legs; the P2P transport itself is exercised by the full
+// system-test suite (which runs the CLI with NODE_URL set to the node's peer id).
+const NODE_HTTP = "http://127.0.0.1:8001";
 
 describe("Ocean Node status (via getNodeStatus)", function () {
-  this.timeout(60_000);
-
-  before(() => {
-    // validateNode awaits ensureP2PReady() for P2P URIs, so P2P must be started.
-    if (IS_P2P) {
-      startP2P(NODE_URL);
-    }
-  });
-
-  after(async () => {
-    await stopP2P();
-  });
+  this.timeout(30_000);
 
   it("should return the full node status object", async () => {
-    const status = await validateNode(NODE_URL);
+    const status = await ProviderInstance.getNodeStatus(
+      NODE_HTTP,
+      AbortSignal.timeout(15_000),
+    );
 
-    expect(status, `node ${NODE_URL} should be reachable`).to.not.be.null;
+    expect(status, `node ${NODE_HTTP} should be reachable`).to.not.be.null;
     expect(status).to.have.property("id");
     expect(status).to.have.property("publicKey");
     expect(status).to.have.property("address");

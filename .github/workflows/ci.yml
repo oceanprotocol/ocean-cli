@@ -219,7 +219,7 @@ jobs:
           attempt=1
           echo "Waiting for node HTTP API to be ready..."
           while [ $attempt -le $max_attempts ]; do
-            PEER_ID=$(curl -s http://127.0.0.1:8001 | jq -r '.nodeId // empty' 2>/dev/null)
+            PEER_ID=$(curl -s http://127.0.0.1:8001 | jq -r '.id // .nodeId // empty' 2>/dev/null)
             if [ -n "$PEER_ID" ]; then
               echo "Got peer ID: $PEER_ID"
               echo "NODE_URL=${PEER_ID}" >> $GITHUB_ENV

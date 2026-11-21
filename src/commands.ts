@@ -14,7 +14,6 @@ import {
   computeJobChainIds,
   summarizeComputeEnvFees,
   prefundedLockUnits,
-  getDdoChainId,
   resolveSubsidyProviderAddresses,
 } from "./helpers.js";
 import {
@@ -58,7 +57,15 @@ import {
   ServiceStatusNumber,
   ServiceTemplatePublic,
 } from "@oceanprotocol/lib";
-import { Asset, DDOManager } from "@oceanprotocol/ddo-js";
+import {
+  Asset,
+  DDOManager,
+  addTrustedAlgorithm,
+  getDdoChainId,
+  isComputeService,
+  isDdoOwner,
+  removeTrustedAlgorithm,
+} from "@oceanprotocol/ddo-js";
 import { Signer, ethers, getAddress } from "ethers";
 import { stdin as input, stdout as output } from "node:process";
 import { createInterface } from "readline/promises";
@@ -205,13 +212,6 @@ export class Commands {
     this.config = this.configFor(chainId);
   }
 
-  // A DDO's chainId lives at the top level in 4.1.0 DDOs but under
-  // `credentialSubject.chainId` in v5 DDOs. Delegates to the shared `getDdoChainId`
-  // helper so routing and compute ordering read the chain the same way.
-  private ddoChainId(ddo: unknown): unknown {
-    return getDdoChainId(ddo);
-  }
-
   // Category (b): re-point at the chain the asset lives on (its DDO's chainId). Returns
   // false (already logged) if the chainId is missing/invalid or not configured, so the
   // caller can bail. Also fixes the old bug where publish ignored the DDO's chainId.
@@ -334,9 +334,7 @@ export class Commands {
     const encryptDDO = args[2] === "false" ? false : true;
     // The chain is the one the DDO declares — publish on that chain, not the RPC's
     // default. (Previously the DDO's chainId was ignored.)
-    if (
-      !(await this.routeToAssetChain(this.ddoChainId(asset), "Metadata file"))
-    )
+    if (!(await this.routeToAssetChain(getDdoChainId(asset), "Metadata file")))
       return;
     try {
       const ddoInstance = DDOManager.getDDOClass(asset);
@@ -373,10 +371,7 @@ export class Commands {
     }
     const encryptDDO = args[2] === "false" ? false : true;
     if (
-      !(await this.routeToAssetChain(
-        this.ddoChainId(algoAsset),
-        "Metadata file",
-      ))
+      !(await this.routeToAssetChain(getDdoChainId(algoAsset), "Metadata file"))
     )
       return;
     // add some more checks
@@ -434,7 +429,7 @@ export class Commands {
       asset[key] = updateJson[key];
     }
 
-    if (!(await this.routeToAssetChain(this.ddoChainId(asset), "DDO"))) return;
+    if (!(await this.routeToAssetChain(getDdoChainId(asset), "DDO"))) return;
 
     const updateAssetTx = await updateAssetMetadata(
       this.signer,
@@ -529,13 +524,12 @@ export class Commands {
       return;
     }
 
-    if (!(await this.routeToAssetChain(this.ddoChainId(dataDdo), "DDO")))
-      return;
+    if (!(await this.routeToAssetChain(getDdoChainId(dataDdo), "DDO"))) return;
 
     const ddoInstance = DDOManager.getDDOClass(dataDdo);
-    const { services, version } = ddoInstance.getDDOFields();
-    const serviceId = args[3] ? args[3] : services[0].id;
-    const service = services.find((s) => s.id === serviceId);
+    const { version } = ddoInstance.getDDOFields();
+    const serviceId = args[3] ? args[3] : ddoInstance.getServiceByIndex(0)?.id;
+    const service = ddoInstance.getService(serviceId);
     if (!service) {
       console.error(
         chalk.red(`Service ID "${serviceId}" not found in DDO ${did}.`),
@@ -579,7 +573,7 @@ export class Commands {
       this.config,
     );
     // Order the same service that policy retrieval and getDownloadUrl target.
-    const serviceIndex = services.findIndex((s) => s.id === serviceId);
+    const serviceIndex = ddoInstance.getServiceIndex(serviceId);
     let tx;
     try {
       tx = await this.orderWithRetry(() =>
@@ -723,18 +717,15 @@ export class Commands {
       version?: string;
     } | null = null;
     if (algoDdo) {
-      const ddoAlgoInstance = DDOManager.getDDOClass(algoDdo);
-      const { services: servicesAlgo, version: versionAlgo } =
-        ddoAlgoInstance.getDDOFields();
+      const ddoInstanceAlgo = DDOManager.getDDOClass(algoDdo);
+      const { version: versionAlgo } = ddoInstanceAlgo.getDDOFields();
       const algoServiceIdInput = args[9] as string | undefined;
       if (
         typeof algoServiceIdInput === "string" &&
         algoServiceIdInput.trim().length > 0
       ) {
         const expectedAlgoServiceId = algoServiceIdInput.trim();
-        const matchAlgoSvc = servicesAlgo.find(
-          (s: any) => s.id === expectedAlgoServiceId,
-        );
+        const matchAlgoSvc = ddoInstanceAlgo.getService(expectedAlgoServiceId);
         if (!matchAlgoSvc) {
           console.error(
             `Algorithm Service ID "${expectedAlgoServiceId}" not found in algo DDO ${algoDdo.id}. ` +
@@ -764,15 +755,13 @@ export class Commands {
       const dataDdo = ddos[i];
       if (!dataDdo) continue;
       const ddoInstanceDdo = DDOManager.getDDOClass(dataDdo);
-      const { services: servicesDdo, version: versionDdo } =
-        ddoInstanceDdo.getDDOFields();
-      let chosenServiceId = assets[i].serviceId || servicesDdo[0].id;
+      const { version: versionDdo } = ddoInstanceDdo.getDDOFields();
+      const defaultService = ddoInstanceDdo.getServiceByIndex(0);
+      let chosenServiceId = assets[i].serviceId || defaultService?.id;
       if (inputServices.length > 0) {
         const expectedServiceId = inputServices[i];
         if (expectedServiceId) {
-          const match = servicesDdo.find(
-            (s: any) => s.id === expectedServiceId,
-          );
+          const match = ddoInstanceDdo.getService(expectedServiceId);
           if (!match) {
             console.error(
               `Service ID "${expectedServiceId}" not found in dataset ${dataDdo.id}. ` +
@@ -785,8 +774,8 @@ export class Commands {
             providerURI = match.serviceEndpoint;
           }
         }
-      } else if (i === 0 && servicesDdo[0]?.serviceEndpoint) {
-        providerURI = servicesDdo[0].serviceEndpoint;
+      } else if (i === 0 && defaultService?.serviceEndpoint) {
+        providerURI = defaultService.serviceEndpoint;
       }
       assets[i].serviceId = chosenServiceId;
       const canStartCompute = await isOrderable(
@@ -1157,18 +1146,16 @@ export class Commands {
     } | null = null;
     if (algoDdo) {
       const ddoInstanceAlgo = DDOManager.getDDOClass(algoDdo);
-      const { services: servicesAlgo, version: versionAlgo } =
-        ddoInstanceAlgo.getDDOFields();
+      const { version: versionAlgo } = ddoInstanceAlgo.getDDOFields();
       const algoServiceIdInput = args[10] as string | undefined;
-      let chosenAlgoServiceId = algo.serviceId || servicesAlgo[0].id;
+      let chosenAlgoServiceId =
+        algo.serviceId || ddoInstanceAlgo.getServiceByIndex(0)?.id;
       if (
         typeof algoServiceIdInput === "string" &&
         algoServiceIdInput.trim().length > 0
       ) {
         const expectedAlgoServiceId = algoServiceIdInput.trim();
-        const matchAlgoSvc = servicesAlgo.find(
-          (s: any) => s.id === expectedAlgoServiceId,
-        );
+        const matchAlgoSvc = ddoInstanceAlgo.getService(expectedAlgoServiceId);
         if (!matchAlgoSvc) {
           console.error(
             `Algorithm Service ID "${expectedAlgoServiceId}" not found in algo DDO ${algoDdo.id}. ` +
@@ -1178,9 +1165,7 @@ export class Commands {
         }
         chosenAlgoServiceId = expectedAlgoServiceId;
       }
-      algoServiceIndex = servicesAlgo.findIndex(
-        (s: any) => s.id === chosenAlgoServiceId,
-      );
+      algoServiceIndex = ddoInstanceAlgo.getServiceIndex(chosenAlgoServiceId);
       if (algoServiceIndex < 0) {
         console.error(
           `Could not resolve serviceIndex for algorithm serviceId ${chosenAlgoServiceId}`,
@@ -1212,15 +1197,13 @@ export class Commands {
         continue;
       }
       const ddoInstanceDdo = DDOManager.getDDOClass(dataDdo);
-      const { services: servicesDdo, version: versionDdo } =
-        ddoInstanceDdo.getDDOFields();
-      let chosenServiceId = assets[i].serviceId || servicesDdo[0].id;
+      const { version: versionDdo } = ddoInstanceDdo.getDDOFields();
+      const defaultService = ddoInstanceDdo.getServiceByIndex(0);
+      let chosenServiceId = assets[i].serviceId || defaultService?.id;
       if (inputServices.length > 0) {
         const expectedServiceId = inputServices[i];
         if (expectedServiceId) {
-          const match = servicesDdo.find(
-            (s: any) => s.id === expectedServiceId,
-          );
+          const match = ddoInstanceDdo.getService(expectedServiceId);
           if (!match) {
             console.error(
               `Service ID "${expectedServiceId}" not found in dataset ${dataDdo.id}. ` +
@@ -1233,12 +1216,11 @@ export class Commands {
             providerURI = match.serviceEndpoint;
           }
         }
-      } else if (i === 0 && servicesDdo[0]?.serviceEndpoint) {
-        providerURI = servicesDdo[0].serviceEndpoint;
+      } else if (i === 0 && defaultService?.serviceEndpoint) {
+        providerURI = defaultService.serviceEndpoint;
       }
-      const chosenServiceIndex = servicesDdo.findIndex(
-        (s: any) => s.id === chosenServiceId,
-      );
+      const chosenServiceIndex =
+        ddoInstanceDdo.getServiceIndex(chosenServiceId);
       if (chosenServiceIndex < 0) {
         console.error(
           `Could not resolve serviceIndex for dataset ${dataDdo.id} with serviceId ${chosenServiceId}`,
@@ -1741,17 +1723,14 @@ export class Commands {
     } | null = null;
     if (algoDdo) {
       const ddoInstanceAlgo = DDOManager.getDDOClass(algoDdo);
-      const { services: servicesAlgo, version: versionAlgo } =
-        ddoInstanceAlgo.getDDOFields();
+      const { version: versionAlgo } = ddoInstanceAlgo.getDDOFields();
       const algoServiceIdInput = args[6] as string | undefined;
       if (
         typeof algoServiceIdInput === "string" &&
         algoServiceIdInput.trim().length > 0
       ) {
         const expectedAlgoServiceId = algoServiceIdInput.trim();
-        const matchAlgoSvc = servicesAlgo.find(
-          (s: any) => s.id === expectedAlgoServiceId,
-        );
+        const matchAlgoSvc = ddoInstanceAlgo.getService(expectedAlgoServiceId);
         if (!matchAlgoSvc) {
           console.error(
             `Algorithm Service ID "${expectedAlgoServiceId}" not found in algo DDO ${algoDdo.id}. ` +
@@ -1781,15 +1760,13 @@ export class Commands {
       const dataDdo = ddos[i];
       if (!dataDdo) continue;
       const ddoInstanceDdo = DDOManager.getDDOClass(dataDdo);
-      const { services: servicesDdo, version: versionDdo } =
-        ddoInstanceDdo.getDDOFields();
-      let chosenServiceId = assets[i].serviceId || servicesDdo[0].id;
+      const { version: versionDdo } = ddoInstanceDdo.getDDOFields();
+      const defaultService = ddoInstanceDdo.getServiceByIndex(0);
+      let chosenServiceId = assets[i].serviceId || defaultService?.id;
       if (inputServices.length > 0) {
         const expectedServiceId = inputServices[i];
         if (expectedServiceId) {
-          const match = servicesDdo.find(
-            (s: any) => s.id === expectedServiceId,
-          );
+          const match = ddoInstanceDdo.getService(expectedServiceId);
           if (!match) {
             console.error(
               `Service ID "${expectedServiceId}" not found in dataset ${dataDdo.id}. ` +
@@ -1802,8 +1779,8 @@ export class Commands {
             providerURI = match.serviceEndpoint;
           }
         }
-      } else if (i === 0 && servicesDdo[0]?.serviceEndpoint) {
-        providerURI = servicesDdo[0].serviceEndpoint;
+      } else if (i === 0 && defaultService?.serviceEndpoint) {
+        providerURI = defaultService.serviceEndpoint;
       }
       assets[i].serviceId = chosenServiceId;
       const canStartCompute = await isOrderable(
@@ -2995,18 +2972,17 @@ export class Commands {
       return;
     }
     // Route to the dataset's chain before the owner check / metadata update.
-    if (!(await this.routeToAssetChain(this.ddoChainId(asset), "DDO"))) return;
+    if (!(await this.routeToAssetChain(getDdoChainId(asset), "DDO"))) return;
     const ddoInstance = DDOManager.getDDOClass(asset);
-    const { indexedMetadata } = ddoInstance.getAssetFields();
-    const { services } = ddoInstance.getDDOFields();
-    if (indexedMetadata.nft.owner !== (await this.signer.getAddress())) {
+    const computeService = ddoInstance.getServiceByIndex(0);
+    if (!isDdoOwner(asset, await this.signer.getAddress())) {
       console.error(
         "You are not the owner of this asset, and there for you cannot update it.",
       );
       return;
     }
 
-    if (services[0].type !== "compute") {
+    if (!isComputeService(computeService)) {
       console.error(
         "Error getting computeService for " +
           args[1] +
@@ -3053,10 +3029,14 @@ export class Commands {
       filesChecksum: filesChecksum?.[0]?.checksum,
       serviceId: servicesAlgo[0].id,
     };
-    if (!services[0].compute.publisherTrustedAlgorithms) {
-      services[0].compute.publisherTrustedAlgorithms = [];
+    // Replaces any earlier entry for the same algorithm DID + service, so
+    // re-allowing an updated algorithm does not keep its old checksums trusted.
+    try {
+      addTrustedAlgorithm(computeService, trustedAlgorithm);
+    } catch (e) {
+      console.error("Error adding trusted algorithm: ", e);
+      return;
     }
-    services[0].compute.publisherTrustedAlgorithms.push(trustedAlgorithm);
     try {
       const txid = await updateAssetMetadata(
         this.signer,
@@ -3087,17 +3067,16 @@ export class Commands {
       return;
     }
     // Route to the dataset's chain before the owner check / metadata update.
-    if (!(await this.routeToAssetChain(this.ddoChainId(asset), "DDO"))) return;
+    if (!(await this.routeToAssetChain(getDdoChainId(asset), "DDO"))) return;
     const ddoInstance = DDOManager.getDDOClass(asset);
-    const { indexedMetadata } = ddoInstance.getAssetFields();
-    const { services } = ddoInstance.getDDOFields();
-    if (indexedMetadata.nft.owner !== (await this.signer.getAddress())) {
+    const computeService = ddoInstance.getServiceByIndex(0);
+    if (!isDdoOwner(asset, await this.signer.getAddress())) {
       console.error(
         "You are not the owner of this asset, and there for you cannot update it.",
       );
       return;
     }
-    if (services[0].type !== "compute") {
+    if (!isComputeService(computeService)) {
       console.error(
         "Error getting computeService for " +
           args[1] +
@@ -3106,8 +3085,8 @@ export class Commands {
       return;
     }
     if (
-      !services[0].compute.publisherTrustedAlgorithms ||
-      services[0].compute.publisherTrustedAlgorithms.length === 0
+      !computeService.compute?.publisherTrustedAlgorithms ||
+      computeService.compute.publisherTrustedAlgorithms.length === 0
     ) {
       console.error(
         "Asset " +
@@ -3117,14 +3096,8 @@ export class Commands {
       return;
     }
     const encryptDDO = args[3] === "false" ? false : true;
-    const indexToDelete =
-      services[0].compute.publisherTrustedAlgorithms.findIndex(
-        (item) => item.did === args[2],
-      );
-
-    if (indexToDelete !== -1) {
-      services[0].compute.publisherTrustedAlgorithms.splice(indexToDelete, 1);
-    } else {
+    // Removes every entry for the DID, including duplicates left by older tools.
+    if (removeTrustedAlgorithm(computeService, args[2]) === 0) {
       console.error(
         " " +
           args[2] +

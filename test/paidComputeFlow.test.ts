@@ -255,7 +255,7 @@ describe("Ocean CLI Paid Compute", function () {
     );
     try {
       const output = await runCommand(
-        `npm run cli -- startCompute --from-json ${specPath}`,
+        `npm run cli -- startCompute --from-json "${specPath}"`,
       );
       expect(output, "no JobID in output").to.match(/JobID:\s*([^\s]+)/);
       expect(output).to.not.contain("initArgs:");

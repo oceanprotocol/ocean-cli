@@ -162,6 +162,12 @@ describe("jobSpec", function () {
       expect(r.errors).to.deep.equal([]);
     });
 
+    it("15b serviceIds entry with a comma is rejected", () => {
+      const r = v(validPaid({ datasets: ["a", "b"], serviceIds: ["a,b", null] }));
+      expect(paths(r)).to.include("serviceIds[0]");
+      expect(msgOf(r, "serviceIds[0]")).to.contain("comma");
+    });
+
     it("16 subsidyProviders tri-state", () => {
       expect(v(validPaid()).value!.subsidyProviders).to.equal(undefined);
       expect(

@@ -285,7 +285,7 @@ describe("Ocean CLI Service-on-Demand", function () {
     );
     try {
       const output = await runCommand(
-        `npm run cli -- startService --from-json ${specPath}`,
+        `npm run cli -- startService --from-json "${specPath}"`,
       );
       const idMatch = output.match(/ServiceID:\s*([^\s]+)/);
       expect(idMatch, "could not find 'ServiceID:' in output").to.not.be.null;

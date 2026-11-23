@@ -212,7 +212,7 @@ class Fields {
       if (required) this.err(key, "required");
       return undefined;
     }
-    if (typeof v !== "number" || !Number.isInteger(v) || v < min) {
+    if (typeof v !== "number" || !Number.isSafeInteger(v) || v < min) {
       const got = typeof v === "number" ? String(v) : typeName(v);
       this.err(key, `must be an integer >= ${min} (got ${got})`);
       return undefined;
@@ -296,7 +296,7 @@ class Fields {
         );
         ok = false;
       } else if (seen.has(item.id)) {
-        this.err(`${key}[${i}].id`, `duplicate resource id "${item.id}"`);
+        this.err(`${key}[${i}].id`, "duplicate resource id");
         ok = false;
       } else {
         seen.add(item.id);
@@ -561,8 +561,15 @@ export function validateComputeSpec(
     } else {
       let ok = true;
       sv.forEach((item, i) => {
-        if (item !== null && (typeof item !== "string" || item.trim() === "")) {
+        if (item === null) return;
+        if (typeof item !== "string" || item.trim() === "") {
           f.err(`serviceIds[${i}]`, "must be a non-empty string or null");
+          ok = false;
+        } else if (item.includes(",")) {
+          f.err(
+            `serviceIds[${i}]`,
+            "must not contain a comma (service ids are joined by comma for positional mapping)",
+          );
           ok = false;
         }
       });

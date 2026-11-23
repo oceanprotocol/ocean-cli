@@ -13,6 +13,26 @@ export const __dirname = dirname(__filename);
 
 export const projectRoot = path.resolve(__dirname, "..");
 
+/**
+ * Extracts a published DID from CLI output, accepting BOTH prefixes:
+ *  - `did:op:`  — classic assets (DDO v4.x)
+ *  - `did:ope:` — enterprise assets (DDO v5)
+ *
+ * The optional `e` (`ope?`) is what makes this match both: a regex hardcoded to
+ * `did:op:` requires a literal `:` right after `did:op`, so a `did:ope:…` DID
+ * never matches it and extraction silently returns null. Every flow that
+ * publishes an asset and feeds the DID back into a later step (consume, compute,
+ * status) should use this shared constant so both prefixes stay covered from one
+ * definition.
+ *
+ * Note: no `g` flag, so `String.prototype.match` is stateless across calls and a
+ * single shared instance is safe to reuse.
+ */
+export const DID_RE = /did:ope?:[a-f0-9]{64}/;
+
+/** Anchored form of {@link DID_RE} for asserting a string is _exactly_ a DID. */
+export const DID_RE_ANCHORED = /^did:ope?:[a-f0-9]{64}$/;
+
 // Never truncate assertion diffs: CLI output is long and a 40-char truncation
 // ("expected '\n> @oceanprotocol/cli@...' to match /extended/i") hides the very
 // text a failure needs to be diagnosed from a CI log.

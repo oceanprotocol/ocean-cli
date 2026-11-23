@@ -4,12 +4,13 @@ import fs from "fs";
 import crypto from "crypto";
 import https from "https";
 
-import { projectRoot, runCommand } from "./util.js";
+import { projectRoot, runCommand, DID_RE } from "./util.js";
 
 describe("Ocean CLI Publishing", function () {
   this.timeout(200000); // Set a longer timeout to allow the command to execute
 
   let downloadDatasetDid: string;
+  let downloadDatasetV5Did: string;
   let computeDatasetDid: string;
   let jsAlgoDid: string;
   let pythonAlgoDid: string;
@@ -60,7 +61,7 @@ describe("Ocean CLI Publishing", function () {
     );
 
     const output = await runCommand(`npm run cli publish ${metadataFile}`);
-    const jsonMatch = output.match(/did:op:[a-f0-9]{64}/);
+    const jsonMatch = output.match(DID_RE);
     if (!jsonMatch) {
       console.error("Raw output:", output);
       throw new Error("Could not find did in the output");
@@ -96,11 +97,27 @@ describe("Ocean CLI Publishing", function () {
     );
 
     const output = await runCommand(`npm run cli publish ${metadataFile}`);
+    // Enterprise/v5 assets mint a `did:ope:` DID. Assert the prefix explicitly
+    // here (the whole point of this case), then capture the DID so a later step
+    // can feed it back and actually exercise the `did:ope:` path end-to-end.
     const jsonMatch = output.match(/did:ope:[a-f0-9]{64}/);
     if (!jsonMatch) {
       console.error("Raw output:", output);
       throw new Error("Could not find did in the output");
     }
+    downloadDatasetV5Did = jsonMatch[0];
+  });
+
+  it("should get DDO using 'npm run cli getDDO' for v5 download dataset", async function () {
+    // Round-trips the enterprise `did:ope:` DID through a later command. getDDO
+    // only resolves metadata (no consume/payment/SSI gate), so it proves the v5
+    // DID flows back in without depending on the asset's policy requirements.
+    const output = await runCommand(
+      `npm run cli getDDO ${downloadDatasetV5Did}`,
+    );
+    expect(output).to.contain(
+      `Resolving Asset with DID: ${downloadDatasetV5Did}`,
+    );
   });
 
   it("should publish a compute dataset using 'npm run cli publish'", async function () {
@@ -115,7 +132,7 @@ describe("Ocean CLI Publishing", function () {
 
     const output = await runCommand(`npm run cli publish ${metadataFile}`);
 
-    const jsonMatch = output.match(/did:op:[a-f0-9]{64}/);
+    const jsonMatch = output.match(DID_RE);
     if (!jsonMatch) {
       console.error("Raw output:", output);
       throw new Error("Could not find did in the output");
@@ -138,7 +155,7 @@ describe("Ocean CLI Publishing", function () {
     }
 
     const output = await runCommand(`npm run cli publishAlgo ${filePath}`);
-    const jsonMatch = output.match(/did:op:[a-f0-9]{64}/);
+    const jsonMatch = output.match(DID_RE);
     if (!jsonMatch) {
       console.error("Raw output:", output);
       throw new Error("Could not find did in the output");
@@ -161,7 +178,7 @@ describe("Ocean CLI Publishing", function () {
     }
 
     const output = await runCommand(`npm run cli publishAlgo ${filePath}`);
-    const jsonMatch = output.match(/did:op:[a-f0-9]{64}/);
+    const jsonMatch = output.match(DID_RE);
     if (!jsonMatch) {
       console.error("Raw output:", output);
       throw new Error("Could not find did in the output");

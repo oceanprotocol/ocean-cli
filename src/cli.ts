@@ -47,6 +47,12 @@ import {
   addChain,
   removeChain,
 } from "./rpcRegistry.js";
+import {
+  loadComputeSpec,
+  loadServiceSpec,
+  ComputeFileInputs,
+  ServiceFileInputs,
+} from "./jobSpec.js";
 
 // Commands usable before any Ocean Node is selected. Everything else is refused by the
 // preAction gate below until `setNode` succeeds. Canonical names only — aliases
@@ -300,6 +306,24 @@ function parsePorts(value: string): number[] {
       }
       return n;
     });
+}
+
+const FROM_JSON_DESCRIPTION =
+  "Read all parameters from a JSON file (see README: 'Start from a JSON file'). " +
+  "Named options passed alongside override the file; positional arguments are not allowed with it.";
+
+// --from-json takes every value from the file; a positional next to it is almost
+// certainly a mistake, so refuse instead of guessing which one wins.
+function rejectPositionalsWithFromJson(
+  commandName: string,
+  positionals: unknown[],
+): void {
+  if (positionals.some((p) => p !== undefined)) {
+    throw new Error(
+      `${commandName}: positional arguments cannot be combined with --from-json. ` +
+        "Put the values in the JSON file, or override single values with named options (e.g. --env, --accept).",
+    );
+  }
 }
 
 // Commander collector for a repeatable `--resource name:amount` option.
@@ -1112,6 +1136,7 @@ export async function createCLI() {
       "--subsidyProviders <list>",
       "Subsidy provider contract addresses (comma-separated) to claim against. Omit to use the node's defaults; pass 'none' (or empty) to explicitly claim with no subsidy.",
     )
+    .option("--from-json <path>", FROM_JSON_DESCRIPTION)
     .action(
       async (
         datasetDids,
@@ -1125,16 +1150,42 @@ export async function createCLI() {
         algoServiceId,
         options,
       ) => {
-        const dsDids = options.datasets || datasetDids;
-        const aDid = options.algo || algoDid;
-        // Fall back to the env remembered by setNodeEnv when none is given explicitly.
-        const envId = options.env || computeEnvId || getCurrentEnvId();
-        const jobDuration = options.maxJobDuration || maxJobDuration;
-        const token = options.token || paymentToken;
-        const res = options.resources || resources;
-        const outputLocation = options.output || output;
-        const svcIds = options.services ?? serviceIds ?? "";
-        const algoSvcId = options.algoService ?? algoServiceId ?? "";
+        let file: ComputeFileInputs | undefined;
+        if (options.fromJson !== undefined) {
+          rejectPositionalsWithFromJson("startCompute", [
+            datasetDids,
+            algoDid,
+            computeEnvId,
+            maxJobDuration,
+            paymentToken,
+            resources,
+            output,
+            serviceIds,
+            algoServiceId,
+          ]);
+          // Throws a plain Error listing every problem; nothing has touched the network yet.
+          file = loadComputeSpec(options.fromJson, { free: false });
+        }
+
+        // Precedence: named option > positional > JSON file > (env only) setNodeEnv.
+        const dsDids = options.datasets || datasetDids || file?.dsDids;
+        const aDid = options.algo || algoDid || file?.aDid;
+        const envId =
+          options.env || computeEnvId || file?.envId || getCurrentEnvId();
+        const jobDuration =
+          options.maxJobDuration || maxJobDuration || file?.jobDuration;
+        const token = options.token || paymentToken || file?.token;
+        const res = options.resources || resources || file?.res;
+        const outputLocation = options.output || output || file?.outputLocation;
+        const svcIds = options.services ?? serviceIds ?? file?.svcIds ?? "";
+        const algoSvcId =
+          options.algoService ?? algoServiceId ?? file?.algoSvcId ?? "";
+
+        if (file && !envId) {
+          throw new Error(
+            'No compute environment: set "env" in the JSON file, pass --env <id>, or select one with setNodeEnv.',
+          );
+        }
 
         // A compute env id is never a bare number, so a numeric positional here almost
         // always means the user omitted the env (relying on setNodeEnv) and let the next
@@ -1184,7 +1235,10 @@ export async function createCLI() {
         // initialization and the payment prompt.
         let subsidyProviders: string[] | undefined;
         try {
-          subsidyProviders = parseSubsidyProviders(options.subsidyProviders);
+          subsidyProviders =
+            options.subsidyProviders !== undefined
+              ? parseSubsidyProviders(options.subsidyProviders)
+              : file?.subsidyProviders;
         } catch (e) {
           console.error(
             chalk.red(`Invalid --subsidyProviders: ${(e as Error).message}`),
@@ -1200,7 +1254,7 @@ export async function createCLI() {
         // the compute methods.
         let paymentChainId: number;
         try {
-          paymentChainId = resolveChainId(options.chainId);
+          paymentChainId = resolveChainId(options.chainId ?? file?.chainId);
         } catch (e) {
           console.error(chalk.red((e as Error).message));
           return;
@@ -1218,7 +1272,6 @@ export async function createCLI() {
           svcIds,
           algoSvcId,
         ];
-        console.log("initArgs:", initArgs);
         const initResp = await commands.initializeCompute(
           initArgs,
           paymentChainId,
@@ -1261,7 +1314,7 @@ export async function createCLI() {
         }
         console.log(chalk.yellow(`  you pay: ${youPay}`));
 
-        const proceed = options.accept;
+        const proceed = options.accept ?? file?.accept;
         if (!proceed) {
           if (!process.stdin.isTTY) {
             console.error(
@@ -1363,6 +1416,7 @@ export async function createCLI() {
       "--chainId <chainId>",
       "Chain to sign the free compute request on (defaults to the active chain). A free env does no ordering or payment.",
     )
+    .option("--from-json <path>", FROM_JSON_DESCRIPTION)
     .action(
       async (
         datasetDids,
@@ -1373,13 +1427,34 @@ export async function createCLI() {
         algoServiceId,
         options,
       ) => {
-        const dsDids = options.datasets || datasetDids;
-        const aDid = options.algo || algoDid;
+        let file: ComputeFileInputs | undefined;
+        if (options.fromJson !== undefined) {
+          rejectPositionalsWithFromJson("startFreeCompute", [
+            datasetDids,
+            algoDid,
+            computeEnvId,
+            output,
+            serviceIds,
+            algoServiceId,
+          ]);
+          file = loadComputeSpec(options.fromJson, { free: true });
+        }
+
+        const dsDids = options.datasets || datasetDids || file?.dsDids;
+        const aDid = options.algo || algoDid || file?.aDid;
         // Fall back to the env remembered by setNodeEnv when none is given explicitly.
-        const envId = options.env || computeEnvId || getCurrentEnvId();
-        const outputLocation = options.output || output;
-        const svcIds = options.services ?? serviceIds ?? "";
-        const algoSvcId = options.algoService ?? algoServiceId ?? "";
+        const envId =
+          options.env || computeEnvId || file?.envId || getCurrentEnvId();
+        const outputLocation = options.output || output || file?.outputLocation;
+        const svcIds = options.services ?? serviceIds ?? file?.svcIds ?? "";
+        const algoSvcId =
+          options.algoService ?? algoServiceId ?? file?.algoSvcId ?? "";
+
+        if (file && !envId) {
+          throw new Error(
+            'No compute environment: set "env" in the JSON file, pass --env <id>, or select one with setNodeEnv.',
+          );
+        }
 
         if (!dsDids || !aDid || !envId) {
           console.error(chalk.red("Missing required arguments"));
@@ -1413,7 +1488,11 @@ export async function createCLI() {
         const commands = new Commands(signer, chainId);
         // Free compute is single-chain signing only (no ordering/escrow): route the
         // signer onto `--chainId` → default, exactly like a category (c) command.
-        if ((await routeExplicit(commands, options.chainId)) === null) return;
+        if (
+          (await routeExplicit(commands, options.chainId ?? file?.chainId)) ===
+          null
+        )
+          return;
         await commands.freeComputeStart([
           null,
           dsDids,
@@ -1559,11 +1638,12 @@ export async function createCLI() {
       "Starts an on-demand service (long-running container) on a compute environment, paid via escrow",
     )
     .argument(
-      "<computeEnvId>",
+      "[computeEnvId]",
       "Compute environment ID (must have services enabled)",
     )
-    .argument("<duration>", "Requested duration in seconds", parseInt)
-    .argument("<paymentToken>", "Payment token address")
+    .argument("[duration]", "Requested duration in seconds", parseInt)
+    .argument("[paymentToken]", "Payment token address")
+    .option("-e, --env <computeEnvId>", "Compute environment ID")
     .option(
       "--template <templateId>",
       "Start from an operator-published template",
@@ -1630,24 +1710,66 @@ export async function createCLI() {
       "--subsidyProviders <list>",
       "Subsidy provider contract addresses (comma-separated) to claim against. Omit for node defaults; 'none' (or empty) for no subsidy.",
     )
-    .action(async (computeEnvId, duration, paymentToken, options) => {
-      const envId = options.env || computeEnvId;
-      const token = paymentToken;
-      if (!envId || !duration || !token) {
+    .option("--from-json <path>", FROM_JSON_DESCRIPTION)
+    .action(async (computeEnvId, duration, paymentToken, options, command) => {
+      let file: ServiceFileInputs | undefined;
+      if (options.fromJson !== undefined) {
+        rejectPositionalsWithFromJson("startService", [
+          computeEnvId,
+          duration,
+          paymentToken,
+        ]);
+        file = loadServiceSpec(options.fromJson);
+
+        // Mutually exclusive groups: a command-line option replaces the whole group
+        // from the file, so "--image x" can override a file that names a template.
+        if (options.template !== undefined || options.image !== undefined) {
+          file.templateId = undefined;
+          file.image = undefined;
+        }
+        if (
+          options.tag !== undefined ||
+          options.checksum !== undefined ||
+          options.dockerfile !== undefined
+        ) {
+          file.tag = undefined;
+          file.checksum = undefined;
+          file.dockerfilePath = undefined;
+        }
+        if (options.additionalDockerFiles !== undefined) {
+          file.additionalDockerFiles = undefined;
+          file.additionalDockerFilesPath = undefined;
+        }
+        if (
+          options.userData !== undefined ||
+          options.userDataFile !== undefined
+        ) {
+          file.userDataInline = undefined;
+          file.userDataFilePath = undefined;
+        }
+      }
+
+      const envId = options.env || computeEnvId || file?.envId;
+      const serviceDuration = duration ?? file?.duration;
+      const token = paymentToken || file?.paymentToken;
+      const templateId = options.template ?? file?.templateId;
+      const image = options.image ?? file?.image;
+
+      if (!envId || !serviceDuration || !token) {
         console.error(
           chalk.red(
-            "Missing required arguments: <computeEnvId> <duration> <paymentToken>",
+            "Missing required arguments: <computeEnvId> <duration> <paymentToken> (or pass --from-json <file>)",
           ),
         );
         return;
       }
-      if (!Number.isInteger(duration) || duration <= 0) {
+      if (!Number.isInteger(serviceDuration) || serviceDuration <= 0) {
         console.error(
           chalk.red("Duration must be a positive integer number of seconds."),
         );
         return;
       }
-      if (options.template && options.image) {
+      if (templateId && image) {
         console.error(
           chalk.red("Provide either --template or --image, not both."),
         );
@@ -1663,36 +1785,49 @@ export async function createCLI() {
         if (options.cmd) cmd = parseJsonStringArray("--cmd", options.cmd);
         if (options.entrypoint)
           entrypoint = parseJsonStringArray("--entrypoint", options.entrypoint);
-        subsidyProviders = parseSubsidyProviders(options.subsidyProviders);
+        subsidyProviders =
+          options.subsidyProviders !== undefined
+            ? parseSubsidyProviders(options.subsidyProviders)
+            : file?.subsidyProviders;
       } catch (e) {
         console.error(chalk.red((e as Error).message));
         return;
       }
 
+      // --wait has a Commander default (true), so options.wait is always set. Only let it
+      // beat the file when the user actually typed it.
+      const waitFromCli = command.getOptionValueSource("wait") === "cli";
+
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
-      // Services are single-chain: --chainId (→ default) is the payment/escrow chain, and
+      // Services are single-chain: --chainId (→ file → default) is the payment/escrow chain, and
       // must be registered here; startService additionally checks it is one the env prices on.
-      if ((await routeExplicit(commands, options.chainId)) === null) return;
+      if (
+        (await routeExplicit(commands, options.chainId ?? file?.chainId)) ===
+        null
+      )
+        return;
       await commands.startService({
         envId,
-        duration,
+        duration: serviceDuration,
         paymentToken: token,
-        templateId: options.template,
-        image: options.image,
-        tag: options.tag,
-        checksum: options.checksum,
-        dockerfilePath: options.dockerfile,
-        additionalDockerFilesPath: options.additionalDockerFiles,
-        cmd,
-        entrypoint,
-        ports,
-        resources: options.resources,
-        userDataInline: options.userData,
-        userDataFilePath: options.userDataFile,
-        accept: options.accept,
-        wait: options.wait,
-        timeout: options.timeout,
+        templateId,
+        image,
+        tag: options.tag ?? file?.tag,
+        checksum: options.checksum ?? file?.checksum,
+        dockerfilePath: options.dockerfile ?? file?.dockerfilePath,
+        additionalDockerFilesPath:
+          options.additionalDockerFiles ?? file?.additionalDockerFilesPath,
+        additionalDockerFiles: file?.additionalDockerFiles,
+        cmd: cmd ?? file?.cmd,
+        entrypoint: entrypoint ?? file?.entrypoint,
+        ports: ports ?? file?.ports,
+        resources: options.resources ?? file?.resources,
+        userDataInline: options.userData ?? file?.userDataInline,
+        userDataFilePath: options.userDataFile ?? file?.userDataFilePath,
+        accept: options.accept ?? file?.accept,
+        wait: waitFromCli ? options.wait : (file?.wait ?? options.wait),
+        timeout: options.timeout ?? file?.timeout,
         subsidyProviders,
       });
     });

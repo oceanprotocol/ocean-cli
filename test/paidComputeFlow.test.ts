@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import path from "path";
 import fs from "fs";
-import { homedir } from "os";
+import os, { homedir } from "os";
 import { ProviderInstance } from "@oceanprotocol/lib";
 import { projectRoot, runCommand } from "./util.js";
 
@@ -237,5 +237,30 @@ describe("Ocean CLI Paid Compute", function () {
     expect(files.length).to.be.greaterThan(0, "No result files downloaded");
     console.log(`Downloaded results to: ${destFolder}`);
     fs.rmSync(path.join(projectRoot, "test-results"), { recursive: true });
+  });
+
+  it("should start paid compute from a JSON file with --from-json", async function () {
+    const specPath = path.join(os.tmpdir(), `ocean-cli-job-${Date.now()}.json`);
+    fs.writeFileSync(
+      specPath,
+      JSON.stringify({
+        datasets: [computeDatasetDid],
+        algorithm: jsAlgoDid,
+        env: computeEnvId,
+        maxJobDuration: 900,
+        paymentToken: getAddresses().Ocean,
+        resources: [],
+        accept: true,
+      }),
+    );
+    try {
+      const output = await runCommand(
+        `npm run cli -- startCompute --from-json ${specPath}`,
+      );
+      expect(output, "no JobID in output").to.match(/JobID:\s*([^\s]+)/);
+      expect(output).to.not.contain("initArgs:");
+    } finally {
+      fs.rmSync(specPath, { force: true });
+    }
   });
 });

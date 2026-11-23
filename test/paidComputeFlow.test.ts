@@ -216,7 +216,7 @@ describe("Ocean CLI Paid Compute", function () {
 
   it("should get job status", async () => {
     const output = await runCommand(
-      `npm run cli getJobStatus ${computeDatasetDid} ${computeJobId} ''`,
+      `npm run cli getJobStatus ${computeJobId}`,
     );
     expect(output).to.contain(computeJobId);
     expect(output.toLowerCase()).to.match(/status/);

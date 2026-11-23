@@ -1841,21 +1841,10 @@ export class Commands {
   }
 
   public async computeStop(args: string[]) {
-    const dataDdo = await this.aquarius.waitForIndexer(
-      args[1],
-      null,
-      null,
-      this.indexingParams.retryInterval,
-      this.indexingParams.maxRetries,
-    );
-    if (!dataDdo) {
-      console.error(
-        "Error fetching DDO " + args[1] + ".  Does this asset exists?",
-      );
-      return;
-    }
-
-    const jobId = args[2];
+    // args[1] - jobId
+    // The node only needs the job id to stop a job; no dataset DID is resolved
+    // here (same legacy requirement that getJobStatus carried).
+    const jobId = args[1];
     const jobStatus = await ProviderInstance.computeStop(
       jobId,
       this.oceanNodeUrl,
@@ -3118,35 +3107,19 @@ export class Commands {
   }
 
   public async getJobStatus(args: string[]) {
-    // args[1] - did (for checking if data asset exists, legacy)
-    // args[2] - jobId
-    // args[3] - agreementId
-    const hasAgreementId = args.length === 4;
-
-    const dataDdo = await this.aquarius.waitForIndexer(
-      args[1],
-      null,
-      null,
-      this.indexingParams.retryInterval,
-      this.indexingParams.maxRetries,
-    );
-    if (!dataDdo) {
-      console.error(
-        "Error fetching DDO " + args[1] + ".  Does this asset exists?",
-      );
-      return;
-    }
-    const jobId = args[2];
-    let agreementId = null;
-    if (hasAgreementId) {
-      agreementId = args[3];
-    }
+    // args[1] - jobId
+    // The node only needs the job id to report status, so no dataset DID is
+    // resolved here. Jobs started without a DID-based dataset (raw code or raw
+    // fileObject algorithms) have no DID to resolve, and the old legacy
+    // waitForIndexer lookup both forced one and blocked for the full indexing
+    // wait before calling the node.
+    const jobId = args[1];
 
     const jobStatus = (await ProviderInstance.computeStatus(
       this.oceanNodeUrl,
       this.signer,
       jobId,
-      agreementId,
+      null,
     )) as ComputeJob;
     console.log(util.inspect(jobStatus, false, null, true));
   }

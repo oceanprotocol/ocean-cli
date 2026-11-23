@@ -164,9 +164,9 @@ ocean-cli getComputeEnvironments [nodeUrlOrPeerId]           # alias getC2DEnvs;
 ocean-cli searchComputeResources --cpu 4 --ram 16 --paid --chain 8996 --order-by price   # alias findComputeNodes
 ocean-cli startCompute --accept true -- did1,did2 algoDid env1 3600 0xPaymentToken '[{"id":"cpu","amount":1}]'
 ocean-cli startFreeCompute did1,did2 algoDid env1
-ocean-cli getJobStatus did:op:123 job-123                    # or --dataset --job [--agreement]
+ocean-cli getJobStatus job-123                               # or --job; only a jobId is needed
 ocean-cli downloadJobResults job-123 0 ./results             # positional only (jobId, index, folder)
-ocean-cli stopCompute did:op:123 job-123 <agreementId>       # agreementId is required
+ocean-cli stopCompute job-123                                # or --job; only a jobId is needed
 ocean-cli computeStreamableLogs <jobId>                      # or --job
 ```
 
@@ -333,8 +333,8 @@ ocean-cli mintOcean [--token 0xOcean] [--chainId 8996]     # mint test Ocean tok
 | `getComputeEnvironments` | `getC2DEnvs` | `[node]` | `-n, --node` |
 | `searchComputeResources` | `findComputeNodes` | | `--cpu --ram --disk --gpu --gpu-model --resource --free --paid --both --chain --token --max-price --duration --order-by` |
 | `computeStreamableLogs` | | `[jobId]` | `-j, --job` |
-| `stopCompute` | | `[datasetDid] [jobId] [agreementId]` | `-d, --dataset`, `-j, --job`, `-a, --agreement` |
-| `getJobStatus` | | `[datasetDid] [jobId] [agreementId]` | `-d, --dataset`, `-j, --job`, `-a, --agreement` |
+| `stopCompute` | | `[jobId]` | `-j, --job` |
+| `getJobStatus` | | `[jobId]` | `-j, --job` |
 | `downloadJobResults` | | `<jobId> <index> [folder]` | |
 | `getServiceTemplates` | `serviceTemplates` | `[node]` | `-n, --node` |
 | `startService` | | `<computeEnvId> <duration> <paymentToken>` | `--template`, `-i, --image`, `--tag`, `--checksum`, `--dockerfile`, `--additional-docker-files`, `--cmd`, `--entrypoint`, `-p, --ports`, `-r, --resources`, `-u, --user-data`, `--user-data-file`, `--accept`, `--wait`, `--timeout`, `--chainId`, `--subsidyProviders` |

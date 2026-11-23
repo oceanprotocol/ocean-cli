@@ -118,6 +118,10 @@ describe("Ocean CLI Publishing", function () {
     expect(output).to.contain(
       `Resolving Asset with DID: ${downloadDatasetV5Did}`,
     );
+    // The "Resolving..." line is printed before resolution, so it alone would
+    // also pass if the lookup then failed. Assert the failure marker is absent
+    // so this genuinely proves the v5 DID resolved.
+    expect(output).to.not.contain("Error fetching Asset with DID:");
   });
 
   it("should publish a compute dataset using 'npm run cli publish'", async function () {

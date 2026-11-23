@@ -119,9 +119,11 @@ describe("Ocean CLI Publishing", function () {
       `Resolving Asset with DID: ${downloadDatasetV5Did}`,
     );
     // The "Resolving..." line is printed before resolution, so it alone would
-    // also pass if the lookup then failed. Assert the failure marker is absent
-    // so this genuinely proves the v5 DID resolved.
-    expect(output).to.not.contain("Error fetching Asset with DID:");
+    // also pass if the lookup then failed. getDDO prints the resolved DDO body
+    // to stdout only on success, so assert on content that lives in that body:
+    // the asset name from the v5 fixture's metadata. This proves the v5 DID
+    // actually resolved, not just that the command started.
+    expect(output).to.contain("DigitalPMO");
   });
 
   it("should publish a compute dataset using 'npm run cli publish'", async function () {

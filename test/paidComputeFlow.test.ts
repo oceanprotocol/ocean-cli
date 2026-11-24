@@ -3,7 +3,7 @@ import path from "path";
 import fs from "fs";
 import os, { homedir } from "os";
 import { ProviderInstance } from "@oceanprotocol/lib";
-import { projectRoot, runCommand } from "./util.js";
+import { projectRoot, runCommand, DID_RE } from "./util.js";
 
 describe("Ocean CLI Paid Compute", function () {
   this.timeout(600000); // Set a longer timeout to allow the command to execute
@@ -49,7 +49,7 @@ describe("Ocean CLI Paid Compute", function () {
 
     const output = await runCommand(`npm run cli publish ${metadataFile}`);
 
-    const jsonMatch = output.match(/did:op:[a-f0-9]{64}/);
+    const jsonMatch = output.match(DID_RE);
     if (!jsonMatch) {
       console.error("Raw output:", output);
       throw new Error("Could not find compute dataset did in the output");
@@ -73,7 +73,7 @@ describe("Ocean CLI Paid Compute", function () {
 
     const output = await runCommand(`npm run cli publishAlgo ${filePath}`);
 
-    const jsonMatch = output.match(/did:op:[a-f0-9]{64}/);
+    const jsonMatch = output.match(DID_RE);
     if (!jsonMatch) {
       console.error("Raw output:", output);
       throw new Error("Could not find algo did in the output");

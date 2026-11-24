@@ -1185,7 +1185,7 @@ export async function createCLI() {
         const token = options.token || paymentToken || file?.token;
         const res = options.resources || resources || file?.res;
         const outputLocation =
-          optStr(options.output) || output || file?.outputLocation;
+          optStr(options.output) ?? output ?? file?.outputLocation;
         const svcIds =
           optStr(options.services) ?? serviceIds ?? file?.svcIds ?? "";
         const algoSvcId =
@@ -1456,7 +1456,7 @@ export async function createCLI() {
         const envId =
           options.env || computeEnvId || file?.envId || getCurrentEnvId();
         const outputLocation =
-          optStr(options.output) || output || file?.outputLocation;
+          optStr(options.output) ?? output ?? file?.outputLocation;
         const svcIds =
           optStr(options.services) ?? serviceIds ?? file?.svcIds ?? "";
         const algoSvcId =

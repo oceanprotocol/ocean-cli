@@ -2212,6 +2212,7 @@ export class Commands {
     checksum?: string;
     dockerfilePath?: string;
     additionalDockerFilesPath?: string;
+    additionalDockerFiles?: Record<string, string>;
     cmd?: string[];
     entrypoint?: string[];
     ports?: number[];
@@ -2315,7 +2316,9 @@ export class Commands {
           return;
         }
       }
-      if (opts.additionalDockerFilesPath) {
+      if (opts.additionalDockerFiles) {
+        additionalDockerFiles = opts.additionalDockerFiles;
+      } else if (opts.additionalDockerFilesPath) {
         try {
           additionalDockerFiles = JSON.parse(
             fs.readFileSync(opts.additionalDockerFilesPath, "utf8"),

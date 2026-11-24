@@ -1,0 +1,10 @@
+{
+  "env": "REPLACE_WITH_ENV_ID",
+  "duration": 3600,
+  "paymentToken": "0x0000000000000000000000000000000000000001",
+  "image": "nginxinc/nginx-unprivileged",
+  "tag": "alpine",
+  "ports": [8080],
+  "chainId": 8996,
+  "accept": false
+}

@@ -92,4 +92,31 @@ describe("--from-json CLI wiring (no infra)", function () {
     const { output } = await runRepl(["startCompute", "exit"]);
     expect(output).to.contain("Missing required arguments");
   });
+
+  it("9 a bare -s / -o flag does not crash (treated as absent)", async () => {
+    // "-s, --services [serviceIds]" / "-o, --output [output]" take an optional value, so a bare
+    // flag sets the option to boolean `true`. That must not win over the file's value and reach
+    // `.split(...)` / JSON handling as `true` (regression: a TypeError aborted the command).
+    const file = path.join(tmpDir, "bare-flags.json");
+    fs.writeFileSync(
+      file,
+      JSON.stringify({
+        datasets: ["did:op:a"],
+        algorithm: "did:op:b",
+        env: "env-1",
+        maxJobDuration: 900,
+        paymentToken: "0x0000000000000000000000000000000000000001",
+        resources: [],
+        serviceIds: ["svc0"],
+      }),
+    );
+    const { output } = await runRepl([
+      "startCompute --from-json " + file + " -s -o",
+      "exit",
+    ]);
+    // No TypeError from `true.split(...)` or from forwarding `true` as the output location: the
+    // bare flags fall through to the file, and the command only fails later at the unreachable node.
+    expect(output).to.not.contain("is not a function");
+    expect(output).to.not.contain("Missing required arguments");
+  });
 });

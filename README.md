@@ -245,8 +245,11 @@ ocean-cli startService --from-json ./jupyter.json
 - Values are native JSON (arrays, objects, numbers), not stringified JSON.
 - The whole file is validated before anything is sent; every problem is listed at once and the
   command exits with status 1. Unknown keys are errors.
-- A named option on the command line overrides the file. Positional arguments cannot be used
-  together with `--from-json`.
+- A named option on the command line overrides the matching value from the file. The file is still
+  validated as a complete spec on its own **before** the command line is merged in, so every key
+  marked **Required** below must be present in the file even when you also pass its option — an
+  option overrides a value, it does not fill in a missing required one. Positional arguments cannot
+  be used together with `--from-json`.
 - Paths inside the file (`dockerfile`, `additionalDockerFiles`, `userDataFile`) are relative to
   the JSON file's folder. These files are read and their contents sent to the node, so only run
   `--from-json` on a job file you trust — a file authored by someone else could point a path field

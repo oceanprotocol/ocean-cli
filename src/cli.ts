@@ -331,6 +331,14 @@ function collectResource(value: string, previous: string[]): string[] {
   return previous.concat([value]);
 }
 
+// Options declared with an optional value (e.g. "-s, --services [serviceIds]") are set to the
+// boolean `true` when the flag is passed with no value. Coerce any non-string to undefined so a
+// bare flag falls through to the positional / file value instead of becoming `true` (which would
+// later blow up on `.split(...)` or be forwarded as a bogus output location).
+function optStr(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
+
 // Run the interactive resource-search wizard, but only when we have a TTY — a wizard with
 // no stdin would hang. In a non-interactive context, tell the user to pass filter flags.
 async function runResourceWizard(chainId: number) {
@@ -1176,10 +1184,12 @@ export async function createCLI() {
           options.maxJobDuration || maxJobDuration || file?.jobDuration;
         const token = options.token || paymentToken || file?.token;
         const res = options.resources || resources || file?.res;
-        const outputLocation = options.output || output || file?.outputLocation;
-        const svcIds = options.services ?? serviceIds ?? file?.svcIds ?? "";
+        const outputLocation =
+          optStr(options.output) || output || file?.outputLocation;
+        const svcIds =
+          optStr(options.services) ?? serviceIds ?? file?.svcIds ?? "";
         const algoSvcId =
-          options.algoService ?? algoServiceId ?? file?.algoSvcId ?? "";
+          optStr(options.algoService) ?? algoServiceId ?? file?.algoSvcId ?? "";
 
         if (file && !envId) {
           throw new Error(
@@ -1445,10 +1455,12 @@ export async function createCLI() {
         // Fall back to the env remembered by setNodeEnv when none is given explicitly.
         const envId =
           options.env || computeEnvId || file?.envId || getCurrentEnvId();
-        const outputLocation = options.output || output || file?.outputLocation;
-        const svcIds = options.services ?? serviceIds ?? file?.svcIds ?? "";
+        const outputLocation =
+          optStr(options.output) || output || file?.outputLocation;
+        const svcIds =
+          optStr(options.services) ?? serviceIds ?? file?.svcIds ?? "";
         const algoSvcId =
-          options.algoService ?? algoServiceId ?? file?.algoSvcId ?? "";
+          optStr(options.algoService) ?? algoServiceId ?? file?.algoSvcId ?? "";
 
         if (file && !envId) {
           throw new Error(
@@ -1723,9 +1735,21 @@ export async function createCLI() {
 
         // Mutually exclusive groups: a command-line option replaces the whole group
         // from the file, so "--image x" can override a file that names a template.
+        // --template / --image switch the container source outright, so they also drop
+        // every file-supplied image modifier (tag, checksum, dockerfile, extra docker
+        // files, cmd, entrypoint, ports). Otherwise those would silently re-apply on top
+        // of the new source (e.g. the old image's tag/cmd layered onto the new template).
         if (options.template !== undefined || options.image !== undefined) {
           file.templateId = undefined;
           file.image = undefined;
+          file.tag = undefined;
+          file.checksum = undefined;
+          file.dockerfilePath = undefined;
+          file.additionalDockerFiles = undefined;
+          file.additionalDockerFilesPath = undefined;
+          file.cmd = undefined;
+          file.entrypoint = undefined;
+          file.ports = undefined;
         }
         if (
           options.tag !== undefined ||

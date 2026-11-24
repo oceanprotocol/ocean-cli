@@ -1,0 +1,11 @@
+{
+  "env": "REPLACE_WITH_ENV_ID",
+  "duration": 3600,
+  "paymentToken": "0x0000000000000000000000000000000000000001",
+  "template": "jupyter-cpu",
+  "userData": { "JUPYTER_TOKEN": "REPLACE_ME" },
+  "chainId": 8996,
+  "accept": false,
+  "wait": true,
+  "timeout": 600
+}

@@ -1,0 +1,14 @@
+{
+  "datasets": ["did:op:REPLACE_WITH_DATASET_DID"],
+  "algorithm": "did:op:REPLACE_WITH_ALGORITHM_DID",
+  "env": "REPLACE_WITH_ENV_ID_FROM_getComputeEnvironments",
+  "maxJobDuration": 900,
+  "paymentToken": "0x0000000000000000000000000000000000000001",
+  "resources": [
+    { "id": "cpu", "amount": 1 },
+    { "id": "ram", "amount": 1073741824 },
+    { "id": "disk", "amount": 0 }
+  ],
+  "chainId": 8996,
+  "accept": false
+}

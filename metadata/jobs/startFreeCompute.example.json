@@ -1,0 +1,13 @@
+{
+  "datasets": [
+    {
+      "fileObject": {
+        "type": "url",
+        "url": "https://example.com/data.csv",
+        "method": "GET"
+      }
+    }
+  ],
+  "algorithm": "did:op:REPLACE_WITH_ALGORITHM_DID",
+  "env": "REPLACE_WITH_FREE_ENV_ID"
+}

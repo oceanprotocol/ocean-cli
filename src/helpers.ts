@@ -762,6 +762,37 @@ export function parseSubsidyProviders(raw?: string): string[] | undefined {
   return trimmed.split(",").map((a) => ethers.getAddress(a.trim()));
 }
 
+/**
+ * Resolve the job id for the job-only compute commands (`getJobStatus`,
+ * `stopCompute`) from their positional arguments and `--job` option.
+ *
+ * The node needs only a job id to report or stop a job, so the dataset DID the
+ * CLI used to demand is gone. For backward compatibility the old positional
+ * forms are still accepted and their extra values ignored:
+ *   - `getJobStatus <jobId>`                         (new, canonical)
+ *   - `getJobStatus <datasetDid> <jobId>`            (legacy)
+ *   - `getJobStatus <datasetDid> <jobId> <agreement>`(legacy)
+ * A leading positional that looks like a DID (`did:…`) is dropped; the first
+ * remaining positional is the job id. `--job` always wins over positionals.
+ * Pure; returns `undefined` when no job id can be determined.
+ */
+export function resolveJobId(
+  pos1?: string,
+  pos2?: string,
+  pos3?: string,
+  options?: { job?: string },
+): string | undefined {
+  if (options?.job) return options.job;
+  const positionals = [pos1, pos2, pos3].filter(
+    (v): v is string => v !== undefined && v !== "",
+  );
+  // Legacy form led with a dataset DID; it is not needed to query the node.
+  if (positionals.length > 0 && positionals[0].startsWith("did:")) {
+    positionals.shift();
+  }
+  return positionals[0];
+}
+
 export interface ResolvedSubsidyProviders {
   /** Provider contracts to query (EIP-55, de-duplicated). */
   addresses: string[];

@@ -15,6 +15,7 @@ import {
   parseComputeInput,
   toBoolean,
   parseSubsidyProviders,
+  resolveJobId,
 } from "./helpers.js";
 import {
   getCurrentNodeUrl,
@@ -1555,52 +1556,40 @@ export async function createCLI() {
   program
     .command("stopCompute")
     .description("Stops a compute job")
-    .argument("[datasetDid]", "Dataset DID")
-    .argument("[jobId]", "Job ID")
-    .argument("[agreementId]", "Agreement ID")
-    .option("-d, --dataset <datasetDid>", "Dataset DID")
+    .argument("[jobId]", "Job ID (a leading dataset DID is accepted but ignored)")
+    .argument("[legacyArg1]", "Ignored (legacy dataset DID / agreement positional)")
+    .argument("[legacyArg2]", "Ignored (legacy agreement positional)")
     .option("-j, --job <jobId>", "Job ID")
-    .option("-a, --agreement [agreementId]", "Agreement ID")
-    .action(async (datasetDid, jobId, agreementId, options) => {
-      const dsDid = options.dataset || datasetDid;
-      const jId = options.job || jobId;
-      const agrId = options.agreement || agreementId;
-      if (!dsDid || !jId) {
+    .action(async (pos1, pos2, pos3, options) => {
+      const jobId = resolveJobId(pos1, pos2, pos3, options);
+      if (!jobId) {
         throw new Error(
-          "A dataset DID and job ID are required. Pass them positionally or with --dataset / --job.",
+          "A job ID is required. Pass it positionally or with --job.",
         );
       }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
-      const args = [null, dsDid, jId];
-      if (agrId) args.push(agrId);
-      await commands.computeStop(args);
+      await commands.computeStop([null, jobId]);
     });
 
   // getJobStatus command
   program
     .command("getJobStatus")
     .description("Displays the compute job status")
-    .argument("[datasetDid]", "Dataset DID")
-    .argument("[jobId]", "Job ID")
-    .argument("[agreementId]", "Agreement ID")
-    .option("-d, --dataset <datasetDid>", "Dataset DID")
+    .argument("[jobId]", "Job ID (a leading dataset DID is accepted but ignored)")
+    .argument("[legacyArg1]", "Ignored (legacy dataset DID / agreement positional)")
+    .argument("[legacyArg2]", "Ignored (legacy agreement positional)")
     .option("-j, --job <jobId>", "Job ID")
-    .option("-a, --agreement [agreementId]", "Agreement ID")
-    .action(async (datasetDid, jobId, agreementId, options) => {
-      const dsDid = options.dataset || datasetDid;
-      const jId = options.job || jobId;
-      const agrId = options.agreement || agreementId;
-      if (!dsDid || !jId) {
+    .action(async (pos1, pos2, pos3, options) => {
+      const jobId = resolveJobId(pos1, pos2, pos3, options);
+      if (!jobId) {
         throw new Error(
-          "A dataset DID and job ID are required. Pass them positionally or with --dataset / --job.",
+          "A job ID is required. Pass it positionally or with --job.",
         );
       }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
-      const args = [null, dsDid, jId];
-      if (agrId) args.push(agrId);
-      await commands.getJobStatus(args);
+      await commands.getJobStatus([null, jobId]);
     });
 
   // downloadJobResults command

@@ -73,7 +73,9 @@ describe("Ocean CLI getConfig / setConfig / unsetConfig", function () {
     const tmp = freshConfigPath("oc-setcfg-");
     const { output } = await runRepl(
       ["setConfig indexing.maxRetries 5", "getConfig indexing.maxRetries", "exit"],
-      { env: { OCEANCLI_CONFIG_PATH: tmp } },
+      // Unset INDEXING_MAX_RETRIES (CI sets it) so the file value is the effective source —
+      // otherwise getConfig correctly reports [env …] and the saved [file] value is shadowed.
+      { env: { OCEANCLI_CONFIG_PATH: tmp, INDEXING_MAX_RETRIES: undefined } },
     );
     const saved = JSON.parse(fs.readFileSync(tmp, "utf-8"));
     expect(saved.indexing.maxRetries).to.equal(5);

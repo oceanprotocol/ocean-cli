@@ -15,7 +15,9 @@ import {
   summarizeComputeEnvFees,
   prefundedLockUnits,
   resolveSubsidyProviderAddresses,
+  mergeSavedSubsidyProviders,
 } from "./helpers.js";
+import { enabledSubsidyProviderAddresses } from "./configStore.js";
 import {
   getConfigFor,
   getSigner,
@@ -960,6 +962,76 @@ export class Commands {
       subsidyProviders,
       lockUnits,
     });
+  }
+
+  // Merge the user's enabled SAVED subsidy providers (config file) for the payment chain
+  // with the node's advertised set, so a job run without an explicit --subsidyProviders flag
+  // still uses the providers the user configured once. An explicit flag (a list or `none`)
+  // wins and the saved list is ignored. Fails soft: a missing/unreadable node status or a
+  // merge that adds nothing falls back to the node defaults (undefined), never blocking a job.
+  public async resolveJobSubsidyProviders(
+    requested: string[] | undefined,
+    paymentChainId: number,
+    // Injectable for unit tests; production callers use the default (live node status).
+    fetchStatus: () => ReturnType<typeof validateNode> = () =>
+      validateNode(getCurrentNodeUrl()),
+  ): Promise<string[] | undefined> {
+    // Explicit flag (a list or `none`/[]) wins — no node call needed.
+    if (requested !== undefined) return requested;
+
+    const savedEnabled = enabledSubsidyProviderAddresses(paymentChainId);
+    if (savedEnabled.length === 0) return undefined;
+
+    const status = await fetchStatus();
+    if (!status) {
+      console.log(
+        chalk.yellow(
+          "Could not read node status to merge saved subsidy providers — using the node defaults.",
+        ),
+      );
+      return undefined;
+    }
+
+    const { providers, filter } = nodeSubsidyInfo(status);
+    const merged = mergeSavedSubsidyProviders(
+      undefined,
+      paymentChainId,
+      providers,
+      filter,
+      savedEnabled,
+    );
+
+    if (merged.added.length) {
+      console.log(
+        chalk.cyan(
+          `Adding saved subsidy provider(s) for chain ${paymentChainId}: ${merged.added.join(
+            ", ",
+          )}.`,
+        ),
+      );
+    }
+    if (merged.droppedByFilter.length) {
+      console.log(
+        chalk.yellow(
+          `Ignoring saved subsidy provider(s) the node does not advertise (its provider filter is on) on chain ${paymentChainId}: ${merged.droppedByFilter.join(
+            ", ",
+          )}.`,
+        ),
+      );
+    }
+    if (
+      merged.effective === undefined &&
+      merged.added.length === 0 &&
+      merged.droppedByFilter.length === 0
+    ) {
+      // All enabled saved providers are already in the node's advertised set.
+      console.log(
+        chalk.gray(
+          `Saved subsidy providers for chain ${paymentChainId} are already advertised by the node — using the node defaults.`,
+        ),
+      );
+    }
+    return merged.effective;
   }
 
   // Base units of the lock that subsidy providers would pre-fund for a paid compute

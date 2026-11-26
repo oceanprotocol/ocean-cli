@@ -1,10 +1,12 @@
 import { Command } from "commander";
 import { Commands } from "./commands.js";
 import fs from "fs";
+import path from "path";
 import { createRequire } from "module";
 import chalk from "chalk";
 import { stdin as input, stdout } from "node:process";
 import { createInterface } from "readline/promises";
+import { getAddress } from "ethers";
 import {
   unitsToAmount,
   isP2pUri,
@@ -47,6 +49,8 @@ import {
   listChains,
   addChain,
   removeChain,
+  clearConfigCache,
+  redactRpcUrl,
 } from "./rpcRegistry.js";
 import {
   loadComputeSpec,
@@ -54,6 +58,34 @@ import {
   ComputeFileInputs,
   ServiceFileInputs,
 } from "./jobSpec.js";
+import {
+  initConfig,
+  configFilePath,
+  configPathProblem,
+  configFileStatus,
+  readConfigFile,
+  isEnvProvided,
+  originalEnvValue,
+  wasHydrated,
+  CONFIG_KEYS,
+  findConfigKey,
+  describeSetting,
+  parseConfigValue,
+  toEnvString,
+  setFileValue,
+  deleteFileValue,
+  updateConfigFile,
+  listFavouriteNodes,
+  addFavouriteNode,
+  removeFavouriteNode,
+  resolveFavouriteRef,
+  normalizeNodeRef,
+  listSubsidyProviders,
+  listAllSubsidyProviders,
+  addSubsidyProvider,
+  removeSubsidyProvider,
+  toggleSubsidyProvider,
+} from "./configStore.js";
 
 // Commands usable before any Ocean Node is selected. Everything else is refused by the
 // preAction gate below until `setNode` succeeds. Canonical names only — aliases
@@ -72,6 +104,64 @@ const NODE_FREE_COMMANDS = new Set([
   "listChains",
   "setChain",
   "getChain",
+  // Configuration file commands — node-free, edit only the local config file.
+  "getConfig",
+  "setConfig",
+  "unsetConfig",
+  // Favourite-node commands — node-free, edit only the local config file.
+  "addFavouriteNode",
+  "listFavouriteNodes",
+  "removeFavouriteNode",
+  // Saved subsidy-provider commands — node-free, edit only the local config file.
+  "addSubsidyProvider",
+  "listSubsidyProviders",
+  "removeSubsidyProvider",
+  "toggleSubsidyProvider",
+]);
+
+// Commands that must work on a fresh install, before any RPC (or signer) is configured:
+// they are how the first chain / setting gets into the config file. Matched against the
+// raw argv[0], so this lists canonical names AND aliases.
+// The keys getConfig/setConfig/unsetConfig accept by name, for the shared "unknown
+// key" error (the per-command rejections of individual keys live in each action).
+function knownConfigKeyError(key: string): Error {
+  return new Error(
+    `Unknown config key "${key}". Known keys: ${[
+      ...CONFIG_KEYS.map((k) => k.key),
+      "rpc",
+      "defaultChainId",
+      "favouriteNodes",
+      "subsidyProviders",
+    ].join(", ")}.`,
+  );
+}
+
+const CONFIG_BOOTSTRAP_COMMANDS = new Set([
+  "addChain",
+  "addRpc",
+  "listChains",
+  "getRpcs",
+  "chains",
+  "getConfig",
+  "showConfig",
+  "setConfig",
+  "unsetConfig",
+  "addFavouriteNode",
+  "addFavoriteNode",
+  "listFavouriteNodes",
+  "listFavoriteNodes",
+  "favourites",
+  "favorites",
+  "removeFavouriteNode",
+  "removeFavoriteNode",
+  "addSubsidyProvider",
+  "addSubsidy",
+  "listSubsidyProviders",
+  "listSubsidy",
+  "removeSubsidyProvider",
+  "removeSubsidy",
+  "toggleSubsidyProvider",
+  "toggleSubsidy",
 ]);
 
 // Topic grouping for the help listing. Purely presentational: it only changes how the command
@@ -91,7 +181,15 @@ interface HelpGroup {
 const HELP_GROUPS: HelpGroup[] = [
   {
     heading: "Node & session",
-    commands: ["setNode", "setNodeEnv", "getNode", "help"],
+    commands: [
+      "setNode",
+      "setNodeEnv",
+      "getNode",
+      "addFavouriteNode",
+      "listFavouriteNodes",
+      "removeFavouriteNode",
+      "help",
+    ],
   },
   {
     heading: "Discover compute providers",
@@ -100,6 +198,10 @@ const HELP_GROUPS: HelpGroup[] = [
   {
     heading: "Chains & RPC",
     commands: ["addChain", "removeChain", "listChains", "setChain", "getChain"],
+  },
+  {
+    heading: "Configuration",
+    commands: ["getConfig", "setConfig", "unsetConfig"],
   },
   {
     heading: "Assets — publish, edit, consume",
@@ -167,7 +269,14 @@ const HELP_GROUPS: HelpGroup[] = [
   },
   {
     heading: "Subsidy providers",
-    commands: ["getSubsidyProviders", "getSubsidyStatus"],
+    commands: [
+      "getSubsidyProviders",
+      "getSubsidyStatus",
+      "addSubsidyProvider",
+      "listSubsidyProviders",
+      "removeSubsidyProvider",
+      "toggleSubsidyProvider",
+    ],
   },
   {
     heading: "Persistent storage (buckets)",
@@ -277,6 +386,25 @@ function printSubsidyInfo(
       info.filter ? "on" : "off"
     }`,
   );
+}
+
+// Print one chain's saved subsidy providers (used by listSubsidyProviders / getConfig).
+// Each entry shows its 1-based number, an [on]/[off] status tag, the address, and the
+// description on its own indented line.
+function printSubsidyProviderChain(
+  chainId: number,
+  list: { address: string; enabled: boolean; description?: string }[],
+): void {
+  console.log(chalk.bold(`Subsidy providers — chain ${chainId}:`));
+  list.forEach((entry, i) => {
+    const tag = entry.enabled
+      ? chalk.green("[on] ")
+      : chalk.gray("[off]");
+    console.log(`  ${i + 1}. ${tag} ${entry.address}`);
+    if (entry.description) {
+      console.log(chalk.gray(`       ${entry.description}`));
+    }
+  });
 }
 
 // Parse a CLI JSON array-of-strings option (e.g. --cmd '["python","app.py"]').
@@ -413,6 +541,20 @@ async function routeExplicit(
   }
 }
 
+// A node/env selection is saved to the config file, but an env var set by the user still
+// wins on the next start — say so instead of letting the saved value look ignored later.
+function warnIfEnvShadows(envVar: string, saved: string): void {
+  const original = originalEnvValue(envVar);
+  if (isEnvProvided(envVar) && original !== saved) {
+    console.log(
+      chalk.yellow(
+        `Saved to ${configFilePath()}, but ${envVar} is set in your environment (${original}) ` +
+          `and will take precedence on the next start.`,
+      ),
+    );
+  }
+}
+
 export async function createCLI() {
   // A pure help/version invocation must work with no configuration at all (a
   // globally installed binary is expected to answer `--help`/`--version`
@@ -427,35 +569,86 @@ export async function createCLI() {
     argv[0] === "help" ||
     argv[0] === "h";
 
+  // Load the config file and hydrate process.env from it BEFORE any validation, and
+  // before ocean.js ConfigHelper can read ADDRESS_FILE. Pure local I/O; never throws.
+  // On a pure help/version run the one-time legacy rpc.json import is skipped so
+  // `ocean-cli --help` never writes a file (hydration itself has no side effects).
+  initConfig(!isHelpOrVersion);
+
+  const isBootstrap = argv.length > 0 && CONFIG_BOOTSTRAP_COMMANDS.has(argv[0]);
+  // Bare interactive start (no command, REPL mode): let the user in so they can addChain.
+  const isBareLoopStart =
+    argv.length === 0 && process.env.AVOID_LOOP_RUN !== "true";
+
   if (!isHelpOrVersion) {
-    if (!process.env.MNEMONIC && !process.env.PRIVATE_KEY) {
+    const pathProblem = configPathProblem();
+    if (pathProblem) {
+      console.error(chalk.red(pathProblem));
+      process.exit(1);
+    }
+    if (
+      !isBootstrap &&
+      !isBareLoopStart &&
+      !process.env.MNEMONIC &&
+      !process.env.PRIVATE_KEY
+    ) {
       console.error(
         chalk.red("Have you forgot to set MNEMONIC or PRIVATE_KEY?"),
       );
       process.exit(1);
     }
-    if (!process.env.RPC) {
-      console.error(chalk.red("Have you forgot to set env RPC?"));
-      process.exit(1);
+    const fileHasChains =
+      Object.keys(readConfigFile().rpc ?? {}).length > 0;
+    if (!process.env.RPC && !fileHasChains) {
+      if (isBootstrap || isBareLoopStart) {
+        console.log(
+          chalk.yellow(
+            "No RPC configured yet. Add one with `addChain <chainId> <rpcUrl>` (it is saved to the config file).",
+          ),
+        );
+      } else {
+        console.error(chalk.red("Have you forgot to set env RPC?"));
+        console.error(
+          chalk.yellow(
+            "Set RPC, or save one to the config file with: addChain <chainId> <rpcUrl>",
+          ),
+        );
+        process.exit(1);
+      }
     }
     // Validate the RPC shape (single URL or JSON map keyed by chainId) up front, so a
     // malformed value fails fast with a clear, example-bearing message instead of deep
     // inside the first command. Pure parse — no providers built, no network touched.
-    try {
-      parseRpcEnv(process.env.RPC);
-    } catch (e) {
-      console.error(chalk.red((e as Error).message));
-      process.exit(1);
+    if (process.env.RPC) {
+      try {
+        parseRpcEnv(process.env.RPC);
+      } catch (e) {
+        console.error(chalk.red((e as Error).message));
+        process.exit(1);
+      }
     }
   }
 
   // NODE_URL is optional: without it the CLI still starts, but only the commands in
   // NODE_FREE_COMMANDS are accepted until `setNode` picks a node (see the gate below).
   if (!isHelpOrVersion) {
-    if (process.env.DISABLE_P2P === "true" && isP2pUri(getCurrentNodeUrl())) {
+    // A saved P2P node plus DISABLE_P2P is a contradiction: no node-using command could
+    // reach it. Exit for those — but NOT for the config/bootstrap commands or a bare REPL
+    // start, which touch only the local config file and are the only way to escape the
+    // deadlock (e.g. `unsetConfig nodeUrl`, `setNode <http-url>`). Blocking them too would
+    // leave hand-editing the JSON as the user's only recourse.
+    if (
+      !isBootstrap &&
+      !isBareLoopStart &&
+      process.env.DISABLE_P2P === "true" &&
+      isP2pUri(getCurrentNodeUrl())
+    ) {
+      const src = (v: string) => (wasHydrated(v) ? "config file" : "environment");
       console.error(
         chalk.red(
-          "NODE_URL is a P2P URI but DISABLE_P2P=true — no command could reach it.",
+          `The node (${getCurrentNodeUrl()}, from ${src("NODE_URL")}) is a P2P URI but P2P is disabled ` +
+            `(DISABLE_P2P=true, from ${src("DISABLE_P2P")}) — no command could reach it. ` +
+            `Change one of them (e.g. 'unsetConfig nodeUrl' or 'setNode <http-url>').`,
         ),
       );
       process.exit(1);
@@ -480,7 +673,8 @@ export async function createCLI() {
       if (status) {
         console.log(
           chalk.green(
-            `Using node ${getCurrentNodeUrl()} (version ${status.version})`,
+            `Using node ${getCurrentNodeUrl()} (version ${status.version})` +
+              (wasHydrated("NODE_URL") ? " [from config file]" : ""),
           ),
         );
       } else {
@@ -541,16 +735,33 @@ export async function createCLI() {
     .command("setNode")
     .alias("useNode")
     .description(
-      "Sets / switches the Ocean Node used by subsequent commands, without restarting",
+      "Sets / switches the Ocean Node used by subsequent commands, without restarting (saved to the config file)",
     )
-    .argument("[nodeUrl]", "HTTP(S) URL, peer id or full multiaddr of the node")
+    .argument(
+      "[nodeUrl]",
+      "HTTP(S) URL, peer id, full multiaddr, or a favourite number from listFavouriteNodes",
+    )
     .option("-n, --node <nodeUrl>", "Ocean Node to use")
     .action(async (nodeUrl, options) => {
-      const target = options.node || nodeUrl;
+      let target = options.node || nodeUrl;
       if (!target) {
         throw new Error(
           "A node is required. Pass it positionally or with --node (URL / peer id / multiaddr).",
         );
+      }
+      // `setNode 2` selects favourite #2 from listFavouriteNodes. A node URL / peer id is
+      // never all digits, so this cannot shadow a real node reference.
+      if (/^\d+$/.test(target)) {
+        const favourites = listFavouriteNodes();
+        const idx = resolveFavouriteRef(target, favourites);
+        if (idx < 0) {
+          throw new Error(
+            `No favourite node #${target}. Run listFavouriteNodes to see the saved ones ` +
+              `(${favourites.length} saved).`,
+          );
+        }
+        target = favourites[idx].node;
+        console.log(chalk.cyan(`Favourite #${idx + 1}: ${target}`));
       }
       const previous = getCurrentNodeUrl();
       if (target === previous) {
@@ -574,6 +785,7 @@ export async function createCLI() {
       // The node changed (equal targets returned early above), so any env remembered by
       // setNodeEnv belonged to the previous node and no longer applies.
       clearCurrentEnvId();
+      warnIfEnvShadows("NODE_URL", target);
       console.log(
         chalk.green(`Using node: ${target} (version ${status.version})`),
       );
@@ -614,7 +826,7 @@ export async function createCLI() {
     .command("setNodeEnv")
     .alias("useNodeEnv")
     .description(
-      "Select both an Ocean Node and a compute environment from a search result's 'node|env' token",
+      "Select both an Ocean Node and a compute environment from a search result's 'node|env' token (saved to the config file)",
     )
     .argument(
       "<nodeEnv>",
@@ -650,6 +862,8 @@ export async function createCLI() {
 
       setCurrentNodeUrl(target);
       setCurrentEnvId(envId);
+      warnIfEnvShadows("NODE_URL", target);
+      warnIfEnvShadows("COMPUTE_ENV_ID", envId);
       console.log(
         chalk.green(
           `Using node: ${target} (version ${status.version})\nUsing compute env: ${envId}`,
@@ -791,6 +1005,258 @@ export async function createCLI() {
         jobType: options.jobType,
         amount: options.amount,
       });
+    });
+
+  // ---------------------------------------------------------------------------
+  // Saved subsidy-provider commands (node-free — see NODE_FREE_COMMANDS). They edit only
+  // the local config file: no signer, no node, no RPC, so they run on a completely fresh
+  // install. chainId is a required explicit argument (no registry default) so they stay
+  // RPC-free. Enabled entries are merged with the node's own providers by startCompute /
+  // startService / extendService when --subsidyProviders is omitted.
+  // ---------------------------------------------------------------------------
+  const requireSubsidyChainId = (raw: unknown): number => {
+    const id = Number(raw);
+    if (!Number.isInteger(id) || id <= 0) {
+      throw new Error(
+        "A chain id is required: addSubsidyProvider <chainId> <address> [description].",
+      );
+    }
+    return id;
+  };
+
+  program
+    .command("addSubsidyProvider")
+    .alias("addSubsidy")
+    .description(
+      "Save a subsidy-provider contract for a chain (enabled by default), with an optional description",
+    )
+    .argument("[chainId]", "Chain id the provider lives on")
+    .argument("[address]", "Subsidy-provider contract address")
+    .argument("[description...]", "Optional free-text description")
+    .option("-c, --chainId <id>", "Chain id")
+    .option("-a, --address <address>", "Subsidy-provider contract address")
+    .option("-d, --description <text>", "Optional description")
+    .action(async (chainIdArg, addressArg, descriptionArgs, options) => {
+      const chainId = requireSubsidyChainId(options.chainId ?? chainIdArg);
+      const addressArgValue = options.address || addressArg;
+      if (!addressArgValue) {
+        throw new Error("A subsidy-provider address is required.");
+      }
+      let address: string;
+      try {
+        address = getAddress(String(addressArgValue).trim());
+      } catch {
+        throw new Error(`"${addressArgValue}" is not a valid EVM address.`);
+      }
+      const description =
+        options.description ?? (descriptionArgs ?? []).join(" ");
+      const { result, index, enabled, saved } = addSubsidyProvider(
+        chainId,
+        address,
+        description,
+      );
+      if (!saved) {
+        console.error(
+          chalk.red("Subsidy provider was not saved (see the warning above)."),
+        );
+        return;
+      }
+      const descr = description ? ` — ${description}` : "";
+      if (result === "added") {
+        console.log(
+          chalk.green(
+            `Saved subsidy provider #${index + 1} on chain ${chainId}: ${address}${descr}${
+              enabled ? "" : " (disabled)"
+            }`,
+          ),
+        );
+      } else if (result === "updated") {
+        console.log(
+          chalk.green(
+            `Updated the description of subsidy provider #${
+              index + 1
+            } on chain ${chainId}: ${address} — ${description}`,
+          ),
+        );
+      } else {
+        console.log(
+          `Subsidy provider #${index + 1} already saved on chain ${chainId}: ${address}${
+            enabled ? "" : " (disabled)"
+          }`,
+        );
+      }
+      if (result !== "unchanged") {
+        console.log(
+          chalk.gray(
+            `Toggle it with: toggleSubsidyProvider ${chainId} ${index + 1}`,
+          ),
+        );
+      }
+    });
+
+  program
+    .command("listSubsidyProviders")
+    .alias("listSubsidy")
+    .description(
+      "List your saved subsidy providers (all chains, or one). These are merged with the node's own providers at compute/service time.",
+    )
+    .argument("[chainId]", "Show only this chain")
+    .option("-c, --chainId <id>", "Show only this chain")
+    .action(async (chainIdArg, options) => {
+      const only = options.chainId ?? chainIdArg;
+      if (only !== undefined) {
+        const id = Number(only);
+        if (!Number.isInteger(id) || id <= 0) {
+          throw new Error(`"${only}" is not a valid chain id.`);
+        }
+        const list = listSubsidyProviders(id);
+        if (list.length === 0) {
+          console.log(
+            chalk.yellow(
+              `No subsidy providers saved for chain ${id}. Add one with \`addSubsidyProvider ${id} <address>\`.`,
+            ),
+          );
+          return;
+        }
+        printSubsidyProviderChain(id, list);
+      } else {
+        const all = listAllSubsidyProviders();
+        const chainIds = Object.keys(all);
+        if (chainIds.length === 0) {
+          console.log(
+            chalk.yellow(
+              "No subsidy providers saved. Add one with `addSubsidyProvider <chainId> <address>`.",
+            ),
+          );
+          return;
+        }
+        for (const cid of chainIds
+          .map((c) => Number(c))
+          .sort((a, b) => a - b)) {
+          printSubsidyProviderChain(cid, all[String(cid)]);
+        }
+      }
+      console.log(
+        chalk.gray(
+          "Use `toggleSubsidyProvider <chainId> <number|address>` to enable/disable, `removeSubsidyProvider <chainId> <number|address>` to delete. Enabled entries are used automatically by startCompute / startService unless you pass --subsidyProviders.",
+        ),
+      );
+    });
+
+  program
+    .command("removeSubsidyProvider")
+    .alias("removeSubsidy")
+    .description(
+      "Remove a saved subsidy provider from a chain (by its number or by address)",
+    )
+    .argument("[chainId]", "Chain id")
+    .argument("[ref]", "Subsidy number (from listSubsidyProviders) or the address")
+    .option("-c, --chainId <id>", "Chain id")
+    .option("-r, --ref <ref>", "Subsidy number or address")
+    .action(async (chainIdArg, refArg, options) => {
+      const chainId = requireSubsidyChainId(options.chainId ?? chainIdArg);
+      const ref = options.ref || refArg;
+      if (!ref) {
+        throw new Error(
+          "Pass a subsidy number (see listSubsidyProviders) or the provider address.",
+        );
+      }
+      const { removed, saved } = removeSubsidyProvider(chainId, String(ref));
+      if (removed === null) {
+        console.error(
+          chalk.red(
+            `No saved subsidy provider matches "${ref}" on chain ${chainId}. Run listSubsidyProviders ${chainId} to see them.`,
+          ),
+        );
+        return;
+      }
+      if (!saved) {
+        console.error(
+          chalk.red(
+            "Subsidy provider was not removed (see the warning above).",
+          ),
+        );
+        return;
+      }
+      console.log(
+        chalk.green(
+          `Removed subsidy provider on chain ${chainId}: ${removed.address}${
+            removed.description ? ` — ${removed.description}` : ""
+          }`,
+        ),
+      );
+    });
+
+  program
+    .command("toggleSubsidyProvider")
+    .alias("toggleSubsidy")
+    .description(
+      "Enable or disable a saved subsidy provider (toggles when no state is given)",
+    )
+    .argument("[chainId]", "Chain id")
+    .argument("[ref]", "Subsidy number (from listSubsidyProviders) or the address")
+    .argument("[state]", "on | off (omit to flip the current state)")
+    .option("-c, --chainId <id>", "Chain id")
+    .option("-r, --ref <ref>", "Subsidy number or address")
+    .option("-s, --state <state>", "on | off")
+    .action(async (chainIdArg, refArg, stateArg, options) => {
+      const chainId = requireSubsidyChainId(options.chainId ?? chainIdArg);
+      const ref = options.ref || refArg;
+      if (!ref) {
+        throw new Error(
+          "Pass a subsidy number (see listSubsidyProviders) or the provider address.",
+        );
+      }
+      const rawState = options.state ?? stateArg;
+      let state: boolean | undefined;
+      if (rawState === undefined || String(rawState).trim() === "") {
+        state = undefined;
+      } else {
+        const s = String(rawState).trim().toLowerCase();
+        if (["on", "true", "1", "enable", "enabled"].includes(s)) state = true;
+        else if (["off", "false", "0", "disable", "disabled"].includes(s))
+          state = false;
+        else throw new Error(`State must be on or off (got "${rawState}").`);
+      }
+      const { entry, enabled, saved } = toggleSubsidyProvider(
+        chainId,
+        String(ref),
+        state,
+      );
+      if (entry === null) {
+        console.error(
+          chalk.red(
+            `No saved subsidy provider matches "${ref}" on chain ${chainId}. Run listSubsidyProviders ${chainId} to see them.`,
+          ),
+        );
+        return;
+      }
+      if (!saved) {
+        console.error(
+          chalk.red(
+            "Subsidy provider was not updated (see the warning above).",
+          ),
+        );
+        return;
+      }
+      if (enabled) {
+        console.log(
+          chalk.green(
+            `Enabled subsidy provider on chain ${chainId}: ${entry.address}`,
+          ),
+        );
+      } else {
+        console.log(
+          chalk.yellow(
+            `Disabled subsidy provider on chain ${chainId}: ${entry.address}`,
+          ),
+        );
+      }
+      console.log(
+        chalk.gray(
+          "Enabled entries are used by startCompute / startService unless you pass --subsidyProviders.",
+        ),
+      );
     });
 
   // ---------------------------------------------------------------------------
@@ -957,6 +1423,489 @@ export async function createCLI() {
           ),
         );
       }
+    });
+
+  // ----- Configuration file commands (getConfig / setConfig / unsetConfig) -----
+
+  // The chain ids that the env RPC var defines (empty on a parse error or a legacy URL).
+  const envRpcChainIds = (): Set<number> => {
+    const out = new Set<number>();
+    if (!process.env.RPC) return out;
+    try {
+      const parsed = parseRpcEnv(process.env.RPC);
+      for (const cid of parsed.chains.keys()) out.add(cid);
+    } catch {
+      /* a malformed env RPC is reported elsewhere; treat as no env chains here */
+    }
+    return out;
+  };
+
+  const favouriteSummaryLine = (): string => {
+    const n = listFavouriteNodes().length;
+    const label = "favouriteNodes".padEnd(26);
+    if (n === 0) return `  ${label}(none)`;
+    return `  ${label}${`${n} saved (run listFavouriteNodes)`.padEnd(32)}${chalk.gray("[file]")}`;
+  };
+
+  const subsidySummaryLine = (): string => {
+    const all = listAllSubsidyProviders();
+    const chains = Object.keys(all);
+    const total = chains.reduce((sum, c) => sum + all[c].length, 0);
+    const label = "subsidyProviders".padEnd(26);
+    if (total === 0) return `  ${label}(none)`;
+    return `  ${label}${`${total} saved on ${chains.length} chain(s) (run listSubsidyProviders)`.padEnd(32)}${chalk.gray("[file]")}`;
+  };
+
+  // Print every chain's saved subsidy providers (for `getConfig subsidyProviders`).
+  const printAllSubsidyProviders = (): void => {
+    const all = listAllSubsidyProviders();
+    const chains = Object.keys(all)
+      .map((c) => Number(c))
+      .sort((a, b) => a - b);
+    if (chains.length === 0) {
+      console.log(chalk.yellow("No subsidy providers saved."));
+      return;
+    }
+    for (const cid of chains) printSubsidyProviderChain(cid, all[String(cid)]);
+  };
+
+  // One setting line (+ an optional "config file has: … (overridden by env)" line).
+  const renderSettingLines = (entry: typeof CONFIG_KEYS[number]): string[] => {
+    const file = readConfigFile();
+    const view = describeSetting(entry, file);
+    const key = entry.key.padEnd(26);
+    const lines: string[] = [];
+    if (view.source === "env") {
+      const value = (view.value ?? "").padEnd(32);
+      lines.push(`  ${key}${value}${chalk.gray(`[env ${entry.env}]`)}`);
+      if (view.fileValue !== undefined) {
+        lines.push(
+          chalk.yellow(
+            `  ${" ".repeat(26)}config file has: ${view.fileValue} (overridden by env)`,
+          ),
+        );
+      }
+    } else if (view.source === "file") {
+      const value = (view.value ?? "").padEnd(32);
+      lines.push(`  ${key}${value}${chalk.gray("[file]")}`);
+    } else {
+      lines.push(
+        `  ${key}${"(not set)".padEnd(32)}${chalk.gray(`[default: ${entry.defaultLabel}]`)}`,
+      );
+    }
+    return lines;
+  };
+
+  const renderRpcSection = (file: ReturnType<typeof readConfigFile>): string[] => {
+    const out: string[] = ["  rpc"];
+    try {
+      loadRegistry();
+    } catch {
+      /* a malformed env RPC is reported at startup; show what we can */
+    }
+    const chains = (() => {
+      try {
+        return listChains();
+      } catch {
+        return [];
+      }
+    })();
+    const fileRpcKeys = new Set(Object.keys(file.rpc ?? {}));
+    const envChains = envRpcChainIds();
+    if (chains.length === 0) {
+      // A legacy single env URL has no probed chainId yet.
+      if (process.env.RPC && envChains.size === 0) {
+        out.push(
+          `      ${"(chain not probed yet)".padEnd(24)}${redactRpcUrl(process.env.RPC)}  ${chalk.gray("[env RPC]")}`,
+        );
+      } else {
+        out.push("      (none)");
+      }
+      return out;
+    }
+    for (const { chainId, urls } of chains) {
+      const fromFile =
+        fileRpcKeys.has(String(chainId)) && !envChains.has(chainId);
+      const tag = chalk.gray(fromFile ? "[file]" : "[env RPC]");
+      out.push(
+        `      ${String(chainId).padEnd(6)}${urls.map(redactRpcUrl).join(", ")}  ${tag}`,
+      );
+    }
+    return out;
+  };
+
+  const renderDefaultChainLine = (
+    file: ReturnType<typeof readConfigFile>,
+  ): string => {
+    const def = getDefaultChainId();
+    const label = "defaultChainId".padEnd(26);
+    if (def === undefined) return `  ${label}${"(not set)"}`;
+    let tag: string;
+    if (process.env.CHAIN_ID && Number(process.env.CHAIN_ID) === def) {
+      tag = "[env CHAIN_ID]";
+    } else if (file.defaultChainId === def) {
+      tag = "[file]";
+    } else {
+      tag = "[auto: only configured chain]";
+    }
+    return `  ${label}${String(def).padEnd(32)}${chalk.gray(tag)}`;
+  };
+
+  const signerLine = (): string => {
+    if (process.env.PRIVATE_KEY) {
+      return "Signer: PRIVATE_KEY is set in the environment (never stored in the config file).";
+    }
+    if (process.env.MNEMONIC) {
+      return "Signer: MNEMONIC is set in the environment (never stored in the config file).";
+    }
+    return chalk.yellow(
+      "Signer: no PRIVATE_KEY or MNEMONIC in the environment.",
+    );
+  };
+
+  program
+    .command("getConfig")
+    .alias("showConfig")
+    .description(
+      "Show the config file location and every setting with its source (env / file / default)",
+    )
+    .argument("[key]", "Show a single setting (e.g. nodeUrl, indexing.maxRetries)")
+    .option("-k, --key <key>", "Show a single setting")
+    .action(async (keyArg, options) => {
+      const file = readConfigFile();
+      const key = options.key || keyArg;
+      if (key) {
+        if (key === "rpc") {
+          for (const line of renderRpcSection(file)) console.log(line);
+          return;
+        }
+        if (key === "defaultChainId") {
+          console.log(renderDefaultChainLine(file));
+          return;
+        }
+        if (key === "favouriteNodes") {
+          console.log(favouriteSummaryLine());
+          return;
+        }
+        if (key === "subsidyProviders") {
+          printAllSubsidyProviders();
+          return;
+        }
+        const entry = findConfigKey(key);
+        if (!entry) {
+          throw knownConfigKeyError(key);
+        }
+        for (const line of renderSettingLines(entry)) console.log(line);
+        return;
+      }
+
+      const status = configFileStatus();
+      const statusSuffix =
+        status === "ok"
+          ? "(exists)"
+          : status === "missing"
+            ? "(not created yet — it is written the first time a setting is saved)"
+            : status === "corrupt"
+              ? "(INVALID JSON — ignored)"
+              : "(unreadable — ignored)";
+      const fromEnv = process.env.OCEANCLI_CONFIG_PATH
+        ? " [from OCEANCLI_CONFIG_PATH]"
+        : "";
+      console.log(`Config file: ${configFilePath()} ${statusSuffix}${fromEnv}`);
+      for (const entry of CONFIG_KEYS) {
+        for (const line of renderSettingLines(entry)) console.log(line);
+      }
+      for (const line of renderRpcSection(file)) console.log(line);
+      console.log(renderDefaultChainLine(file));
+      console.log(favouriteSummaryLine());
+      console.log(subsidySummaryLine());
+      console.log(signerLine());
+    });
+
+  program
+    .command("setConfig")
+    .description("Set a setting in the config file (saved immediately)")
+    .argument("[key]", "Setting name, e.g. indexing.maxRetries (env-var names work too)")
+    .argument("[value...]", "New value (lists are comma-separated)")
+    .option("-k, --key <key>", "Setting name")
+    .option("-v, --value <value>", "New value")
+    .action(async (keyArg, valueArgs, options) => {
+      const key = options.key || keyArg;
+      const value =
+        options.value ?? ((valueArgs as string[] | undefined) ?? []).join(" ");
+      if (!key || !value || value.trim().length === 0) {
+        throw new Error(
+          "Usage: setConfig <key> <value>. Run getConfig to list the keys.",
+        );
+      }
+      const lk = key.toLowerCase();
+      if (lk === "privatekey" || lk === "private_key" || lk === "mnemonic") {
+        throw new Error(
+          "Signer secrets are never stored in the config file. Set PRIVATE_KEY (or MNEMONIC) in your environment.",
+        );
+      }
+      if (key === "rpc" || key === "RPC") {
+        throw new Error(
+          "RPC endpoints are managed with addChain / removeChain (they verify the URL serves the chain).",
+        );
+      }
+      if (key === "defaultChainId" || key === "CHAIN_ID") {
+        throw new Error("Use setChain <chainId> to change the default chain.");
+      }
+      if (key === "favouriteNodes") {
+        throw new Error(
+          "Favourite nodes are managed with addFavouriteNode / removeFavouriteNode.",
+        );
+      }
+      if (key === "subsidyProviders" || key === "SubsidyProviders") {
+        throw new Error(
+          "Subsidy providers are managed with addSubsidyProvider / removeSubsidyProvider / toggleSubsidyProvider.",
+        );
+      }
+      const entry = findConfigKey(key);
+      if (!entry) {
+        throw knownConfigKeyError(key);
+      }
+      if (!entry.settable) {
+        throw new Error(
+          `${entry.key} is changed with ${entry.setHint} (it validates the node first).`,
+        );
+      }
+      let parsed = parseConfigValue(entry, value);
+      if (entry.key === "addressFile") {
+        parsed = path.resolve(parsed as string);
+        if (!fs.existsSync(parsed as string)) {
+          throw new Error(`File not found: ${parsed}`);
+        }
+      }
+      if (entry.key === "disableP2P" && parsed === true && isP2pUri(getCurrentNodeUrl())) {
+        throw new Error(
+          "The current node is a P2P URI — it would be unreachable with P2P disabled. Switch to an HTTP node first (setNode).",
+        );
+      }
+      const ok = updateConfigFile((f) => setFileValue(f, entry.key, parsed));
+      const envStr = toEnvString(entry, parsed);
+      if (isEnvProvided(entry.env)) {
+        warnIfEnvShadows(entry.env, envStr);
+      } else if (!entry.nextStart) {
+        // "Next start" keys (disableP2P / bootstrapPeers / avoidLoopRun) are read once
+        // at startup; mutating the live session would e.g. break P2P mid-REPL while
+        // libp2p is still running. Persist them to the file only — they take effect
+        // on the next start (the note below says so).
+        process.env[entry.env] = envStr;
+      }
+      if (entry.key === "addressFile") clearConfigCache();
+      if (ok) {
+        console.log(
+          chalk.green(
+            `${entry.key} = ${envStr} (saved to ${configFilePath()})`,
+          ),
+        );
+        if (entry.nextStart) {
+          console.log(
+            chalk.yellow("This setting takes effect the next time the CLI starts."),
+          );
+        }
+      }
+    });
+
+  program
+    .command("unsetConfig")
+    .description("Remove a setting from the config file (falls back to env / default)")
+    .argument("[key]", "Setting name")
+    .option("-k, --key <key>", "Setting name")
+    .action(async (keyArg, options) => {
+      const key = options.key || keyArg;
+      if (!key) {
+        throw new Error(
+          "Usage: unsetConfig <key>. Run getConfig to list the keys.",
+        );
+      }
+      if (key === "rpc" || key === "RPC") {
+        throw new Error("Use removeChain <chainId> to remove an RPC chain.");
+      }
+      if (key === "defaultChainId" || key === "CHAIN_ID") {
+        throw new Error("Use setChain <chainId> to change the default chain.");
+      }
+      if (key === "favouriteNodes") {
+        throw new Error(
+          "Use removeFavouriteNode <node|number> to remove a favourite node.",
+        );
+      }
+      if (key === "subsidyProviders" || key === "SubsidyProviders") {
+        throw new Error(
+          "Use removeSubsidyProvider <chainId> <number|address> to remove a saved subsidy provider.",
+        );
+      }
+      const entry = findConfigKey(key);
+      if (!entry) {
+        throw knownConfigKeyError(key);
+      }
+      updateConfigFile((f) => {
+        deleteFileValue(f, entry.key);
+        if (entry.key === "nodeUrl") delete f.computeEnvId;
+      });
+      if (!isEnvProvided(entry.env)) {
+        delete process.env[entry.env];
+        // Clearing nodeUrl also drops the remembered compute env — but not if the
+        // user's environment set COMPUTE_ENV_ID (that stays in effect).
+        if (entry.key === "nodeUrl" && !isEnvProvided("COMPUTE_ENV_ID")) {
+          delete process.env.COMPUTE_ENV_ID;
+        }
+      } else {
+        console.log(
+          chalk.yellow(
+            `${entry.env} is still set in your environment and stays in effect.`,
+          ),
+        );
+      }
+      if (entry.key === "addressFile") clearConfigCache();
+      console.log(chalk.green(`${entry.key} removed from ${configFilePath()}.`));
+      if (entry.key === "nodeUrl" && !hasNode()) {
+        console.log(
+          chalk.yellow("No Ocean Node set. Run `setNode <nodeUrl>` to pick one."),
+        );
+      }
+    });
+
+  // ----- Favourite-node commands -----
+
+  program
+    .command("addFavouriteNode")
+    .alias("addFavoriteNode")
+    .description(
+      "Save a node (URL or peer id) to your favourite nodes, with an optional description",
+    )
+    .argument(
+      "[node]",
+      "HTTP(S) URL, peer id or multiaddr (default: the node currently in use)",
+    )
+    .argument("[description...]", "Optional free-text description")
+    .option("-n, --node <node>", "Node to save")
+    .option("-d, --description <text>", "Optional description")
+    .action(async (nodeArg, descriptionArgs, options) => {
+      let node = options.node || nodeArg || getCurrentNodeUrl();
+      if (!node) {
+        throw new Error(
+          "A node is required. Pass a URL / peer id, or select a node first with setNode.",
+        );
+      }
+      const description =
+        options.description ??
+        ((descriptionArgs as string[] | undefined) ?? []).join(" ");
+      node = normalizeNodeRef(node);
+      const isHttp = (() => {
+        try {
+          const u = new URL(node);
+          return u.protocol === "http:" || u.protocol === "https:";
+        } catch {
+          return false;
+        }
+      })();
+      if (/^\d+$/.test(node) || (!isHttp && !isP2pUri(node))) {
+        throw new Error(
+          `"${node}" is not a node reference. Use an http(s) URL, a peer id, or a multiaddr.`,
+        );
+      }
+      const { result, index, saved } = addFavouriteNode(node, description);
+      if (!saved) {
+        console.error(
+          chalk.red("Favourite node was not saved (see the warning above)."),
+        );
+        return;
+      }
+      if (result === "added") {
+        console.log(
+          chalk.green(
+            `Saved favourite #${index + 1}: ${node}${description ? ` — ${description}` : ""}`,
+          ),
+        );
+      } else if (result === "updated") {
+        console.log(
+          chalk.green(
+            `Updated the description of favourite #${index + 1}: ${node} — ${description}`,
+          ),
+        );
+      } else {
+        console.log(`Favourite #${index + 1} already saved: ${node}`);
+      }
+      if (result === "added" || result === "updated") {
+        console.log(chalk.gray(`Switch to it any time with: setNode ${index + 1}`));
+      }
+    });
+
+  program
+    .command("listFavouriteNodes")
+    .alias("listFavoriteNodes")
+    .alias("favourites")
+    .alias("favorites")
+    .description("List your saved favourite nodes (use the number with setNode)")
+    .action(async () => {
+      const list = listFavouriteNodes();
+      if (list.length === 0) {
+        console.log(
+          chalk.yellow(
+            "No favourite nodes saved. Add one with `addFavouriteNode <nodeUrl|peerId> [description]`.",
+          ),
+        );
+        return;
+      }
+      console.log(chalk.bold("Favourite nodes:"));
+      const current = normalizeNodeRef(getCurrentNodeUrl() || "");
+      list.forEach((entry, i) => {
+        const isCurrent =
+          current.length > 0 && normalizeNodeRef(entry.node) === current;
+        const marker = isCurrent ? ` ${chalk.green("[current]")}` : "";
+        console.log(`  ${i + 1}. ${entry.node}${marker}`);
+        if (entry.description) {
+          console.log(chalk.gray(`       ${entry.description}`));
+        }
+      });
+      console.log(
+        chalk.gray(
+          "Use `setNode <number>` to switch, `removeFavouriteNode <number|node>` to delete.",
+        ),
+      );
+    });
+
+  program
+    .command("removeFavouriteNode")
+    .alias("removeFavoriteNode")
+    .description(
+      "Remove a node from your favourite nodes (by its number or by URL / peer id)",
+    )
+    .argument(
+      "[node]",
+      "Favourite number (from listFavouriteNodes) or the node URL / peer id",
+    )
+    .option("-n, --node <node>", "Favourite number or node")
+    .action(async (nodeArg, options) => {
+      const ref = options.node || nodeArg;
+      if (!ref) {
+        throw new Error(
+          "Pass a favourite number (see listFavouriteNodes) or the node URL / peer id.",
+        );
+      }
+      const { removed, saved } = removeFavouriteNode(String(ref));
+      if (removed === null) {
+        console.error(
+          chalk.red(
+            `No favourite node matches "${ref}". Run listFavouriteNodes to see the saved ones.`,
+          ),
+        );
+        return;
+      }
+      if (!saved) {
+        console.error(
+          chalk.red("Favourite node was not removed (see the warning above)."),
+        );
+        return;
+      }
+      console.log(
+        chalk.green(
+          `Removed favourite: ${removed.node}${removed.description ? ` — ${removed.description}` : ""}`,
+        ),
+      );
     });
 
   // getDDO command
@@ -1270,6 +2219,15 @@ export async function createCLI() {
           console.error(chalk.red((e as Error).message));
           return;
         }
+
+        // With no explicit --subsidyProviders flag, merge the user's enabled saved
+        // providers for the payment chain with the node's advertised set (prints a note
+        // naming any it adds, before the payment prompt). A no-op when the flag was
+        // explicit or no enabled saved providers exist.
+        subsidyProviders = await commands.resolveJobSubsidyProviders(
+          subsidyProviders,
+          paymentChainId,
+        );
 
         const initArgs = [
           null,
@@ -1815,11 +2773,17 @@ export async function createCLI() {
       const commands = new Commands(signer, chainId);
       // Services are single-chain: --chainId (→ file → default) is the payment/escrow chain, and
       // must be registered here; startService additionally checks it is one the env prices on.
-      if (
-        (await routeExplicit(commands, options.chainId ?? file?.chainId)) ===
-        null
-      )
-        return;
+      const servicePaymentChainId = await routeExplicit(
+        commands,
+        options.chainId ?? file?.chainId,
+      );
+      if (servicePaymentChainId === null) return;
+      // Merge enabled saved subsidy providers for the payment chain when no explicit flag
+      // was given (no-op otherwise); prints a note before any deposit/authorize.
+      subsidyProviders = await commands.resolveJobSubsidyProviders(
+        subsidyProviders,
+        servicePaymentChainId,
+      );
       await commands.startService({
         envId,
         duration: serviceDuration,
@@ -2004,7 +2968,14 @@ export async function createCLI() {
       }
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
-      if ((await routeExplicit(commands, options.chainId)) === null) return;
+      const extendPaymentChainId = await routeExplicit(commands, options.chainId);
+      if (extendPaymentChainId === null) return;
+      // Merge enabled saved subsidy providers for the payment chain when no explicit flag
+      // was given (no-op otherwise).
+      subsidyProviders = await commands.resolveJobSubsidyProviders(
+        subsidyProviders,
+        extendPaymentChainId,
+      );
       await commands.extendService(
         id,
         addl,

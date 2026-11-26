@@ -880,6 +880,98 @@ export function resolveSubsidyProviderAddresses(
   };
 }
 
+export interface MergedSubsidyProviders {
+  /** The tri-state to hand downstream (to computePrefundedUnits / computeStart). */
+  effective: string[] | undefined;
+  /** Saved providers newly merged in (EIP-55) — for the "Adding…" note. */
+  added: string[];
+  /** Saved providers dropped because the node filter is on and does not advertise them. */
+  droppedByFilter: string[];
+}
+
+/**
+ * Merge the user's enabled saved subsidy providers for a chain with the node's advertised
+ * set, honouring the node's provider filter. Returns `effective === undefined` (i.e. leave
+ * the node to use its own defaults) when the flag was explicit, when there are no enabled
+ * saved providers, or when the merge adds nothing new to the node's set — so a run with no
+ * saved providers (or only already-advertised ones) is byte-for-byte identical to today.
+ *
+ * To get "node providers AND our enabled ones", the merged value must be the explicit union
+ * `advertised ∪ keptSaved`, because passing a non-undefined list makes the node use exactly
+ * those providers (a replacement of its advertised set). Pure: the caller prints the notes.
+ */
+export function mergeSavedSubsidyProviders(
+  requested: string[] | undefined,
+  chainId: number,
+  nodeProviders: Record<string, string[]> | undefined,
+  filter: boolean,
+  savedEnabled: string[],
+): MergedSubsidyProviders {
+  // An explicit --subsidyProviders flag (a list or `none`/[]) wins; the saved list is ignored.
+  if (requested !== undefined) {
+    return { effective: requested, added: [], droppedByFilter: [] };
+  }
+  if (savedEnabled.length === 0) {
+    return { effective: undefined, added: [], droppedByFilter: [] };
+  }
+
+  // Normalize to EIP-55 and de-duplicate. A malformed stored address (which the add
+  // command prevents) is skipped defensively rather than throwing — a bad saved entry
+  // must never block a job the user could otherwise run.
+  const normalize = (list: string[]): string[] => {
+    const out: string[] = [];
+    const seen = new Set<string>();
+    for (const a of list) {
+      let checksummed: string;
+      try {
+        checksummed = ethers.getAddress(a);
+      } catch {
+        continue;
+      }
+      if (!seen.has(checksummed)) {
+        seen.add(checksummed);
+        out.push(checksummed);
+      }
+    }
+    return out;
+  };
+
+  const advertised = normalize(nodeProviders?.[String(chainId)] ?? []);
+  const saved = normalize(savedEnabled);
+  const advertisedSet = new Set(advertised);
+
+  let keptSaved: string[];
+  let added: string[];
+  let droppedByFilter: string[];
+  if (filter) {
+    // Filter on: the node rejects anything it does not advertise, so a saved provider it
+    // does not advertise cannot be added — drop it with a note.
+    droppedByFilter = saved.filter((a) => !advertisedSet.has(a));
+    keptSaved = saved.filter((a) => advertisedSet.has(a));
+    added = [];
+  } else {
+    droppedByFilter = [];
+    keptSaved = saved;
+    added = saved.filter((a) => !advertisedSet.has(a));
+  }
+
+  // If the merge adds nothing the node did not already advertise, run byte-for-byte as today.
+  if (added.length === 0) {
+    return { effective: undefined, added: [], droppedByFilter };
+  }
+
+  // advertised first, then the newly added ones, order preserved, de-duplicated.
+  const effective: string[] = [...advertised];
+  const effectiveSet = new Set(effective);
+  for (const a of keptSaved) {
+    if (!effectiveSet.has(a)) {
+      effectiveSet.add(a);
+      effective.push(a);
+    }
+  }
+  return { effective, added, droppedByFilter };
+}
+
 /**
  * How much of a job's lock the subsidy providers would PRE-FUND, in token base units,
  * read off an ocean.js `estimateJobSubsidy` result. What is left is the payer's own

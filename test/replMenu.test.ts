@@ -83,19 +83,19 @@ describe("Ocean CLI interactive menu (REPL)", function () {
   });
 
   it("runs the node-free chain commands (listChains / setChain / getChain)", async function () {
-    // A JSON-map RPC with two chains, and an isolated persistence file so the test
-    // never touches the real ~/.ocean/cli/rpc.json. All three commands are node-free,
+    // A JSON-map RPC with two chains, and an isolated config file so the test
+    // never touches the real ~/.ocean/cli/config.json. All three commands are node-free,
     // so they reach the gate and run with no live infra.
     const tmpFile = path.join(
       fs.mkdtempSync(path.join(os.tmpdir(), "repl-rpc-")),
-      "rpc.json",
+      "config.json",
     );
     const { output } = await runRepl(
       ["listChains", "setChain 137", "getChain", "exit"],
       {
         env: {
           RPC: '{"8996":"http://127.0.0.1:1","137":"http://127.0.0.1:2"}',
-          RPC_CONFIG_FILE: tmpFile,
+          OCEANCLI_CONFIG_PATH: tmpFile,
           CHAIN_ID: undefined,
         },
       },
@@ -105,8 +105,10 @@ describe("Ocean CLI interactive menu (REPL)", function () {
     expect(output).to.contain("137");
     expect(output).to.contain("Default chain is now 137");
     expect(output).to.contain("Default chain: 137");
-    // The switch was persisted to the isolated file.
+    // The switch was persisted to the isolated file; both chains came from env, so only
+    // defaultChainId is written (no `rpc` section).
     const persisted = JSON.parse(fs.readFileSync(tmpFile, "utf-8"));
     expect(persisted.defaultChainId).to.equal(137);
+    expect(persisted.rpc).to.equal(undefined);
   });
 });

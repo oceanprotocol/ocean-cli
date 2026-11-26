@@ -2,5 +2,6 @@
   "full-trace": true,
   "bail": true,
   "exit": true,
-  "timeout": "20000"
+  "timeout": "20000",
+  "require": ["./test/isolateConfig.ts"]
 }

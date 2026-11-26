@@ -3,6 +3,7 @@ import path from "path";
 import fs from "fs";
 import os, { homedir } from "os";
 import { ProviderInstance } from "@oceanprotocol/lib";
+import { getAddress } from "ethers";
 import { projectRoot, runCommand, DID_RE } from "./util.js";
 
 describe("Ocean CLI Paid Compute", function () {
@@ -208,6 +209,44 @@ describe("Ocean CLI Paid Compute", function () {
       console.error("Agreement ID was empty:", output);
       throw new Error("Agreement ID is missing");
     }
+  });
+
+  it("merges an enabled saved subsidy provider from the config file into startCompute (no --subsidyProviders)", async function () {
+    // With no --subsidyProviders flag, resolveJobSubsidyProviders merges the enabled
+    // saved provider for the payment chain (8996) with the node's advertised set and
+    // prints a note naming it BEFORE ordering. Assert the note, tolerant of the job's
+    // downstream outcome (an unknown provider may be rejected later by the node).
+    const saved = getAddress("0x00000000000000000000000000000000c0ffee01");
+    const cfgPath = path.join(os.tmpdir(), `ocean-cli-subsidy-${Date.now()}.json`);
+    fs.writeFileSync(
+      cfgPath,
+      JSON.stringify({
+        version: 1,
+        subsidyProviders: { "8996": [{ address: saved, enabled: true }] },
+      }),
+    );
+    const paymentToken = getAddresses().Ocean;
+    const serviceIdDataset =
+      "ccb398c50d6abd5b456e8d7242bd856a1767a890b537c2f8c10ba8b8a10e6025";
+    const serviceIdAlgorithm =
+      "db164c1b981e4d2974e90e61bda121512e6909c1035c908d68933ae4cfaba6b0";
+    let output: string;
+    try {
+      output = await runCommand(
+        `OCEANCLI_CONFIG_PATH="${cfgPath}" npm run cli -- startCompute ${computeDatasetDid} ${jsAlgoDid} ${computeEnvId} 900 ${paymentToken} '[]' 'null' ${serviceIdDataset} ${serviceIdAlgorithm} --accept true`,
+      );
+    } catch (error: any) {
+      // The job may fail after the merge note is printed; capture whatever was emitted.
+      output = `${error.stdout || ""}${error.stderr || error.message || ""}`;
+    } finally {
+      fs.rmSync(cfgPath, { force: true });
+    }
+    // Either the cyan "Adding …" note (node filter off) or the yellow "Ignoring …" note
+    // (filter on) proves the saved provider reached the merge for chain 8996.
+    expect(output, output).to.match(
+      /(Adding|Ignoring) saved subsidy provider\(s\)[\s\S]*8996/,
+    );
+    expect(output).to.contain(saved);
   });
 
   it("should delay for compute job", (done) => {

@@ -26,55 +26,58 @@ import {
 // (__setChainProbeForTests), so nothing here dials an RPC.
 
 describe("rpcRegistry — redactRpcUrl", function () {
-  it("redacts HTTP userinfo credentials, keeping the host", function () {
+  // The path is redacted WHOLESALE (any segment can be a key); only scheme/host/port survive.
+  it("redacts HTTP userinfo credentials and the path, keeping the host", function () {
     expect(redactRpcUrl("https://user:secret@rpc.example/eth")).to.equal(
-      "https://***@rpc.example/eth",
+      "https://***@rpc.example/***",
     );
   });
 
-  it("redacts an api-key-like path segment, keeping structural ones", function () {
+  it("redacts a version-prefixed api key (whole path)", function () {
     const out = redactRpcUrl(
       "https://mainnet.infura.io/v3/0123456789abcdef0123456789abcdef",
     );
-    expect(out).to.equal("https://mainnet.infura.io/v3/***");
+    expect(out).to.equal("https://mainnet.infura.io/***");
     expect(out).to.not.contain("0123456789abcdef");
   });
 
-  it("redacts a base64/percent-punctuated key-like path segment", function () {
-    const out = redactRpcUrl("https://rpc.example/v1/AbCd+1234567890%3DefGh");
-    expect(out).to.equal("https://rpc.example/v1/***"); // v1 kept, long key redacted
-    expect(out).to.not.contain("1234567890");
-  });
-
-  it("redacts a key segment whose punctuation is outside any secret-char list", function () {
-    // Regression: an allowlist posture must not depend on enumerating "secret" chars.
+  it("redacts a key whose punctuation is outside any secret-char list", function () {
+    // Regression: redaction must not depend on enumerating "secret" characters.
     const out = redactRpcUrl(
       "https://rpc.example/v3/0123456789abcdef!0123456789abcdef",
     );
-    expect(out).to.equal("https://rpc.example/v3/***");
+    expect(out).to.equal("https://rpc.example/***");
     expect(out).to.not.contain("0123456789abcdef");
   });
 
-  it("redacts a short (<16 char) credential segment", function () {
-    // Regression: short keys were previously left visible by the length-gated heuristic.
-    const out = redactRpcUrl("https://rpc.example/rpc/a1b2c3");
-    expect(out).to.equal("https://rpc.example/rpc/***");
-    expect(out).to.not.contain("a1b2c3");
+  it("redacts a lowercase-only path credential", function () {
+    // Regression: a lowercase word can itself be the key.
+    const out = redactRpcUrl("https://rpc.example/abcdefghij");
+    expect(out).to.equal("https://rpc.example/***");
+    expect(out).to.not.contain("abcdefghij");
   });
 
-  it("keeps a lowercase network-name path segment (no over-redaction of structural parts)", function () {
-    const out = redactRpcUrl("https://rpc.example/eth/mainnet");
-    expect(out).to.equal("https://rpc.example/eth/mainnet");
+  it("redacts a purely-numeric path credential", function () {
+    // Regression: a short number can itself be the key.
+    const out = redactRpcUrl("https://rpc.example/1234");
+    expect(out).to.equal("https://rpc.example/***");
+    expect(out).to.not.contain("/1234");
   });
 
-  it("redacts every query value, keeping the names and endpoint", function () {
+  it("redacts a multi-segment path to a single placeholder", function () {
+    expect(redactRpcUrl("https://rpc.example/eth/mainnet/secretKey123")).to.equal(
+      "https://rpc.example/***",
+    );
+  });
+
+  it("redacts every query value and the path, keeping names and host", function () {
     const out = redactRpcUrl("https://rpc.example/path?apikey=supersecret123456");
     expect(out).to.not.contain("supersecret123456");
     expect(out).to.contain("apikey=");
     expect(out).to.contain("rpc.example");
   });
 
-  it("leaves a credential-free localhost URL unchanged", function () {
+  it("leaves a credential-free host:port URL unchanged (root path)", function () {
     expect(redactRpcUrl("http://127.0.0.1:8545")).to.equal(
       "http://127.0.0.1:8545/",
     );

@@ -722,11 +722,12 @@ export function requireAddress(
 }
 
 // Redact credentials embedded in an RPC URL before it is shown to the user (getConfig),
-// keeping the scheme, host, port and path *structure* so the endpoint stays recognizable.
-// RPC URLs very often carry an API key — Infura/Alchemy/… put it in the path or query,
-// and some providers use HTTP userinfo — and getConfig output is frequently pasted into
-// bug reports or shared on a screen. Best-effort: a value that does not parse as a URL
-// (should not happen for a validated RPC) is returned unchanged.
+// keeping only the scheme, host and port (which identify the provider/endpoint). RPC URLs
+// very often carry an API key — Infura/Alchemy/… put it in the path or query, and some
+// providers use HTTP userinfo — and getConfig output is frequently pasted into bug reports
+// or shared on a screen. The path is redacted by default (any segment can be a key, see
+// below), every query value is masked, and userinfo is dropped. Best-effort: a value that
+// does not parse as a URL (should not happen for a validated RPC) is returned unchanged.
 export function redactRpcUrl(url: string): string {
   let u: URL;
   try {
@@ -738,19 +739,15 @@ export function redactRpcUrl(url: string): string {
     u.username = "***";
     u.password = "";
   }
-  // Redact path segments BY DEFAULT: show a segment only when it is a recognized
-  // STRUCTURAL token — a version like "v3"/"v1"/"2" or a short all-lowercase word like
-  // "rpc"/"eth"/"mainnet" — and redact everything else. A credential is high-entropy
-  // (digits, mixed case, punctuation, or long), so an allowlist is the only reliable
-  // posture: enumerating "secret-looking" characters always misses some (e.g. "a!b") and
-  // cannot catch a short key. Empty segments (leading/trailing "/") are kept. This can
-  // over-redact an unusual non-structural segment but never leaks a credential — the
-  // right trade-off for getConfig output.
-  const STRUCTURAL = /^(v?\d{1,4}|[a-z]{2,12})$/;
-  u.pathname = u.pathname
-    .split("/")
-    .map((seg) => (seg === "" || STRUCTURAL.test(seg) ? seg : "***"))
-    .join("/");
+  // Redact the ENTIRE path by default. Providers embed the API key in a version-prefixed
+  // segment ("/v3/<key>"), a trailing token, or a bare path ("/<token>"), and no heuristic
+  // can reliably tell a key from a structural word — a lowercase word or a short number can
+  // itself be the credential. Keep only scheme/host/port (which still identify the
+  // provider/endpoint) and collapse any non-empty path to "/***". The root path "/" is left
+  // as-is (nothing to hide).
+  if (u.pathname && u.pathname !== "/") {
+    u.pathname = "/***";
+  }
   // RPC query params are almost always API keys — redact every value, keep the names.
   if (u.search) {
     const params = new URLSearchParams(u.search);

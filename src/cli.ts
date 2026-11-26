@@ -791,11 +791,22 @@ export async function createCLI() {
       // The node changed (equal targets returned early above), so any env remembered by
       // setNodeEnv belonged to the previous node and no longer applies — set the node and
       // clear the env id in one write so a failure can't leave a mismatched pair.
-      setCurrentNode(target, null);
+      const saved = setCurrentNode(target, null);
       warnIfEnvShadows("NODE_URL", target);
-      console.log(
-        chalk.green(`Using node: ${target} (version ${status.version})`),
-      );
+      if (saved) {
+        console.log(
+          chalk.green(`Using node: ${target} (version ${status.version})`),
+        );
+      } else {
+        // setCurrentNode applied the switch to this session but could not persist it
+        // (updateConfigFile already said why) — don't report it as a saved selection.
+        console.log(
+          chalk.yellow(
+            `Using node (this session only): ${target} (version ${status.version}) — ` +
+              "could not save it to the config file, so it won't be remembered after a restart.",
+          ),
+        );
+      }
 
       // chainId comes from RPC, not from the node, so the two can disagree. The switch
       // is already committed at this point, so this is a courtesy warning only — bound
@@ -868,14 +879,26 @@ export async function createCLI() {
       }
 
       // Persist node + env id together in one write (no mismatched pair on partial failure).
-      setCurrentNode(target, envId);
+      const saved = setCurrentNode(target, envId);
       warnIfEnvShadows("NODE_URL", target);
       warnIfEnvShadows("COMPUTE_ENV_ID", envId);
-      console.log(
-        chalk.green(
-          `Using node: ${target} (version ${status.version})\nUsing compute env: ${envId}`,
-        ),
-      );
+      if (saved) {
+        console.log(
+          chalk.green(
+            `Using node: ${target} (version ${status.version})\nUsing compute env: ${envId}`,
+          ),
+        );
+      } else {
+        // Applied to this session but not persisted (updateConfigFile already said why) —
+        // don't report it as a saved selection.
+        console.log(
+          chalk.yellow(
+            `Using node (this session only): ${target} (version ${status.version})\n` +
+              `Using compute env (this session only): ${envId}\n` +
+              "Could not save this selection to the config file, so it won't be remembered after a restart.",
+          ),
+        );
+      }
       console.log(
         chalk.yellow(
           "startCompute / startFreeCompute will use this env by default (override with --env).",

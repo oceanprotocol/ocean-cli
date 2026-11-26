@@ -40,6 +40,12 @@ describe("rpcRegistry — redactRpcUrl", function () {
     expect(out).to.not.contain("0123456789abcdef");
   });
 
+  it("redacts a base64/percent-punctuated key-like path segment", function () {
+    const out = redactRpcUrl("https://rpc.example/v1/AbCd+1234567890%3DefGh");
+    expect(out).to.equal("https://rpc.example/v1/***"); // v1 kept, long key redacted
+    expect(out).to.not.contain("1234567890");
+  });
+
   it("redacts every query value, keeping the names and endpoint", function () {
     const out = redactRpcUrl("https://rpc.example/path?apikey=supersecret123456");
     expect(out).to.not.contain("supersecret123456");

@@ -176,13 +176,21 @@ export function getCurrentNodeUrl(): string {
 }
 
 /**
- * Make `nodeUrl` the active Ocean Node for every subsequent command, and persist it to
- * the config file so it is reused on the next start (env `NODE_URL` still wins per start).
+ * Make `nodeUrl` the active Ocean Node for every subsequent command and, in the SAME
+ * config-file write, set or clear its compute env id — so a failed write can never persist
+ * a node with the previous node's (now stale) env id. `envId`: a string sets it, `null`
+ * clears it. `process.env` is always updated (the switch applies to the session); the
+ * return value is whether the change was persisted (false → this session only; the warning
+ * comes from updateConfigFile).
  */
-export function setCurrentNodeUrl(nodeUrl: string): void {
+export function setCurrentNode(nodeUrl: string, envId: string | null): boolean {
   process.env.NODE_URL = nodeUrl;
-  updateConfigFile((f) => {
+  if (envId === null) delete process.env.COMPUTE_ENV_ID;
+  else process.env.COMPUTE_ENV_ID = envId;
+  return updateConfigFile((f) => {
     f.nodeUrl = nodeUrl;
+    if (envId === null) delete f.computeEnvId;
+    else f.computeEnvId = envId;
   });
 }
 
@@ -200,25 +208,6 @@ export function hasNode(): boolean {
  */
 export function getCurrentEnvId(): string {
   return process.env.COMPUTE_ENV_ID || "";
-}
-
-/** Remember the compute environment id for subsequent compute commands (see getCurrentEnvId). */
-export function setCurrentEnvId(envId: string): void {
-  process.env.COMPUTE_ENV_ID = envId;
-  updateConfigFile((f) => {
-    f.computeEnvId = envId;
-  });
-}
-
-/**
- * Forget any remembered compute environment. Called when the active node changes, since an env id
- * belongs to a specific node and is meaningless (or wrong) once a different node is selected.
- */
-export function clearCurrentEnvId(): void {
-  delete process.env.COMPUTE_ENV_ID;
-  updateConfigFile((f) => {
-    delete f.computeEnvId;
-  });
 }
 
 /**

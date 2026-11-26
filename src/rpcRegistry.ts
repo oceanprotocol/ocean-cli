@@ -467,8 +467,10 @@ export async function addChain(
   const hadDefault = defaultChainId !== undefined;
   if (defaultChainId === undefined) defaultChainId = chainId;
   updateConfigFile((f) => {
+    // Start fresh unless `rpc` is a valid object (a hand-edited array would otherwise be
+    // mutated into a malformed array-with-string-keys); keep existing entries when it is.
     const rpc = (
-      f.rpc && typeof f.rpc === "object" ? f.rpc : {}
+      f.rpc && typeof f.rpc === "object" && !Array.isArray(f.rpc) ? f.rpc : {}
     ) as Record<string, string[] | string>;
     rpc[String(chainId)] = deduped;
     f.rpc = rpc;
@@ -520,7 +522,7 @@ export function removeChain(chainId: number): void {
     defaultChainId = remaining.length === 1 ? remaining[0] : undefined;
   }
   updateConfigFile((f) => {
-    if (f.rpc && typeof f.rpc === "object") {
+    if (f.rpc && typeof f.rpc === "object" && !Array.isArray(f.rpc)) {
       delete (f.rpc as Record<string, unknown>)[String(chainId)];
       if (Object.keys(f.rpc).length === 0) delete f.rpc;
     }
@@ -736,9 +738,11 @@ export function redactRpcUrl(url: string): string {
     u.username = "***";
     u.password = "";
   }
-  // Redact opaque, key-like path segments (long [A-Za-z0-9_-] tokens such as an Infura
-  // project id), while keeping short structural ones like "v3" / "rpc" / "eth".
-  const SECRET_SEGMENT = /^[A-Za-z0-9_-]{16,}$/;
+  // Redact opaque, key-like path segments — long tokens including base64 / url-safe /
+  // percent-encoded punctuation (an Infura project id, an Alchemy key, …) — while keeping
+  // short structural ones like "v3" / "rpc" / "eth" (the length gate protects network
+  // names such as "mainnet"). A whitelist-only approach would over-redact those names.
+  const SECRET_SEGMENT = /^[A-Za-z0-9_\-+=%.]{16,}$/;
   u.pathname = u.pathname
     .split("/")
     .map((seg) => (SECRET_SEGMENT.test(seg) ? "***" : seg))

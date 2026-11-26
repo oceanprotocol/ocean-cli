@@ -25,9 +25,7 @@ import {
   hasNode,
   nodeChainIds,
   nodeSubsidyInfo,
-  setCurrentNodeUrl,
-  setCurrentEnvId,
-  clearCurrentEnvId,
+  setCurrentNode,
   startP2P,
   validateNode,
 } from "./nodeConnection.js";
@@ -579,6 +577,12 @@ export async function createCLI() {
   // Bare interactive start (no command, REPL mode): let the user in so they can addChain.
   const isBareLoopStart =
     argv.length === 0 && process.env.AVOID_LOOP_RUN !== "true";
+  // Node-switch commands (setNode / setNodeEnv) replace the active node, so they must be
+  // able to run even when the *current* saved node is a P2P URI under DISABLE_P2P (they are
+  // the fix), and the startup reachability probe of the node they are about to drop is moot.
+  const isNodeSwitch = ["setNode", "useNode", "setNodeEnv", "useNodeEnv"].includes(
+    argv[0],
+  );
 
   if (!isHelpOrVersion) {
     const pathProblem = configPathProblem();
@@ -633,13 +637,14 @@ export async function createCLI() {
   // NODE_FREE_COMMANDS are accepted until `setNode` picks a node (see the gate below).
   if (!isHelpOrVersion) {
     // A saved P2P node plus DISABLE_P2P is a contradiction: no node-using command could
-    // reach it. Exit for those — but NOT for the config/bootstrap commands or a bare REPL
-    // start, which touch only the local config file and are the only way to escape the
-    // deadlock (e.g. `unsetConfig nodeUrl`, `setNode <http-url>`). Blocking them too would
-    // leave hand-editing the JSON as the user's only recourse.
+    // reach it. Exit for those — but NOT for the config/bootstrap commands, a bare REPL
+    // start, or a node-switch command, which are the ways to escape the deadlock
+    // (`unsetConfig nodeUrl`, or `setNode <http-url>` to replace the P2P node). Blocking
+    // them too would leave hand-editing the JSON as the user's only recourse.
     if (
       !isBootstrap &&
       !isBareLoopStart &&
+      !isNodeSwitch &&
       process.env.DISABLE_P2P === "true" &&
       isP2pUri(getCurrentNodeUrl())
     ) {
@@ -665,10 +670,12 @@ export async function createCLI() {
       startP2P(process.env.NODE_URL);
     }
 
-    if (hasNode()) {
+    if (hasNode() && !isBootstrap && !isNodeSwitch) {
       // Confirms the startup node is reachable before the user types anything. For a
       // P2P node the status call dials the peer, which is what the old wait-for-peer
-      // polling loop used to do.
+      // polling loop used to do. Skipped for config/bootstrap and node-switch commands:
+      // they do not use the saved node (a node-switch is about to replace it), so probing
+      // it is wasted work and, under DISABLE_P2P + a P2P node, a misleading error.
       const status = await validateNode(getCurrentNodeUrl());
       if (status) {
         console.log(
@@ -684,7 +691,7 @@ export async function createCLI() {
           ),
         );
       }
-    } else {
+    } else if (!hasNode()) {
       console.log(
         chalk.yellow(
           "No Ocean Node configured. Run `setNode <nodeUrl>` to choose one — " +
@@ -781,10 +788,10 @@ export async function createCLI() {
         return;
       }
 
-      setCurrentNodeUrl(target);
       // The node changed (equal targets returned early above), so any env remembered by
-      // setNodeEnv belonged to the previous node and no longer applies.
-      clearCurrentEnvId();
+      // setNodeEnv belonged to the previous node and no longer applies — set the node and
+      // clear the env id in one write so a failure can't leave a mismatched pair.
+      setCurrentNode(target, null);
       warnIfEnvShadows("NODE_URL", target);
       console.log(
         chalk.green(`Using node: ${target} (version ${status.version})`),
@@ -860,8 +867,8 @@ export async function createCLI() {
         return;
       }
 
-      setCurrentNodeUrl(target);
-      setCurrentEnvId(envId);
+      // Persist node + env id together in one write (no mismatched pair on partial failure).
+      setCurrentNode(target, envId);
       warnIfEnvShadows("NODE_URL", target);
       warnIfEnvShadows("COMPUTE_ENV_ID", envId);
       console.log(
@@ -1580,6 +1587,13 @@ export async function createCLI() {
           return;
         }
         if (key === "defaultChainId") {
+          // Load the registry first so getDefaultChainId() reflects the saved/resolved
+          // default (the full getConfig path gets this via renderRpcSection()).
+          try {
+            loadRegistry();
+          } catch {
+            /* a malformed env RPC is reported at startup; show what we can */
+          }
           console.log(renderDefaultChainLine(file));
           return;
         }
@@ -1741,7 +1755,7 @@ export async function createCLI() {
       if (!entry) {
         throw knownConfigKeyError(key);
       }
-      updateConfigFile((f) => {
+      const removed = updateConfigFile((f) => {
         deleteFileValue(f, entry.key);
         if (entry.key === "nodeUrl") delete f.computeEnvId;
       });
@@ -1760,7 +1774,17 @@ export async function createCLI() {
         );
       }
       if (entry.key === "addressFile") clearConfigCache();
-      console.log(chalk.green(`${entry.key} removed from ${configFilePath()}.`));
+      if (removed) {
+        console.log(chalk.green(`${entry.key} removed from ${configFilePath()}.`));
+      } else {
+        // updateConfigFile already warned why it could not write; don't claim a
+        // persistent removal. The session env change above still applies.
+        console.log(
+          chalk.yellow(
+            `${entry.key} cleared for this session only — the config file was not updated.`,
+          ),
+        );
+      }
       if (entry.key === "nodeUrl" && !hasNode()) {
         console.log(
           chalk.yellow("No Ocean Node set. Run `setNode <nodeUrl>` to pick one."),

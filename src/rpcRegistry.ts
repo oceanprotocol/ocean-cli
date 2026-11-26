@@ -738,14 +738,18 @@ export function redactRpcUrl(url: string): string {
     u.username = "***";
     u.password = "";
   }
-  // Redact opaque, key-like path segments — long tokens including base64 / url-safe /
-  // percent-encoded punctuation (an Infura project id, an Alchemy key, …) — while keeping
-  // short structural ones like "v3" / "rpc" / "eth" (the length gate protects network
-  // names such as "mainnet"). A whitelist-only approach would over-redact those names.
-  const SECRET_SEGMENT = /^[A-Za-z0-9_\-+=%.]{16,}$/;
+  // Redact path segments BY DEFAULT: show a segment only when it is a recognized
+  // STRUCTURAL token — a version like "v3"/"v1"/"2" or a short all-lowercase word like
+  // "rpc"/"eth"/"mainnet" — and redact everything else. A credential is high-entropy
+  // (digits, mixed case, punctuation, or long), so an allowlist is the only reliable
+  // posture: enumerating "secret-looking" characters always misses some (e.g. "a!b") and
+  // cannot catch a short key. Empty segments (leading/trailing "/") are kept. This can
+  // over-redact an unusual non-structural segment but never leaks a credential — the
+  // right trade-off for getConfig output.
+  const STRUCTURAL = /^(v?\d{1,4}|[a-z]{2,12})$/;
   u.pathname = u.pathname
     .split("/")
-    .map((seg) => (SECRET_SEGMENT.test(seg) ? "***" : seg))
+    .map((seg) => (seg === "" || STRUCTURAL.test(seg) ? seg : "***"))
     .join("/");
   // RPC query params are almost always API keys — redact every value, keep the names.
   if (u.search) {

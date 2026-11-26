@@ -667,39 +667,14 @@ export function updateConfigFile(mutator: (file: ConfigFile) => void): boolean {
     fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
     const data = JSON.stringify(raw, null, 2) + "\n";
     fs.writeFileSync(tmp, data, { mode: 0o600 });
-    try {
-      fs.renameSync(tmp, file);
-    } catch {
-      // Some Windows / network filesystems refuse to rename OVER an existing file. Move the
-      // live file out of the way first (rename to a *new* name, which those filesystems do
-      // allow), then rename the temp into place and drop the backup. A complete file is on
-      // disk at every step, so a crash never truncates the config — unlike a direct
-      // writeFileSync over the live file.
-      const bak = `${file}.${process.pid}.${Date.now().toString(36)}.bak`;
-      try {
-        if (fs.existsSync(file)) fs.renameSync(file, bak);
-        fs.renameSync(tmp, file);
-        fs.rmSync(bak, { force: true });
-      } catch (swapErr) {
-        // Could not complete the swap — restore the original (if we moved it) and fail
-        // without having altered the live file's contents. The outer catch cleans up tmp.
-        try {
-          if (fs.existsSync(bak) && !fs.existsSync(file)) fs.renameSync(bak, file);
-        } catch {
-          /* best effort */
-        }
-        throw swapErr;
-      }
-    }
-    // writeFileSync's `mode` only applies when it CREATES the file; the fallback write
-    // over a pre-existing (possibly 0644) file leaves its old mode. Force 0600.
-    if (process.platform !== "win32") {
-      try {
-        fs.chmodSync(file, 0o600);
-      } catch {
-        /* best effort */
-      }
-    }
+    // Atomic replace via rename. If it fails — e.g. a network filesystem that refuses to
+    // rename over an existing file — let it propagate to the outer catch, which removes the
+    // temp file and returns a save failure WITHOUT touching the destination. We never move,
+    // truncate, or overwrite the live config, so a valid previous configuration always
+    // survives a failed save intact (the change still applies to this session via
+    // process.env; it just won't persist across a restart). The renamed file keeps the temp
+    // file's 0600 mode, so no chmod is needed.
+    fs.renameSync(tmp, file);
     return true;
   } catch (e) {
     console.warn(

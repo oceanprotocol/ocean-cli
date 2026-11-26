@@ -588,6 +588,13 @@ export async function createCLI() {
   const isNodeSwitch = ["setNode", "useNode", "setNodeEnv", "useNodeEnv"].includes(
     argv[0],
   );
+  // getSubsidyStatus reads one provider contract on-chain via RPC and never touches the saved
+  // node, so it must run even under the DISABLE_P2P + saved-P2P-node contradiction below (that
+  // deadlock only affects node-using commands) and needs no startup reachability probe.
+  const isNodeFreeRpcCommand = [
+    "getSubsidyStatus",
+    "getSubsidyProviderStatus",
+  ].includes(argv[0]);
 
   if (!isHelpOrVersion) {
     const pathProblem = configPathProblem();
@@ -650,6 +657,7 @@ export async function createCLI() {
       !isBootstrap &&
       !isBareLoopStart &&
       !isNodeSwitch &&
+      !isNodeFreeRpcCommand &&
       process.env.DISABLE_P2P === "true" &&
       isP2pUri(getCurrentNodeUrl())
     ) {
@@ -675,7 +683,7 @@ export async function createCLI() {
       startP2P(process.env.NODE_URL);
     }
 
-    if (hasNode() && !isBootstrap && !isNodeSwitch) {
+    if (hasNode() && !isBootstrap && !isNodeSwitch && !isNodeFreeRpcCommand) {
       // Confirms the startup node is reachable before the user types anything. For a
       // P2P node the status call dials the peer, which is what the old wait-for-peer
       // polling loop used to do. Skipped for config/bootstrap and node-switch commands:

@@ -3994,13 +3994,13 @@ export class Commands {
     }
     if (chainId === undefined) {
       const want = normalizeSubsidyAddress(providerAddress);
+      const matches: number[] = [];
       for (const [cid, list] of Object.entries(listAllSubsidyProviders())) {
         if (list.some((e) => normalizeSubsidyAddress(e.address) === want)) {
-          chainId = Number(cid);
-          break;
+          matches.push(Number(cid));
         }
       }
-      if (chainId === undefined) {
+      if (matches.length === 0) {
         console.error(
           chalk.red(
             `Could not determine the chain for ${providerAddress}. It is not in your saved subsidy providers (add it with addSubsidyProvider, or list them with listSubsidyProviders) — pass a chainId: getSubsidyStatus <providerAddress> <tokenAddress> <chainId>.`,
@@ -4008,6 +4008,17 @@ export class Commands {
         );
         return;
       }
+      if (matches.length > 1) {
+        console.error(
+          chalk.red(
+            `${providerAddress} is saved on multiple chains (${matches.join(
+              ", ",
+            )}) — pass a chainId to disambiguate: getSubsidyStatus <providerAddress> <tokenAddress> <chainId>.`,
+          ),
+        );
+        return;
+      }
+      chainId = matches[0];
     }
 
     let signer: Signer;

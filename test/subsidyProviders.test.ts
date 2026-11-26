@@ -152,7 +152,7 @@ describe("prefundedLockUnits", () => {
   });
 });
 
-// Which provider contracts `getSubsidyStatus` reports on: the node's advertised list and the
+// Which provider contracts `getNodeSubsidyStatus` reports on: the node's advertised list and the
 // caller's `--subsidy` list, mixed according to the node's provider filter.
 describe("resolveSubsidyProviderAddresses", () => {
   const CHAIN = 8453;

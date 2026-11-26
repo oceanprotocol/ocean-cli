@@ -803,7 +803,7 @@ export interface ResolvedSubsidyProviders {
 }
 
 /**
- * Resolve the subsidy-provider contract addresses `getSubsidyStatus` reports on. The Ocean
+ * Resolve the subsidy-provider contract addresses `getNodeSubsidyStatus` reports on. The Ocean
  * Node is the source of truth for what is usable, so nothing is read from bundled config /
  * ADDRESS_FILE — the candidates are the node's status `subsidyProviders[chainId]` and the
  * caller's own `--subsidy` list, and the node's `subsidyProviderFilter` decides how they mix:

@@ -115,6 +115,10 @@ const NODE_FREE_COMMANDS = new Set([
   "listSubsidyProviders",
   "removeSubsidyProvider",
   "toggleSubsidyProvider",
+  // Query one subsidy-provider contract directly by address. Works with just --chainId (no
+  // node needed); when --chainId is omitted it infers the chain from the active node, so it
+  // must be reachable before a node is picked too.
+  "getSubsidyStatus",
 ]);
 
 // Commands that must work on a fresh install, before any RPC (or signer) is configured:
@@ -268,7 +272,8 @@ const HELP_GROUPS: HelpGroup[] = [
   {
     heading: "Subsidy providers",
     commands: [
-      "getSubsidyProviders",
+      "getNodeSubsidyProviders",
+      "getNodeSubsidyStatus",
       "getSubsidyStatus",
       "addSubsidyProvider",
       "listSubsidyProviders",
@@ -361,7 +366,7 @@ export function formatGroupedHelp(program: Command): string {
 const pkg = createRequire(import.meta.url)("../package.json");
 
 // Print the subsidy-provider info a node advertises in its status (shared by getNode and
-// getSubsidyProviders). `indent` lets getNode nest it under the node summary.
+// getNodeSubsidyProviders). `indent` lets getNode nest it under the node summary.
 function printSubsidyInfo(
   info: { providers: Record<string, string[]>; filter: boolean },
   indent = "  ",
@@ -964,12 +969,12 @@ export async function createCLI() {
       }
     });
 
-  // getSubsidyProviders command — show the subsidy-provider contracts the current node
+  // getNodeSubsidyProviders command — show the subsidy-provider contracts the current node
   // advertises per chain (and whether it enforces a whitelist on user-supplied ones).
   // Node-dependent (deliberately NOT in NODE_FREE_COMMANDS): the preAction gate refuses it
   // until a node is set. Implemented inline like getNode — no signer/Commands needed.
   program
-    .command("getSubsidyProviders")
+    .command("getNodeSubsidyProviders")
     .alias("subsidyProviders")
     .description(
       "Show the subsidy-provider contracts the current Ocean Node supports (per chain)",
@@ -993,12 +998,12 @@ export async function createCLI() {
       printSubsidyInfo(nodeSubsidyInfo(status));
     });
 
-  // getSubsidyStatus command — read-only, provider-agnostic subsidy report for a token on a
+  // getNodeSubsidyStatus command — read-only, provider-agnostic subsidy report for a token on a
   // chain: kind, per-window buckets (limit/used/remaining), claimable-now amount, contract
   // balance, eligibility, and (with --node/--jobType/--amount) a quote. Provider addresses are
   // discovered from the node; --subsidy only narrows to a subset the node advertises.
   program
-    .command("getSubsidyStatus")
+    .command("getNodeSubsidyStatus")
     .alias("subsidyStatus")
     .description(
       "Show subsidy limits / remaining credit for a token from the node's subsidy providers",
@@ -1029,8 +1034,52 @@ export async function createCLI() {
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
       if ((await routeExplicit(commands, options.chainId)) === null) return;
-      await commands.getSubsidyStatus(token || options.token, {
+      await commands.getNodeSubsidyStatus(token || options.token, {
         subsidy: options.subsidy,
+        node: options.node,
+        jobType: options.jobType,
+        amount: options.amount,
+      });
+    });
+
+  // getSubsidyStatus command — read-only report for ONE subsidy-provider contract the caller
+  // names directly (by address), independent of the node's advertised list. Node-free: it needs
+  // only an RPC for the provider's chain. The chain is resolved as --chainId / positional chainId
+  // → the chain your saved subsidy providers (addSubsidyProvider / listSubsidyProviders) record
+  // this provider on → error asking for a chainId (required when the provider is not saved).
+  program
+    .command("getSubsidyStatus")
+    .alias("getSubsidyProviderStatus")
+    .description(
+      "Show limits / remaining credit for one subsidy-provider contract (by address) for a token",
+    )
+    .argument("<subsidyProviderAddress>", "Subsidy-provider contract address")
+    .argument("<tokenAddress>", "Token address to report limits/credit for")
+    .argument(
+      "[chainId]",
+      "Chain the provider lives on (required when it is not in your saved subsidy providers)",
+    )
+    .option(
+      "--chainId <chainId>",
+      "Chain the provider lives on (overrides the positional chainId; inferred from your saved subsidy providers when omitted)",
+    )
+    .option(
+      "--node <urlOrPeerId>",
+      "Ocean Node whose on-chain address is used for the isNodeAllowed line / quote (URL / peer id / multiaddr); default: active node",
+    )
+    .option(
+      "--jobType <type>",
+      "Job type for isJobTypeSubsidized / quoteSubsidy (compute | service | none)",
+    )
+    .option(
+      "--amount <value>",
+      "Job amount to quote a subsidy for, in natural token units (e.g. 1.5). Needs --jobType and a node address.",
+    )
+    .action(async (subsidyProviderAddress, tokenAddress, chainId, options) => {
+      const { signer, chainId: defaultChainId } = await initializeSigner();
+      const commands = new Commands(signer, defaultChainId);
+      await commands.getSubsidyProviderStatus(subsidyProviderAddress, tokenAddress, {
+        chainId: options.chainId || chainId,
         node: options.node,
         jobType: options.jobType,
         amount: options.amount,

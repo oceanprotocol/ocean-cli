@@ -176,7 +176,7 @@ export class Commands {
     }
     this.oceanNodeUrl = process.env.NODE_URL;
     this.indexingParams = getIndexingWaitSettings();
-    console.log("Using Ocean Node URL :", this.oceanNodeUrl);
+    console.error("Using Ocean Node URL :", this.oceanNodeUrl);
     this.config.nodeUri = this.oceanNodeUrl;
   }
 
@@ -3237,7 +3237,9 @@ export class Commands {
       this.oceanNodeUrl,
       options,
     );
-    console.log(`Auth token successfully generated: ${authToken}`);
+    // Only the token goes to stdout, so `generateAuthToken | …` stays parseable;
+    // the human-readable summary below is written to stderr.
+    console.log(authToken);
     this.printAuthTokenSummary(authToken, options);
   }
 

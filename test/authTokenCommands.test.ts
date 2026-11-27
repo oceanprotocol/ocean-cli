@@ -107,8 +107,10 @@ describe("Auth-token CLI commands (infra-free)", function () {
       const { output } = await runRepl(["getNodeAuthTokenPolicy", "exit"], {
         env: { NODE_URL: undefined },
       });
-      // Not in NODE_FREE_COMMANDS → the preAction gate refuses it.
-      expect(output.toLowerCase()).to.contain("node");
+      // Not in NODE_FREE_COMMANDS → the preAction gate refuses it with this exact
+      // message. Asserting the specific text (not just "node", which the command
+      // name itself contains) means an unknown-command error can't satisfy it.
+      expect(output).to.contain("No Ocean Node set");
       expect(output).to.not.contain("Auth-token policy for");
     });
   });

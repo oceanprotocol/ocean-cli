@@ -1,18 +1,41 @@
 import { expect } from "chai";
+import { ProviderInstance } from "@oceanprotocol/lib";
 
-describe("Ocean Node Root Endpoint", () => {
-  it("should return 200 OK", async () => {
-    const response = await fetch("http://localhost:8001/");
-    const responseBody = await response.json();
+// Node status is fetched through ocean.js `getNodeStatus` (which uses the STATUS
+// command over `POST /directCommand`), not a raw `fetch` to the root endpoint, so
+// this is immune to the ocean-node #1622 root-endpoint rename (`nodeId`/
+// `providerAddress`/`nodePublicKey`/`software` are gone; the status object exposes
+// `id`/`address`/`publicKey`). It runs over the node's HTTP API, which is up in
+// both CI transport legs; the P2P transport itself is exercised by the full
+// system-test suite (which runs the CLI with NODE_URL set to the node's peer id).
+const NODE_HTTP = "http://127.0.0.1:8001";
 
-    expect(response.status).to.equal(200);
-    expect(responseBody).to.have.property("id");
-    expect(responseBody).to.have.property("address");
-    expect(responseBody).to.have.property("provider");
-    expect(responseBody).to.have.property("version");
+describe("Ocean Node status (via getNodeStatus)", function () {
+  this.timeout(30_000);
+
+  it("should return the full node status object", async () => {
+    const status = await ProviderInstance.getNodeStatus(
+      NODE_HTTP,
+      AbortSignal.timeout(15_000),
+    );
+
+    expect(status, `node ${NODE_HTTP} should be reachable`).to.not.be.null;
+    expect(status).to.have.property("id");
+    expect(status).to.have.property("publicKey");
+    expect(status).to.have.property("address");
+    expect(status).to.have.property("version");
+    expect(status).to.have.property("http");
+    expect(status).to.have.property("p2p");
+    expect(status).to.have.property("provider");
+    expect(status).to.have.property("indexer");
+    expect(status).to.have.property("supportedStorage");
+    expect(status).to.have.property("uptime");
+    expect(status).to.have.property("platform");
+    expect(status).to.have.property("codeHash");
+    expect(status).to.have.property("allowedAdmins");
 
     // Check if version is "0.0.1" or greater
-    const [major, minor, patch] = responseBody.version.split(".").map(Number);
+    const [major, minor, patch] = status.version.split(".").map(Number);
     expect(major).to.be.at.least(0);
     if (major === 0) {
       expect(minor).to.be.at.least(0);
@@ -20,38 +43,6 @@ describe("Ocean Node Root Endpoint", () => {
         expect(patch).to.be.at.least(1);
       }
     }
-  });
-});
-
-describe("Direct Command Endpoint", () => {
-  it("should return correct status", async () => {
-    const response = await fetch("http://localhost:8001/directCommand", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ command: "status" }),
-    });
-    const responseBody = await response.json();
-
-    expect(response.status).to.equal(200);
-    expect(responseBody).to.have.property("id");
-    expect(responseBody).to.have.property("publicKey");
-    expect(responseBody).to.have.property("address");
-    expect(responseBody).to.have.property("version");
-    expect(responseBody).to.have.property("http");
-    expect(responseBody).to.have.property("p2p");
-    expect(responseBody).to.have.property("provider");
-    expect(responseBody).to.have.property("indexer");
-    expect(responseBody).to.have.property("supportedStorage");
-    expect(responseBody).to.have.property("uptime");
-    expect(responseBody).to.have.property("platform");
-    expect(responseBody).to.have.property("codeHash");
-    expect(responseBody).to.have.property("allowedAdmins");
-
-    // Check the values of some of the properties
-    expect(responseBody.http).to.be.true;
-    expect(responseBody.p2p).to.be.true;
   });
 });
 

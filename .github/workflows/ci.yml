@@ -42,7 +42,7 @@ jobs:
         with:
           persist-credentials: false
           repository: 'oceanprotocol/ocean.js'
-          ref: 'feat/node-neutral-query'
+          ref: 'rc_11.0.0'
           path: 'ocean.js'
       - name: Build and link ocean.js
         working-directory: ${{ github.workspace }}/ocean.js
@@ -207,7 +207,7 @@ jobs:
         with:
           persist-credentials: false
           repository: 'oceanprotocol/ocean.js'
-          ref: 'feat/node-neutral-query'
+          ref: 'rc_11.0.0'
           path: 'ocean.js'
       - name: Build and link ocean.js
         working-directory: ${{ github.workspace }}/ocean.js

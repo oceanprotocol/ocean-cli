@@ -5,6 +5,8 @@ import path from "path";
 import { dirname } from "path";
 import { fileURLToPath } from "url";
 
+import { DID_RE, DID_RE_ANCHORED } from "./util.js";
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 describe("Ocean CLI Interactive Publishing", function () {
@@ -68,10 +70,10 @@ describe("Ocean CLI Interactive Publishing", function () {
         expect(fullOutput).to.contain("Asset successfully published with DID:");
         expect(fullOutput).to.contain("Metadata successfully updated for DID:");
 
-        const match = fullOutput.match(/did:op:[a-f0-9]{64}/);
+        const match = fullOutput.match(DID_RE);
         if (match) {
           publishedDid = match[0];
-          expect(publishedDid).to.match(/^did:op:[a-f0-9]{64}$/);
+          expect(publishedDid).to.match(DID_RE_ANCHORED);
         } else {
           throw new Error("DID not found in output");
         }

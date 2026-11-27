@@ -2,10 +2,15 @@ import { ethers, hexlify, Signer, toBeHex } from "ethers";
 import { promises as fs, readFileSync } from "fs";
 import * as path from "path";
 import { wrapEthersSigner } from "@oasisprotocol/sapphire-ethers-v6";
-import { Asset, DDO, DDOManager } from "@oceanprotocol/ddo-js";
+import {
+  Asset,
+  DDO,
+  DDOManager,
+  getDdoChainId,
+  isComputeService,
+} from "@oceanprotocol/ddo-js";
 import {
   AccesslistFactory,
-  Aquarius,
   Nft,
   NftFactory,
   ProviderInstance,
@@ -135,7 +140,6 @@ export async function createAssetUtil(
   ddo: DDO,
   oceanNodeUrl: string,
   config: Config,
-  aquariusInstance: Aquarius,
   encryptDDO: boolean = true,
   templateIDorAddress: string | number = 1, // If string, it's template address , otherwise, it's templateId,
   providerFeeToken: string = ZERO_ADDRESS,
@@ -178,7 +182,6 @@ export async function createAssetUtil(
       encryptDDO,
       oceanNodeUrl,
       providerFeeToken,
-      aquariusInstance,
       accessListFactory,
       allowAccessList,
       denyAccessList,
@@ -194,7 +197,6 @@ export async function createAssetUtil(
     encryptDDO,
     oceanNodeUrl,
     providerFeeToken,
-    aquariusInstance,
   );
 }
 
@@ -202,7 +204,6 @@ export async function updateAssetMetadata(
   owner: Signer,
   updatedDdo: Asset,
   oceanNodeUrl: string,
-  aquariusInstance: Aquarius,
   encryptDDO: boolean = true,
 ): Promise<any> {
   const nft = new Nft(
@@ -211,11 +212,12 @@ export async function updateAssetMetadata(
   );
   let flags;
   let metadata;
-  const validateResult = await aquariusInstance.validate(
+  const validateResult = await ProviderInstance.validateDdo(
+    oceanNodeUrl,
     updatedDdo,
     owner,
-    oceanNodeUrl,
   );
+  if (!validateResult) throw new Error("DDO validation failed");
   const ddoInstance = DDOManager.getDDOClass(updatedDdo);
   const { chainId, nftAddress } = ddoInstance.getDDOFields();
   if (encryptDDO) {
@@ -260,9 +262,8 @@ export async function handleComputeOrder(
   consumeMarkerFee?: ConsumeMarketFee,
 ) {
   const ddoInstance = DDOManager.getDDOClass(asset);
-  const { services } = ddoInstance.getDDOFields();
-  const service = services?.[serviceIndex];
-  if (!Number.isInteger(serviceIndex) || serviceIndex < 0 || !service) {
+  const service = ddoInstance.getServiceByIndex(serviceIndex);
+  if (!service) {
     throw new Error(
       `Service index ${serviceIndex} not found in asset ${asset.id}`,
     );
@@ -338,24 +339,19 @@ export async function isOrderable(
   algorithm: ComputeAlgorithm,
   algorithmDDO: Asset | DDO,
 ): Promise<boolean> {
-  const ddoInstanceAsset = DDOManager.getDDOClass(asset);
-  const { services: servicesAsset } = ddoInstanceAsset.getDDOFields();
-  const datasetService = servicesAsset.find((s) => s.id === serviceId);
+  const datasetService = DDOManager.getDDOClass(asset).getService(serviceId);
   if (!datasetService) return false;
 
-  if (datasetService.type === "compute") {
+  if (isComputeService(datasetService)) {
     // A DID-based algorithm carries a `documentId` (and, for convenience, its
     // `meta`); a raw algorithm carries only `meta` (a fileObject, no DID). Check
     // `documentId` first so published algorithms are validated against the
     // dataset's provider rather than the raw-algorithm allowance.
     if (algorithm.documentId) {
-      const servicesAlgo = algorithmDDO
-        ? DDOManager.getDDOClass(algorithmDDO).getDDOFields().services
+      const algoService = algorithmDDO
+        ? DDOManager.getDDOClass(algorithmDDO).getService(algorithm.serviceId)
         : undefined;
-      const algoService = servicesAlgo?.find(
-        (s) => s.id === algorithm.serviceId,
-      );
-      if (algoService && algoService.type === "compute") {
+      if (isComputeService(algoService)) {
         if (algoService.serviceEndpoint !== datasetService.serviceEndpoint) {
           LoggerInstance.error(
             "ERROR: Both assets with compute service are not served by the same provider",
@@ -424,14 +420,13 @@ export function parseComputeInput(
 
 // Resolves the raw datasets/algo CLI strings into fully-built ComputeAsset[] and
 // ComputeAlgorithm, plus index-aligned DDO arrays (null where the entry is raw).
-// DID entries are resolved via Aquarius; raw (fileObject) entries are passed through
+// DID entries are resolved on nodeUri; raw (fileObject) entries are passed through
 // untouched. Returns null (after logging) when a DID cannot be resolved.
 export async function resolveComputeInputs(
   datasetsInput: string,
   algoInput: string,
-  aquarius: Aquarius,
   indexingParams: IndexerWaitParams,
-  fallbackProviderURI: string,
+  nodeUri: string,
 ): Promise<ResolvedComputeInputs | null> {
   const datasetTokens = parseComputeInput(datasetsInput);
 
@@ -440,7 +435,8 @@ export async function resolveComputeInputs(
 
   for (const token of datasetTokens) {
     if (typeof token === "string") {
-      const dataDdo = await aquarius.waitForIndexer(
+      const dataDdo = await ProviderInstance.waitForIndexer(
+        nodeUri,
         token,
         undefined,
         undefined,
@@ -453,14 +449,14 @@ export async function resolveComputeInputs(
         );
         return null;
       }
-      const { services } = DDOManager.getDDOClass(dataDdo).getDDOFields();
-      if (!services?.[0]) {
+      const service = DDOManager.getDDOClass(dataDdo).getServiceByIndex(0);
+      if (!service) {
         console.error(`Error: dataset ${token} has no services.`);
         return null;
       }
       assets.push({
         documentId: dataDdo.id,
-        serviceId: services[0].id,
+        serviceId: service.id,
       });
       ddos.push(dataDdo);
     } else if (token && typeof token === "object") {
@@ -484,11 +480,11 @@ export async function resolveComputeInputs(
     }
   }
 
-  let providerURI = fallbackProviderURI;
+  let providerURI = nodeUri;
   const firstDdo = ddos.find((d) => d !== null);
   if (firstDdo) {
-    const { services } = DDOManager.getDDOClass(firstDdo).getDDOFields();
-    providerURI = services[0].serviceEndpoint;
+    providerURI =
+      DDOManager.getDDOClass(firstDdo).getServiceByIndex(0).serviceEndpoint;
   }
 
   // Resolve the algorithm (single entry: DID or raw object)
@@ -498,7 +494,8 @@ export async function resolveComputeInputs(
   let algoDdo: Asset | DDO | null = null;
 
   if (typeof algoToken === "string") {
-    algoDdo = await aquarius.waitForIndexer(
+    algoDdo = await ProviderInstance.waitForIndexer(
+      nodeUri,
       algoToken,
       undefined,
       undefined,
@@ -511,9 +508,10 @@ export async function resolveComputeInputs(
       );
       return null;
     }
-    const { services, metadata } =
-      DDOManager.getDDOClass(algoDdo).getDDOFields();
-    if (!services?.[0]) {
+    const algoInstance = DDOManager.getDDOClass(algoDdo);
+    const { metadata } = algoInstance.getDDOFields();
+    const service = algoInstance.getServiceByIndex(0);
+    if (!service) {
       console.error(`Error: algorithm ${algoToken} has no services.`);
       return null;
     }
@@ -523,7 +521,7 @@ export async function resolveComputeInputs(
     }
     algo = {
       documentId: algoDdo.id,
-      serviceId: services[0].id,
+      serviceId: service.id,
       meta: metadata.algorithm,
     };
   } else if (algoToken && typeof algoToken === "object") {
@@ -675,17 +673,6 @@ export function toBoolean(value) {
 // Multi-chain compute helpers (Phase 3).
 // ---------------------------------------------------------------------------
 
-// A DDO's chainId lives at the top level in 4.1.0 DDOs but under
-// `credentialSubject.chainId` in v5 DDOs — read whichever is present so both metadata
-// versions resolve to the right chain (publish/edit routing and compute ordering alike).
-export function getDdoChainId(ddo: unknown): unknown {
-  const d = ddo as {
-    chainId?: unknown;
-    credentialSubject?: { chainId?: unknown };
-  };
-  return d?.chainId ?? d?.credentialSubject?.chainId;
-}
-
 /**
  * The set of chainIds a compute job actually touches: the payment/escrow chain plus
  * every DID-based dataset/algorithm DDO's own chain (a job may mix assets across
@@ -770,6 +757,37 @@ export function parseSubsidyProviders(raw?: string): string[] | undefined {
   const trimmed = raw.trim();
   if (trimmed === "" || trimmed.toLowerCase() === "none") return [];
   return trimmed.split(",").map((a) => ethers.getAddress(a.trim()));
+}
+
+/**
+ * Resolve the job id for the job-only compute commands (`getJobStatus`,
+ * `stopCompute`) from their positional arguments and `--job` option.
+ *
+ * The node needs only a job id to report or stop a job, so the dataset DID the
+ * CLI used to demand is gone. For backward compatibility the old positional
+ * forms are still accepted and their extra values ignored:
+ *   - `getJobStatus <jobId>`                         (new, canonical)
+ *   - `getJobStatus <datasetDid> <jobId>`            (legacy)
+ *   - `getJobStatus <datasetDid> <jobId> <agreement>`(legacy)
+ * A leading positional that looks like a DID (`did:…`) is dropped; the first
+ * remaining positional is the job id. `--job` always wins over positionals.
+ * Pure; returns `undefined` when no job id can be determined.
+ */
+export function resolveJobId(
+  pos1?: string,
+  pos2?: string,
+  pos3?: string,
+  options?: { job?: string },
+): string | undefined {
+  if (options?.job) return options.job;
+  const positionals = [pos1, pos2, pos3].filter(
+    (v): v is string => v !== undefined && v !== "",
+  );
+  // Legacy form led with a dataset DID; it is not needed to query the node.
+  if (positionals.length > 0 && positionals[0].startsWith("did:")) {
+    positionals.shift();
+  }
+  return positionals[0];
 }
 
 export interface ResolvedSubsidyProviders {

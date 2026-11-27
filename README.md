@@ -25,7 +25,7 @@ Built on [`@oceanprotocol/lib`](https://github.com/oceanprotocol/ocean.js) (ocea
 
 ## Contents
 
-[Requirements](#requirements) | [Install](#install) | [Quick start](#quick-start) | [Configuration](#configuration) | [How the CLI works](#how-the-cli-works) | [Nodes and chains](#nodes-and-chains) | [Command guide](#command-guide) | [Command reference](#command-reference) | [Sample metadata](#sample-metadata-files) | [Troubleshooting](#troubleshooting) | [Development](#development) | [License](#license)
+[Requirements](#requirements) | [Install](#install) | [Quick start](#quick-start) | [Configuration](#configuration) | [How the CLI works](#how-the-cli-works) | [Nodes and chains](#nodes-and-chains) | [Command guide](#command-guide) | [Start from a JSON file](#start-from-a-json-file) | [Command reference](#command-reference) | [Sample metadata](#sample-metadata-files) | [Troubleshooting](#troubleshooting) | [Development](#development) | [License](#license)
 
 ## Requirements
 
@@ -164,9 +164,12 @@ ocean-cli getComputeEnvironments [nodeUrlOrPeerId]           # alias getC2DEnvs;
 ocean-cli searchComputeResources --cpu 4 --ram 16 --paid --chain 8996 --order-by price   # alias findComputeNodes
 ocean-cli startCompute --accept true -- did1,did2 algoDid env1 3600 0xPaymentToken '[{"id":"cpu","amount":1}]'
 ocean-cli startFreeCompute did1,did2 algoDid env1
-ocean-cli getJobStatus did:op:123 job-123                    # or --dataset --job [--agreement]
+
+ocean-cli startCompute --from-json ./job.json               # all parameters from a file, see below
+ocean-cli getJobStatus job-123                    
+
 ocean-cli downloadJobResults job-123 0 ./results             # positional only (jobId, index, folder)
-ocean-cli stopCompute did:op:123 job-123 <agreementId>       # agreementId is required
+ocean-cli stopCompute job-123                                # or --job; only a jobId is needed
 ocean-cli computeStreamableLogs <jobId>                      # or --job
 ```
 
@@ -229,6 +232,81 @@ ocean-cli stopService <serviceId>
 - `--user-data` is a JSON object of container env vars, encrypted to the node's key. Values are never logged.
 - `getServiceStatus` shows your services in full; `getServices` lists all owners' services with the image spec stripped and supports `--status`, `--include-all`, `--from`.
 - `restartService` with no spec flags bounces the container unchanged (REUSE). Any of `--image --tag --checksum --dockerfile --additional-docker-files` rebuilds it on the new spec (RESPEC), keeping ports, expiry and payment window at no extra charge. `--cmd` / `--entrypoint` replace the stored command (empty array clears).
+
+### Start from a JSON file
+
+`startCompute`, `startFreeCompute` and `startService` accept `--from-json <path>` and read
+every parameter from that file instead of the command line:
+
+```bash
+ocean-cli startCompute --from-json ./job.json
+ocean-cli startCompute --from-json ./job.json --env <otherEnv> --accept true   # override single values
+ocean-cli startService --from-json ./jupyter.json
+```
+
+- Values are native JSON (arrays, objects, numbers), not stringified JSON.
+- The whole file is validated before anything is sent; every problem is listed at once and the
+  command exits with status 1. Unknown keys are errors.
+- A named option on the command line overrides the matching value from the file. The file is still
+  validated as a complete spec on its own **before** the command line is merged in, so every key
+  marked **Required** below must be present in the file even when you also pass its option — an
+  option overrides a value, it does not fill in a missing required one. Positional arguments cannot
+  be used together with `--from-json`.
+- Paths inside the file (`dockerfile`, `additionalDockerFiles`, `userDataFile`) are relative to
+  the JSON file's folder. These files are read and their contents sent to the node, so only run
+  `--from-json` on a job file you trust — a file authored by someone else could point a path field
+  at a local secret (e.g. `~/.ssh/id_rsa`, a `.env`).
+- The file may contain secrets (`userData`, storage credentials in `output`); keep it out of
+  version control.
+- A top-level `$schema` string is allowed and ignored. A key set to `null` counts as absent.
+
+Ready-to-edit examples are in [`metadata/jobs/`](metadata/jobs/).
+
+**`startCompute`**
+
+| Key | Type | Required | Rules |
+| --- | --- | --- | --- |
+| `datasets` | array | yes | May be `[]`. Each entry: a DID string, or an object with a `fileObject` object (raw dataset) |
+| `algorithm` | string or object | yes | A DID string, or an object with a `fileObject` object or a `meta.rawcode` string |
+| `env` | string | no | Non-empty. Falls back to the env selected via `setNodeEnv` |
+| `maxJobDuration` | number | yes | Integer >= 1 (seconds) |
+| `paymentToken` | string | yes | EVM address |
+| `resources` | array | yes | May be `[]`. Entries `{ "id": string, "amount": number >= 0 }`, no duplicate `id` |
+| `chainId` | number | no | Integer >= 1, the payment/escrow chain |
+| `output` | object | no | Remote-storage backend object |
+| `serviceIds` | array | no | Strings or `null`; length must equal `datasets` |
+| `algoServiceId` | string | no | Non-empty |
+| `subsidyProviders` | array or `"none"` | no | Addresses (may be `[]`) or `"none"`; absent = node defaults |
+| `accept` | boolean | no | Skip the payment prompt |
+
+**`startFreeCompute`** allows `datasets`, `algorithm`, `env`, `output`, `serviceIds`, `algoServiceId`
+and `chainId` (same rules). `maxJobDuration`, `paymentToken`, `resources`, `subsidyProviders` and
+`accept` are rejected: a free job has no payment.
+
+**`startService`**
+
+| Key | Type | Required | Rules |
+| --- | --- | --- | --- |
+| `env` | string | yes | Non-empty |
+| `duration` | number | yes | Integer >= 1 (seconds) |
+| `paymentToken` | string | yes | EVM address |
+| `template` | string | one of `template` / `image` | Non-empty |
+| `image` | string | one of `template` / `image` | Non-empty |
+| `tag` | string | no | At most one of `tag` / `checksum` / `dockerfile` |
+| `checksum` | string | no | Non-empty |
+| `dockerfile` | string (path) | no | File must exist |
+| `additionalDockerFiles` | string (path) or object | no | Path: file must exist. Object: `{filename: content}` strings |
+| `cmd` | array of strings | no | |
+| `entrypoint` | array of strings | no | |
+| `ports` | array of numbers | no | Each an integer 1-65535 |
+| `resources` | array | no | Same entry rules as `startCompute` |
+| `userData` | object | no | Not together with `userDataFile` |
+| `userDataFile` | string (path) | no | File must exist |
+| `chainId` | number | no | Integer >= 1 |
+| `subsidyProviders` | array or `"none"` | no | As `startCompute` |
+| `accept` | boolean | no | |
+| `wait` | boolean | no | |
+| `timeout` | number | no | Integer >= 1 (seconds) |
 
 ### Escrow
 
@@ -309,7 +387,7 @@ ocean-cli mintOcean [--token 0xOcean] [--chainId 8996]     # mint test Ocean tok
 
 ## Command reference
 
-53 commands, as registered in `src/cli.ts`. `<x>` is required, `[x]` optional. A named option **overrides** its positional when both are passed. Every positional that has a matching named option is declared `[x]`, so it can be supplied **either** positionally **or** by its option alone (the command itself errors if a needed value is missing from both). The remaining `<x>` positionals have no named-option equivalent and must be given positionally — these are `setNodeEnv`, `startService`, `downloadJobResults`, `restartService`, and the bucket commands (`addFileToBucket`, `listFilesInBucket`, `getFileObject`, `deleteFile`). Commands with no Options entry are positional-only. `<command> --help` is authoritative.
+53 commands, as registered in `src/cli.ts`. `<x>` is required, `[x]` optional. A named option **overrides** its positional when both are passed. Every positional that has a matching named option is declared `[x]`, so it can be supplied **either** positionally **or** by its option alone (the command itself errors if a needed value is missing from both). The remaining `<x>` positionals have no named-option equivalent and must be given positionally — these are `setNodeEnv`, `downloadJobResults`, `restartService`, and the bucket commands (`addFileToBucket`, `listFilesInBucket`, `getFileObject`, `deleteFile`). Commands with no Options entry are positional-only. `<command> --help` is authoritative.
 
 | Command | Aliases | Arguments | Options |
 | --- | --- | --- | --- |
@@ -328,16 +406,16 @@ ocean-cli mintOcean [--token 0xOcean] [--chainId 8996]     # mint test Ocean tok
 | `editAsset` | `edit` | `[did] [file]` | `-d, --did`, `-f, --file`, `-e, --encrypt [bool]` |
 | `download` | | `[did] [folder] [serviceId]` | `-d, --did`, `-f, --folder` (default `.`), `-s, --service` |
 | `allowAlgo` | | `[datasetDid] [algoDid]` | `-d, --dataset`, `-a, --algo`, `-e, --encrypt [bool]` |
-| `startCompute` | | `[datasets] [algo] [env] [maxJobDuration] [paymentToken] [resources] [output] [serviceIds] [algoServiceId]` | `-d, --datasets`, `-a, --algo`, `-e, --env`, `--maxJobDuration`, `-t, --token`, `--resources`, `--chainId`, `--accept`, `-o, --output`, `-s, --services`, `-x, --algo-service`, `--subsidyProviders` |
-| `startFreeCompute` | | `[datasets] [algo] [env] [output] [serviceIds] [algoServiceId]` | `-d, --datasets`, `-a, --algo`, `-e, --env`, `-o, --output`, `-s, --services`, `-x, --algo-service`, `--chainId` |
+| `startCompute` | | `[datasets] [algo] [env] [maxJobDuration] [paymentToken] [resources] [output] [serviceIds] [algoServiceId]` | `-d, --datasets`, `-a, --algo`, `-e, --env`, `--maxJobDuration`, `-t, --token`, `--resources`, `--chainId`, `--accept`, `-o, --output`, `-s, --services`, `-x, --algo-service`, `--subsidyProviders`, `--from-json` |
+| `startFreeCompute` | | `[datasets] [algo] [env] [output] [serviceIds] [algoServiceId]` | `-d, --datasets`, `-a, --algo`, `-e, --env`, `-o, --output`, `-s, --services`, `-x, --algo-service`, `--chainId`, `--from-json` |
 | `getComputeEnvironments` | `getC2DEnvs` | `[node]` | `-n, --node` |
 | `searchComputeResources` | `findComputeNodes` | | `--cpu --ram --disk --gpu --gpu-model --resource --free --paid --both --chain --token --max-price --duration --order-by` |
 | `computeStreamableLogs` | | `[jobId]` | `-j, --job` |
-| `stopCompute` | | `[datasetDid] [jobId] [agreementId]` | `-d, --dataset`, `-j, --job`, `-a, --agreement` |
-| `getJobStatus` | | `[datasetDid] [jobId] [agreementId]` | `-d, --dataset`, `-j, --job`, `-a, --agreement` |
+| `stopCompute` | | `[jobId]` | `-j, --job` |
+| `getJobStatus` | | `[jobId]` | `-j, --job` |
 | `downloadJobResults` | | `<jobId> <index> [folder]` | |
 | `getServiceTemplates` | `serviceTemplates` | `[node]` | `-n, --node` |
-| `startService` | | `<computeEnvId> <duration> <paymentToken>` | `--template`, `-i, --image`, `--tag`, `--checksum`, `--dockerfile`, `--additional-docker-files`, `--cmd`, `--entrypoint`, `-p, --ports`, `-r, --resources`, `-u, --user-data`, `--user-data-file`, `--accept`, `--wait`, `--timeout`, `--chainId`, `--subsidyProviders` |
+| `startService` | | `[computeEnvId] [duration] [paymentToken]` | `--template`, `-i, --image`, `--tag`, `--checksum`, `--dockerfile`, `--additional-docker-files`, `--cmd`, `--entrypoint`, `-p, --ports`, `-r, --resources`, `-u, --user-data`, `--user-data-file`, `--accept`, `--wait`, `--timeout`, `--chainId`, `--subsidyProviders`, `-e, --env`, `--from-json` |
 | `getServiceStatus` | `myServices` | `[serviceId]` | `-s, --service`, `-v, --verbose` |
 | `getServices` | `listServices` | `[node]` | `-n, --node`, `--status`, `--include-all`, `--from`, `-v, --verbose` |
 | `serviceLogs` | `computeServiceLogs` | `[serviceId]` | `-s, --service`, `--since` |
@@ -369,7 +447,7 @@ ocean-cli mintOcean [--token 0xOcean] [--chainId 8996]     # mint test Ocean tok
 
 ## Sample metadata files
 
-The [`metadata/`](metadata/) folder holds ready-to-publish DDOs. They default to chain `8996` (Barge); **edit `chainId` and `serviceEndpoint` to match your network before publishing.**
+The [`metadata/`](metadata/) folder holds ready-to-publish DDOs. They default to chain `8996` (Barge); **edit `chainId` and `serviceEndpoint` to match your network before publishing.** `metadata/jobs/` holds example `--from-json` files for `startCompute`, `startFreeCompute` and `startService`.
 
 | File | DDO | What it is |
 | --- | --- | --- |

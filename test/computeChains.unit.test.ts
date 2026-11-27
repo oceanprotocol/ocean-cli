@@ -1,9 +1,6 @@
 import { expect } from "chai";
-import {
-  computeJobChainIds,
-  summarizeComputeEnvFees,
-  getDdoChainId,
-} from "../src/helpers.js";
+import { getDdoChainId } from "@oceanprotocol/ddo-js";
+import { computeJobChainIds, summarizeComputeEnvFees } from "../src/helpers.js";
 
 // Pure unit tests for the Phase 3 multi-chain-compute helpers. No infra.
 

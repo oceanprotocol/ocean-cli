@@ -118,7 +118,7 @@ One big class holding all command logic. The constructor:
 
 - sets `this.config = config || new ConfigHelper().getConfig(network)` — ocean.js's `ConfigHelper` maps a chainId (or name) to a network config object,
 - sets `this.oceanNodeUrl = process.env.NODE_URL` and `this.config.nodeUri = this.oceanNodeUrl`,
-- creates `this.aquarius = new Aquarius(this.oceanNodeUrl)` (the Ocean Node also serves the Aquarius/indexer API),
+- resolves and validates DDOs with `ProviderInstance` against `this.oceanNodeUrl` (`waitForIndexer`, `validateDdo`),
 - loads `this.indexingParams` from `getIndexingWaitSettings()`.
 
 ### Config & chain selection — one mechanism (important)
@@ -157,9 +157,9 @@ uses directly. `destroyProviders()` tears providers down on exit (next to `stopP
 `helpers.ts` is the seam between the CLI and ocean.js:
 
 - `createAssetUtil(...)` wraps ocean.js `createAsset` (used by publish/publishAlgo and the interactive publisher). It resolves the active ERC20 template (`calculateActiveTemplateIndex` reads and `JSON.parse`s the `@oceanprotocol/contracts` `ERC20Template.json` ABI, resolved via `createRequire`/`require.resolve` so it works from any cwd — e.g. a global install — not a cwd-relative `node_modules` path), and for **Oasis Sapphire** (`config.sdk === 'oasis'`) wraps the signer with `wrapEthersSigner` from `@oasisprotocol/sapphire-ethers-v6` (`getSignerAccordingSdk`; sapphire-paratime v2 moved its ethers integration into that package, and it throws `SignerHasNoProviderError` for a provider-less signer) and deploys an allow access list before creating the asset.
-- `updateAssetMetadata(...)` — used by `editAsset`, `allowAlgo`, `disallowAlgo` and the interactive publisher. It validates the DDO via `aquarius.validate`, then either `ProviderInstance.encrypt`s the DDO (flags = 2) or hexlifies raw JSON (flags = 0) depending on the `encryptDDO` flag, then calls `nft.setMetadata`.
+- `updateAssetMetadata(...)` — used by `editAsset`, `allowAlgo`, `disallowAlgo` and the interactive publisher. It validates the DDO via `ProviderInstance.validateDdo`, then either `ProviderInstance.encrypt`s the DDO (flags = 2) or hexlifies raw JSON (flags = 0) depending on the `encryptDDO` flag, then calls `nft.setMetadata`.
 - `handleComputeOrder(...)` — the ordering state machine used in compute: validOrder + no fees → reuse as-is; validOrder + fees → `datatoken.reuseOrder` paying only provider fees; no order → `orderAsset` (pay 1 datatoken + fees). Approves provider-fee tokens first when the fee amount > 0.
-- `resolveComputeInputs(...)` + `parseComputeInput(...)` — parse the datasets/algo CLI strings (DID | JSON object | array | mixed | legacy `[did:a,did:b]`), resolve DID entries through `aquarius.waitForIndexer`, pass raw entries through (a `fileObject`, or for an algorithm inline `meta.rawcode`; aligned with a `null` DDO slot), and pick `providerURI` from the first DID-based DDO's `serviceEndpoint` (else fall back to `NODE_URL`).
+- `resolveComputeInputs(...)` + `parseComputeInput(...)` — parse the datasets/algo CLI strings (DID | JSON object | array | mixed | legacy `[did:a,did:b]`), resolve DID entries through `ProviderInstance.waitForIndexer` on the node, pass raw entries through (a `fileObject`, or for an algorithm inline `meta.rawcode`; aligned with a `null` DDO slot), and pick `providerURI` from the first DID-based DDO's `serviceEndpoint` (else fall back to `NODE_URL`).
 - `fixAndParseProviderFees(...)` — regex-based repair of the stringified provider-initialize response that is round-tripped from `initializeCompute` into `computeStart` (adds quotes to keys, DIDs, hex addresses). Fragile by design; touch carefully.
 - `getIndexingWaitSettings()` — reads the `INDEXING_*` env vars.
 - Signing/encryption is always done via the `Signer` and `ProviderInstance` from ocean.js; the CLI never handles raw keys beyond constructing the `ethers.Wallet`.
@@ -231,7 +231,7 @@ Most tests are **integration/system tests that require a running Ocean stack** (
 - `test/setup.test.ts` — asserts `npm run cli h` help output and the env-var validation error messages.
 - `test/consumeFlow.test.ts`, `paidComputeFlow.test.ts`, `escrow.test.ts`, `accessList.test.ts`, `storage.test.ts` — end-to-end flows against the live node.
 - `test/http.test.ts` — hits the node HTTP API (`localhost:8001`) directly.
-- `test/resolveComputeInputs.test.ts` — a **true unit test** using a fake `Aquarius`; runs with no infra.
+- `test/resolveComputeInputs.test.ts` — a **true unit test** that stubs `ProviderInstance.waitForIndexer`; runs with no infra.
 - `test/interactivePublishFlow.ts` — the enquirer wizard (note: no `.test.ts` suffix, so it is not picked up by the `test:system` glob).
 
 CI (`.github/workflows/ci.yml`) has three jobs: `build`, `lint`, and `test_system` (matrix over `transport: [http, p2p]`), which checks out `oceanprotocol/barge`, runs `start_ocean.sh --with-typesense`, waits for `ocean-node-1`, sets `NODE_URL` (HTTP `http://127.0.0.1:8001`, or the peer id for P2P), and runs `npm run test:system` with `AVOID_LOOP_RUN=true` and `INDEXING_RETRY_INTERVAL=4000` / `INDEXING_MAX_RETRIES=120`.

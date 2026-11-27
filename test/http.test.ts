@@ -6,13 +6,10 @@ describe("Ocean Node Root Endpoint", () => {
     const responseBody = await response.json();
 
     expect(response.status).to.equal(200);
-    expect(responseBody).to.have.property("chainIds");
-    expect(responseBody).to.have.property("providerAddress");
-    expect(responseBody).to.have.property("software");
+    expect(responseBody).to.have.property("id");
+    expect(responseBody).to.have.property("address");
+    expect(responseBody).to.have.property("provider");
     expect(responseBody).to.have.property("version");
-
-    // You can also check the values of the properties
-    expect(responseBody.software).to.equal("Ocean-Node");
 
     // Check if version is "0.0.1" or greater
     const [major, minor, patch] = responseBody.version.split(".").map(Number);

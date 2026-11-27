@@ -10,6 +10,8 @@ import {
   isP2pUri,
   ServiceStatusNumber,
   ServiceRestartParams,
+  decodeJwt,
+  listScopableCommands,
 } from "@oceanprotocol/lib";
 import {
   parseComputeInput,
@@ -72,6 +74,10 @@ const NODE_FREE_COMMANDS = new Set([
   "listChains",
   "setChain",
   "getChain",
+  // Pure auth-token helpers — a static command catalog and a local JWT decoder.
+  // Neither touches the node, RPC, or signer.
+  "listScopableCommands",
+  "decodeAuthToken",
 ]);
 
 // Topic grouping for the help listing. Purely presentational: it only changes how the command
@@ -143,7 +149,14 @@ const HELP_GROUPS: HelpGroup[] = [
   },
   {
     heading: "Tokens & auth",
-    commands: ["mintOcean", "generateAuthToken", "invalidateAuthToken"],
+    commands: [
+      "mintOcean",
+      "generateAuthToken",
+      "invalidateAuthToken",
+      "getNodeAuthTokenPolicy",
+      "listScopableCommands",
+      "decodeAuthToken",
+    ],
   },
   {
     heading: "Escrow payments",
@@ -427,7 +440,20 @@ export async function createCLI() {
     argv[0] === "help" ||
     argv[0] === "h";
 
-  if (!isHelpOrVersion) {
+  // The pure auth-token helpers — a static command catalog (`listScopableCommands`)
+  // and a local JWT decoder (`decodeAuthToken`) — touch no node, RPC, or signer, so
+  // like help/version they must run with no configuration at all. Matched against the
+  // raw argv[0], so this lists canonical names AND aliases.
+  const CREDENTIAL_FREE_COMMANDS = new Set([
+    "listScopableCommands",
+    "scopableCommands",
+    "decodeAuthToken",
+    "decodeToken",
+  ]);
+  const skipStartupConfig =
+    isHelpOrVersion || CREDENTIAL_FREE_COMMANDS.has(argv[0]);
+
+  if (!skipStartupConfig) {
     if (!process.env.MNEMONIC && !process.env.PRIVATE_KEY) {
       console.error(
         chalk.red("Have you forgot to set MNEMONIC or PRIVATE_KEY?"),
@@ -451,7 +477,7 @@ export async function createCLI() {
 
   // NODE_URL is optional: without it the CLI still starts, but only the commands in
   // NODE_FREE_COMMANDS are accepted until `setNode` picks a node (see the gate below).
-  if (!isHelpOrVersion) {
+  if (!skipStartupConfig) {
     if (process.env.DISABLE_P2P === "true" && isP2pUri(getCurrentNodeUrl())) {
       console.error(
         chalk.red(
@@ -2169,11 +2195,120 @@ export async function createCLI() {
   // Generate new auth token
   program
     .command("generateAuthToken")
-    .description("Generate new auth token")
+    .description(
+      "Generate a new (node-scoped, self-expiring) auth token. v2 tokens require an expiry; the CLI defaults to 1h.",
+    )
+    .option(
+      "--ttl <seconds>",
+      "Token lifetime in seconds (default 3600; the default is capped to the node's policy)",
+    )
+    .option(
+      "--valid-until <epochMs>",
+      "Absolute expiry as epoch-milliseconds (overrides --ttl)",
+    )
+    .option(
+      "--audience <peerIds>",
+      "Comma-separated node peerIds the token is valid at, or 'any' for an unrestricted (reusable, network-wide) token. Omit for node-scoped.",
+    )
+    .option(
+      "--scope <commands>",
+      "Comma-separated protocol commands the token may perform (see listScopableCommands). Omit for any command.",
+    )
+    .option(
+      "--allow-unverified-issuer",
+      "Skip the OJ-03 node-identity check (insecure; only for nodes that predate it)",
+    )
+    .action(async (options) => {
+      const { signer, chainId } = await initializeSigner();
+      const commands = new Commands(signer, chainId);
+      await commands.generateAuthToken({
+        ttl: options.ttl,
+        validUntil: options.validUntil,
+        audience: options.audience,
+        scope: options.scope,
+        allowUnverifiedIssuer: options.allowUnverifiedIssuer,
+      });
+    });
+
+  // Show the current node's auth-token policy
+  program
+    .command("getNodeAuthTokenPolicy")
+    .alias("authTokenPolicy")
+    .description(
+      "Show the current node's auth-token policy (max lifetime, cross-node federation, revocation posture)",
+    )
     .action(async () => {
       const { signer, chainId } = await initializeSigner();
       const commands = new Commands(signer, chainId);
-      await commands.generateAuthToken();
+      await commands.getNodeAuthTokenPolicy();
+    });
+
+  // List the commands that may appear in an auth-token --scope (node-free, static catalog)
+  program
+    .command("listScopableCommands")
+    .alias("scopableCommands")
+    .description(
+      "List the protocol commands that may appear in an auth-token --scope",
+    )
+    .action(() => {
+      const commands = listScopableCommands();
+      console.log(`Scopable commands (${commands.length}):`);
+      for (const c of commands) {
+        console.log(
+          `  ${c.command.padEnd(28)} ${String(c.category).padEnd(10)} ${c.description}`,
+        );
+      }
+    });
+
+  // Decode an auth token locally (node-free; pure, no signer/RPC needed)
+  program
+    .command("decodeAuthToken")
+    .alias("decodeToken")
+    .description(
+      "Decode an auth token locally and print its claims (scope, audience, expiry)",
+    )
+    .argument("[token]", "Auth token (JWT) to decode")
+    .option("-t, --token <token>", "Auth token to decode")
+    .action((token, options) => {
+      const authToken = options.token || token;
+      if (!authToken) {
+        throw new Error(
+          "An auth token is required. Pass it positionally or with --token.",
+        );
+      }
+      // decodeJwt throws "Error decoding JWT" on a malformed token (or one with
+      // no string `address` claim); turn that into an actionable message.
+      let claims;
+      try {
+        claims = decodeJwt(authToken);
+      } catch {
+        throw new Error(
+          "Could not decode the token (not a valid JWT, or missing the address claim).",
+        );
+      }
+      console.log(JSON.stringify(claims, null, 2));
+      // Local decode only — the signature is NOT checked here. Anyone can craft
+      // a JWT with any payload, so the claims above are untrusted.
+      console.log(
+        chalk.yellow(
+          "Decoded locally — signature NOT verified; treat these claims as untrusted.",
+        ),
+      );
+      // `validUntil` is signed epoch-ms on a v2 token. Guard against missing,
+      // malformed, or out-of-Date-range values so a bad token can't throw here.
+      const vu = claims.validUntil;
+      if (Number.isFinite(vu) && Math.abs(vu as number) <= 8.64e15) {
+        const expired = (vu as number) < Date.now();
+        console.log(
+          `Valid until: ${new Date(vu as number).toISOString()}${
+            expired ? chalk.yellow(" (expired)") : ""
+          }`,
+        );
+      } else if (vu !== undefined) {
+        console.log(
+          chalk.yellow(`Valid until: unparseable validUntil value (${vu}).`),
+        );
+      }
     });
 
   // Invalidate auth token

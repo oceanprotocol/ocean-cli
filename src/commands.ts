@@ -15,6 +15,8 @@ import {
   summarizeComputeEnvFees,
   prefundedLockUnits,
   resolveSubsidyProviderAddresses,
+  parseAuthTokenOptions,
+  AuthTokenCliOptions,
 } from "./helpers.js";
 import {
   getConfigFor,
@@ -24,7 +26,6 @@ import {
   listChains,
 } from "./rpcRegistry.js";
 import {
-  Aquarius,
   ComputeAsset,
   ComputeJob,
   Config,
@@ -56,6 +57,10 @@ import {
   ServiceStartParams,
   ServiceStatusNumber,
   ServiceTemplatePublic,
+  AuthTokenOptions,
+  AuthTokenPolicy,
+  UNRESTRICTED_AUDIENCE,
+  decodeJwt,
 } from "@oceanprotocol/lib";
 import {
   Asset,
@@ -152,7 +157,6 @@ function formatAmountDiff(total: number, share: string): string {
 export class Commands {
   public signer: Signer;
   public config: Config;
-  public aquarius: Aquarius;
   public oceanNodeUrl: string;
   // optional settings for indexing wait time
   private indexingParams: IndexerWaitParams;
@@ -172,9 +176,8 @@ export class Commands {
     }
     this.oceanNodeUrl = process.env.NODE_URL;
     this.indexingParams = getIndexingWaitSettings();
-    console.log("Using Ocean Node URL :", this.oceanNodeUrl);
+    console.error("Using Ocean Node URL :", this.oceanNodeUrl);
     this.config.nodeUri = this.oceanNodeUrl;
-    this.aquarius = new Aquarius(this.oceanNodeUrl);
   }
 
   // ---------------------------------------------------------------------------
@@ -310,7 +313,7 @@ export class Commands {
   public async start() {
     console.log("Starting the interactive CLI flow...\n\n");
     const data = await interactiveFlow(this.oceanNodeUrl); // Collect data via CLI
-    await publishAsset(this.aquarius, data, this.signer, this.config); // Publish asset with collected data
+    await publishAsset(data, this.signer, this.config); // Publish asset with collected data
   }
 
   // utils
@@ -349,7 +352,6 @@ export class Commands {
         asset,
         this.oceanNodeUrl,
         this.config,
-        this.aquarius,
         encryptDDO,
       );
       console.log("Asset published. ID:  " + urlAssetId);
@@ -387,7 +389,6 @@ export class Commands {
         algoAsset,
         this.oceanNodeUrl,
         this.config,
-        this.aquarius,
         encryptDDO,
       );
       // add some more checks
@@ -400,7 +401,8 @@ export class Commands {
   }
 
   public async editAsset(args: string[]) {
-    const asset = await this.aquarius.waitForIndexer(
+    const asset = await ProviderInstance.waitForIndexer(
+      this.oceanNodeUrl,
       args[1],
       null,
       null,
@@ -435,7 +437,6 @@ export class Commands {
       this.signer,
       asset,
       this.oceanNodeUrl,
-      this.aquarius,
       encryptDDO,
     );
     console.log("Asset updated. Tx: " + JSON.stringify(updateAssetTx, null, 2));
@@ -443,7 +444,8 @@ export class Commands {
 
   public async getDDO(args: string[]) {
     console.log("Resolving Asset with DID: " + args[1]);
-    const resolvedDDO = await this.aquarius.waitForIndexer(
+    const resolvedDDO = await ProviderInstance.waitForIndexer(
+      this.oceanNodeUrl,
       args[1],
       null,
       null,
@@ -512,7 +514,8 @@ export class Commands {
 
   public async download(args: string[]) {
     const did = args[1];
-    const dataDdo = await this.aquarius.waitForIndexer(
+    const dataDdo = await ProviderInstance.waitForIndexer(
+      this.oceanNodeUrl,
       did,
       null,
       null,
@@ -635,7 +638,6 @@ export class Commands {
     const resolved = await resolveComputeInputs(
       args[1],
       args[2],
-      this.aquarius,
       this.indexingParams,
       this.oceanNodeUrl,
     );
@@ -1038,7 +1040,6 @@ export class Commands {
     const resolved = await resolveComputeInputs(
       args[1],
       args[2],
-      this.aquarius,
       this.indexingParams,
       this.oceanNodeUrl,
     );
@@ -1657,7 +1658,6 @@ export class Commands {
     const resolved = await resolveComputeInputs(
       args[1],
       args[2],
-      this.aquarius,
       this.indexingParams,
       this.oceanNodeUrl,
     );
@@ -2949,7 +2949,8 @@ export class Commands {
   }
 
   public async allowAlgo(args: string[]) {
-    const asset = await this.aquarius.waitForIndexer(
+    const asset = await ProviderInstance.waitForIndexer(
+      this.oceanNodeUrl,
       args[1],
       null,
       null,
@@ -2982,7 +2983,8 @@ export class Commands {
       );
       return;
     }
-    const algoAsset = await this.aquarius.waitForIndexer(
+    const algoAsset = await ProviderInstance.waitForIndexer(
+      this.oceanNodeUrl,
       args[2],
       null,
       null,
@@ -3034,7 +3036,6 @@ export class Commands {
         this.signer,
         asset,
         this.oceanNodeUrl,
-        this.aquarius,
         encryptDDO,
       );
       console.log("Successfully updated asset metadata: " + txid);
@@ -3045,7 +3046,8 @@ export class Commands {
   }
 
   public async disallowAlgo(args: string[]) {
-    const asset = await this.aquarius.waitForIndexer(
+    const asset = await ProviderInstance.waitForIndexer(
+      this.oceanNodeUrl,
       args[1],
       null,
       null,
@@ -3103,7 +3105,6 @@ export class Commands {
       this.signer,
       asset,
       this.oceanNodeUrl,
-      this.aquarius,
       encryptDDO,
     );
     console.log("Asset updated " + txid);
@@ -3203,12 +3204,93 @@ export class Commands {
     }
   }
 
-  public async generateAuthToken() {
+  public async generateAuthToken(rawOptions: AuthTokenCliOptions = {}) {
+    // Read the node's policy first (same status call the lib's OJ-03 challenge
+    // uses) so we can clamp the default lifetime to the node's cap and give a
+    // precise error up front. Best-effort: a node that is briefly unreachable
+    // or predates scoped tokens just yields no cap, and the mint call below
+    // still surfaces any hard failure.
+    let policy: AuthTokenPolicy | undefined;
+    try {
+      policy = await ProviderInstance.getNodeAuthTokenPolicy(this.oceanNodeUrl);
+    } catch {
+      policy = undefined;
+    }
+
+    const options = parseAuthTokenOptions(rawOptions, policy?.maxTokenLifetime);
+
+    // Warnings go to stderr so the token stays the only thing on stdout
+    // (`generateAuthToken | …` stays parseable).
+    if (options.audience === UNRESTRICTED_AUDIENCE) {
+      console.error(
+        "Warning: minting an UNRESTRICTED token (audience 'any') — it is a reusable, network-wide bearer. Use HTTPS/Noise and a short lifetime.",
+      );
+    }
+    if (options.allowUnverifiedIssuer) {
+      console.error(
+        "Warning: node-identity verification (OJ-03) disabled via --allow-unverified-issuer — the token may be issued to a spoofed or MITM node. Only use this against a node that predates OJ-03, over a trusted channel.",
+      );
+    }
+
     const authToken = await ProviderInstance.generateAuthToken(
       this.signer,
       this.oceanNodeUrl,
+      options,
     );
-    console.log(`Auth token successfully generated: ${authToken}`);
+    // Only the token goes to stdout, so `generateAuthToken | …` stays parseable;
+    // the human-readable summary below is written to stderr.
+    console.log(authToken);
+    this.printAuthTokenSummary(authToken, options);
+  }
+
+  /**
+   * Print a short, human-readable summary (expiry / audience / scope) of a
+   * freshly minted token. Best-effort: the token was already printed in full,
+   * so a decode failure is swallowed.
+   */
+  private printAuthTokenSummary(token: string, options: AuthTokenOptions) {
+    // Diagnostic summary → stderr, so stdout carries only the token line above.
+    try {
+      const claims = decodeJwt(token);
+      const validUntil = claims?.validUntil ?? options.validUntil;
+      if (Number.isFinite(validUntil) && Math.abs(validUntil) <= 8.64e15) {
+        console.error(
+          `  Valid until: ${new Date(validUntil).toISOString()} (${validUntil})`,
+        );
+      }
+      if (options.audience === UNRESTRICTED_AUDIENCE) {
+        console.error("  Audience: any (unrestricted — reusable at any node)");
+      } else {
+        const audience =
+          claims?.audience ??
+          (Array.isArray(options.audience) ? options.audience : undefined);
+        console.error(
+          `  Audience: ${
+            audience?.length ? audience.join(", ") : "this node (node-scoped)"
+          }`,
+        );
+      }
+      const scope = claims?.scope ?? options.scope;
+      console.error(
+        `  Scope: ${scope?.length ? scope.join(", ") : "any command"}`,
+      );
+    } catch {
+      // decoding is best-effort; the full token is already printed above.
+    }
+  }
+
+  public async getNodeAuthTokenPolicy() {
+    const policy = await ProviderInstance.getNodeAuthTokenPolicy(
+      this.oceanNodeUrl,
+    );
+    if (!policy) {
+      console.log(
+        "This node did not report an auth-token policy (it may predate scoped auth tokens).",
+      );
+      return;
+    }
+    console.log(`Auth-token policy for ${this.oceanNodeUrl}:`);
+    console.log(JSON.stringify(policy, null, 2));
   }
 
   public async invalidateAuthToken(args: string[]) {

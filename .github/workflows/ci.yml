@@ -203,6 +203,18 @@ jobs:
           bash -x start_ocean.sh --with-typesense 2>&1 > start_ocean.log &
         env:
           NODE_VERSION: pr-1641
+      # ocean.js#2216 build; remove with the link step after its release
+      - name: Checkout ocean.js
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          repository: 'oceanprotocol/ocean.js'
+          ref: 'rc_11.0.0'
+          path: 'ocean.js'
+      - name: Build and link ocean.js
+        working-directory: ${{ github.workspace }}/ocean.js
+        run: npm ci && npm run build && npm link
+
       - name: Install dependencies
         run: npm ci
       - name: Use the ocean.js build

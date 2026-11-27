@@ -1,9 +1,9 @@
 import { expect } from "chai";
 import path from "path";
 import fs from "fs";
-import { homedir } from "os";
+import os, { homedir } from "os";
 import { ProviderInstance } from "@oceanprotocol/lib";
-import { projectRoot, runCommand } from "./util.js";
+import { projectRoot, runCommand, DID_RE } from "./util.js";
 
 describe("Ocean CLI Paid Compute", function () {
   this.timeout(600000); // Set a longer timeout to allow the command to execute
@@ -49,7 +49,7 @@ describe("Ocean CLI Paid Compute", function () {
 
     const output = await runCommand(`npm run cli publish ${metadataFile}`);
 
-    const jsonMatch = output.match(/did:op:[a-f0-9]{64}/);
+    const jsonMatch = output.match(DID_RE);
     if (!jsonMatch) {
       console.error("Raw output:", output);
       throw new Error("Could not find compute dataset did in the output");
@@ -73,7 +73,7 @@ describe("Ocean CLI Paid Compute", function () {
 
     const output = await runCommand(`npm run cli publishAlgo ${filePath}`);
 
-    const jsonMatch = output.match(/did:op:[a-f0-9]{64}/);
+    const jsonMatch = output.match(DID_RE);
     if (!jsonMatch) {
       console.error("Raw output:", output);
       throw new Error("Could not find algo did in the output");
@@ -216,7 +216,7 @@ describe("Ocean CLI Paid Compute", function () {
 
   it("should get job status", async () => {
     const output = await runCommand(
-      `npm run cli getJobStatus ${computeDatasetDid} ${computeJobId} ''`,
+      `npm run cli getJobStatus ${computeJobId}`,
     );
     expect(output).to.contain(computeJobId);
     expect(output.toLowerCase()).to.match(/status/);
@@ -237,5 +237,30 @@ describe("Ocean CLI Paid Compute", function () {
     expect(files.length).to.be.greaterThan(0, "No result files downloaded");
     console.log(`Downloaded results to: ${destFolder}`);
     fs.rmSync(path.join(projectRoot, "test-results"), { recursive: true });
+  });
+
+  it("should start paid compute from a JSON file with --from-json", async function () {
+    const specPath = path.join(os.tmpdir(), `ocean-cli-job-${Date.now()}.json`);
+    fs.writeFileSync(
+      specPath,
+      JSON.stringify({
+        datasets: [computeDatasetDid],
+        algorithm: jsAlgoDid,
+        env: computeEnvId,
+        maxJobDuration: 900,
+        paymentToken: getAddresses().Ocean,
+        resources: [],
+        accept: true,
+      }),
+    );
+    try {
+      const output = await runCommand(
+        `npm run cli -- startCompute --from-json "${specPath}"`,
+      );
+      expect(output, "no JobID in output").to.match(/JobID:\s*([^\s]+)/);
+      expect(output).to.not.contain("initArgs:");
+    } finally {
+      fs.rmSync(specPath, { force: true });
+    }
   });
 });

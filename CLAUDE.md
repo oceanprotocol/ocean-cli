@@ -76,7 +76,7 @@ Validated at startup in `createCLI()` (`src/cli.ts`), which `process.exit(1)`s w
 All registered in `src/cli.ts` via Commander (`commander` v13). Every command supports **both** positional arguments and named options (options win: the action does `options.x || positionalArg`), so `publish metadata.json` and `publish --file metadata.json` are equivalent.
 
 - Assets: `getDDO`, `publish`, `publishAlgo`, `editAsset` (alias `edit`), `download`, `allowAlgo`.
-- Compute: `startCompute`, `startFreeCompute`, `getComputeEnvironments` (alias `getC2DEnvs`), `computeStreamableLogs`, `stopCompute`, `getJobStatus`, `downloadJobResults`.
+- Compute: `startCompute`, `startFreeCompute`, `getComputeEnvironments` (alias `getC2DEnvs`), `computeStreamableLogs`, `stopCompute`, `getJobStatus`, `downloadJobResults`. `startCompute`, `startFreeCompute` and `startService` also accept `--from-json <path>` (all parameters from a validated JSON file; named options override it, positionals are rejected).
 - Tokens/auth: `mintOcean`, `generateAuthToken`, `invalidateAuthToken`.
 - Escrow: `depositEscrow`, `getUserFundsEscrow`, `withdrawFromEscrow`, `authorizeEscrow`, `getAuthorizationsEscrow`, `getEscrowInfo` (alias `escrowInfo`).
 - Access lists: `createAccessList`, `addToAccessList`, `checkAccessList`, `removeFromAccessList`.
@@ -191,6 +191,15 @@ The `startCompute` **action in `cli.ts`** orchestrates a two-phase flow (not a s
 - **Auth tokens**: `generateAuthToken` / `invalidateAuthToken` via `ProviderInstance`.
 - **downloadNodeLogs** (admin): time-range or `--last N` hours; writes `<output>/logs.json`.
 
+### Job files (`src/jobSpec.ts`)
+
+Pure module (no network, no `Commands`) behind `--from-json`. `loadComputeSpec(path, {free})` and
+`loadServiceSpec(path)` read the file, validate it (collecting every error, unknown keys
+rejected, values never echoed because the file may hold secrets) and return the same string /
+opts values the actions already build from flags, so `Commands` is unchanged. They throw a plain
+`Error`, which `index.ts` turns into a red message (REPL) or exit 1 (one-shot). Paths in a
+service file resolve against the file's directory.
+
 ### Transport: HTTP vs P2P, and node selection (`src/nodeConnection.ts`)
 
 All node lifecycle logic lives in `nodeConnection.ts`; `cli.ts` only calls into it.
@@ -236,6 +245,7 @@ CI (`.github/workflows/ci.yml`) has three jobs: `build`, `lint`, and `test_syste
 - **Runtime chains persist** to `~/.ocean/cli/rpc.json` (`RPC_CONFIG_FILE` override); env `RPC` is merged with it and **env wins**. `addChain`/`removeChain`/`setChain` rewrite the file; all persistence I/O is defensive (a failure warns, never breaks a command).
 - The five chain commands (`addChain`/`removeChain`/`listChains`/`setChain`/`getChain`) are in `NODE_FREE_COMMANDS` **and** a `HELP_GROUPS` entry — `assertHelpGroupsCoverAll` fails startup if a registered command is ungrouped.
 - Contract addresses come **only** from ocean.js `ConfigHelper` (via `getConfigFor`), using lowercase keys (`escrow`/`accessListFactory`/`oceanTokenAddress`). The old CLI-local `getConfigByChainId` is gone. Addresses resolve from `ADDRESS_FILE` (Barge/custom) else the bundled multi-chain set; a chain with no address for the needed contract errors via `requireAddress`.
+- With `--from-json`, precedence is named option > JSON file; only `startService --wait` needs `getOptionValueSource('wait') === 'cli'` because it is the one option with a Commander default.
 - The 1-indexed vs 0-indexed args-array split between `Commands` methods is easy to get wrong when adding/renaming commands.
 - Running the CLI without `AVOID_LOOP_RUN=true` drops into a stdin REPL after the first command — surprising in scripts.
 - `fixAndParseProviderFees` is a regex JSON patcher for the initialize→start round trip; prefer fixing the data shape over extending the regex.

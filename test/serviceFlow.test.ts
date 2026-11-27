@@ -1,6 +1,7 @@
 import { expect } from "chai";
 import fs from "fs";
-import { homedir } from "os";
+import os, { homedir } from "os";
+import path from "path";
 import { runCommand } from "./util.js";
 
 /**
@@ -46,6 +47,7 @@ describe("Ocean CLI Service-on-Demand", function () {
   let servicesEnv: any;
   let oceanToken: string;
   let serviceId: string;
+  let serviceIdFromJson: string;
 
   const getAddresses = () => {
     const data = JSON.parse(
@@ -261,13 +263,55 @@ describe("Ocean CLI Service-on-Demand", function () {
     expect(output).to.match(/Stopped \(70\)|stopped/i);
   });
 
+  it("starts a service from a JSON file with --from-json, then stops it", async function () {
+    if (skipLifecycle) this.skip();
+    const specPath = path.join(
+      os.tmpdir(),
+      `ocean-cli-service-${Date.now()}.json`,
+    );
+    fs.writeFileSync(
+      specPath,
+      JSON.stringify({
+        env: servicesEnv.id,
+        duration: START_DURATION,
+        paymentToken: oceanToken,
+        image: IMAGE,
+        tag: TAG,
+        ports: [CONTAINER_PORT],
+        accept: true,
+        wait: true,
+        timeout: 480,
+      }),
+    );
+    try {
+      const output = await runCommand(
+        `npm run cli -- startService --from-json "${specPath}"`,
+      );
+      const idMatch = output.match(/ServiceID:\s*([^\s]+)/);
+      expect(idMatch, "could not find 'ServiceID:' in output").to.not.be.null;
+      serviceIdFromJson = idMatch![1];
+      expect(output, "service never reached Running").to.match(
+        /\[Running\]|Running \(40\)/,
+      );
+    } finally {
+      fs.rmSync(specPath, { force: true });
+    }
+    const stopped = await runCommand(
+      `npm run cli stopService ${serviceIdFromJson}`,
+    );
+    expect(stopped).to.match(/Stopped \(70\)|stopped/i);
+  });
+
   after(async function () {
     // Best-effort teardown if a mid-flow failure left the service running.
-    if (skipLifecycle || !serviceId) return;
-    try {
-      await runCommand(`npm run cli stopService ${serviceId}`);
-    } catch {
-      /* already stopped or gone */
+    if (skipLifecycle) return;
+    for (const id of [serviceId, serviceIdFromJson]) {
+      if (!id) continue;
+      try {
+        await runCommand(`npm run cli stopService ${id}`);
+      } catch {
+        /* already stopped or gone */
+      }
     }
   });
 });

@@ -366,10 +366,45 @@ ocean-cli deleteFile <bucketId> <fileName>
 
 ### Auth tokens
 
+`generateAuthToken` mints a **scoped, self-expiring** JWT (ocean.js v11 / scoped-auth-tokens).
+By default the token is **node-scoped** (usable only at the current node) and the CLI gives it a
+1-hour lifetime (capped to the node's advertised `maxTokenLifetime`). Before signing, ocean.js
+verifies the node's identity (OJ-03 challenge-response).
+
 ```bash
+# node-scoped, 1h default lifetime
 ocean-cli generateAuthToken
+
+# custom lifetime
+ocean-cli generateAuthToken --ttl 900                      # 15 minutes
+ocean-cli generateAuthToken --valid-until 1990000000000    # absolute epoch-ms expiry (future)
+
+# restrict the commands the token may perform
+ocean-cli generateAuthToken --scope download,getDDO
+
+# multi-node / unrestricted audience
+ocean-cli generateAuthToken --audience 16Uiu2HA...,16Uiu2HB...
+ocean-cli generateAuthToken --audience any                 # reusable, network-wide (warned)
+
+# talk to a node that predates OJ-03 (insecure)
+ocean-cli generateAuthToken --allow-unverified-issuer
+
 ocean-cli invalidateAuthToken myAuthToken123               # or --token
+
+# inspect / discover
+ocean-cli getNodeAuthTokenPolicy                           # node's max lifetime, cross-node, revocation
+ocean-cli listScopableCommands                             # commands valid in --scope (node-free)
+ocean-cli decodeAuthToken myAuthToken123                   # decode claims locally (node-free)
 ```
+
+> **Breaking change:** v2 tokens require an expiry. If you call ocean.js directly, pass
+> `{ validUntil }`; the CLI supplies a default. An `--audience any` token is a reusable bearer —
+> use HTTPS/Noise transport and a short lifetime.
+
+`generateAuthToken` prints the token to **stdout**; the expiry/audience/scope summary and any
+warnings go to **stderr**, so `ocean-cli generateAuthToken | …` captures only the token. Note that
+`decodeAuthToken` only *decodes* a token locally — it does **not** verify its signature, so treat
+the printed claims as untrusted.
 
 ### Admin
 
@@ -423,8 +458,11 @@ ocean-cli mintOcean [--token 0xOcean] [--chainId 8996]     # mint test Ocean tok
 | `restartService` | | `<serviceId>` | `-u, --user-data`, `--user-data-file`, `--cmd`, `--entrypoint`, `--image`, `--tag`, `--checksum`, `--dockerfile`, `--additional-docker-files`, `--wait`, `--timeout` |
 | `stopService` | | `[serviceId]` | `-s, --service` |
 | `mintOcean` | | | `-t, --token`, `--chainId` |
-| `generateAuthToken` | | | |
+| `generateAuthToken` | | | `--ttl`, `--valid-until`, `--audience`, `--scope`, `--allow-unverified-issuer` |
 | `invalidateAuthToken` | | `[token]` | `-t, --token` |
+| `getNodeAuthTokenPolicy` | `authTokenPolicy` | | |
+| `listScopableCommands` | `scopableCommands` | | |
+| `decodeAuthToken` | `decodeToken` | `[token]` | `-t, --token` |
 | `depositEscrow` | | `[token] [amount]` | `-t, --token`, `-a, --amount`, `--chainId` |
 | `getUserFundsEscrow` | | `[token]` | `-t, --token`, `--chainId` |
 | `withdrawFromEscrow` | | `[token] [amount]` | `-t, --token`, `-a, --amount`, `--chainId` |

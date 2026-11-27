@@ -29,6 +29,8 @@ import {
   createAsset,
   LoggerInstance,
   JobSubsidyEstimate,
+  AuthTokenOptions,
+  UNRESTRICTED_AUDIENCE,
 } from "@oceanprotocol/lib";
 import { createRequire } from "module";
 
@@ -757,6 +759,123 @@ export function parseSubsidyProviders(raw?: string): string[] | undefined {
   const trimmed = raw.trim();
   if (trimmed === "" || trimmed.toLowerCase() === "none") return [];
   return trimmed.split(",").map((a) => ethers.getAddress(a.trim()));
+}
+
+/**
+ * Default lifetime (seconds) the CLI applies to a minted auth token when the
+ * user passes neither `--ttl` nor `--valid-until`. ocean.js (v11) deliberately
+ * refuses to default `validUntil` for a v2 token, so the CLI — a UX layer —
+ * supplies a sensible one here. It is still capped to the node's advertised
+ * `maxTokenLifetime` when that is known (see {@link parseAuthTokenOptions}).
+ */
+export const DEFAULT_AUTH_TOKEN_TTL_SECONDS = 3600;
+
+/** Raw, string-shaped auth-token options as they arrive from Commander flags. */
+export interface AuthTokenCliOptions {
+  /** Lifetime in seconds (string from the CLI or a number). */
+  ttl?: string | number;
+  /** Absolute expiry as epoch-milliseconds; overrides `ttl` when set. */
+  validUntil?: string | number;
+  /** Comma-separated node peerIds, or the literal `any` for an unrestricted token. */
+  audience?: string;
+  /** Comma-separated protocol commands the token may perform. */
+  scope?: string;
+  /** Skip the OJ-03 node-identity check (insecure; for pre-OJ-03 nodes only). */
+  allowUnverifiedIssuer?: boolean;
+}
+
+/**
+ * Turn the raw CLI auth-token flags into the ocean.js {@link AuthTokenOptions}
+ * object. Pure (no network): the optional `maxTokenLifetimeSeconds` is the
+ * node's advertised cap, used only to clamp the *default* lifetime so a bare
+ * `generateAuthToken` keeps working against a node with a short cap. An
+ * explicit `--ttl`/`--valid-until` is never silently clamped — the lib surfaces
+ * a precise cap error instead.
+ */
+export function parseAuthTokenOptions(
+  raw: AuthTokenCliOptions = {},
+  maxTokenLifetimeSeconds?: number,
+): AuthTokenOptions {
+  // --- validUntil (epoch ms), from --valid-until or --ttl, else the default TTL ---
+  let validUntil: number;
+  const hasValidUntil =
+    raw.validUntil !== undefined && `${raw.validUntil}`.trim() !== "";
+  if (hasValidUntil) {
+    validUntil = Number(raw.validUntil);
+    if (!Number.isInteger(validUntil) || validUntil <= 0) {
+      throw new Error(
+        "--valid-until must be a positive epoch-milliseconds integer.",
+      );
+    }
+    // Reject a value that is already in the past. This also catches the common
+    // mistake of passing epoch *seconds* (~1.7e9 ⇒ a 1970 date), which would
+    // otherwise mint a token that is born expired.
+    if (validUntil <= Date.now()) {
+      throw new Error(
+        "--valid-until is in the past — it must be a FUTURE epoch-milliseconds value (did you pass seconds instead of milliseconds?).",
+      );
+    }
+  } else {
+    const ttlExplicit = raw.ttl !== undefined && `${raw.ttl}`.trim() !== "";
+    let ttl = ttlExplicit
+      ? Number(raw.ttl)
+      : DEFAULT_AUTH_TOKEN_TTL_SECONDS;
+    if (!Number.isFinite(ttl) || ttl <= 0) {
+      throw new Error("--ttl must be a positive number of seconds.");
+    }
+    // Clamp only the default, so the bare command still works against a node
+    // whose cap is shorter than our default; respect an explicit --ttl verbatim.
+    if (
+      !ttlExplicit &&
+      maxTokenLifetimeSeconds &&
+      maxTokenLifetimeSeconds > 0 &&
+      ttl > maxTokenLifetimeSeconds
+    ) {
+      ttl = maxTokenLifetimeSeconds;
+    }
+    validUntil = Date.now() + Math.floor(ttl * 1000);
+  }
+
+  const options: AuthTokenOptions = { validUntil };
+
+  // --- audience: 'any' (unrestricted) or a peerId list (node-scoped) ---
+  if (raw.audience !== undefined && `${raw.audience}`.trim() !== "") {
+    const trimmed = `${raw.audience}`.trim();
+    if (trimmed.toLowerCase() === UNRESTRICTED_AUDIENCE) {
+      options.audience = UNRESTRICTED_AUDIENCE;
+    } else {
+      const list = trimmed
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (list.length === 0) {
+        throw new Error(
+          `--audience must be '${UNRESTRICTED_AUDIENCE}' or a comma-separated list of node peerIds.`,
+        );
+      }
+      options.audience = list;
+    }
+  }
+
+  // --- scope: list of protocol commands (validated server-side / by the lib) ---
+  if (raw.scope !== undefined && `${raw.scope}`.trim() !== "") {
+    const list = `${raw.scope}`
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (list.length === 0) {
+      throw new Error(
+        "--scope must be a comma-separated list of protocol commands.",
+      );
+    }
+    options.scope = list;
+  }
+
+  if (raw.allowUnverifiedIssuer) {
+    options.allowUnverifiedIssuer = true;
+  }
+
+  return options;
 }
 
 /**

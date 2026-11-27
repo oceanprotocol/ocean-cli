@@ -15,6 +15,8 @@ import {
   summarizeComputeEnvFees,
   prefundedLockUnits,
   resolveSubsidyProviderAddresses,
+  parseAuthTokenOptions,
+  AuthTokenCliOptions,
 } from "./helpers.js";
 import {
   getConfigFor,
@@ -55,6 +57,10 @@ import {
   ServiceStartParams,
   ServiceStatusNumber,
   ServiceTemplatePublic,
+  AuthTokenOptions,
+  AuthTokenPolicy,
+  UNRESTRICTED_AUDIENCE,
+  decodeJwt,
 } from "@oceanprotocol/lib";
 import {
   Asset,
@@ -3198,12 +3204,91 @@ export class Commands {
     }
   }
 
-  public async generateAuthToken() {
+  public async generateAuthToken(rawOptions: AuthTokenCliOptions = {}) {
+    // Read the node's policy first (same status call the lib's OJ-03 challenge
+    // uses) so we can clamp the default lifetime to the node's cap and give a
+    // precise error up front. Best-effort: a node that is briefly unreachable
+    // or predates scoped tokens just yields no cap, and the mint call below
+    // still surfaces any hard failure.
+    let policy: AuthTokenPolicy | undefined;
+    try {
+      policy = await ProviderInstance.getNodeAuthTokenPolicy(this.oceanNodeUrl);
+    } catch {
+      policy = undefined;
+    }
+
+    const options = parseAuthTokenOptions(rawOptions, policy?.maxTokenLifetime);
+
+    // Warnings go to stderr so the token stays the only thing on stdout
+    // (`generateAuthToken | …` stays parseable).
+    if (options.audience === UNRESTRICTED_AUDIENCE) {
+      console.error(
+        "Warning: minting an UNRESTRICTED token (audience 'any') — it is a reusable, network-wide bearer. Use HTTPS/Noise and a short lifetime.",
+      );
+    }
+    if (options.allowUnverifiedIssuer) {
+      console.error(
+        "Warning: node-identity verification (OJ-03) disabled via --allow-unverified-issuer — the token may be issued to a spoofed or MITM node. Only use this against a node that predates OJ-03, over a trusted channel.",
+      );
+    }
+
     const authToken = await ProviderInstance.generateAuthToken(
       this.signer,
       this.oceanNodeUrl,
+      options,
     );
     console.log(`Auth token successfully generated: ${authToken}`);
+    this.printAuthTokenSummary(authToken, options);
+  }
+
+  /**
+   * Print a short, human-readable summary (expiry / audience / scope) of a
+   * freshly minted token. Best-effort: the token was already printed in full,
+   * so a decode failure is swallowed.
+   */
+  private printAuthTokenSummary(token: string, options: AuthTokenOptions) {
+    // Diagnostic summary → stderr, so stdout carries only the token line above.
+    try {
+      const claims = decodeJwt(token);
+      const validUntil = claims?.validUntil ?? options.validUntil;
+      if (Number.isFinite(validUntil) && Math.abs(validUntil) <= 8.64e15) {
+        console.error(
+          `  Valid until: ${new Date(validUntil).toISOString()} (${validUntil})`,
+        );
+      }
+      if (options.audience === UNRESTRICTED_AUDIENCE) {
+        console.error("  Audience: any (unrestricted — reusable at any node)");
+      } else {
+        const audience =
+          claims?.audience ??
+          (Array.isArray(options.audience) ? options.audience : undefined);
+        console.error(
+          `  Audience: ${
+            audience?.length ? audience.join(", ") : "this node (node-scoped)"
+          }`,
+        );
+      }
+      const scope = claims?.scope ?? options.scope;
+      console.error(
+        `  Scope: ${scope?.length ? scope.join(", ") : "any command"}`,
+      );
+    } catch {
+      // decoding is best-effort; the full token is already printed above.
+    }
+  }
+
+  public async getNodeAuthTokenPolicy() {
+    const policy = await ProviderInstance.getNodeAuthTokenPolicy(
+      this.oceanNodeUrl,
+    );
+    if (!policy) {
+      console.log(
+        "This node did not report an auth-token policy (it may predate scoped auth tokens).",
+      );
+      return;
+    }
+    console.log(`Auth-token policy for ${this.oceanNodeUrl}:`);
+    console.log(JSON.stringify(policy, null, 2));
   }
 
   public async invalidateAuthToken(args: string[]) {

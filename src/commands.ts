@@ -15,7 +15,13 @@ import {
   summarizeComputeEnvFees,
   prefundedLockUnits,
   resolveSubsidyProviderAddresses,
+  mergeSavedSubsidyProviders,
 } from "./helpers.js";
+import {
+  enabledSubsidyProviderAddresses,
+  listAllSubsidyProviders,
+  normalizeSubsidyAddress,
+} from "./configStore.js";
 import {
   getConfigFor,
   getSigner,
@@ -960,6 +966,76 @@ export class Commands {
       subsidyProviders,
       lockUnits,
     });
+  }
+
+  // Merge the user's enabled SAVED subsidy providers (config file) for the payment chain
+  // with the node's advertised set, so a job run without an explicit --subsidyProviders flag
+  // still uses the providers the user configured once. An explicit flag (a list or `none`)
+  // wins and the saved list is ignored. Fails soft: a missing/unreadable node status or a
+  // merge that adds nothing falls back to the node defaults (undefined), never blocking a job.
+  public async resolveJobSubsidyProviders(
+    requested: string[] | undefined,
+    paymentChainId: number,
+    // Injectable for unit tests; production callers use the default (live node status).
+    fetchStatus: () => ReturnType<typeof validateNode> = () =>
+      validateNode(getCurrentNodeUrl()),
+  ): Promise<string[] | undefined> {
+    // Explicit flag (a list or `none`/[]) wins — no node call needed.
+    if (requested !== undefined) return requested;
+
+    const savedEnabled = enabledSubsidyProviderAddresses(paymentChainId);
+    if (savedEnabled.length === 0) return undefined;
+
+    const status = await fetchStatus();
+    if (!status) {
+      console.log(
+        chalk.yellow(
+          "Could not read node status to merge saved subsidy providers — using the node defaults.",
+        ),
+      );
+      return undefined;
+    }
+
+    const { providers, filter } = nodeSubsidyInfo(status);
+    const merged = mergeSavedSubsidyProviders(
+      undefined,
+      paymentChainId,
+      providers,
+      filter,
+      savedEnabled,
+    );
+
+    if (merged.added.length) {
+      console.log(
+        chalk.cyan(
+          `Adding saved subsidy provider(s) for chain ${paymentChainId}: ${merged.added.join(
+            ", ",
+          )}.`,
+        ),
+      );
+    }
+    if (merged.droppedByFilter.length) {
+      console.log(
+        chalk.yellow(
+          `Ignoring saved subsidy provider(s) the node does not advertise (its provider filter is on) on chain ${paymentChainId}: ${merged.droppedByFilter.join(
+            ", ",
+          )}.`,
+        ),
+      );
+    }
+    if (
+      merged.effective === undefined &&
+      merged.added.length === 0 &&
+      merged.droppedByFilter.length === 0
+    ) {
+      // All enabled saved providers are already in the node's advertised set.
+      console.log(
+        chalk.gray(
+          `Saved subsidy providers for chain ${paymentChainId} are already advertised by the node — using the node defaults.`,
+        ),
+      );
+    }
+    return merged.effective;
   }
 
   // Base units of the lock that subsidy providers would pre-fund for a paid compute
@@ -3588,7 +3664,7 @@ export class Commands {
    * the claimable amount now, contract balance and eligibility — plus kind-specific detail for
    * rolling-window (OPF) and one-time providers. Answers "do I have credit available?".
    */
-  public async getSubsidyStatus(
+  public async getNodeSubsidyStatus(
     token: string,
     opts: {
       subsidy?: string;
@@ -3600,7 +3676,7 @@ export class Commands {
     if (!token) {
       console.error(
         chalk.red(
-          "A token address is required. Pass it positionally (getSubsidyStatus 0x...) or with --token 0x...",
+          "A token address is required. Pass it positionally (getNodeSubsidyStatus 0x...) or with --token 0x...",
         ),
       );
       return;
@@ -3671,162 +3747,318 @@ export class Commands {
     }
 
     for (const address of addresses) {
-      console.log(
-        chalk.cyan(`\n=== Subsidy provider ${address} (chain ${chainId}) ===`),
-      );
+      await this.reportSubsidyProvider(this.signer, address, chainId, {
+        payer,
+        tokenAddress,
+        nodeAddress,
+        jobType,
+        jobTypeLabel: opts.jobType,
+        amount: opts.amount,
+      });
+    }
+  }
+
+  /**
+   * Query a single subsidy-provider contract by address and print its full report — kind,
+   * paused/allowed/token-enabled flags, per-window buckets (limit/used/remaining), claimable
+   * amount now, contract balance, and kind-specific rolling-window / one-time detail. `signer`
+   * must be connected to `chainId`. Shared by `getNodeSubsidyStatus` (provider addresses come
+   * from the node) and `getSubsidyProviderStatus` (a single address the caller supplies).
+   * `opts.nodeAddress` (optional) adds the `isNodeAllowed` line and enables the quote; without a
+   * node the report still answers "how much credit / what limits do I have on this provider?".
+   */
+  private async reportSubsidyProvider(
+    signer: Signer,
+    address: string,
+    chainId: number,
+    opts: {
+      payer: string;
+      tokenAddress: string;
+      nodeAddress?: string;
+      jobType?: number;
+      jobTypeLabel?: string;
+      amount?: string;
+    },
+  ): Promise<void> {
+    const { payer, tokenAddress, nodeAddress, jobType } = opts;
+    console.log(
+      chalk.cyan(`\n=== Subsidy provider ${address} (chain ${chainId}) ===`),
+    );
+    try {
+      const view = new SubsidyView(signer, address, chainId);
+      // We don't gate on `isSubsidyView()` (ERC-165) — it can under-report. `subsidyKind()`
+      // is the liveness probe: if it reverts, the address isn't a readable subsidy view
+      // (which also covers a user-named address the node does not vouch for).
+      let kind: SubsidyKind;
       try {
-        const view = new SubsidyView(this.signer, address, chainId);
-        // We don't gate on `isSubsidyView()` (ERC-165) — it can under-report. `subsidyKind()`
-        // is the liveness probe: if it reverts, the address isn't a readable subsidy view
-        // (which also covers a user-named `--subsidy` address the node does not vouch for).
-        let kind: SubsidyKind;
-        try {
-          kind = await view.subsidyKind();
-        } catch {
-          console.warn(
-            chalk.yellow(
-              `  ${address} is not a readable subsidy provider (subsidyKind() reverted) — skipping.`,
+        kind = await view.subsidyKind();
+      } catch {
+        console.warn(
+          chalk.yellow(
+            `  ${address} is not a readable subsidy provider (subsidyKind() reverted) — skipping.`,
+          ),
+        );
+        return;
+      }
+      console.log(`  Kind: ${SubsidyKind[kind] ?? kind}`);
+
+      const report = await view.subsidyBuckets(payer, tokenAddress);
+      console.log(
+        report.paused
+          ? chalk.red(
+              "  Paused: true (this subsidy provider is paused — no claims are possible)",
+            )
+          : chalk.green("  Paused: false"),
+      );
+      console.log(
+        report.userAllowed
+          ? chalk.green("  User allowed: true")
+          : chalk.red(
+              "  User allowed: false (you are not on this provider's user access list — you cannot use this subsidy provider)",
             ),
+      );
+      console.log(
+        report.tokenEnabled
+          ? chalk.green("  Token enabled: true")
+          : chalk.red(
+              "  Token enabled: false (this token is not subsidised by this provider)",
+            ),
+      );
+      if (!report.buckets || report.buckets.length === 0) {
+        console.log("  Buckets: (none)");
+      } else {
+        console.log("  Buckets:");
+        for (const b of report.buckets) {
+          const period = SubsidyPeriod[b.period] ?? b.period;
+          const cap = b.unlimited ? "unlimited" : b.limit;
+          const reset =
+            b.resetsAt && b.resetsAt !== "0" ? ` resetsAt=${b.resetsAt}` : "";
+          console.log(
+            `    - ${period}: limit=${cap} used=${b.used} remaining=${b.remaining}${reset}`,
           );
-          continue;
         }
-        console.log(`  Kind: ${SubsidyKind[kind] ?? kind}`);
+      }
 
-        const report = await view.subsidyBuckets(payer, tokenAddress);
+      console.log(
+        `  Remaining subsidy (claimable now): ${await view.remainingSubsidy(
+          payer,
+          tokenAddress,
+        )}`,
+      );
+      console.log(
+        `  Contract available balance: ${await view.availableBalance(
+          tokenAddress,
+        )}`,
+      );
+      if (nodeAddress) {
+        const nodeAllowed = await view.isNodeAllowed(nodeAddress);
         console.log(
-          report.paused
-            ? chalk.red(
-                "  Paused: true (this subsidy provider is paused — no claims are possible)",
-              )
-            : chalk.green("  Paused: false"),
-        );
-        console.log(
-          report.userAllowed
-            ? chalk.green("  User allowed: true")
+          nodeAllowed
+            ? chalk.green(`  Node allowed (isNodeAllowed, ${nodeAddress}): true`)
             : chalk.red(
-                "  User allowed: false (you are not on this provider's user access list — you cannot use this subsidy provider)",
+                `  Node allowed (isNodeAllowed, ${nodeAddress}): false (this node is not on the provider's node access list — it cannot use this subsidy provider)`,
               ),
-        );
-        console.log(
-          report.tokenEnabled
-            ? chalk.green("  Token enabled: true")
-            : chalk.red(
-                "  Token enabled: false (this token is not subsidised by this provider)",
-              ),
-        );
-        if (!report.buckets || report.buckets.length === 0) {
-          console.log("  Buckets: (none)");
-        } else {
-          console.log("  Buckets:");
-          for (const b of report.buckets) {
-            const period = SubsidyPeriod[b.period] ?? b.period;
-            const cap = b.unlimited ? "unlimited" : b.limit;
-            const reset =
-              b.resetsAt && b.resetsAt !== "0" ? ` resetsAt=${b.resetsAt}` : "";
-            console.log(
-              `    - ${period}: limit=${cap} used=${b.used} remaining=${b.remaining}${reset}`,
-            );
-          }
-        }
-
-        console.log(
-          `  Remaining subsidy (claimable now): ${await view.remainingSubsidy(
-            payer,
-            tokenAddress,
-          )}`,
-        );
-        console.log(
-          `  Contract available balance: ${await view.availableBalance(
-            tokenAddress,
-          )}`,
-        );
-        if (nodeAddress) {
-          const nodeAllowed = await view.isNodeAllowed(nodeAddress);
-          console.log(
-            nodeAllowed
-              ? chalk.green(
-                  `  Node allowed (isNodeAllowed, ${nodeAddress}): true`,
-                )
-              : chalk.red(
-                  `  Node allowed (isNodeAllowed, ${nodeAddress}): false (this node is not on the provider's node access list — it cannot use this subsidy provider)`,
-                ),
-          );
-        }
-        if (jobType !== undefined) {
-          console.log(
-            `  Job type subsidized (${opts.jobType}): ${await view.isJobTypeSubsidized(
-              jobType,
-            )}`,
-          );
-        }
-
-        // Optional quote — needs the queried node's address, a job type and an amount.
-        if (opts.amount && nodeAddress && jobType !== undefined) {
-          const quote = await view.quoteSubsidy(
-            nodeAddress,
-            payer,
-            jobType,
-            tokenAddress,
-            opts.amount,
-            opts.amount, // subsidyNeeded: request the full amount; the contract caps it
-          );
-          console.log(
-            `  Quote for amount ${opts.amount}: subsidy=${quote.subsidy} bonus=${quote.bonus}`,
-          );
-        }
-
-        // Kind-specific detail (subsidyBuckets already covers the core numbers).
-        if (kind === SubsidyKind.ROLLING_WINDOW) {
-          const opf = new OPFSubsidyProvider(this.signer, address, chainId);
-          const limits = await opf.getTokenLimits(tokenAddress);
-          console.log("  Rolling-window detail:");
-          console.log(
-            `    token config: subsidy=${Number(limits.pctBps) / 100}%`,
-          );
-          console.log(
-            `    remaining daily/weekly/monthly: ${await opf.remainingDaily(
-              payer,
-              tokenAddress,
-            )} / ${await opf.remainingWeekly(
-              payer,
-              tokenAddress,
-            )} / ${await opf.remainingMonthly(payer, tokenAddress)}`,
-          );
-          console.log(
-            `    used daily/weekly/monthly: ${await opf.dailyUsedBy(
-              payer,
-              tokenAddress,
-            )} / ${await opf.weeklyUsedBy(
-              payer,
-              tokenAddress,
-            )} / ${await opf.monthlyUsedBy(payer, tokenAddress)}`,
-          );
-        } else if (kind === SubsidyKind.ONE_TIME) {
-          const one = new OneTimeSubsidyProvider(this.signer, address, chainId);
-          const cfg = await one.getTokenConfig(tokenAddress);
-          console.log("  One-time detail:");
-          console.log(
-            `    token config: subsidy=${Number(cfg.pctBps) / 100}% defaultCredit=${
-              cfg.defaultCredit
-            }`,
-          );
-          console.log(
-            `    effective/remaining/used credit: ${await one.effectiveCredit(
-              payer,
-              tokenAddress,
-            )} / ${await one.remainingCredit(
-              payer,
-              tokenAddress,
-            )} / ${await one.usedBy(payer, tokenAddress)}`,
-          );
-        }
-      } catch (error) {
-        console.error(
-          chalk.red(`  Error reading ${address}:`),
-          (error as Error).message ?? error,
         );
       }
+      if (jobType !== undefined) {
+        console.log(
+          `  Job type subsidized (${opts.jobTypeLabel}): ${await view.isJobTypeSubsidized(
+            jobType,
+          )}`,
+        );
+      }
+
+      // Optional quote — needs a node address, a job type and an amount.
+      if (opts.amount && nodeAddress && jobType !== undefined) {
+        const quote = await view.quoteSubsidy(
+          nodeAddress,
+          payer,
+          jobType,
+          tokenAddress,
+          opts.amount,
+          opts.amount, // subsidyNeeded: request the full amount; the contract caps it
+        );
+        console.log(
+          `  Quote for amount ${opts.amount}: subsidy=${quote.subsidy} bonus=${quote.bonus}`,
+        );
+      }
+
+      // Kind-specific detail (subsidyBuckets already covers the core numbers).
+      if (kind === SubsidyKind.ROLLING_WINDOW) {
+        const opf = new OPFSubsidyProvider(signer, address, chainId);
+        const limits = await opf.getTokenLimits(tokenAddress);
+        console.log("  Rolling-window detail:");
+        console.log(`    token config: subsidy=${Number(limits.pctBps) / 100}%`);
+        console.log(
+          `    remaining daily/weekly/monthly: ${await opf.remainingDaily(
+            payer,
+            tokenAddress,
+          )} / ${await opf.remainingWeekly(
+            payer,
+            tokenAddress,
+          )} / ${await opf.remainingMonthly(payer, tokenAddress)}`,
+        );
+        console.log(
+          `    used daily/weekly/monthly: ${await opf.dailyUsedBy(
+            payer,
+            tokenAddress,
+          )} / ${await opf.weeklyUsedBy(
+            payer,
+            tokenAddress,
+          )} / ${await opf.monthlyUsedBy(payer, tokenAddress)}`,
+        );
+      } else if (kind === SubsidyKind.ONE_TIME) {
+        const one = new OneTimeSubsidyProvider(signer, address, chainId);
+        const cfg = await one.getTokenConfig(tokenAddress);
+        console.log("  One-time detail:");
+        console.log(
+          `    token config: subsidy=${Number(cfg.pctBps) / 100}% defaultCredit=${
+            cfg.defaultCredit
+          }`,
+        );
+        console.log(
+          `    effective/remaining/used credit: ${await one.effectiveCredit(
+            payer,
+            tokenAddress,
+          )} / ${await one.remainingCredit(
+            payer,
+            tokenAddress,
+          )} / ${await one.usedBy(payer, tokenAddress)}`,
+        );
+      }
+    } catch (error) {
+      console.error(
+        chalk.red(`  Error reading ${address}:`),
+        (error as Error).message ?? error,
+      );
     }
+  }
+
+  /**
+   * Read-only subsidy report for ONE provider contract the caller names directly (by address),
+   * independent of what the node advertises. Answers "what are my limits / remaining credit on
+   * this specific subsidy provider?". The chain is resolved as: `opts.chainId` (positional or
+   * --chainId) → the chain your *saved* subsidy providers (addSubsidyProvider /
+   * listSubsidyProviders) record this provider on → error asking for a chainId (needed when the
+   * provider is not saved, so its chain cannot be inferred). No node is consulted to resolve the
+   * chain; a node is queried only for the optional isNodeAllowed line / quote (--node, --amount).
+   */
+  public async getSubsidyProviderStatus(
+    subsidyProviderAddress: string,
+    token: string,
+    opts: {
+      chainId?: string | number;
+      node?: string;
+      jobType?: string;
+      amount?: string;
+    } = {},
+  ): Promise<void> {
+    if (!subsidyProviderAddress) {
+      console.error(
+        chalk.red(
+          "A subsidy provider address is required (getSubsidyStatus <providerAddress> <tokenAddress>).",
+        ),
+      );
+      return;
+    }
+    if (!token) {
+      console.error(
+        chalk.red(
+          "A token address is required (getSubsidyStatus <providerAddress> <tokenAddress>).",
+        ),
+      );
+      return;
+    }
+
+    let providerAddress: string;
+    let tokenAddress: string;
+    try {
+      providerAddress = getAddress(subsidyProviderAddress);
+      tokenAddress = getAddress(token);
+    } catch (e) {
+      console.error(chalk.red(`Invalid address: ${(e as Error).message}`));
+      return;
+    }
+
+    // Resolve the chain. An explicit chainId (positional or --chainId) wins. Otherwise infer it
+    // from your *saved* subsidy providers (addSubsidyProvider / listSubsidyProviders), which
+    // already record the chain each provider lives on — so a saved provider needs no chainId.
+    // No node is consulted; if the provider isn't saved we cannot guess its chain and ask for one.
+    let chainId: number | undefined =
+      opts.chainId !== undefined && `${opts.chainId}` !== ""
+        ? Number(opts.chainId)
+        : undefined;
+    if (chainId !== undefined && !Number.isFinite(chainId)) {
+      console.error(chalk.red(`Invalid chainId '${opts.chainId}'.`));
+      return;
+    }
+    if (chainId === undefined) {
+      const want = normalizeSubsidyAddress(providerAddress);
+      const matches: number[] = [];
+      for (const [cid, list] of Object.entries(listAllSubsidyProviders())) {
+        if (list.some((e) => normalizeSubsidyAddress(e.address) === want)) {
+          matches.push(Number(cid));
+        }
+      }
+      if (matches.length === 0) {
+        console.error(
+          chalk.red(
+            `Could not determine the chain for ${providerAddress}. It is not in your saved subsidy providers (add it with addSubsidyProvider, or list them with listSubsidyProviders) — pass a chainId: getSubsidyStatus <providerAddress> <tokenAddress> <chainId>.`,
+          ),
+        );
+        return;
+      }
+      if (matches.length > 1) {
+        console.error(
+          chalk.red(
+            `${providerAddress} is saved on multiple chains (${matches.join(
+              ", ",
+            )}) — pass a chainId to disambiguate: getSubsidyStatus <providerAddress> <tokenAddress> <chainId>.`,
+          ),
+        );
+        return;
+      }
+      chainId = matches[0];
+    }
+
+    let signer: Signer;
+    try {
+      signer = await this.signerFor(chainId);
+    } catch (e) {
+      console.error(
+        chalk.red(
+          `No RPC registered for chain ${chainId}: ${(e as Error).message}`,
+        ),
+      );
+      return;
+    }
+
+    let jobType: number | undefined;
+    try {
+      jobType = this.mapJobType(opts.jobType);
+    } catch (e) {
+      console.error(chalk.red((e as Error).message));
+      return;
+    }
+
+    // A node is only needed for the optional isNodeAllowed line and the quote; look it up
+    // best-effort when --node or --amount asks for it, so the basic report stays node-free.
+    let nodeAddress: string | undefined;
+    if (opts.node || opts.amount) {
+      const nodeUrl = opts.node || getCurrentNodeUrl();
+      const status = nodeUrl ? await validateNode(nodeUrl).catch(() => null) : null;
+      if (status?.address) nodeAddress = getAddress(status.address);
+    }
+
+    const payer = await signer.getAddress();
+    await this.reportSubsidyProvider(signer, providerAddress, chainId, {
+      payer,
+      tokenAddress,
+      nodeAddress,
+      jobType,
+      jobTypeLabel: opts.jobType,
+      amount: opts.amount,
+    });
   }
 
   public async createAccessList(args: string[]): Promise<void> {

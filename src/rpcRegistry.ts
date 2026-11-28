@@ -6,9 +6,11 @@
 // Multi-chain: `RPC` is either a legacy single URL (preserved byte-for-byte) or a JSON
 // map keyed by chainId; a chain with ≥2 URLs is served by a `FallbackProvider`, and
 // contract addresses resolve off-Barge via ocean.js `ConfigHelper`. Runtime `addChain`,
-// `removeChain`, and `setDefaultChainId` mutate the registry and persist to
-// `~/.ocean/cli/rpc.json` (`RPC_CONFIG_FILE` override; env `RPC` merged first, env wins).
-// The chain-management commands are exposed node-free through `cli.ts`.
+// `removeChain`, and `setDefaultChainId` mutate the registry and persist to the unified
+// config file (`~/.ocean/cli/config.json`, overridable via `OCEANCLI_CONFIG_PATH`) via
+// `configStore.ts` — only the changed chain is written, never the env-derived ones; env
+// `RPC` is merged first and wins per chainId. The chain-management commands are exposed
+// node-free through `cli.ts`.
 import {
   AbstractProvider,
   FallbackProvider,
@@ -20,9 +22,7 @@ import {
 } from "ethers";
 import { Config, ConfigHelper } from "@oceanprotocol/lib";
 import chalk from "chalk";
-import fs from "fs";
-import os from "os";
-import path from "path";
+import { readConfigFile, updateConfigFile } from "./configStore.js";
 
 // Per-backend stall timeout: a slow endpoint hands off to the next instead of hanging.
 const STALL_TIMEOUT_MS = 1000;
@@ -115,12 +115,10 @@ function dedupePreserveOrder(urls: string[]): string[] {
   return out;
 }
 
-// Non-chain keys tolerated inside a chain map object (the persisted file stores the
-// active default alongside the chains); callers strip these before validating chains.
-const RESERVED_MAP_KEYS = new Set(["defaultChainId"]);
-
 // Validate + normalize a plain object of chainId->url(s) into a deduped, order-preserving
-// Map. Shared by the RPC env parser and the persisted-file loader.
+// Map. Shared by the RPC env parser and the config-file `rpc` loader. The config file
+// keeps `defaultChainId` as its own top-level key (not inside `rpc`), so no reserved-key
+// stripping is needed here any more.
 function parseChainMapObject(
   parsed: unknown,
   opts: { requireNonEmpty: boolean },
@@ -133,9 +131,7 @@ function parseChainMapObject(
   if (typeof parsed !== "object" || parsed === null) {
     throw new Error(`RPC JSON must be an object. Provide ${RPC_EXAMPLE}`);
   }
-  const entries = Object.entries(parsed as Record<string, unknown>).filter(
-    ([k]) => !RESERVED_MAP_KEYS.has(k),
-  );
+  const entries = Object.entries(parsed as Record<string, unknown>);
   if (opts.requireNonEmpty && entries.length === 0) {
     throw new Error(`RPC JSON map is empty. Provide ${RPC_EXAMPLE}`);
   }
@@ -227,75 +223,35 @@ function teardownProviders(): void {
 }
 
 // ---------------------------------------------------------------------------
-// Persistence — runtime-added chains survive a restart (~/.ocean/cli/rpc.json,
-// overridable via RPC_CONFIG_FILE). Same JSON-map shape as `RPC`, plus a top-level
-// `defaultChainId`. All I/O is defensive: a persistence failure never breaks a command
-// whose blockchain work already succeeded.
+// Persistence — runtime-added chains survive a restart via the unified config file
+// (`configStore.ts`). The file's `rpc` section is read here into a Map; writes patch only
+// the changed chain (in addChain/removeChain/setDefaultChainId) so env-derived chains are
+// never copied into the file. All I/O stays defensive: a read never throws, and a failed
+// write only warns (see configStore.updateConfigFile).
 // ---------------------------------------------------------------------------
-function persistFilePath(): string {
-  return (
-    process.env.RPC_CONFIG_FILE ||
-    path.join(os.homedir(), ".ocean", "cli", "rpc.json")
-  );
-}
 
-interface PersistedConfig {
+// Read the config file's `rpc` section into a Map without ever throwing. A malformed
+// `rpc` object is ignored with a yellow warning (the rest of the registry still loads).
+function fileChains(): {
   chains: Map<number, string[]>;
   defaultChainId?: number;
-}
-
-function readPersistedConfig(): PersistedConfig {
-  const file = persistFilePath();
-  let raw: string;
-  try {
-    if (!fs.existsSync(file)) return { chains: new Map() };
-    raw = fs.readFileSync(file, "utf-8");
-  } catch (e) {
-    console.warn(
-      chalk.yellow(
-        `Could not read RPC config file ${file} (${
-          (e as Error).message
-        }) — ignoring it.`,
-      ),
-    );
-    return { chains: new Map() };
+} {
+  const file = readConfigFile();
+  let chains = new Map<number, string[]>();
+  if (file.rpc !== undefined) {
+    try {
+      chains = parseChainMapObject(file.rpc, { requireNonEmpty: false });
+    } catch (e) {
+      console.warn(
+        chalk.yellow(
+          `Config file "rpc" section is malformed (${
+            (e as Error).message
+          }) — ignoring it.`,
+        ),
+      );
+    }
   }
-  try {
-    const parsed = JSON.parse(raw) as Record<string, unknown>;
-    const chains = parseChainMapObject(parsed, { requireNonEmpty: false });
-    const dc = parsed.defaultChainId;
-    const defaultChain =
-      typeof dc === "number" && Number.isInteger(dc) && dc > 0 ? dc : undefined;
-    return { chains, defaultChainId: defaultChain };
-  } catch (e) {
-    console.warn(
-      chalk.yellow(
-        `RPC config file ${file} is malformed (${
-          (e as Error).message
-        }) — ignoring it.`,
-      ),
-    );
-    return { chains: new Map() };
-  }
-}
-
-function persistConfig(): void {
-  const file = persistFilePath();
-  const obj: Record<string, unknown> = {};
-  for (const [cid, urls] of chainUrls) obj[String(cid)] = urls;
-  if (defaultChainId !== undefined) obj.defaultChainId = defaultChainId;
-  try {
-    fs.mkdirSync(path.dirname(file), { recursive: true });
-    fs.writeFileSync(file, JSON.stringify(obj, null, 2));
-  } catch (e) {
-    console.warn(
-      chalk.yellow(
-        `Could not write RPC config file ${file} (${
-          (e as Error).message
-        }) — the chain change will not survive a restart.`,
-      ),
-    );
-  }
+  return { chains, defaultChainId: file.defaultChainId };
 }
 
 // Seed the registry from the `RPC` env. Idempotent: repeated calls with an unchanged
@@ -309,17 +265,23 @@ export function loadRegistry(force = false): void {
   defaultChainId = undefined;
   pendingLegacyUrl = undefined;
 
-  const parsed = parseRpcEnv(raw);
-  if (parsed.legacyUrl) {
-    pendingLegacyUrl = parsed.legacyUrl;
-  } else {
-    for (const [cid, urls] of parsed.chains) chainUrls.set(cid, urls);
+  // Env `RPC` is optional now — chains can come from the config file alone. Only a
+  // *malformed* (non-blank) value throws; an unset/blank value is fine (an empty registry
+  // is valid, and signer commands fail later with a clear message).
+  const envBlank = raw === undefined || raw.trim().length === 0;
+  if (!envBlank) {
+    const parsed = parseRpcEnv(raw);
+    if (parsed.legacyUrl) {
+      pendingLegacyUrl = parsed.legacyUrl;
+    } else {
+      for (const [cid, urls] of parsed.chains) chainUrls.set(cid, urls);
+    }
   }
 
-  // Merge the persisted file (runtime-added chains survive a restart). Env wins on
+  // Merge the config file's chains (runtime-added chains survive a restart). Env wins on
   // conflict, so CI and env-driven runs stay deterministic regardless of what a prior
-  // interactive session persisted.
-  const persisted = readPersistedConfig();
+  // interactive session saved.
+  const persisted = fileChains();
   for (const [cid, urls] of persisted.chains) {
     if (!chainUrls.has(cid)) chainUrls.set(cid, urls);
   }
@@ -398,7 +360,9 @@ export function setDefaultChainId(id: number): void {
     );
   }
   defaultChainId = id;
-  persistConfig();
+  updateConfigFile((f) => {
+    f.defaultChainId = id;
+  });
 }
 
 // Full default-chain resolution (plan §"Default (active) chain"): explicit default
@@ -429,7 +393,9 @@ export async function getActiveChainId(): Promise<number> {
     return keys[0];
   }
   if (keys.length > 1) return keys[0]; // any — for signing only, not made the default
-  throw new Error("No RPC chains configured.");
+  throw new Error(
+    "No RPC chains configured. Set the RPC environment variable or run 'addChain <chainId> <rpcUrl>'.",
+  );
 }
 
 // Register a chain at runtime: verify EACH url actually serves `chainId` (probe
@@ -481,10 +447,35 @@ export async function addChain(
   signerCache.delete(chainId);
   configCache.delete(chainId);
   verifiedChains.add(chainId); // just verified above
+  // A chain also listed in the `RPC` env var is re-merged on the next startup and wins
+  // there, so the saved URLs only take effect for this session unless the user edits RPC.
+  try {
+    const fromEnv = parseRpcEnv(process.env.RPC);
+    if (fromEnv.chains.has(chainId)) {
+      console.warn(
+        chalk.yellow(
+          `Chain ${chainId} is also defined in the RPC env var, which wins on the next ` +
+            `start. The saved URLs are used for this session only.`,
+        ),
+      );
+    }
+  } catch {
+    // RPC unparseable/absent — nothing to warn about; proceed.
+  }
   // Only become the default when there isn't one already (a recovered legacy chain, or a
   // prior setChain, keeps precedence).
+  const hadDefault = defaultChainId !== undefined;
   if (defaultChainId === undefined) defaultChainId = chainId;
-  persistConfig();
+  updateConfigFile((f) => {
+    // Start fresh unless `rpc` is a valid object (a hand-edited array would otherwise be
+    // mutated into a malformed array-with-string-keys); keep existing entries when it is.
+    const rpc = (
+      f.rpc && typeof f.rpc === "object" && !Array.isArray(f.rpc) ? f.rpc : {}
+    ) as Record<string, string[] | string>;
+    rpc[String(chainId)] = deduped;
+    f.rpc = rpc;
+    if (!hadDefault) f.defaultChainId = chainId;
+  });
 }
 
 // Unregister a chain + persist. Refuses to remove the only configured chain (it would
@@ -530,7 +521,16 @@ export function removeChain(chainId: number): void {
     const remaining = [...chainUrls.keys()];
     defaultChainId = remaining.length === 1 ? remaining[0] : undefined;
   }
-  persistConfig();
+  updateConfigFile((f) => {
+    if (f.rpc && typeof f.rpc === "object" && !Array.isArray(f.rpc)) {
+      delete (f.rpc as Record<string, unknown>)[String(chainId)];
+      if (Object.keys(f.rpc).length === 0) delete f.rpc;
+    }
+    if (f.defaultChainId === chainId) {
+      if (defaultChainId !== undefined) f.defaultChainId = defaultChainId;
+      else delete f.defaultChainId;
+    }
+  });
 }
 
 export function hasChain(chainId: number): boolean {
@@ -719,6 +719,49 @@ export function requireAddress(
     );
   }
   return address;
+}
+
+// Redact credentials embedded in an RPC URL before it is shown to the user (getConfig),
+// keeping only the scheme, host and port (which identify the provider/endpoint). RPC URLs
+// very often carry an API key — Infura/Alchemy/… put it in the path or query, and some
+// providers use HTTP userinfo — and getConfig output is frequently pasted into bug reports
+// or shared on a screen. The path is redacted by default (any segment can be a key, see
+// below), every query value is masked, and userinfo is dropped. Best-effort: a value that
+// does not parse as a URL (should not happen for a validated RPC) is returned unchanged.
+export function redactRpcUrl(url: string): string {
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    return url;
+  }
+  if (u.username || u.password) {
+    u.username = "***";
+    u.password = "";
+  }
+  // Redact the ENTIRE path by default. Providers embed the API key in a version-prefixed
+  // segment ("/v3/<key>"), a trailing token, or a bare path ("/<token>"), and no heuristic
+  // can reliably tell a key from a structural word — a lowercase word or a short number can
+  // itself be the credential. Keep only scheme/host/port (which still identify the
+  // provider/endpoint) and collapse any non-empty path to "/***". The root path "/" is left
+  // as-is (nothing to hide).
+  if (u.pathname && u.pathname !== "/") {
+    u.pathname = "/***";
+  }
+  // RPC query params are almost always API keys — redact every value, keep the names.
+  if (u.search) {
+    const params = new URLSearchParams(u.search);
+    for (const key of [...params.keys()]) params.set(key, "***");
+    u.search = params.toString();
+  }
+  return u.toString();
+}
+
+// Clear the per-chain ocean.js Config cache. Needed after ADDRESS_FILE changes at runtime
+// (setConfig addressFile): ConfigHelper reads ADDRESS_FILE at call time, and getConfigFor
+// memoizes its result per chain, so a stale config would otherwise be reused.
+export function clearConfigCache(): void {
+  configCache.clear();
 }
 
 // Tear down every provider (they hold timers that keep the event loop alive) and reset

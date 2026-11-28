@@ -1,4 +1,6 @@
 import { exec, spawn } from "child_process";
+import fs from "fs";
+import os from "os";
 import path from "path";
 import util from "util";
 import { config as chaiConfig } from "chai";
@@ -117,6 +119,14 @@ export const runRepl = (
     env.NODE_URL = "http://127.0.0.1:1";
     // These tests must not dial the public Ocean bootstrap nodes.
     env.DISABLE_P2P = "true";
+
+    // Give every REPL run its own fresh config file, so a `setNode`/`addChain`
+    // saved by one test cannot leak into a later test. A test that needs two runs
+    // to share a file passes its own OCEANCLI_CONFIG_PATH in options.env below.
+    env.OCEANCLI_CONFIG_PATH = path.join(
+      fs.mkdtempSync(path.join(os.tmpdir(), "oceancli-repl-")),
+      "config.json",
+    );
 
     for (const [key, value] of Object.entries(options.env || {})) {
       if (value === undefined) delete env[key];

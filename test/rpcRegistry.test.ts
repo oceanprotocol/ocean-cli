@@ -16,6 +16,7 @@ import {
   removeChain,
   setDefaultChainId,
   resolveDefaultChain,
+  redactRpcUrl,
   __setChainProbeForTests,
   __resetRegistryForTests,
 } from "../src/rpcRegistry.js";
@@ -23,6 +24,69 @@ import {
 // Pure unit tests — no live network. Provider construction is lazy in ethers v6, and
 // the chainId verification path is exercised through an injected probe seam
 // (__setChainProbeForTests), so nothing here dials an RPC.
+
+describe("rpcRegistry — redactRpcUrl", function () {
+  // The path is redacted WHOLESALE (any segment can be a key); only scheme/host/port survive.
+  it("redacts HTTP userinfo credentials and the path, keeping the host", function () {
+    expect(redactRpcUrl("https://user:secret@rpc.example/eth")).to.equal(
+      "https://***@rpc.example/***",
+    );
+  });
+
+  it("redacts a version-prefixed api key (whole path)", function () {
+    const out = redactRpcUrl(
+      "https://mainnet.infura.io/v3/0123456789abcdef0123456789abcdef",
+    );
+    expect(out).to.equal("https://mainnet.infura.io/***");
+    expect(out).to.not.contain("0123456789abcdef");
+  });
+
+  it("redacts a key whose punctuation is outside any secret-char list", function () {
+    // Regression: redaction must not depend on enumerating "secret" characters.
+    const out = redactRpcUrl(
+      "https://rpc.example/v3/0123456789abcdef!0123456789abcdef",
+    );
+    expect(out).to.equal("https://rpc.example/***");
+    expect(out).to.not.contain("0123456789abcdef");
+  });
+
+  it("redacts a lowercase-only path credential", function () {
+    // Regression: a lowercase word can itself be the key.
+    const out = redactRpcUrl("https://rpc.example/abcdefghij");
+    expect(out).to.equal("https://rpc.example/***");
+    expect(out).to.not.contain("abcdefghij");
+  });
+
+  it("redacts a purely-numeric path credential", function () {
+    // Regression: a short number can itself be the key.
+    const out = redactRpcUrl("https://rpc.example/1234");
+    expect(out).to.equal("https://rpc.example/***");
+    expect(out).to.not.contain("/1234");
+  });
+
+  it("redacts a multi-segment path to a single placeholder", function () {
+    expect(redactRpcUrl("https://rpc.example/eth/mainnet/secretKey123")).to.equal(
+      "https://rpc.example/***",
+    );
+  });
+
+  it("redacts every query value and the path, keeping names and host", function () {
+    const out = redactRpcUrl("https://rpc.example/path?apikey=supersecret123456");
+    expect(out).to.not.contain("supersecret123456");
+    expect(out).to.contain("apikey=");
+    expect(out).to.contain("rpc.example");
+  });
+
+  it("leaves a credential-free host:port URL unchanged (root path)", function () {
+    expect(redactRpcUrl("http://127.0.0.1:8545")).to.equal(
+      "http://127.0.0.1:8545/",
+    );
+  });
+
+  it("returns an unparseable value unchanged (best-effort)", function () {
+    expect(redactRpcUrl("not a url")).to.equal("not a url");
+  });
+});
 
 describe("rpcRegistry — parseRpcEnv", function () {
   it("keeps a legacy single-URL string verbatim (backwards compatible)", function () {
@@ -123,15 +187,15 @@ describe("rpcRegistry — buildFallbackConfigs", function () {
 
 describe("rpcRegistry — registry from env", function () {
   const origRpc = process.env.RPC;
-  const origFile = process.env.RPC_CONFIG_FILE;
+  const origConfigPath = process.env.OCEANCLI_CONFIG_PATH;
   const origChainId = process.env.CHAIN_ID;
 
   beforeEach(function () {
     // Isolate from a leaked persisted file / default-chain override so listChains()
     // and getDefaultChainId() assertions here are deterministic.
-    process.env.RPC_CONFIG_FILE = path.join(
+    process.env.OCEANCLI_CONFIG_PATH = path.join(
       fs.mkdtempSync(path.join(os.tmpdir(), "rpcreg-")),
-      "rpc.json",
+      "config.json",
     );
     delete process.env.CHAIN_ID;
   });
@@ -141,8 +205,8 @@ describe("rpcRegistry — registry from env", function () {
     __setChainProbeForTests(null);
     if (origRpc === undefined) delete process.env.RPC;
     else process.env.RPC = origRpc;
-    if (origFile === undefined) delete process.env.RPC_CONFIG_FILE;
-    else process.env.RPC_CONFIG_FILE = origFile;
+    if (origConfigPath === undefined) delete process.env.OCEANCLI_CONFIG_PATH;
+    else process.env.OCEANCLI_CONFIG_PATH = origConfigPath;
     if (origChainId === undefined) delete process.env.CHAIN_ID;
     else process.env.CHAIN_ID = origChainId;
   });
@@ -187,15 +251,15 @@ describe("rpcRegistry — registry from env", function () {
 
 describe("rpcRegistry — verifyChain (mocked probe)", function () {
   const origRpc = process.env.RPC;
-  const origFile = process.env.RPC_CONFIG_FILE;
+  const origConfigPath = process.env.OCEANCLI_CONFIG_PATH;
   const origChainId = process.env.CHAIN_ID;
 
   beforeEach(function () {
     // Point persistence at a fresh temp file (and clear CHAIN_ID) so loadRegistry(true)
-    // can't merge a real ~/.ocean/cli/rpc.json into these listChains() assertions.
-    process.env.RPC_CONFIG_FILE = path.join(
+    // can't merge a real ~/.ocean/cli/config.json into these listChains() assertions.
+    process.env.OCEANCLI_CONFIG_PATH = path.join(
       fs.mkdtempSync(path.join(os.tmpdir(), "rpcreg-")),
-      "rpc.json",
+      "config.json",
     );
     delete process.env.CHAIN_ID;
   });
@@ -205,8 +269,8 @@ describe("rpcRegistry — verifyChain (mocked probe)", function () {
     __setChainProbeForTests(null);
     if (origRpc === undefined) delete process.env.RPC;
     else process.env.RPC = origRpc;
-    if (origFile === undefined) delete process.env.RPC_CONFIG_FILE;
-    else process.env.RPC_CONFIG_FILE = origFile;
+    if (origConfigPath === undefined) delete process.env.OCEANCLI_CONFIG_PATH;
+    else process.env.OCEANCLI_CONFIG_PATH = origConfigPath;
     if (origChainId === undefined) delete process.env.CHAIN_ID;
     else process.env.CHAIN_ID = origChainId;
   });
@@ -257,16 +321,16 @@ describe("rpcRegistry — verifyChain (mocked probe)", function () {
 
 describe("rpcRegistry — addChain / removeChain (mocked probe)", function () {
   const origRpc = process.env.RPC;
-  const origFile = process.env.RPC_CONFIG_FILE;
+  const origConfigPath = process.env.OCEANCLI_CONFIG_PATH;
   const origChainId = process.env.CHAIN_ID;
   let tmpFile: string;
 
   beforeEach(function () {
     tmpFile = path.join(
       fs.mkdtempSync(path.join(os.tmpdir(), "rpcreg-")),
-      "rpc.json",
+      "config.json",
     );
-    process.env.RPC_CONFIG_FILE = tmpFile;
+    process.env.OCEANCLI_CONFIG_PATH = tmpFile;
     delete process.env.CHAIN_ID;
     // Every probed URL reports the chainId embedded in its host segment `cid-<n>`.
     __setChainProbeForTests(async (url) => {
@@ -280,8 +344,8 @@ describe("rpcRegistry — addChain / removeChain (mocked probe)", function () {
     __setChainProbeForTests(null);
     if (origRpc === undefined) delete process.env.RPC;
     else process.env.RPC = origRpc;
-    if (origFile === undefined) delete process.env.RPC_CONFIG_FILE;
-    else process.env.RPC_CONFIG_FILE = origFile;
+    if (origConfigPath === undefined) delete process.env.OCEANCLI_CONFIG_PATH;
+    else process.env.OCEANCLI_CONFIG_PATH = origConfigPath;
     if (origChainId === undefined) delete process.env.CHAIN_ID;
     else process.env.CHAIN_ID = origChainId;
   });
@@ -292,7 +356,20 @@ describe("rpcRegistry — addChain / removeChain (mocked probe)", function () {
     await addChain(137, ["http://cid-137.example"]);
     expect(hasChain(137)).to.equal(true);
     const written = JSON.parse(fs.readFileSync(tmpFile, "utf-8"));
-    expect(written["137"]).to.deep.equal(["http://cid-137.example"]);
+    // Only the added chain is written under `rpc` — never the env-derived one — and the
+    // file is stamped with the config version.
+    expect(written.rpc["137"]).to.deep.equal(["http://cid-137.example"]);
+    expect(written.rpc["8996"]).to.equal(undefined);
+    expect(written.version).to.equal(1);
+  });
+
+  it("removeChain of an env-only chain does not create the config file", function () {
+    process.env.RPC =
+      '{"8996":"http://cid-8996.example","137":"http://cid-137.example"}';
+    loadRegistry(true);
+    removeChain(137); // 137 came only from env; nothing to patch in the file
+    expect(hasChain(137)).to.equal(false);
+    expect(fs.existsSync(tmpFile)).to.equal(false);
   });
 
   it("resolves a pending legacy URL before adding, keeping legacy as default", async function () {
@@ -340,16 +417,16 @@ describe("rpcRegistry — addChain / removeChain (mocked probe)", function () {
 
 describe("rpcRegistry — persistence merge + default precedence", function () {
   const origRpc = process.env.RPC;
-  const origFile = process.env.RPC_CONFIG_FILE;
+  const origConfigPath = process.env.OCEANCLI_CONFIG_PATH;
   const origChainId = process.env.CHAIN_ID;
   let tmpFile: string;
 
   beforeEach(function () {
     tmpFile = path.join(
       fs.mkdtempSync(path.join(os.tmpdir(), "rpcreg-")),
-      "rpc.json",
+      "config.json",
     );
-    process.env.RPC_CONFIG_FILE = tmpFile;
+    process.env.OCEANCLI_CONFIG_PATH = tmpFile;
     delete process.env.CHAIN_ID;
     __setChainProbeForTests(async (url) => {
       const m = url.match(/cid-(\d+)/);
@@ -362,8 +439,8 @@ describe("rpcRegistry — persistence merge + default precedence", function () {
     __setChainProbeForTests(null);
     if (origRpc === undefined) delete process.env.RPC;
     else process.env.RPC = origRpc;
-    if (origFile === undefined) delete process.env.RPC_CONFIG_FILE;
-    else process.env.RPC_CONFIG_FILE = origFile;
+    if (origConfigPath === undefined) delete process.env.OCEANCLI_CONFIG_PATH;
+    else process.env.OCEANCLI_CONFIG_PATH = origConfigPath;
     if (origChainId === undefined) delete process.env.CHAIN_ID;
     else process.env.CHAIN_ID = origChainId;
   });
@@ -372,8 +449,11 @@ describe("rpcRegistry — persistence merge + default precedence", function () {
     fs.writeFileSync(
       tmpFile,
       JSON.stringify({
-        "8996": ["http://persisted-8996.example"],
-        "137": ["http://cid-137.example"],
+        version: 1,
+        rpc: {
+          "8996": ["http://persisted-8996.example"],
+          "137": ["http://cid-137.example"],
+        },
       }),
     );
     process.env.RPC = '{"8996":"http://env-8996.example"}';
@@ -388,8 +468,11 @@ describe("rpcRegistry — persistence merge + default precedence", function () {
     fs.writeFileSync(
       tmpFile,
       JSON.stringify({
-        "8996": ["http://cid-8996.example"],
-        "137": ["http://cid-137.example"],
+        version: 1,
+        rpc: {
+          "8996": ["http://cid-8996.example"],
+          "137": ["http://cid-137.example"],
+        },
         defaultChainId: 137,
       }),
     );
@@ -402,7 +485,10 @@ describe("rpcRegistry — persistence merge + default precedence", function () {
     fs.writeFileSync(
       tmpFile,
       JSON.stringify({
-        "137": ["http://cid-137.example"],
+        version: 1,
+        rpc: {
+          "137": ["http://cid-137.example"],
+        },
         defaultChainId: 137,
       }),
     );
@@ -426,5 +512,36 @@ describe("rpcRegistry — persistence merge + default precedence", function () {
     expect(resolveDefaultChain([137, 999])).to.equal(137); // only 137 is both served & configured
     setDefaultChainId(8996);
     expect(resolveDefaultChain([137])).to.equal(8996); // explicit default wins
+  });
+
+  it("loads chains from the config file when env RPC is unset", function () {
+    fs.writeFileSync(
+      tmpFile,
+      JSON.stringify({
+        version: 1,
+        rpc: { "137": ["http://cid-137.example"] },
+      }),
+    );
+    delete process.env.RPC;
+    expect(() => loadRegistry(true)).to.not.throw();
+    expect(hasChain(137)).to.equal(true);
+    expect(getDefaultChainId()).to.equal(137); // sole configured chain
+  });
+
+  it("loads an empty registry when neither env RPC nor the file has chains", function () {
+    delete process.env.RPC; // tmpFile does not exist yet
+    expect(() => loadRegistry(true)).to.not.throw();
+    expect(listChains()).to.deep.equal([]);
+  });
+
+  it("setDefaultChainId writes only defaultChainId (no rpc for env-only chains)", function () {
+    process.env.RPC =
+      '{"8996":"http://cid-8996.example","137":"http://cid-137.example"}';
+    loadRegistry(true);
+    setDefaultChainId(8996);
+    const written = JSON.parse(fs.readFileSync(tmpFile, "utf-8"));
+    expect(written.defaultChainId).to.equal(8996);
+    expect(written.rpc).to.equal(undefined); // both chains came from env
+    expect(written.version).to.equal(1);
   });
 });

@@ -35,8 +35,12 @@ describe("Ocean CLI Setup", function () {
         expect(stdout).to.contain("Access lists");
         expect(stdout).to.contain("Persistent storage (buckets)");
         expect(stdout).to.contain("Admin");
+        expect(stdout).to.contain("Configuration");
 
         // Commands are listed as "name (aliases)" followed by their description.
+        expect(stdout).to.contain("getConfig (showConfig)");
+        expect(stdout).to.contain("addFavouriteNode (addFavoriteNode)");
+        expect(stdout).to.contain("addSubsidyProvider (addSubsidy)");
         expect(stdout).to.contain("help (h)");
         expect(stdout).to.contain("Display help for all commands");
         expect(stdout).to.contain("setNodeEnv (useNodeEnv)");

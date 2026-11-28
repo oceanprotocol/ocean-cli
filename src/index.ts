@@ -10,6 +10,11 @@ import { destroyProviders } from "./rpcRegistry.js";
 
 let program: Command;
 const supportedCommands: string[] = [];
+// Canonical command names only (no aliases) — used for TAB completion so the
+// REPL does not offer near-duplicate British/American alias pairs
+// (e.g. listFavouriteNodes / listFavoriteNodes). Aliases stay valid to type
+// and run because `supportedCommands` (above) still includes them.
+const completionCommands: string[] = [];
 
 /**
  * Prepare commander for REPL use: make it throw instead of calling process.exit
@@ -158,7 +163,9 @@ async function discardBufferedInput(): Promise<void> {
 function completer(line: string): [string[], string] {
   // Only complete the command name, not its arguments.
   if (line.includes(" ")) return [[], line];
-  const hits = supportedCommands.filter((name) => name.startsWith(line)).sort();
+  const hits = completionCommands
+    .filter((name) => name.startsWith(line))
+    .sort();
   return [hits, line];
 }
 
@@ -279,6 +286,7 @@ async function main(): Promise<void> {
   try {
     program = await createCLI();
     for (const command of program.commands) {
+      completionCommands.push(command.name());
       supportedCommands.push(command.name());
       // aliases() (plural): alias() would only ever return the first one.
       const aliases = command.aliases();

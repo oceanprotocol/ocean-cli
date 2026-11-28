@@ -1,5 +1,6 @@
 import chalk from "chalk";
 import { ProviderInstance, isP2pUri, NodeStatus } from "@oceanprotocol/lib";
+import { updateConfigFile } from "./configStore.js";
 
 /**
  * Ocean Node selection and libp2p transport lifecycle.
@@ -7,6 +8,8 @@ import { ProviderInstance, isP2pUri, NodeStatus } from "@oceanprotocol/lib";
  * The active node lives in `process.env.NODE_URL`, which stays the single source of
  * truth: `Commands` (its constructor) and `getMetadataURI()` re-read that variable on
  * every use, so mutating it switches every subsequent command with no other wiring.
+ * The selection (node URL and compute env id) is ALSO persisted to the config file by
+ * the setters below, so it survives a restart; `process.env` still wins for the session.
  *
  * libp2p is *transport*, not a connection to one node: every P2P call in ocean.js takes
  * a `nodeUri` and dials that peer on demand (direct dial for a full multiaddr, DHT
@@ -172,9 +175,23 @@ export function getCurrentNodeUrl(): string {
   return process.env.NODE_URL || "";
 }
 
-/** Make `nodeUrl` the active Ocean Node for every subsequent command. */
-export function setCurrentNodeUrl(nodeUrl: string): void {
+/**
+ * Make `nodeUrl` the active Ocean Node for every subsequent command and, in the SAME
+ * config-file write, set or clear its compute env id — so a failed write can never persist
+ * a node with the previous node's (now stale) env id. `envId`: a string sets it, `null`
+ * clears it. `process.env` is always updated (the switch applies to the session); the
+ * return value is whether the change was persisted (false → this session only; the warning
+ * comes from updateConfigFile).
+ */
+export function setCurrentNode(nodeUrl: string, envId: string | null): boolean {
   process.env.NODE_URL = nodeUrl;
+  if (envId === null) delete process.env.COMPUTE_ENV_ID;
+  else process.env.COMPUTE_ENV_ID = envId;
+  return updateConfigFile((f) => {
+    f.nodeUrl = nodeUrl;
+    if (envId === null) delete f.computeEnvId;
+    else f.computeEnvId = envId;
+  });
 }
 
 /** Whether a node is currently selected (gates most commands, see cli.ts). */
@@ -187,22 +204,10 @@ export function hasNode(): boolean {
  * `startFreeCompute` can default its `--env` to it — the user pastes the node+env token from a
  * search result once instead of repeating the env id on every compute command. Like NODE_URL it
  * lives in an env var so it survives across REPL commands and is read fresh each time; "" = none.
+ * It is also persisted to the config file (alongside the node url) so it survives a restart.
  */
 export function getCurrentEnvId(): string {
   return process.env.COMPUTE_ENV_ID || "";
-}
-
-/** Remember the compute environment id for subsequent compute commands (see getCurrentEnvId). */
-export function setCurrentEnvId(envId: string): void {
-  process.env.COMPUTE_ENV_ID = envId;
-}
-
-/**
- * Forget any remembered compute environment. Called when the active node changes, since an env id
- * belongs to a specific node and is meaningless (or wrong) once a different node is selected.
- */
-export function clearCurrentEnvId(): void {
-  delete process.env.COMPUTE_ENV_ID;
 }
 
 /**

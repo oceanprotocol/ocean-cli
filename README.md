@@ -48,10 +48,13 @@ ocean-cli h            # list all commands
 ## Quick start
 
 ```bash
-export PRIVATE_KEY="0x..."                  # or MNEMONIC="word1 word2 ..."
-export RPC="https://your-rpc.example"
-export NODE_URL="http://127.0.0.1:8001"
+export PRIVATE_KEY="0x..."                  # or MNEMONIC="word1 word2 ..." — the only secret, never stored
 
+# One-time setup, saved to ~/.ocean/cli/config.json (so no RPC / NODE_URL env vars are needed again):
+ocean-cli addChain 8453 https://your-rpc.example   # register a chain (each URL is verified)
+ocean-cli setNode http://127.0.0.1:8001            # choose an Ocean Node (health-checked)
+
+# Afterwards every run needs only PRIVATE_KEY exported:
 # Publish a sample asset (edit chainId / serviceEndpoint in the file first)
 ocean-cli publish metadata/simpleDownloadDataset.json
 
@@ -62,42 +65,89 @@ ocean-cli download did:op:123 ./downloads
 ocean-cli getComputeEnvironments
 ```
 
+Prefer environment variables? `export RPC=...` and `export NODE_URL=...` still work and take precedence over the saved file. See [Configuration](#configuration).
+
 ## Configuration
 
-All configuration is via environment variables.
+Settings come from three places, in order of precedence: a **command-line flag**, an **environment variable**, then the **configuration file** (below). A built-in default applies when none of those set a value. The only secrets — `PRIVATE_KEY` / `MNEMONIC` — are read from the environment only and are **never** written to the file.
+
+### Configuration file
+
+The CLI keeps one per-user file, by default `~/.ocean/cli/config.json` (override the whole path with `OCEANCLI_CONFIG_PATH`). It holds every setting except the signer secret, so once it is set up you run `ocean-cli <command>` with only `PRIVATE_KEY` exported. Commands that change a setting (`addChain`, `setChain`, `setNode`, `setNodeEnv`, `setConfig`, and the favourites / subsidy commands) save it automatically — there is no separate "save" step. The file is written atomically with permissions `0600` (directory `0700`); because RPC URLs may embed API keys, keep it private.
+
+```bash
+ocean-cli getConfig                             # alias showConfig; every setting with its source (env / file / default)
+ocean-cli getConfig indexing.maxRetries         # one setting
+ocean-cli setConfig indexing.maxRetries 200     # saved immediately
+ocean-cli unsetConfig indexing.maxRetries       # remove it (falls back to env / default)
+```
+
+`setConfig` handles the plain settings in the Optional table below; `nodeUrl`, `computeEnvId`, `rpc` and `defaultChainId` are changed only through their dedicated commands (`setNode`, `setNodeEnv`, `addChain`/`removeChain`, `setChain`), which validate first. Example file:
+
+```json
+{
+  "version": 1,
+  "nodeUrl": "https://node.example.com",
+  "rpc": { "8453": ["https://base.a.example", "https://base.b.example"], "1": ["https://eth.example"] },
+  "defaultChainId": 8453,
+  "indexing": { "maxRetries": 120, "retryIntervalMs": 4000 },
+  "favouriteNodes": [{ "node": "https://node.example.com", "description": "main GPU node" }],
+  "subsidyProviders": { "8453": [{ "address": "0xAbC...0001", "enabled": true }] }
+}
+```
+
+What auto-saves:
+
+| Command | Saves |
+| --- | --- |
+| `addChain` / `removeChain` | `rpc[chainId]` (and `defaultChainId` when it is the first chain) |
+| `setChain` | `defaultChainId` |
+| `setNode` | `nodeUrl` (clears `computeEnvId`) |
+| `setNodeEnv` | `nodeUrl` + `computeEnvId` |
+| `setConfig` / `unsetConfig` | the named key |
+| `addFavouriteNode` / `removeFavouriteNode` | `favouriteNodes` |
+| `addSubsidyProvider` / `removeSubsidyProvider` / `toggleSubsidyProvider` | `subsidyProviders[chainId]` |
+
+When an environment variable and the file both set the same thing, the env wins for that run and the file is left untouched; `getConfig` shows both so nothing looks silently ignored.
+
+### Environment variables
+
+Every variable below (except the secrets) has a matching **config key**, so it can be saved to the file instead of exported.
 
 **Required**
 
-| Variable | Description |
-| --- | --- |
-| `PRIVATE_KEY` or `MNEMONIC` | Signer credentials. The private key is preferred. |
-| `RPC` | Either a single URL (`http://localhost:8545`) or a JSON map keyed by chainId whose values are a URL or an ordered list of URLs: `'{"1":"https://eth.example","8453":["https://a","https://b"]}'`. Two or more URLs for a chain become an ethers v6 `FallbackProvider` (`quorum: 1`, declaration order = preference). A malformed value fails at startup with the expected shape. |
+| Variable | Config key | Description |
+| --- | --- | --- |
+| `PRIVATE_KEY` or `MNEMONIC` | — (never stored) | Signer credentials. The private key is preferred. |
+| `RPC` | `rpc` | Required **unless** the config file already has a chain (add one with `addChain <chainId> <rpcUrl>`, which saves it). Either a single URL (`http://localhost:8545`) or a JSON map keyed by chainId whose values are a URL or an ordered list of URLs: `'{"1":"https://eth.example","8453":["https://a","https://b"]}'`. Two or more URLs for a chain become an ethers v6 `FallbackProvider` (`quorum: 1`, declaration order = preference). Env `RPC` chains are merged with the file's and **env wins** per chainId. A malformed value fails at startup with the expected shape. |
 
 **Recommended**
 
-| Variable | Description |
-| --- | --- |
-| `NODE_URL` | The initial Ocean Node: HTTP(S) URL, libp2p peer id, or full multiaddr. The CLI starts without it, but then only `setNode`, `setNodeEnv`, `getNode`, `help`, `searchComputeResources` and the chain commands work; everything else fails with `No Ocean Node set` until you run `setNode`. (`searchComputeResources` runs node-free but still needs `RPC`, a signer and libp2p — it is a way to *find* a node before selecting one.) In practice, set it. |
-
-**Optional**
-
-| Variable | Default | Description |
+| Variable | Config key | Description |
 | --- | --- | --- |
-| `CHAIN_ID` | resolved automatically | Default (active) chain for the session. See [Nodes and chains](#nodes-and-chains). |
-| `RPC_CONFIG_FILE` | `~/.ocean/cli/rpc.json` | Where runtime-added chains are persisted (same JSON-map shape, hand-editable). Env `RPC` is merged with it and **env wins** on conflict. |
-| `ADDRESS_FILE` | ocean.js bundled addresses | Path to a contracts `address.json` for Barge / custom deployments. Without it, escrow, access-list and Ocean-token addresses come from the multi-chain set bundled with ocean.js. |
-| `DISABLE_P2P` | unset | `true` skips libp2p. **Fatal at startup if combined with a P2P `NODE_URL`** (peer id / multiaddr). Use it only if you exclusively use HTTP nodes. `searchComputeResources` needs libp2p. |
-| `BOOTSTRAP_PEERS` | unset | Comma-separated extra libp2p multiaddrs, added to the built-in Ocean bootstrap list. |
-| `AVOID_LOOP_RUN` | unset | `true` = one-shot: run the command and exit (use for CI and scripts). Unset = interactive. |
-| `INDEXING_MAX_RETRIES` | `120` | Max retries while waiting for an asset to be indexed. |
-| `INDEXING_RETRY_INTERVAL` | `4000` | Milliseconds between indexing retries. |
-| `SSI_WALLET_API`, `SSI_WALLET_ID`, `SSI_WALLET_DID` | unset | SSI wallet settings for v5 DDOs (credentialSubject / SSI policy flows). |
+| `NODE_URL` | `nodeUrl` | The initial Ocean Node: HTTP(S) URL, libp2p peer id, or full multiaddr. The CLI starts without it, but then only the node-free commands (`setNode`, `setNodeEnv`, `getNode`, `help`, `searchComputeResources`, the chain commands, and the configuration / favourites / subsidy commands) work; everything else fails with `No Ocean Node set` until you run `setNode`. Saved by `setNode`, so you normally set it once. |
+
+**Optional** — each can be set via the env var or saved with `setConfig <config key> <value>`:
+
+| Variable | Config key | Default | Description |
+| --- | --- | --- | --- |
+| `OCEANCLI_CONFIG_PATH` | — | `~/.ocean/cli/config.json` | Full path to the config file (overrides the default location; relative paths resolve against the cwd). |
+| `CHAIN_ID` | `defaultChainId` | resolved automatically | Default (active) chain for the session. Change with `setChain`. See [Nodes and chains](#nodes-and-chains). |
+| `COMPUTE_ENV_ID` | `computeEnvId` | none | Default compute environment id for the current node (set by `setNodeEnv`). |
+| `ADDRESS_FILE` | `addressFile` | ocean.js bundled addresses | Path to a contracts `address.json` for Barge / custom deployments. Without it, escrow, access-list and Ocean-token addresses come from the multi-chain set bundled with ocean.js. |
+| `DISABLE_P2P` | `disableP2P` | `false` | `true` skips libp2p. **Fatal at startup if combined with a P2P `NODE_URL`** (peer id / multiaddr). Use it only if you exclusively use HTTP nodes. `searchComputeResources` needs libp2p. |
+| `BOOTSTRAP_PEERS` | `bootstrapPeers` | none | Comma-separated extra libp2p multiaddrs, added to the built-in Ocean bootstrap list. |
+| `AVOID_LOOP_RUN` | `avoidLoopRun` | `false` | `true` = one-shot: run the command and exit (use for CI and scripts). Unset = interactive. (`AVOID_LOOP_RUN=false` in the env also overrides a saved `avoidLoopRun: true`.) |
+| `INDEXING_MAX_RETRIES` | `indexing.maxRetries` | `120` | Max retries while waiting for an asset to be indexed. |
+| `INDEXING_RETRY_INTERVAL` | `indexing.retryIntervalMs` | `4000` | Milliseconds between indexing retries. |
+| `SEARCH_TIMEOUT_MS` | `searchTimeoutMs` | `60000` | Timeout for node search requests, in milliseconds. |
+| `SSI_WALLET_API`, `SSI_WALLET_ID`, `SSI_WALLET_DID` | `ssi.walletApi`, `ssi.walletId`, `ssi.walletDid` | none | SSI wallet settings for v5 DDOs (credentialSubject / SSI policy flows). |
 
 `mintOcean` additionally needs an Ocean token address, from the chain's configured `oceanTokenAddress` or `--token <address>` (some chains, e.g. Base, ship none).
 
 ## How the CLI works
 
-- **Interactive vs one-shot.** By default the CLI runs the command you pass (if any) and then stays in a prompt (REPL). Leave with `exit`, `quit`, **ESC** or **CTRL-C**. In the prompt you can type the bare command or paste a full `ocean-cli ...` line. With `AVOID_LOOP_RUN=true` it runs once and exits. In one-shot mode `setNode` only validates; the switch dies with the process, so use `NODE_URL`.
+- **Interactive vs one-shot.** By default the CLI runs the command you pass (if any) and then stays in a prompt (REPL). Leave with `exit`, `quit`, **ESC** or **CTRL-C**. In the prompt you can type the bare command or paste a full `ocean-cli ...` line. With `AVOID_LOOP_RUN=true` it runs once and exits. `setNode` (and the other setting commands) persist to the [configuration file](#configuration), so a node selected even in one-shot mode is remembered and reused by later runs.
 - **Positional and named arguments.** Named options may come in any order and **override** the matching positional when both are given. But a **required** positional (`<x>`) must still be supplied positionally — passing only its named option fails with Commander's *missing required argument* (e.g. `publish --file metadata.json` errors; use `publish metadata.json`, and `publish metadata.json --file other.json` lets the option win). Optional positionals (`[x]`) may be omitted or supplied via their named option. A few commands (e.g. `downloadJobResults`) are positional-only.
 - **JSON arguments.** Single-quote JSON on the shell and put `--` before the arguments so option parsing stops: `ocean-cli startCompute -- '["did:op:a",{"fileObject":{...}}]' did:op:algo ...`.
 - **Help.** `ocean-cli h` or `ocean-cli help` prints the grouped command list (the `help` command takes no argument). For a specific command's arguments and options, add `--help` / `-h` after it: `ocean-cli publish --help`.
@@ -118,6 +168,17 @@ ocean-cli setNodeEnv '16Uiu2HAm...|0xff10...-0xc92e...'   # alias useNodeEnv (qu
 - For a node on your own machine prefer the full multiaddr (`/ip4/127.0.0.1/tcp/9001/ws/p2p/<peerId>`); a bare peer id needs DHT lookup, which may not advertise localhost.
 - `chainId` always comes from `RPC`, never from the node. `setNode` warns if the node does not serve your chain; `getNode` flags served chains with no RPC configured.
 
+**Favourite nodes** (saved in the config file; node-free, work offline):
+
+```bash
+ocean-cli addFavouriteNode https://node.example.com main GPU node   # alias addFavoriteNode; no node arg = the current node
+ocean-cli listFavouriteNodes                                        # aliases listFavoriteNodes, favourites, favorites
+ocean-cli setNode 2                                                 # switch to favourite #2 (validated like any setNode)
+ocean-cli removeFavouriteNode 2                                     # alias removeFavoriteNode; by number or by URL / peer id
+```
+
+Each entry is a node URL / peer id / multiaddr plus an optional description. The format is checked when saving, but reachability is **not** (a favourite may be offline at save time); re-adding an existing node updates its description instead of duplicating it. `setNode <number>` resolves the favourite then health-checks it like any other switch. The numbers are list positions and **shift after a removal**, so re-run `listFavouriteNodes` before using one.
+
 **Managing chains** (node-free; work before a node is set):
 
 ```bash
@@ -128,7 +189,7 @@ ocean-cli setChain 137                                               # alias use
 ocean-cli getChain                                                   # alias currentChain
 ```
 
-Added chains persist to `~/.ocean/cli/rpc.json`. The active default chain is: `setChain` / `CHAIN_ID` -> persisted default -> the only configured chain. If none of those resolve, commands that target a specific chain require an explicit `--chainId`. (The display-only `listChains` additionally reports the single chain the node and your registry both know, but that intersection is not used to auto-select a chain for commands.)
+Added chains persist to the [configuration file](#configuration) (`~/.ocean/cli/config.json`). The active default chain is: `setChain` / `CHAIN_ID` -> persisted default -> the only configured chain. If none of those resolve, commands that target a specific chain require an explicit `--chainId`. (The display-only `listChains` additionally reports the single chain the node and your registry both know, but that intersection is not used to auto-select a chain for commands.)
 
 **How each command picks its chain:**
 
@@ -334,13 +395,27 @@ These commands require the Escrow v2 deployment; they degrade gracefully against
 Subsidy providers are on-chain contracts that sponsor part or all of a job's cost (a subsidy released back to the payer, plus an optional bonus paid to the node), subject to allow-lists, job-type restrictions and per-period caps. **The Ocean Node is the source of truth for which subsidy providers are usable** (a node may not support them at all), so the CLI reads provider addresses from the node's status, never from bundled contract addresses.
 
 ```bash
-ocean-cli getSubsidyProviders                              # alias subsidyProviders; per-chain providers the node advertises
-ocean-cli getSubsidyStatus 0xToken                         # alias subsidyStatus; your limits / remaining credit
+ocean-cli getNodeSubsidyProviders                          # alias subsidyProviders; per-chain providers the node advertises
+ocean-cli getNodeSubsidyStatus 0xToken                     # alias subsidyStatus; your limits / remaining credit
+ocean-cli getSubsidyStatus 0xProvider 0xToken              # alias getSubsidyProviderStatus; one provider by address
+ocean-cli getSubsidyStatus 0xProvider 0xToken 8453         # ...with an explicit chainId
 ```
 
-- `getSubsidyStatus` discovers the provider contract(s) from the node, then prints each one's kind, per-window buckets (limit / used / remaining / reset), claimable amount, contract balance and your eligibility. Flags: `--token --chainId --node --jobType --amount --subsidy 0xA[,0xB]`. `--node <url|peerId>` queries a specific Ocean Node (default: the active node) and uses that node's on-chain address for the `isNodeAllowed` check; adding `--jobType` and `--amount` also prints a subsidy quote (`{subsidy, bonus}`). `--subsidy` depends on the node's provider filter: with the filter **off** the node accepts any provider named per request, so the listed addresses are queried as-is (even when the node advertises none; the ones it does not advertise are flagged as not node defaults); with the filter **on** the list is narrowed to what the node advertises.
+- `getNodeSubsidyStatus` discovers the provider contract(s) from the node, then prints each one's kind, per-window buckets (limit / used / remaining / reset), claimable amount, contract balance and your eligibility. Flags: `--token --chainId --node --jobType --amount --subsidy 0xA[,0xB]`. `--node <url|peerId>` queries a specific Ocean Node (default: the active node) and uses that node's on-chain address for the `isNodeAllowed` check; adding `--jobType` and `--amount` also prints a subsidy quote (`{subsidy, bonus}`). `--subsidy` depends on the node's provider filter: with the filter **off** the node accepts any provider named per request, so the listed addresses are queried as-is (even when the node advertises none; the ones it does not advertise are flagged as not node defaults); with the filter **on** the list is narrowed to what the node advertises.
+- `getSubsidyStatus <subsidyProviderAddress> <tokenAddress> [chainId]` (alias `getSubsidyProviderStatus`) reports on **one** provider contract you name directly — the same report (kind, buckets, claimable amount, balance, eligibility, rolling-window / one-time detail) as `getNodeSubsidyStatus` prints per provider, but independent of the node's advertised list. The chain is resolved as `--chainId` (or the `[chainId]` positional) → the chain your **saved** subsidy providers (`addSubsidyProvider` / `listSubsidyProviders`) record that provider on → error asking for a chainId. So for a provider you have saved you can omit the chain; for any other provider pass it explicitly. Node-free: no node is consulted to resolve the chain, only an RPC for that chain is needed. Optional `--node` supplies the node address for the `isNodeAllowed` line, and `--jobType` + `--amount` add a quote (needs a node address).
 - `startCompute`, `startService` and `extendService` take `--subsidyProviders <list>`: omit for the node's defaults, `none` (or empty) to claim with **no** subsidy, or `0xA,0xB` to claim against exactly those contracts. `startFreeCompute` ignores it (a free job does no escrow claim).
 - **Zero-deposit paid compute.** Before a paid `startCompute` the CLI asks the subsidy providers how much of the job they would **pre-fund** at lock time and deposits only your share; the payment prompt shows the total cost and what you pay. A fully sponsored job needs no payment tokens **for the compute lock** — only gas for a single `authorize` transaction, which lets the node create the lock (with a ceiling of `0`, i.e. the lock can never take your own funds). Refund-only providers pre-fund nothing, so you still front the full cost and are reimbursed at claim. Sponsorship and that ceiling cover the compute lock only: each DID-based dataset or algorithm is still ordered on its own chain before the job starts, which can cost a datatoken and/or provider fees (plus gas) that no subsidy covers. The quote is advisory: if a provider's budget runs out before the node creates the lock, the node rejects the job and nothing is locked or deposited for it, but orders already placed for its assets are not reversed. `startService` and `extendService` apply the same rule to the service lock.
+
+**Saved subsidy providers.** You can keep a per-chain list of subsidy-provider contracts in the [configuration file](#configuration) so paid jobs use them without a flag each time. These commands are node-free and need no RPC (the `chainId` is an explicit argument), so they work on a fresh install:
+
+```bash
+ocean-cli addSubsidyProvider 8453 0xProvider OPF subsidy   # alias addSubsidy; enabled by default, optional description
+ocean-cli listSubsidyProviders [8453]                      # alias listSubsidy; all chains, or one
+ocean-cli toggleSubsidyProvider 8453 1 off                 # alias toggleSubsidy; enable/disable (omit on|off to flip)
+ocean-cli removeSubsidyProvider 8453 1                      # alias removeSubsidy; by per-chain number or by address
+```
+
+When `startCompute`, `startService` or `extendService` run with **no** `--subsidyProviders` flag, your **enabled** saved providers for the payment chain are merged with the node's advertised providers (`node advertised ∪ your enabled saved`) and used for the job; a note names any that were added. If the node runs a provider filter, saved providers it does not advertise are dropped with a note rather than rejected. Passing `--subsidyProviders` (including `none`) overrides the saved list entirely. Numbers are per-chain positions and shift after a removal; a newly added provider is enabled, and re-adding one never silently re-enables a disabled entry or erases its description (only `toggleSubsidyProvider` changes the flag). Saved entries are **not** checked on-chain when saved — the node validates them at job time. This is distinct from `getNodeSubsidyProviders`, which shows what the **node** advertises, not your saved list.
 
 ### Access lists
 
@@ -387,7 +462,7 @@ ocean-cli mintOcean [--token 0xOcean] [--chainId 8996]     # mint test Ocean tok
 
 ## Command reference
 
-53 commands, as registered in `src/cli.ts`. `<x>` is required, `[x]` optional. A named option **overrides** its positional when both are passed. Every positional that has a matching named option is declared `[x]`, so it can be supplied **either** positionally **or** by its option alone (the command itself errors if a needed value is missing from both). The remaining `<x>` positionals have no named-option equivalent and must be given positionally — these are `setNodeEnv`, `downloadJobResults`, `restartService`, and the bucket commands (`addFileToBucket`, `listFilesInBucket`, `getFileObject`, `deleteFile`). Commands with no Options entry are positional-only. `<command> --help` is authoritative.
+63 commands, as registered in `src/cli.ts`. `<x>` is required, `[x]` optional. A named option **overrides** its positional when both are passed. Every positional that has a matching named option is declared `[x]`, so it can be supplied **either** positionally **or** by its option alone (the command itself errors if a needed value is missing from both). The remaining `<x>` positionals have no named-option equivalent and must be given positionally — these are `setNodeEnv`, `downloadJobResults`, `restartService`, and the bucket commands (`addFileToBucket`, `listFilesInBucket`, `getFileObject`, `deleteFile`). Commands with no Options entry are positional-only. `<command> --help` is authoritative.
 
 | Command | Aliases | Arguments | Options |
 | --- | --- | --- | --- |
@@ -400,6 +475,12 @@ ocean-cli mintOcean [--token 0xOcean] [--chainId 8996]     # mint test Ocean tok
 | `listChains` | `getRpcs`, `chains` | | |
 | `setChain` | `useChain` | `[chainId]` | `-c, --chainId` |
 | `getChain` | `currentChain` | | |
+| `getConfig` | `showConfig` | `[key]` | `-k, --key` |
+| `setConfig` | | `[key] [value...]` | `-k, --key`, `-v, --value` |
+| `unsetConfig` | | `[key]` | `-k, --key` |
+| `addFavouriteNode` | `addFavoriteNode` | `[node] [description...]` | `-n, --node`, `-d, --description` |
+| `listFavouriteNodes` | `listFavoriteNodes`, `favourites`, `favorites` | | |
+| `removeFavouriteNode` | `removeFavoriteNode` | `[node]` | `-n, --node` |
 | `getDDO` | | `[did]` | `-d, --did` |
 | `publish` | | `[file]` | `-f, --file`, `-e, --encrypt [bool]` (default true) |
 | `publishAlgo` | | `[file]` | `-f, --file`, `-e, --encrypt [bool]` |
@@ -431,8 +512,13 @@ ocean-cli mintOcean [--token 0xOcean] [--chainId 8996]     # mint test Ocean tok
 | `authorizeEscrow` | | `[token] [payee] [maxLockedAmount] [maxLockSeconds] [maxLockCounts]` | `-t, --token`, `-p, --payee`, `-m, --maxLockedAmount`, `-s, --maxLockSeconds`, `-c, --maxLockCounts`, `-e, --expiry`, `--chainId` |
 | `getAuthorizationsEscrow` | | `[token] [payee]` | `-t, --token`, `-p, --payee`, `--chainId` |
 | `getEscrowInfo` | `escrowInfo` | `[token]` | `-t, --token`, `--chainId` |
-| `getSubsidyProviders` | `subsidyProviders` | | `--chainId` |
-| `getSubsidyStatus` | `subsidyStatus` | `[token]` | `-t, --token`, `--chainId`, `--node`, `--jobType`, `--amount`, `--subsidy` |
+| `getNodeSubsidyProviders` | `subsidyProviders` | | `--chainId` |
+| `getNodeSubsidyStatus` | `subsidyStatus` | `[token]` | `-t, --token`, `--chainId`, `--node`, `--jobType`, `--amount`, `--subsidy` |
+| `getSubsidyStatus` | `getSubsidyProviderStatus` | `<subsidyProviderAddress> <tokenAddress> [chainId]` | `--chainId`, `--node`, `--jobType`, `--amount` |
+| `addSubsidyProvider` | `addSubsidy` | `[chainId] [address] [description...]` | `-c, --chainId`, `-a, --address`, `-d, --description` |
+| `listSubsidyProviders` | `listSubsidy` | `[chainId]` | `-c, --chainId` |
+| `removeSubsidyProvider` | `removeSubsidy` | `[chainId] [ref]` | `-c, --chainId`, `-r, --ref` |
+| `toggleSubsidyProvider` | `toggleSubsidy` | `[chainId] [ref] [state]` | `-c, --chainId`, `-r, --ref`, `-s, --state` |
 | `createAccessList` | | `[name] [symbol] [initialUsers] [transferable]` | `-n, --name`, `-s, --symbol`, `-u, --initial-users`, `-t, --transferable`, `--chainId` |
 | `addToAccessList` | | `[address] [users]` | `-a, --address`, `-u, --users`, `--chainId` |
 | `checkAccessList` | | `[address] [users]` | `-a, --address`, `-u, --users`, `--chainId` |
@@ -471,6 +557,8 @@ The [`metadata/`](metadata/) folder holds ready-to-publish DDOs. They default to
 - **Asset not indexed yet**: the CLI waits up to `INDEXING_MAX_RETRIES` x `INDEXING_RETRY_INTERVAL` (default 120 x 4 s). Raise them for slow chains.
 - **Script hangs after the command**: set `AVOID_LOOP_RUN=true` for one-shot runs.
 - **`mintOcean` asks for `--token`**: the chain has no bundled Ocean token address.
+- **A saved setting seems ignored**: an environment variable with the same meaning is set and takes precedence for this run. Run `getConfig` — it shows the source (`env` / `file` / `default`) of every value, and flags a file value that the env overrides.
+- **Upgrading from `RPC_CONFIG_FILE` / `rpc.json`**: `RPC_CONFIG_FILE` is no longer supported (a one-line warning prints if it is still set). Chains in the default `~/.ocean/cli/rpc.json` are imported automatically into `config.json` on first run (the old file is left in place, no longer used). A file at a **custom** `RPC_CONFIG_FILE` path is not imported — re-add its chains with `addChain`, or convert it to the new `{ "version": 1, "rpc": { ... } }` shape and point `OCEANCLI_CONFIG_PATH` at it.
 
 ## Development
 
